@@ -1,18 +1,12 @@
-import { ListEntryCard, ListEntryGrid } from "@/app/components/list-entry-card";
+import { ListEntryGrid } from "@/app/components/list-entry-card";
+import { ProjectCard } from "@/app/components/project-card";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
 export function ProjectList({ projects }: { projects: ProjectSummary[] }) {
   return (
     <ListEntryGrid>
       {projects.map((project) => (
-        <ListEntryCard
-          key={project.id}
-          href={`/projekti/${project.id}`}
-          primaryLabel="Nosaukums"
-          primaryValue={project.name}
-          secondaryLabel="Adrese"
-          secondaryValue={project.address}
-        />
+        <ProjectCard key={project.id} project={project} />
       ))}
     </ListEntryGrid>
   );

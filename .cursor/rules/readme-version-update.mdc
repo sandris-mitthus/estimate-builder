@@ -1,42 +1,49 @@
 ---
-description: When updating README.md, bump version and append Changelog since last release
+description: When the user says "README update", bump patch version and sync README.md changelog
 globs: README.md,package.json
 alwaysApply: false
 ---
 
-# README version & changelog update
+# README update
 
-When the user asks to **update** `README.md` (e.g. `@README.md update`), or before a **release commit**, treat it as a **release notes pass**, not prose-only edits.
+When the user asks for a **README update** (e.g. `README update`, `@README.md update`, `update readme`), run a **release notes pass** — not typo-only edits unless they say so.
+
+## Version bump (default: patch +0.0.1)
+
+| User says | Bump | Example |
+|-----------|------|---------|
+| `README update` (default) | **Patch** — last segment +1 | `1.1.0` → `1.1.1` |
+| Explicit **minor** / **0.1 step** / `v1.2.0` | **Minor** — middle segment +1, patch → 0 | `1.1.0` → `1.2.0` |
+| Explicit **major** | **Major** — first segment +1, rest → 0 | `1.1.0` → `2.0.0` |
+| Typo/docs only, **no release** | Skip bump | — |
+
+**Do not** use a minor bump unless the user explicitly asks for a 0.1+ step or names the target minor/major version.
 
 ## Required steps (in order)
 
-1. **Find the last released version** — read `package.json` `"version"` and the newest `### vX.Y.Z` block under `## Changelog`.
-2. **Collect changes since that version** — use `git log`, `git diff`, and uncommitted work. Group by theme (features, fixes, UI).
-3. **Bump version** in `package.json` (patch by default: `1.0.0` → `1.0.1`). Use minor/major only if the user explicitly wants it.
-4. **Update README header** — `**Current version:** \`X.Y.Z\`` (line near the top).
-5. **Update `## Changelog`** (newest first):
-   - Move everything under `### Unreleased` into the new `### vX.Y.Z` section.
-   - Add bullet points for **all** improvements since the previous changelog version.
-   - Use a short **bold theme** line when helpful (e.g. `**Estimate table & DnD**`).
-   - Leave `### Unreleased` empty or with `- (none)` until the next cycle.
-6. **Sync other README sections** if behavior changed (Features, Project structure, Getting started).
-7. **GitHub** — if the user then asks to commit/push, follow `.cursor/rules/github-version-commit.mdc` (message must end with `. vX.Y.Z`). Do not commit or push unless explicitly asked.
+1. **Last released version** — read `package.json` `"version"` and newest `### vX.Y.Z` under `## Changelog`.
+2. **Changes since that version** — `git log`, `git diff`, uncommitted work. Group by theme (features, fixes, docs, infra).
+3. **Bump** `package.json` per table above.
+4. **README header** — `**Current version:** \`X.Y.Z\``.
+5. **`## Changelog`** (newest first):
+   - Move `### Unreleased` bullets into new `### vX.Y.Z`.
+   - Document **all** shippable changes since the previous changelog version.
+   - Optional **bold theme** line per section.
+   - Reset `### Unreleased` to `- (none)`.
+6. **Sync README body** if behavior changed: Features, Environment, Project structure, Roadmap.
+7. **Commit/push** — only if the user explicitly asks; then follow `.cursor/rules/github-version-commit.mdc` (message ends with `. vX.Y.Z`).
 
 ## Changelog entry format
 
 ```markdown
-### v1.0.1
+### v1.1.1
 
 **Short theme (optional)**
 
-- Concrete improvement — route or component when relevant
-- Another change users care about
+- Concrete improvement — route, script, or migration when relevant
 ```
 
-## Versioning & commits
+## When to skip the bump
 
-Commit messages for these releases end with the version tag: `Short description. v1.0.1`
-
-See **`.cursor/rules/github-version-commit.mdc`** for the full commit/push checklist.
-
-Only bump `package.json` when there are **real changes** to document since the last changelog version. If the user only wants typo fixes with no release, skip the bump and say so.
+- User only wants spelling/grammar with **no release**
+- Nothing changed since the last `### vX.Y.Z` entry (say so; do not invent a version)

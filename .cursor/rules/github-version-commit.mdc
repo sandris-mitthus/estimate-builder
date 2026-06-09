@@ -9,7 +9,7 @@ When the user asks to **commit**, **push**, **update GitHub**, or similar, every
 
 ## Before commit
 
-1. **Shippable work** (features, fixes, migrations, notable UI) → run the **README release pass** first (`.cursor/rules/readme-version-update.mdc`):
+1. **Shippable work** (features, fixes, migrations, notable UI) → run **README update** first (`.cursor/rules/readme-version-update.mdc`; default patch +0.0.1):
    - bump `package.json` `"version"`
    - add `### vX.Y.Z` under `## Changelog`
    - sync Features / Project structure if behavior changed

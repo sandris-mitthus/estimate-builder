@@ -16,8 +16,12 @@ function loadEnv(file) {
   return env;
 }
 
-function getConnectionString(env) {
-  if (env.DATABASE_URL) return env.DATABASE_URL;
+function getProjectRef(url) {
+  return url.replace("https://", "").replace(".supabase.co", "");
+}
+
+function getConnectionCandidates(env) {
+  if (env.DATABASE_URL) return [env.DATABASE_URL];
 
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
   const password = env.SUPABASE_DB_PASSWORD;
@@ -30,8 +34,139 @@ function getConnectionString(env) {
     process.exit(1);
   }
 
-  const projectRef = url.replace("https://", "").replace(".supabase.co", "");
-  return `postgresql://postgres:${encodeURIComponent(password)}@db.${projectRef}.supabase.co:5432/postgres`;
+  const projectRef = getProjectRef(url);
+  const encodedPassword = encodeURIComponent(password);
+  const region = env.SUPABASE_DB_REGION || "eu-west-1";
+  const poolerHost = `aws-0-${region}.pooler.supabase.com`;
+  const poolerUser = `postgres.${projectRef}`;
+
+  return [
+    `postgresql://${poolerUser}:${encodedPassword}@${poolerHost}:5432/postgres`,
+    `postgresql://${poolerUser}:${encodedPassword}@${poolerHost}:6543/postgres`,
+    `postgresql://postgres:${encodedPassword}@db.${projectRef}.supabase.co:5432/postgres`,
+  ];
+}
+
+async function ensureMigrationTable(client) {
+  await client.query(`
+    create table if not exists public.schema_migrations (
+      filename text primary key,
+      applied_at timestamptz not null default now()
+    );
+
+    alter table public.schema_migrations enable row level security;
+
+    revoke all on table public.schema_migrations from anon, authenticated;
+  `);
+
+  await client.query(`
+    drop policy if exists "schema_migrations deny clients" on public.schema_migrations;
+  `);
+
+  await client.query(`
+    create policy "schema_migrations deny clients"
+    on public.schema_migrations
+    as restrictive
+    for all
+    to anon, authenticated
+    using (false)
+    with check (false);
+  `);
+}
+
+async function tableExists(client, tableName) {
+  const { rows } = await client.query(
+    `
+      select exists (
+        select 1
+        from information_schema.tables
+        where table_schema = 'public' and table_name = $1
+      ) as exists
+    `,
+    [tableName],
+  );
+
+  return rows[0]?.exists === true;
+}
+
+async function columnExists(client, tableName, columnName) {
+  const { rows } = await client.query(
+    `
+      select exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = $1
+          and column_name = $2
+      ) as exists
+    `,
+    [tableName, columnName],
+  );
+
+  return rows[0]?.exists === true;
+}
+
+async function bucketExists(client, bucketId) {
+  const { rows } = await client.query(
+    `select exists (select 1 from storage.buckets where id = $1) as exists`,
+    [bucketId],
+  );
+
+  return rows[0]?.exists === true;
+}
+
+async function markMigrationApplied(client, filename) {
+  await client.query(
+    `
+      insert into public.schema_migrations (filename)
+      values ($1)
+      on conflict (filename) do nothing
+    `,
+    [filename],
+  );
+}
+
+async function bootstrapExistingMigrations(client, files) {
+  const { rows } = await client.query(
+    `select filename from public.schema_migrations`,
+  );
+  if (rows.length > 0) {
+    return;
+  }
+
+  const legacy = [];
+
+  if (await tableExists(client, "projects")) {
+    legacy.push("001_projects_and_estimates.sql");
+  }
+
+  if (legacy.includes("001_projects_and_estimates.sql")) {
+    legacy.push("002_seed_projects.sql");
+  }
+
+  if (await tableExists(client, "company_settings")) {
+    legacy.push("003_company_settings.sql");
+  }
+
+  if (await columnExists(client, "company_settings", "logo_url")) {
+    legacy.push("004_company_logo.sql");
+  } else if (await bucketExists(client, "company-assets")) {
+    legacy.push("004_company_logo.sql");
+  }
+
+  for (const filename of legacy) {
+    if (!files.includes(filename)) continue;
+    await markMigrationApplied(client, filename);
+    console.log(`Bootstrap — marked ${filename} as already applied`);
+  }
+}
+
+async function getAppliedMigrations(client) {
+  const { rows } = await client.query(
+    `select filename from public.schema_migrations order by filename`,
+  );
+
+  return new Set(rows.map((row) => row.filename));
 }
 
 const env = loadEnv(".env.local");
@@ -45,23 +180,58 @@ if (files.length === 0) {
   process.exit(0);
 }
 
-const client = new Client({
-  connectionString: getConnectionString(env),
-  ssl: { rejectUnauthorized: false },
-});
+const candidates = getConnectionCandidates(env);
+let client;
+let connectedVia = "";
+
+for (const connectionString of candidates) {
+  const attempt = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+  });
+
+  try {
+    await attempt.connect();
+    client = attempt;
+    connectedVia = connectionString.replace(/:([^:@/]+)@/, ":***@");
+    break;
+  } catch (error) {
+    console.log(`Connect skip: ${error.message}`);
+    await attempt.end().catch(() => {});
+  }
+}
+
+if (!client) {
+  console.error(
+    "Could not connect to Supabase Postgres. Check SUPABASE_DB_PASSWORD, SUPABASE_DB_REGION, or set DATABASE_URL from Dashboard → Database → Connection string.",
+  );
+  process.exit(1);
+}
 
 try {
-  await client.connect();
-  console.log("Connected to Supabase Postgres");
+  console.log("Connected to Supabase Postgres via", connectedVia);
 
-  for (const file of files) {
+  await ensureMigrationTable(client);
+  await bootstrapExistingMigrations(client, files);
+
+  const applied = await getAppliedMigrations(client);
+  const pending = files.filter((file) => !applied.has(file));
+
+  if (pending.length === 0) {
+    console.log("No pending migrations.");
+    process.exit(0);
+  }
+
+  for (const file of pending) {
     const sql = readFileSync(join(migrationsDir, file), "utf8");
     console.log(`Applying ${file}...`);
     await client.query(sql);
+    await markMigrationApplied(client, file);
     console.log(`OK — ${file}`);
   }
 
-  console.log("All migrations applied.");
+  console.log(`Applied ${pending.length} migration(s).`);
 } catch (error) {
   console.error("Migration failed:", error.message);
   process.exit(1);

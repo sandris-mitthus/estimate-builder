@@ -1,0 +1,60 @@
+---
+description: Server action atbildes — uznirstošs toast ar hover aizturēšanu
+globs: app/**/*.tsx
+alwaysApply: false
+---
+
+# Atbilžu toast (FeedbackToast)
+
+Visas **server action** un saglabāšanas atbildes (veiksme, kļūda) rādi ar **`useFeedbackToast()`**, nevis iebūvētu tekstu formā.
+
+## Komponenti
+
+| Kas | Kur |
+|-----|-----|
+| Provider | `FeedbackToastProvider` — `app/(protected)/layout.tsx` |
+| Hook | `useFeedbackToast()` → `showFeedback`, `clearFeedback` |
+| UI | `FeedbackToast` — `app/components/feedback-toast.tsx` |
+
+## Uzvedība
+
+| Situācija | Rezultāts |
+|-----------|-----------|
+| Atbilde parādās | Toast apakšā centrā |
+| Peles kursors **nav** uz toast | Auto-aizveras pēc ~5 s |
+| Kursors **uz** toast | Neaizveras (taimeris apstājas) |
+| Kursors **noiet** no toast | Toast uzreiz pazūd |
+
+## Piemērs
+
+```tsx
+"use client";
+
+import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+
+export function MyForm() {
+  const { showFeedback, clearFeedback } = useFeedbackToast();
+
+  async function handleSave() {
+    clearFeedback();
+    const result = await saveAction(data);
+
+    if (result.ok) {
+      showFeedback({ type: "success", text: "Saglabāts." });
+      return;
+    }
+
+    showFeedback({ type: "error", text: result.error });
+  }
+}
+```
+
+## Ko nedarīt
+
+- ❌ `<p role="status">` blakus pogai saglabāšanas atbildei
+- ❌ `alert()` vai `window.confirm()` operāciju rezultātiem
+- ❌ Atsevišķs toast katrā lapā — izmanto provideri un hook
+
+## Izņēmumi
+
+- Kļūdas **modāla formā** (piem. `AppModal` validācija), kam lietotājs vēl rediģē — var palikt inline `role="alert"` formā.

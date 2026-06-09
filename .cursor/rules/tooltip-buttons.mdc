@@ -1,0 +1,54 @@
+---
+description: Tooltip komponente pogām un ikonām (melns fons, balts teksts)
+globs: app/components/**/*.tsx
+alwaysApply: false
+---
+
+# Tooltip — nevis title
+
+Visur, kur vajag īsu paskaidrojumu virs elementa (īpaši **ikonu pogām**), izmanto **`Tooltip`** (`app/components/tooltip.tsx`).
+
+## Obligāti
+
+- **Visām ikonu pogām** jābūt tooltip ar tekstu (poga bez teksta blakus — tikai ikona + tooltip).
+- **`title` atribūtu neizmanto** — tas rāda pārlūka noklusējuma tooltip, ne projekta stilu.
+
+## Stils (nemainīt)
+
+- Fons: **melns** (`bg-black`)
+- Teksts: **balts** (`text-white`)
+- Parādās hover / focus uz ietinēja
+
+## Komponenti
+
+| Kas | Kur |
+|-----|-----|
+| `Tooltip` | Vispārīgs ietinējs ar `label` |
+| `IconActionButton` | Ikona + tooltip + `aria-label` |
+
+## Piemērs
+
+```tsx
+import { IconActionButton } from "@/app/components/icon-action-button";
+
+<IconActionButton
+  label="Labot"
+  icon="fas fa-pen"
+  variant="edit"
+  onClick={handleEdit}
+/>
+```
+
+```tsx
+import { Tooltip } from "@/app/components/tooltip";
+
+<Tooltip label="Saglabāt">
+  <button type="button" aria-label="Saglabāt">…</button>
+</Tooltip>
+```
+
+## Ko nedarīt
+
+- ❌ `<button title="Edit">` — izmanto `Tooltip`
+- ❌ Ikona bez tooltip un bez `aria-label`
+- ❌ Jauns tooltip stils katrā komponentē — paplašini `Tooltip` / `IconActionButton`

@@ -1,0 +1,63 @@
+---
+description: Modāļi ar apstiprinājumu, aizverot ārpus modāla (AppModal)
+globs: app/components/**/*.tsx
+alwaysApply: false
+---
+
+# Modāļi — apstiprinājums pirms aizvēršanas
+
+Visiem jaunajiem modāliem izmanto **`AppModal`** (`app/components/app-modal.tsx`). Neveido atsevišķus modāļus bez apstiprinājuma. **`AppModal` izmanto `fixed` overlay (ne `<dialog showModal>`)** — lai Google Places `.pac-container` (z-index virs modāla) darbotos pareizi.
+
+## Uzvedība
+
+| Darbība | Rezultāts |
+|---------|-----------|
+| Klikšķis ārpus modāla (backdrop / tukšā vieta) | Parādās apstiprinājuma modāls |
+| **Escape** | Galvenais modāls aizveras **uzreiz** (bez apstiprinājuma) |
+| **×** poga | Galvenais modāls aizveras **uzreiz** (bez apstiprinājuma) |
+| Apstiprinājumā **Izbeigt** | Abi modāli aizveras, `onOpenChange(false)` |
+| Apstiprinājumā **Turpināt** | Apstiprinājums pazūd, galvenais modāls paliek |
+| Apstiprinājumā Escape / ārpus klikšķis | Kā **Turpināt** |
+| `blocking={true}` (piem. saglabāšana) | Aizvēršana bloķēta |
+
+## Teksti (latviski, nemainīt)
+
+- Virsraksts: **Izbeigt darbību?**
+- Teksts: **Vai vēlaties izbeigt šo darbību?**
+- Pogas: **Turpināt** / **Izbeigt**
+
+## Piemērs
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { AppModal } from "@/app/components/app-modal";
+
+export function MyFeatureButton() {
+  const [open, setOpen] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>Atvērt</button>
+      <AppModal
+        open={open}
+        onOpenChange={setOpen}
+        title="Virsraksts"
+        description="Apraksts (neobligāts)"
+        blocking={isPending}
+      >
+        {/* forma vai saturs */}
+      </AppModal>
+    </>
+  );
+}
+```
+
+## Ko nedarīt
+
+- ❌ Tieša `<dialog>` ar `onClose={() => setOpen(false)}` bez apstiprinājuma
+- ❌ `window.confirm()` — izmanto iebūvēto apstiprinājuma modālu
+- ❌ Apstiprinājums uz Escape vai × — tikai backdrop klikšķim
+- ❌ Atkārtot apstiprinājuma loģiku katrā komponentē — paplašini `AppModal`, ja vajag jaunu variantu

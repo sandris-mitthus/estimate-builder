@@ -4,6 +4,20 @@ export type ProjectSummary = {
   id: string;
   name: string;
   address: string;
+  phone: string;
+  email: string;
+};
+
+export type CreateProjectInput = {
+  clientName: string;
+  phone: string;
+  email: string;
+  address: string;
+  phoneCallingCode?: string;
+};
+
+export type UpdateProjectInput = CreateProjectInput & {
+  id: string;
 };
 
 export type EstimateMeta = {

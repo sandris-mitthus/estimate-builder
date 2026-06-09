@@ -14,6 +14,21 @@ body {
   overflow-x: hidden;
 }
 
+button:not(:disabled),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[type="reset"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled {
+  cursor: not-allowed;
+}
+
 .page {
   max-width: 1480px;
   margin: 0 auto;
@@ -24,4 +39,34 @@ body {
   .page {
     padding: 2rem 1.5rem 3rem;
   }
+}
+
+/* Closed native dialogs stay hidden even with layout utility classes */
+dialog:not([open]) {
+  display: none !important;
+}
+
+/* Invalid form fields */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus {
+  border-color: #f87171;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.1);
+}
+
+/* Google Places dropdown above modals */
+.pac-container {
+  z-index: 10000 !important;
+  margin-top: 4px;
+  border-radius: 0.5rem;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
 }
