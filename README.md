@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices, volume totals, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, blanks, position prices, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.1.6` (see [Changelog](#changelog))
+**Current version:** `1.1.7` (see [Changelog](#changelog))
 
 ---
 
@@ -30,9 +30,9 @@ English routes, Latvian labels:
 | Uzstādījumi | `/settings` |
 
 - **Projekti** — project cards (client name, email, phone, address); **Jauns projekts** modal creates project + empty estimate in Supabase; card actions **Labot** (edit contact modal), **Dzēst** (confirm + delete from DB), Apstiprināts / Noraidīts (placeholders) with colored hover icon tooltips
-- **Jauns projekts / Labot** — shared `ProjectFormModal` with client name, phone, email, address; phone country code from IP on create, parsed from stored number on edit; email/phone validation; optional **Google Places** address autocomplete (server proxy, map preview when embed key allows)
+- **Jauns projekts / Labot** — shared `ProjectFormModal` with client name, phone, email, address; phone country code from IP on create, parsed from stored number on edit; email/phone validation; **Google Places** autocomplete with map preview (including pre-filled address on edit)
 - **Ēku moduļi**, **Sagataves**, **Cenu pozicijas** — placeholder catalog lists
-- **Lietotāji** — real users from Supabase Auth (name, email, Google avatar)
+- **Lietotāji** — Supabase Auth users (name, email, Google avatar); **Uzaicināt** modal sends email invite via admin API (client + server validation)
 - **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo)
 
 ### Company settings (`/settings`)
@@ -42,7 +42,7 @@ English routes, Latvian labels:
 - Info phone and email
 - Currency select (EUR, USD, GBP, PLN, SEK, NOK, DKK)
 - **Logo upload** — drag-and-drop or file picker → Supabase Storage (`company-assets` bucket)
-- Live preview of company block on the right
+- Live preview of company block on the right (wider sidebar column)
 - Persisted in `public.company_settings` (singleton row)
 
 ### Estimate editor (`/[id]`)
@@ -52,7 +52,7 @@ English routes, Latvian labels:
 - Drag-and-drop reorder for categories, subcategories, and items (cross-subcategory / cross-category item moves)
 - Drop indicator: thick horizontal line on hover (no slide animation)
 - Sticky table header, footer totals row
-- Editable document meta: client, object, author, date, estimate number
+- Editable document meta: client, object, author, date, **tāmes termiņš**, estimate number; header **Kopā** shows grand total
 
 ### Data
 
@@ -89,6 +89,8 @@ npm run dev
 ```
 
 Open [http://localhost:3100](http://localhost:3100) — project list at `/` (login gate if Supabase auth is configured).
+
+**Local dev tip:** Multiple Supabase apps on `localhost` share cookies and can trigger HTTP **431** (headers too large). Use `127.0.0.1` for one app, or clear `sb-*` cookies; `dev`/`start` scripts raise the header limit and middleware prunes foreign Supabase cookies.
 
 ### Other scripts
 
@@ -151,7 +153,7 @@ app/
 │   ├── modules/
 │   ├── blanks/
 │   ├── positions/
-│   ├── users/
+│   ├── users/          # page + inviteUserAction
 │   └── settings/
 ├── api/
 │   ├── geo/calling-code/   # IP → phone country code
@@ -159,19 +161,19 @@ app/
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate table, nav, AppModal, ConfirmModal, ProjectFormModal, project cards, settings, tooltips, toasts)
+├── components/         # UI (estimate table, nav, AppModal, ConfirmModal, ProjectFormModal, InviteUserButton, project cards, settings, tooltips, toasts)
 ├── lib/
 │   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay
-│   ├── estimates/
+│   ├── estimates/      # calculate-totals, sample data, DnD reorder
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
 │   ├── google-maps/    # Places API server client
 │   ├── projects/
 │   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
-│   ├── users/          # Auth user list (admin API)
-│   ├── validation/     # email, phone
+│   ├── users/          # Auth user list + invite (admin API)
+│   ├── validation/     # email, phone (validateRequiredEmail)
 │   ├── security/       # safe redirect paths
-│   └── supabase/
+│   └── supabase/       # clients, update-session, storage-key cookie cleanup
 proxy.ts                # Supabase session refresh
 scripts/                # db:migrate (pending-only), db:test
 supabase/migrations/
@@ -184,7 +186,7 @@ supabase/migrations/
 
 - [ ] Persist estimate edits to `estimates` table (save API / server action)
 - [ ] CRUD for Ēku moduļi, Sagataves, Cenu pozicijas
-- [ ] User management beyond read-only list
+- [ ] User management beyond read-only list and email invite
 - [ ] Use company settings + logo on estimate PDF/header
 - [ ] Export estimate (PDF / Excel)
 
@@ -201,7 +203,7 @@ Semantic versioning in `package.json`. Each **release** commit:
 **Commit message format:**
 
 ```
-Short description of what shipped. v1.1.6
+Short description of what shipped. v1.1.7
 ```
 
 ### README update (Cursor)
@@ -228,6 +230,17 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.1.7
+
+**Users invite, estimate termiņš & local auth fixes**
+
+- **Lietotāji** — **Uzaicināt** button + modal; `inviteUserAction` / `inviteUserByEmail`; `validateRequiredEmail` on client and server
+- Estimate meta: editable **Tāmes termiņš** (`meta.deadline`); default +30 days on new project; header total label **Kopā**
+- **Labot projektu** — Google Maps embed for pre-filled address (debounced preview)
+- Settings preview sidebar widened (+15%)
+- Fix missing `calculate-totals.ts` module (build error)
+- Mitigate localhost **431** cookie bloat: larger HTTP header limit in `dev`/`start`; middleware purges foreign `sb-*` cookies (`storage-key.ts`)
 
 ### v1.1.6
 

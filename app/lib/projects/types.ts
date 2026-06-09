@@ -25,6 +25,7 @@ export type EstimateMeta = {
   project: string;
   author: string;
   date: string;
+  deadline: string;
   number: string;
 };
 

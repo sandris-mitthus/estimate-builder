@@ -1,3 +1,4 @@
+import { InviteUserButton } from "@/app/components/invite-user-button";
 import { ListEntryGrid } from "@/app/components/list-entry-card";
 import { SectionPage } from "@/app/components/section-page";
 import { UserListCard } from "@/app/components/user-list-card";
@@ -10,6 +11,7 @@ export default async function UsersPage() {
     <SectionPage
       title="Lietotāji"
       subtitle={`${users.length} lietotāji sistēmā`}
+      actions={<InviteUserButton />}
     >
       <ListEntryGrid>
         {users.map((user) => (

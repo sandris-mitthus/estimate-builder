@@ -43,10 +43,23 @@ export function AddressAutocompleteField({
   const invalid = Boolean(error);
 
   useEffect(() => {
-    if (!value.trim()) {
+    if (!embedConfigured) {
       setMapQuery(null);
+      return;
     }
-  }, [value]);
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setMapQuery(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setMapQuery(trimmed);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [value, embedConfigured]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -108,7 +121,6 @@ export function AddressAutocompleteField({
 
   function handleInputChange(nextValue: string) {
     onChange(nextValue);
-    setMapQuery(null);
 
     if (debounceRef.current) {
       window.clearTimeout(debounceRef.current);

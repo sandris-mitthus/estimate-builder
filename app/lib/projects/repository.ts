@@ -1,4 +1,4 @@
-import { createSampleCategories, SAMPLE_META } from "@/app/lib/estimates/sample-data";
+import { createSampleCategories, defaultEstimateDeadline, SAMPLE_META } from "@/app/lib/estimates/sample-data";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -62,6 +62,7 @@ function parseEstimateRow(row: EstimateRow | null, project: ProjectSummary): Pro
       ...SAMPLE_META,
       ...row.meta,
       project: row.meta?.project ?? project.address,
+      deadline: row.meta?.deadline ?? "",
     },
     categories: Array.isArray(row.categories) && row.categories.length > 0
       ? row.categories
@@ -182,6 +183,7 @@ export async function createProject(
     project: address,
     author,
     date: today,
+    deadline: defaultEstimateDeadline(today),
     number: "",
   };
 

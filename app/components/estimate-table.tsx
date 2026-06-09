@@ -28,6 +28,7 @@ import {
   multiplyBreakdown,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
+import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
   createCategory,
   createLineItem,
@@ -532,13 +533,6 @@ function CategoryBlock({
   );
 }
 
-function collectAllItems(categories: EstimateCategory[]): EstimateLineItem[] {
-  return categories.flatMap((category) => [
-    ...category.items,
-    ...category.subcategories.flatMap((sub) => sub.items),
-  ]);
-}
-
 function EstimateDndTable({
   categories,
   allDragIds,
@@ -770,23 +764,12 @@ export function EstimateTable({
     initialCategories,
   );
 
-  const totals = useMemo(() => {
-    const items = collectAllItems(categories);
-    let labor = 0;
-    let materials = 0;
-    let mechanisms = 0;
+  const totals = useMemo(
+    () => calculateEstimateTotals(categories),
+    [categories],
+  );
 
-    for (const item of items) {
-      const volume = multiplyBreakdown(item.quantity, item.unitPrice);
-      labor += volume.labor;
-      materials += volume.materials;
-      mechanisms += volume.mechanisms;
-    }
-
-    return { labor, materials, mechanisms, grand: labor + materials + mechanisms };
-  }, [categories]);
-
-  const positionCount = collectAllItems(categories).length;
+  const positionCount = collectEstimateLineItems(categories).length;
 
   const allDragIds = useMemo(
     () => collectAllDragIds(categories),
@@ -809,12 +792,24 @@ export function EstimateTable({
               className="mt-1 w-full border-0 bg-transparent text-xl font-semibold tracking-tight text-zinc-900 focus:outline-none"
             />
           </div>
-          <span className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-600">
-            {meta.number}
-          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {meta.number.trim() ? (
+              <span className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-600">
+                {meta.number}
+              </span>
+            ) : null}
+            <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                Kopā
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-white">
+                {formatMoney(totals.grand)}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 lg:grid-cols-5">
           <MetaField
             label="Klients"
             value={meta.client}
@@ -835,6 +830,12 @@ export function EstimateTable({
             type="date"
             value={meta.date}
             onChange={(date) => setMeta({ ...meta, date })}
+          />
+          <MetaField
+            label="Tāmes termiņš"
+            type="date"
+            value={meta.deadline}
+            onChange={(deadline) => setMeta({ ...meta, deadline })}
           />
         </div>
       </div>

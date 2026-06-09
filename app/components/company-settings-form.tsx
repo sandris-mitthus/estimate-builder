@@ -162,7 +162,7 @@ export function CompanySettingsForm({
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_386px] lg:items-start">
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title="Uzņēmums">

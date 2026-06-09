@@ -7,8 +7,18 @@ export const SAMPLE_META = {
   project: "Biroja telpu pārbūve — 248 m²",
   author: "Jānis Bērziņš",
   date: "2026-06-09",
+  deadline: "2026-07-09",
   number: "T-2026/014",
 };
+
+export function defaultEstimateDeadline(
+  fromDate = new Date().toISOString().slice(0, 10),
+  validityDays = 30,
+): string {
+  const date = new Date(`${fromDate}T12:00:00`);
+  date.setDate(date.getDate() + validityDays);
+  return date.toISOString().slice(0, 10);
+}
 
 export function createSampleCategories(): EstimateCategory[] {
   return [

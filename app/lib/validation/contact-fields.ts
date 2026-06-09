@@ -18,6 +18,17 @@ export function validateEmail(value: string): string | null {
   return null;
 }
 
+export function validateRequiredEmail(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "Ievadi e-pasta adresi.";
+  }
+  if (!isValidEmail(trimmed)) {
+    return "Ievadi derīgu e-pasta adresi.";
+  }
+  return null;
+}
+
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
