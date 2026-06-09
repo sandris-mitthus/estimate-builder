@@ -1,0 +1,49 @@
+---
+description: GitHub commit/push must use version-tagged messages matching package.json
+alwaysApply: true
+---
+
+# GitHub commits — version tag required
+
+When the user asks to **commit**, **push**, **update GitHub**, or similar, every release commit must follow the project convention documented in `README.md` → **Versioning & commits**.
+
+## Before commit
+
+1. **Shippable work** (features, fixes, migrations, notable UI) → run the **README release pass** first (`.cursor/rules/readme-version-update.mdc`):
+   - bump `package.json` `"version"`
+   - add `### vX.Y.Z` under `## Changelog`
+   - sync Features / Project structure if behavior changed
+2. Read the final version from `package.json` — that is the tag for the commit message.
+
+Skip README bump only when the user explicitly wants a typo/docs-only change **with no release**.
+
+## Commit message format (required)
+
+```
+Short description of the change. vX.Y.Z
+```
+
+- **One sentence** — what shipped and why it matters (not a file list).
+- **Must end** with `. vX.Y.Z` (period, space, `v`, semver from `package.json`).
+- Version in the message **must match** `package.json` and the newest README changelog section.
+
+### Examples
+
+```
+Project list and estimate editor with drag-and-drop reorder. v1.0.0
+```
+
+```
+Fix subcategory border and drop indicator on cross-category moves. v1.0.1
+```
+
+### Do not
+
+- Push without the version suffix (`Fix lint error.` ❌)
+- Use a version tag that does not match `package.json` / Changelog
+- Amend or force-push unless the user explicitly asks
+
+## Push
+
+- Include `README.md` and `package.json` in the same commit when they were bumped for this release.
+- Do not push unless the user explicitly asks.

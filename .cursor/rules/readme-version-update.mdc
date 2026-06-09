@@ -1,0 +1,42 @@
+---
+description: When updating README.md, bump version and append Changelog since last release
+globs: README.md,package.json
+alwaysApply: false
+---
+
+# README version & changelog update
+
+When the user asks to **update** `README.md` (e.g. `@README.md update`), or before a **release commit**, treat it as a **release notes pass**, not prose-only edits.
+
+## Required steps (in order)
+
+1. **Find the last released version** — read `package.json` `"version"` and the newest `### vX.Y.Z` block under `## Changelog`.
+2. **Collect changes since that version** — use `git log`, `git diff`, and uncommitted work. Group by theme (features, fixes, UI).
+3. **Bump version** in `package.json` (patch by default: `1.0.0` → `1.0.1`). Use minor/major only if the user explicitly wants it.
+4. **Update README header** — `**Current version:** \`X.Y.Z\`` (line near the top).
+5. **Update `## Changelog`** (newest first):
+   - Move everything under `### Unreleased` into the new `### vX.Y.Z` section.
+   - Add bullet points for **all** improvements since the previous changelog version.
+   - Use a short **bold theme** line when helpful (e.g. `**Estimate table & DnD**`).
+   - Leave `### Unreleased` empty or with `- (none)` until the next cycle.
+6. **Sync other README sections** if behavior changed (Features, Project structure, Getting started).
+7. **GitHub** — if the user then asks to commit/push, follow `.cursor/rules/github-version-commit.mdc` (message must end with `. vX.Y.Z`). Do not commit or push unless explicitly asked.
+
+## Changelog entry format
+
+```markdown
+### v1.0.1
+
+**Short theme (optional)**
+
+- Concrete improvement — route or component when relevant
+- Another change users care about
+```
+
+## Versioning & commits
+
+Commit messages for these releases end with the version tag: `Short description. v1.0.1`
+
+See **`.cursor/rules/github-version-commit.mdc`** for the full commit/push checklist.
+
+Only bump `package.json` when there are **real changes** to document since the last changelog version. If the user only wants typo fixes with no release, skip the bump and say so.
