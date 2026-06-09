@@ -62,6 +62,7 @@ import type {
   EstimateSubcategory,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
+import type { EstimateMeta } from "@/app/lib/projects/types";
 
 const FULL_COL_COUNT = 12;
 
@@ -754,20 +755,19 @@ function MetaField({
 
 type EstimateTableProps = {
   initialTitle?: string;
-  initialProject?: string;
+  initialMeta?: EstimateMeta;
+  initialCategories?: EstimateCategory[];
 };
 
 export function EstimateTable({
   initialTitle = SAMPLE_TITLE,
-  initialProject = SAMPLE_META.project,
+  initialMeta = SAMPLE_META,
+  initialCategories = createSampleCategories(),
 }: EstimateTableProps = {}) {
   const [title, setTitle] = useState(initialTitle);
-  const [meta, setMeta] = useState({
-    ...SAMPLE_META,
-    project: initialProject,
-  });
+  const [meta, setMeta] = useState(initialMeta);
   const [categories, setCategories] = useState<EstimateCategory[]>(
-    createSampleCategories,
+    initialCategories,
   );
 
   const totals = useMemo(() => {

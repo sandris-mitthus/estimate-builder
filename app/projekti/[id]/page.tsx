@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
-import { getProjectById } from "@/app/lib/projects/sample-projects";
+import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
 
 export default async function ProjectDetailPage({
   params,
@@ -9,9 +9,12 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = getProjectById(id);
+  const [project, estimate] = await Promise.all([
+    getProject(id),
+    getProjectEstimate(id),
+  ]);
 
-  if (!project) {
+  if (!project || !estimate) {
     notFound();
   }
 
@@ -25,8 +28,9 @@ export default async function ProjectDetailPage({
         Atpakaļ uz projektiem
       </Link>
       <EstimateTable
-        initialTitle={project.name}
-        initialProject={project.address}
+        initialTitle={estimate.title}
+        initialMeta={estimate.meta}
+        initialCategories={estimate.categories}
       />
     </main>
   );

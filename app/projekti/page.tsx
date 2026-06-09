@@ -1,14 +1,16 @@
 import { ProjectList } from "@/app/components/project-list";
 import { SectionPage } from "@/app/components/section-page";
-import { SAMPLE_PROJECTS } from "@/app/lib/projects/sample-projects";
+import { listProjects } from "@/app/lib/projects/repository";
 
-export default function ProjektiPage() {
+export default async function ProjektiPage() {
+  const projects = await listProjects();
+
   return (
     <SectionPage
       title="Projekti"
-      subtitle={`${SAMPLE_PROJECTS.length} aktīvi projekti`}
+      subtitle={`${projects.length} aktīvi projekti`}
     >
-      <ProjectList projects={SAMPLE_PROJECTS} />
+      <ProjectList projects={projects} />
     </SectionPage>
   );
 }
