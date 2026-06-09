@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
+  background: #f4f4f5;
+  color: #18181b;
+  overflow-x: hidden;
+}
+
+.page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 2rem 1.5rem 3rem;
+  }
+}
