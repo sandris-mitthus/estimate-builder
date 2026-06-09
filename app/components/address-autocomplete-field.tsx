@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { buildGoogleMapsEmbedUrl } from "@/app/lib/google-maps/build-embed-url";
 import {
-  getGoogleMapsApiKey,
   isGoogleMapsConfigured,
   isGoogleMapsEmbedConfigured,
 } from "@/app/lib/google-maps/env";
@@ -39,7 +39,6 @@ export function AddressAutocompleteField({
   const [activeIndex, setActiveIndex] = useState(-1);
   const configured = isGoogleMapsConfigured();
   const embedConfigured = isGoogleMapsEmbedConfigured();
-  const apiKey = getGoogleMapsApiKey();
   const invalid = Boolean(error);
 
   useEffect(() => {
@@ -200,10 +199,7 @@ export function AddressAutocompleteField({
     }
   }
 
-  const mapEmbedUrl =
-    mapQuery && embedConfigured && apiKey
-      ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(mapQuery)}`
-      : null;
+  const mapEmbedUrl = mapQuery ? buildGoogleMapsEmbedUrl(mapQuery) : null;
 
   return (
     <div ref={rootRef} className="relative block">

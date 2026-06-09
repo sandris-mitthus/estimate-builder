@@ -41,6 +41,7 @@ import {
   SAMPLE_TITLE,
 } from "@/app/lib/estimates/sample-data";
 import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
+import { AddressMapEmbed } from "@/app/components/address-map-embed";
 import { DeleteButton } from "@/app/components/delete-button";
 import {
   DropIndicatorProvider,
@@ -64,6 +65,7 @@ import type {
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
+import { isGoogleMapsEmbedConfigured } from "@/app/lib/google-maps/env";
 
 const FULL_COL_COUNT = 12;
 
@@ -726,23 +728,37 @@ function MetaField({
   value,
   type = "text",
   onChange,
+  fullWidth = false,
 }: {
   label: string;
   value: string;
   type?: string;
   onChange: (value: string) => void;
+  fullWidth?: boolean;
 }) {
+  const fieldClassName =
+    "w-full border-0 border-b border-zinc-200 bg-transparent pb-1.5 text-sm text-zinc-800 transition focus:border-zinc-400 focus:outline-none";
+
   return (
-    <label className="block">
+    <label className="block w-full">
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-400">
         {label}
       </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full border-0 border-b border-zinc-200 bg-transparent pb-1.5 text-sm text-zinc-800 transition focus:border-zinc-400 focus:outline-none"
-      />
+      {fullWidth && type === "text" ? (
+        <textarea
+          rows={2}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={`${fieldClassName} resize-none break-words`}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={fieldClassName}
+        />
+      )}
     </label>
   );
 }
@@ -776,10 +792,26 @@ export function EstimateTable({
     [categories],
   );
 
+  const mapEmbedEnabled = isGoogleMapsEmbedConfigured();
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
-      {/* Header */}
-      <div className="border-b border-zinc-100 px-6 py-5">
+    <div className="max-w-full space-y-4">
+      <div
+        className={
+          mapEmbedEnabled
+            ? "grid items-stretch gap-6 lg:grid-cols-2"
+            : "max-w-3xl"
+        }
+      >
+        {mapEmbedEnabled ? (
+          <AddressMapEmbed
+            address={meta.project}
+            title="Objekta karte"
+            className="h-full"
+          />
+        ) : null}
+
+        <div className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
@@ -809,7 +841,7 @@ export function EstimateTable({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 lg:grid-cols-5">
+        <div className="space-y-4">
           <MetaField
             label="Klients"
             value={meta.client}
@@ -819,27 +851,32 @@ export function EstimateTable({
             label="Objekts"
             value={meta.project}
             onChange={(project) => setMeta({ ...meta, project })}
+            fullWidth
           />
-          <MetaField
-            label="Sagatavotājs"
-            value={meta.author}
-            onChange={(author) => setMeta({ ...meta, author })}
-          />
-          <MetaField
-            label="Datums"
-            type="date"
-            value={meta.date}
-            onChange={(date) => setMeta({ ...meta, date })}
-          />
-          <MetaField
-            label="Tāmes termiņš"
-            type="date"
-            value={meta.deadline}
-            onChange={(deadline) => setMeta({ ...meta, deadline })}
-          />
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <MetaField
+              label="Sagatavotājs"
+              value={meta.author}
+              onChange={(author) => setMeta({ ...meta, author })}
+            />
+            <MetaField
+              label="Datums"
+              type="date"
+              value={meta.date}
+              onChange={(date) => setMeta({ ...meta, date })}
+            />
+            <MetaField
+              label="Tāmes termiņš"
+              type="date"
+              value={meta.deadline}
+              onChange={(deadline) => setMeta({ ...meta, deadline })}
+            />
+          </div>
+        </div>
         </div>
       </div>
 
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
         <p className="text-xs text-zinc-500">
@@ -855,7 +892,7 @@ export function EstimateTable({
       </div>
 
       {/* Table — DndContext wraps <table>, not inside it (valid HTML) */}
-      <div className="max-h-[calc(100vh-18rem)] overflow-x-hidden overflow-y-auto">
+      <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
         <EstimateDndTable
           categories={categories}
           allDragIds={allDragIds}
@@ -863,6 +900,7 @@ export function EstimateTable({
           totals={totals}
         />
       </div>
+    </div>
     </div>
   );
 }

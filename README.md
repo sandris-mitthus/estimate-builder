@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices, volume totals, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, blanks, position prices, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.1.7` (see [Changelog](#changelog))
+**Current version:** `1.1.8` (see [Changelog](#changelog))
 
 ---
 
@@ -47,12 +47,14 @@ English routes, Latvian labels:
 
 ### Estimate editor (`/[id]`)
 
+- **Header above table** (outside white table block): **50/50** — Google Maps embed (left, from **Objekts** address) + editable meta (right)
+- Meta layout: client, full-width object address, then author / date / **tāmes termiņš** in one row; title + **Kopā** total at top
 - Excel-style table: categories, optional subcategories, line items
 - Columns: name, unit, quantity, unit price (labor / materials / mechanisms / total), volume totals, delete
 - Drag-and-drop reorder for categories, subcategories, and items (cross-subcategory / cross-category item moves)
 - Drop indicator: thick horizontal line on hover (no slide animation)
 - Sticky table header, footer totals row
-- Editable document meta: client, object, author, date, **tāmes termiņš**, estimate number; header **Kopā** shows grand total
+- Editable estimate number in meta when set
 
 ### Data
 
@@ -161,13 +163,13 @@ app/
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate table, nav, AppModal, ConfirmModal, ProjectFormModal, InviteUserButton, project cards, settings, tooltips, toasts)
+├── components/         # UI (estimate table, AddressMapEmbed, nav, modals, project cards, settings, tooltips, toasts)
 ├── lib/
 │   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay
 │   ├── estimates/      # calculate-totals, sample data, DnD reorder
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
-│   ├── google-maps/    # Places API server client
+│   ├── google-maps/    # Places API, build-embed-url
 │   ├── projects/
 │   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
 │   ├── users/          # Auth user list + invite (admin API)
@@ -203,7 +205,7 @@ Semantic versioning in `package.json`. Each **release** commit:
 **Commit message format:**
 
 ```
-Short description of what shipped. v1.1.7
+Short description of what shipped. v1.1.8
 ```
 
 ### README update (Cursor)
@@ -213,7 +215,7 @@ Say **`README update`** (or `@README.md update`) to refresh changelog and docs. 
 Cursor rules:
 
 - `.cursor/rules/readme-version-update.mdc` — README update + version bump
-- `.cursor/rules/github-version-commit.mdc` — commit message format on commit/push
+- `.cursor/rules/github-version-commit.mdc` — commit message format; run `typecheck` + `build` before commit/push
 - `.cursor/rules/db-migrate-after-sql.mdc` — run `npm run db:migrate` after new SQL; fix and retry on failure
 - `.cursor/rules/supabase-migration-security.mdc` — RLS deny policies, no `using (true)`, `search_path`, storage rules
 - `.cursor/rules/modal-confirm-exit.mdc` — `AppModal` backdrop confirm; fixed overlay (not `showModal`) for Places dropdown z-index
@@ -230,6 +232,15 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.1.8
+
+**Estimate editor — map + meta header layout**
+
+- Project page (`/[id]`): document meta moved **above** the table block; **Google Maps** (left) and meta fields (right) in a **50/50** grid; map height matches meta column
+- Meta fields: **Objekts** full-width textarea; **Sagatavotājs**, **Datums**, **Tāmes termiņš** below in one row
+- Shared `AddressMapEmbed` + `buildGoogleMapsEmbedUrl` (used in estimate header and address autocomplete)
+- Cursor rule: `typecheck` + `build` required before GitHub commit/push
 
 ### v1.1.7
 
