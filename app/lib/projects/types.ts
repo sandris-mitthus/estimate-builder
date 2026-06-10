@@ -1,4 +1,8 @@
 import type { EstimateCategory } from "@/app/lib/estimates/types";
+import type { ModuleContentBlock } from "@/app/lib/modules/types";
+
+/** Form select value for projects without a catalog module. */
+export const INDIVIDUAL_PROJECT_MODULE = "__individual__" as const;
 
 export type ProjectSummary = {
   id: string;
@@ -6,6 +10,17 @@ export type ProjectSummary = {
   address: string;
   phone: string;
   email: string;
+  /** ISO timestamp from `projects.created_at`. */
+  createdAt: string;
+  buildingModuleId: string | null;
+  visualizationBlocks: ModuleContentBlock[];
+  projectBlocks: ModuleContentBlock[];
+};
+
+export type UpdateProjectModuleBlocksInput = {
+  id: string;
+  visualizationBlocks: ModuleContentBlock[];
+  projectBlocks: ModuleContentBlock[];
 };
 
 export type CreateProjectInput = {
@@ -14,6 +29,8 @@ export type CreateProjectInput = {
   email: string;
   address: string;
   phoneCallingCode?: string;
+  /** Selected module id, or null for individual project. */
+  buildingModuleId: string | null;
 };
 
 export type UpdateProjectInput = CreateProjectInput & {

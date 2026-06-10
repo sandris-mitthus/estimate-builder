@@ -1,24 +1,25 @@
-import { ListEntryCard, ListEntryGrid } from "@/app/components/list-entry-card";
-import { SectionPage } from "@/app/components/section-page";
-import { SAMPLE_POSITION_PRICES } from "@/app/lib/positions/sample-prices";
+import { PositionsPageContent } from "@/app/components/positions-page-content";
+import { listPositionPrices } from "@/app/lib/positions/repository";
+import {
+  DEFAULT_CURRENCY,
+  isCurrencyCode,
+} from "@/app/lib/settings/currencies";
+import { getCompanySettings } from "@/app/lib/settings/repository";
 
-export default function PositionsPage() {
+export default async function PositionsPage() {
+  const [positions, settings] = await Promise.all([
+    listPositionPrices(),
+    getCompanySettings(),
+  ]);
+
   return (
-    <SectionPage
-      title="Cenu pozicijas"
-      subtitle={`${SAMPLE_POSITION_PRICES.length} pozīcijas katalogā`}
-    >
-      <ListEntryGrid>
-        {SAMPLE_POSITION_PRICES.map((position) => (
-          <ListEntryCard
-            key={position.id}
-            primaryLabel="Nosaukums"
-            primaryValue={position.name}
-            secondaryLabel="Mērvienība"
-            secondaryValue={position.unit}
-          />
-        ))}
-      </ListEntryGrid>
-    </SectionPage>
+    <PositionsPageContent
+      initialPositions={positions}
+      currency={
+        isCurrencyCode(settings.currency)
+          ? settings.currency
+          : DEFAULT_CURRENCY
+      }
+    />
   );
 }

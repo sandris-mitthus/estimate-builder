@@ -10,8 +10,8 @@ import { signOut } from "@/app/lib/auth/sign-out";
 const NAV_ITEMS = [
   { href: "/", label: "Projekti" },
   { href: "/modules", label: "Ēku moduļi" },
-  { href: "/blanks", label: "Sagataves" },
-  { href: "/positions", label: "Cenu pozicijas" },
+  { href: "/positions", label: "Tāmes Pozīcijas" },
+  { href: "/blanks", label: "Sagatave" },
   { href: "/users", label: "Lietotāji" },
   { href: "/settings", label: "Uzstādījumi" },
 ] as const;

@@ -6,14 +6,28 @@ import { deleteProjectAction } from "@/app/(protected)/actions";
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
+import type { BuildingModuleSummary } from "@/app/lib/modules/types";
+import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
-export function ProjectCardActions({ project }: { project: ProjectSummary }) {
+type ProjectCardActionsProps = {
+  project: ProjectSummary;
+  modules: BuildingModuleSummary[];
+  moduleDataSpotlight?: boolean;
+};
+
+export function ProjectCardActions({
+  project,
+  modules,
+  moduleDataSpotlight = false,
+}: ProjectCardActionsProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isIndividualProject = project.buildingModuleId === null;
+  const moduleDataComplete = isIndividualProjectModuleDataComplete(project);
 
   function handleDeleteOpenChange(open: boolean) {
     if (!open && !isPending) {
@@ -41,6 +55,20 @@ export function ProjectCardActions({ project }: { project: ProjectSummary }) {
   return (
     <>
       <div className="flex shrink-0 items-center gap-0.5">
+        {isIndividualProject ? (
+          <IconActionButton
+            label={
+              moduleDataComplete
+                ? "Moduļa dati"
+                : "Moduļa dati – trūkst vizualizāciju vai projekta failu"
+            }
+            icon="fas fa-level-up-alt"
+            variant="moduleData"
+            highlighted={!moduleDataComplete}
+            spotlight={moduleDataSpotlight && !moduleDataComplete}
+            onClick={() => router.push(`/${project.id}/module-data`)}
+          />
+        ) : null}
         <IconActionButton
           label="Labot"
           icon="fas fa-pen"
@@ -72,6 +100,7 @@ export function ProjectCardActions({ project }: { project: ProjectSummary }) {
         onOpenChange={setEditOpen}
         mode="edit"
         project={project}
+        modules={modules}
       />
 
       <ConfirmModal

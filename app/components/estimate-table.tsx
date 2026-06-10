@@ -16,13 +16,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import {
+  useEffect,
   useMemo,
   useState,
+  useTransition,
   type CSSProperties,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { updateProjectEstimateDatesAction } from "@/app/(protected)/actions";
 import {
   formatAmount,
   multiplyBreakdown,
@@ -37,11 +40,15 @@ import {
 import { formatMoney } from "@/app/lib/estimates/format-money";
 import {
   createSampleCategories,
+  defaultEstimateDeadline,
   SAMPLE_META,
   SAMPLE_TITLE,
 } from "@/app/lib/estimates/sample-data";
 import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
 import { AddressMapEmbed } from "@/app/components/address-map-embed";
+import { IndividualProjectModuleDataSpotlight } from "@/app/components/individual-project-module-data-spotlight";
+import { ModuleVisualizationGallery } from "@/app/components/module-visualization-gallery";
+import { ProjectCardActions } from "@/app/components/project-card-actions";
 import { DeleteButton } from "@/app/components/delete-button";
 import {
   DropIndicatorProvider,
@@ -64,7 +71,10 @@ import type {
   EstimateSubcategory,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
-import type { EstimateMeta } from "@/app/lib/projects/types";
+import type { BuildingModuleSummary, ModuleContentBlock } from "@/app/lib/modules/types";
+import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
+import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
+import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 import { isGoogleMapsEmbedConfigured } from "@/app/lib/google-maps/env";
 
 const FULL_COL_COUNT = 12;
@@ -729,35 +739,63 @@ function MetaField({
   type = "text",
   onChange,
   fullWidth = false,
+  suffix,
+  readOnly = false,
 }: {
   label: string;
   value: string;
   type?: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
   fullWidth?: boolean;
+  suffix?: string;
+  readOnly?: boolean;
 }) {
   const fieldClassName =
-    "w-full border-0 border-b border-zinc-200 bg-transparent pb-1.5 text-sm text-zinc-800 transition focus:border-zinc-400 focus:outline-none";
+    "w-full border-0 bg-transparent pb-1.5 text-sm text-zinc-800 transition focus:outline-none";
+
+  const inputElement =
+    fullWidth && type === "text" ? (
+      <textarea
+        rows={2}
+        value={value}
+        readOnly={readOnly}
+        onChange={
+          readOnly || !onChange
+            ? undefined
+            : (event) => onChange(event.target.value)
+        }
+        className={`${fieldClassName} resize-none break-words`}
+      />
+    ) : (
+      <input
+        type={type}
+        value={value}
+        readOnly={readOnly}
+        onChange={
+          readOnly || !onChange
+            ? undefined
+            : (event) => onChange(event.target.value)
+        }
+        className={fieldClassName}
+      />
+    );
 
   return (
     <label className="block w-full">
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-400">
         {label}
       </span>
-      {fullWidth && type === "text" ? (
-        <textarea
-          rows={2}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={`${fieldClassName} resize-none break-words`}
-        />
+      {suffix ? (
+        <div className="flex items-center border-b border-zinc-200 transition focus-within:border-zinc-400">
+          <div className="min-w-0 flex-1">{inputElement}</div>
+          <span className="shrink-0 border-l border-zinc-200 pl-2 text-sm text-zinc-500">
+            {suffix}
+          </span>
+        </div>
       ) : (
-        <input
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={fieldClassName}
-        />
+        <div className="border-b border-zinc-200 transition focus-within:border-zinc-400">
+          {inputElement}
+        </div>
       )}
     </label>
   );
@@ -767,18 +805,62 @@ type EstimateTableProps = {
   initialTitle?: string;
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
+  moduleName?: string | null;
+  moduleVisualizations?: ModuleContentBlock[];
+  project?: ProjectSummary;
+  modules?: BuildingModuleSummary[];
+  estimateValidityDays?: number;
 };
 
 export function EstimateTable({
   initialTitle = SAMPLE_TITLE,
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
+  moduleName = null,
+  moduleVisualizations = [],
+  project,
+  modules = [],
+  estimateValidityDays = DEFAULT_ESTIMATE_VALIDITY_DAYS,
 }: EstimateTableProps = {}) {
   const [title, setTitle] = useState(initialTitle);
   const [meta, setMeta] = useState(initialMeta);
   const [categories, setCategories] = useState<EstimateCategory[]>(
     initialCategories,
   );
+  const [moduleDataSpotlightDismissed, setModuleDataSpotlightDismissed] =
+    useState(false);
+  const [, startSaveDatesTransition] = useTransition();
+
+  useEffect(() => {
+    setMeta(initialMeta);
+  }, [initialMeta]);
+
+  useEffect(() => {
+    setModuleDataSpotlightDismissed(false);
+  }, [project?.id]);
+
+  function persistEstimateDates(dates: Pick<EstimateMeta, "date" | "deadline">) {
+    if (!project) return;
+
+    startSaveDatesTransition(async () => {
+      await updateProjectEstimateDatesAction(project.id, dates);
+    });
+  }
+
+  function handleEstimateDateChange(date: string) {
+    const deadline = date
+      ? defaultEstimateDeadline(date, estimateValidityDays)
+      : meta.deadline;
+    const nextMeta = { ...meta, date, deadline };
+    setMeta(nextMeta);
+    persistEstimateDates({ date: nextMeta.date, deadline: nextMeta.deadline });
+  }
+
+  function handleEstimateDeadlineChange(deadline: string) {
+    const nextMeta = { ...meta, deadline };
+    setMeta(nextMeta);
+    persistEstimateDates({ date: nextMeta.date, deadline: nextMeta.deadline });
+  }
 
   const totals = useMemo(
     () => calculateEstimateTotals(categories),
@@ -793,25 +875,53 @@ export function EstimateTable({
   );
 
   const mapEmbedEnabled = isGoogleMapsEmbedConfigured();
+  const displayModuleName = moduleName ?? "Individuāls projekts";
+  const showModuleDataSpotlight = Boolean(
+    project &&
+      project.buildingModuleId === null &&
+      !isIndividualProjectModuleDataComplete(project) &&
+      !moduleDataSpotlightDismissed,
+  );
 
   return (
-    <div className="max-w-full space-y-4">
-      <div
-        className={
-          mapEmbedEnabled
-            ? "grid items-stretch gap-6 lg:grid-cols-2"
-            : "max-w-3xl"
-        }
-      >
+    <>
+      {showModuleDataSpotlight ? (
+        <IndividualProjectModuleDataSpotlight
+          onDismiss={() => setModuleDataSpotlightDismissed(true)}
+        />
+      ) : null}
+      <div className="max-w-full space-y-4">
+      <div className="grid items-stretch gap-6 lg:grid-cols-3">
         {mapEmbedEnabled ? (
           <AddressMapEmbed
             address={meta.project}
             title="Objekta karte"
             className="h-full"
           />
-        ) : null}
+        ) : (
+          <div className="flex h-full min-h-[14rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-6 text-center text-sm text-zinc-400">
+            Karte nav pieejama.
+          </div>
+        )}
+
+        <ModuleVisualizationGallery
+          blocks={moduleVisualizations}
+          className="h-full"
+        />
 
         <div className="space-y-5">
+        {project ? (
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="min-w-0 text-2xl font-bold tracking-tight text-zinc-900">
+              {displayModuleName}
+            </h2>
+            <ProjectCardActions
+              project={project}
+              modules={modules}
+              moduleDataSpotlight={showModuleDataSpotlight}
+            />
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
@@ -843,7 +953,7 @@ export function EstimateTable({
 
         <div className="space-y-4">
           <MetaField
-            label="Klients"
+            label="Pasūtītāja vārds, uzvārds"
             value={meta.client}
             onChange={(client) => setMeta({ ...meta, client })}
           />
@@ -863,13 +973,13 @@ export function EstimateTable({
               label="Datums"
               type="date"
               value={meta.date}
-              onChange={(date) => setMeta({ ...meta, date })}
+              onChange={handleEstimateDateChange}
             />
             <MetaField
               label="Tāmes termiņš"
               type="date"
               value={meta.deadline}
-              onChange={(deadline) => setMeta({ ...meta, deadline })}
+              onChange={handleEstimateDeadlineChange}
             />
           </div>
         </div>
@@ -902,5 +1012,6 @@ export function EstimateTable({
       </div>
     </div>
     </div>
+    </>
   );
 }

@@ -1,0 +1,132 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { updateBuildingModuleAction } from "@/app/(protected)/modules/actions";
+import { AppModal } from "@/app/components/app-modal";
+import { ModalFormActions } from "@/app/components/modal-form-actions";
+import {
+  formInputClassName,
+  formInputFullWidthClass,
+} from "@/app/lib/form/input-styles";
+import type { BuildingModuleSummary } from "@/app/lib/modules/types";
+
+type ModuleFormModalProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  module: BuildingModuleSummary;
+};
+
+export function ModuleFormModal({
+  open,
+  onOpenChange,
+  module,
+}: ModuleFormModalProps) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+
+    setName(module.name);
+    setNameError(undefined);
+    setError(null);
+  }, [open, module]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && !isPending) {
+      setNameError(undefined);
+      setError(null);
+    }
+    onOpenChange(nextOpen);
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    if (!name.trim()) {
+      setNameError("Ievadi nosaukumu.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateBuildingModuleAction({
+        id: module.id,
+        name: name.trim(),
+      });
+
+      if (!result.ok) {
+        if (result.error === "Ievadi nosaukumu.") {
+          setNameError(result.error);
+        } else {
+          setError(result.error);
+        }
+        return;
+      }
+
+      handleOpenChange(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <AppModal
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Labot moduli"
+      description="Ievadi moduļa nosaukumu"
+      blocking={isPending}
+      dirty={name !== module.name}
+    >
+      <form noValidate onSubmit={handleSubmit} className="space-y-4">
+        <label htmlFor="module-edit-name" className="block">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            Nosaukums
+          </span>
+          <input
+            id="module-edit-name"
+            name="module-edit-name"
+            type="text"
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              setNameError(undefined);
+              setError(null);
+            }}
+            className={`${formInputFullWidthClass} ${formInputClassName(Boolean(nameError))}`}
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? "module-edit-name-error" : undefined}
+          />
+          {nameError ? (
+            <p id="module-edit-name-error" className="mt-1 text-sm text-red-600" role="alert">
+              {nameError}
+            </p>
+          ) : null}
+        </label>
+
+        {error ? (
+          <p className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <ModalFormActions
+          onCancel={() => handleOpenChange(false)}
+          cancelDisabled={isPending}
+        >
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? "Saglabā…" : "Saglabāt"}
+          </button>
+        </ModalFormActions>
+      </form>
+    </AppModal>
+  );
+}

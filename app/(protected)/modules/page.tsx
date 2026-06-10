@@ -1,24 +1,18 @@
-import { ListEntryCard, ListEntryGrid } from "@/app/components/list-entry-card";
+import { AddModuleButton } from "@/app/components/add-module-button";
+import { ModuleList } from "@/app/components/module-list";
 import { SectionPage } from "@/app/components/section-page";
-import { SAMPLE_BUILDING_MODULES } from "@/app/lib/modules/sample-modules";
+import { listBuildingModules } from "@/app/lib/modules/repository";
 
-export default function ModulesPage() {
+export default async function ModulesPage() {
+  const modules = await listBuildingModules();
+
   return (
     <SectionPage
       title="Ēku moduļi"
-      subtitle={`${SAMPLE_BUILDING_MODULES.length} moduļi katalogā`}
+      subtitle={`${modules.length} moduļi katalogā`}
+      actions={<AddModuleButton />}
     >
-      <ListEntryGrid>
-        {SAMPLE_BUILDING_MODULES.map((module) => (
-          <ListEntryCard
-            key={module.id}
-            primaryLabel="Nosaukums"
-            primaryValue={module.name}
-            secondaryLabel="Adrese"
-            secondaryValue={module.address}
-          />
-        ))}
-      </ListEntryGrid>
+      <ModuleList modules={modules} />
     </SectionPage>
   );
 }

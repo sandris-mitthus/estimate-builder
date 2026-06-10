@@ -12,13 +12,39 @@ Visiem jaunajiem modāliem izmanto **`AppModal`** (`app/components/app-modal.tsx
 
 | Darbība | Rezultāts |
 |---------|-----------|
-| Klikšķis ārpus modāla (backdrop / tukšā vieta) | Parādās apstiprinājuma modāls |
+| Klikšķis ārpus modāla, **`dirty={false}`** | Modāls aizveras **uzreiz** (bez apstiprinājuma) |
+| Klikšķis ārpus modāla, **`dirty={true}`** | Parādās apstiprinājuma modāls |
 | **Escape** | Galvenais modāls aizveras **uzreiz** (bez apstiprinājuma) |
+| **Enter** (formas modālī ar `<form>`) | Kā **Submit** — `form.requestSubmit()` |
 | **×** poga | Galvenais modāls aizveras **uzreiz** (bez apstiprinājuma) |
 | Apstiprinājumā **Izbeigt** | Abi modāli aizveras, `onOpenChange(false)` |
 | Apstiprinājumā **Turpināt** | Apstiprinājums pazūd, galvenais modāls paliek |
-| Apstiprinājumā Escape / ārpus klikšķis | Kā **Turpināt** |
-| `blocking={true}` (piem. saglabāšana) | Aizvēršana bloķēta |
+| Apstiprinājumā Escape / Enter / ārpus klikšķis | Kā **Turpināt** |
+| `blocking={true}` (piem. saglabāšana) | Aizvēršana un Enter submit bloķēts |
+
+## `dirty` — obligāti formu modāļos
+
+Katram **`AppModal`** ar ievades laukiem nodod **`dirty`**: `true`, ja lietotājs kaut ko **mainījis vai ierakstījis** salīdzinot ar atvēršanas brīdi; citādi `false`.
+
+| Modālis | `dirty={true}`, kad… |
+|---------|----------------------|
+| Jauns ieraksts | Jebkurš obligātais/neobligātais lauks nav tukšs (vai select nav placeholder) |
+| Labošana | Kāds lauks atšķiras no sākotnējās vērtības |
+
+Ja **`dirty` nav padots**, noklusējums ir `false` — ārpus klikšķis aizver bez jautājuma.
+
+## ConfirmModal (`confirm-modal.tsx`)
+
+Dzēšanas un citi apstiprinājuma modāļi — **ne** `AppModal`. Backdrop klikšķis aizver **uzreiz** (nav ievades lauku).
+
+| Darbība | Rezultāts |
+|---------|-----------|
+| **Enter** | Kā apstiprinājuma poga (`onConfirm`) |
+| **Escape** | Aizver modāli (`onOpenChange(false)`) |
+| Fokuss uz pogas | Enter aktivizē fokusēto pogu (Atcelt / apstiprināt) |
+| `blocking={true}` | Enter un Escape bloķēti |
+
+Formu modāļos saturs **obligāti** `<form onSubmit={…}>` ar `type="submit"` pogu — Enter tiek apstrādāts `AppModal` līmenī.
 
 ## Teksti (latviski, nemainīt)
 
@@ -36,6 +62,7 @@ import { AppModal } from "@/app/components/app-modal";
 
 export function MyFeatureButton() {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
   const [isPending, setIsPending] = useState(false);
 
   return (
@@ -47,8 +74,11 @@ export function MyFeatureButton() {
         title="Virsraksts"
         description="Apraksts (neobligāts)"
         blocking={isPending}
+        dirty={name.trim().length > 0}
       >
-        {/* forma vai saturs */}
+        <form onSubmit={…}>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </form>
       </AppModal>
     </>
   );
@@ -59,5 +89,8 @@ export function MyFeatureButton() {
 
 - ❌ Tieša `<dialog>` ar `onClose={() => setOpen(false)}` bez apstiprinājuma
 - ❌ `window.confirm()` — izmanto iebūvēto apstiprinājuma modālu
-- ❌ Apstiprinājums uz Escape vai × — tikai backdrop klikšķim
+- ❌ Apstiprinājums uz Escape vai × — tikai backdrop klikšķim ar `dirty={true}`
 - ❌ Atkārtot apstiprinājuma loģiku katrā komponentē — paplašini `AppModal`, ja vajag jaunu variantu
+- ❌ Atsevišķs `keydown` Enter handler katrā formas modālī — izmanto `AppModal` + `<form>`
+- ❌ Dzēšanai `AppModal` — izmanto `ConfirmModal` (Enter = apstiprināt)
+- ❌ Formu modālis bez `dirty` — lietotājs tiek jautāts pat tukšā formā

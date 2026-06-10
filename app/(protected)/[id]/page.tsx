@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
+import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
+import { getCompanySettings } from "@/app/lib/settings/repository";
 
 export default async function ProjectDetailPage({
   params,
@@ -9,14 +11,24 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, estimate] = await Promise.all([
+  const [project, estimate, modules, companySettings] = await Promise.all([
     getProject(id),
     getProjectEstimate(id),
+    listBuildingModules(),
+    getCompanySettings(),
   ]);
 
   if (!project || !estimate) {
     notFound();
   }
+
+  const buildingModule = project.buildingModuleId
+    ? await getBuildingModule(project.buildingModuleId)
+    : null;
+
+  const moduleVisualizations = buildingModule
+    ? buildingModule.visualizationBlocks
+    : project.visualizationBlocks;
 
   return (
     <main className="page">
@@ -31,6 +43,11 @@ export default async function ProjectDetailPage({
         initialTitle={estimate.title}
         initialMeta={estimate.meta}
         initialCategories={estimate.categories}
+        moduleName={buildingModule?.name ?? null}
+        moduleVisualizations={moduleVisualizations}
+        project={project}
+        modules={modules}
+        estimateValidityDays={companySettings.estimateValidityDays}
       />
     </main>
   );

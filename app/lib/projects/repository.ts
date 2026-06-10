@@ -1,6 +1,9 @@
-import { createSampleCategories, defaultEstimateDeadline, SAMPLE_META } from "@/app/lib/estimates/sample-data";
+import { createSampleCategories, defaultEstimateDeadline, projectCreatedDateIso, SAMPLE_META } from "@/app/lib/estimates/sample-data";
+import { resolveEstimateMeta } from "@/app/lib/estimates/resolve-estimate-meta";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
+import { getBuildingModule } from "@/app/lib/modules/repository";
+import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import {
@@ -14,7 +17,9 @@ import type {
   ProjectSummary,
   UpdateProjectInput,
 } from "@/app/lib/projects/types";
+import { parseProjectModuleBlocks } from "@/app/lib/projects/project-module-data";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
+import { deleteAllProjectBlockFiles } from "@/app/lib/modules/file-storage";
 
 type ProjectRow = {
   id: string;
@@ -22,6 +27,10 @@ type ProjectRow = {
   address: string;
   phone?: string;
   email?: string;
+  created_at?: string;
+  building_module_id?: string | null;
+  visualization_blocks?: unknown;
+  project_blocks?: unknown;
 };
 
 type EstimateRow = {
@@ -31,39 +40,59 @@ type EstimateRow = {
 };
 
 function mapProject(row: ProjectRow): ProjectSummary {
+  const moduleBlocks = parseProjectModuleBlocks(row);
+
   return {
     id: row.id,
     name: row.name,
     address: row.address,
     phone: row.phone ?? "",
     email: row.email ?? "",
+    createdAt: row.created_at ?? new Date().toISOString(),
+    buildingModuleId: row.building_module_id ?? null,
+    visualizationBlocks: moduleBlocks.visualizationBlocks,
+    projectBlocks: moduleBlocks.projectBlocks,
   };
 }
 
-function defaultEstimateForProject(project: ProjectSummary): ProjectEstimate {
+function estimateMetaForProject(
+  project: ProjectSummary,
+  validityDays: number,
+  overrides: Partial<EstimateMeta> = {},
+): EstimateMeta {
+  return resolveEstimateMeta(
+    project.createdAt,
+    project.address,
+    validityDays,
+    overrides,
+  );
+}
+
+function defaultEstimateForProject(
+  project: ProjectSummary,
+  validityDays: number,
+): ProjectEstimate {
   return {
     title: project.name,
-    meta: {
-      ...SAMPLE_META,
-      project: project.address,
-    },
+    meta: estimateMetaForProject(project, validityDays),
     categories: createSampleCategories(),
   };
 }
 
-function parseEstimateRow(row: EstimateRow | null, project: ProjectSummary): ProjectEstimate {
+function parseEstimateRow(
+  row: EstimateRow | null,
+  project: ProjectSummary,
+  validityDays: number,
+): ProjectEstimate {
   if (!row) {
-    return defaultEstimateForProject(project);
+    return defaultEstimateForProject(project, validityDays);
   }
 
   return {
     title: row.title || project.name,
-    meta: {
-      ...SAMPLE_META,
+    meta: estimateMetaForProject(project, validityDays, {
       ...row.meta,
-      project: row.meta?.project ?? project.address,
-      deadline: row.meta?.deadline ?? "",
-    },
+    }),
     categories: Array.isArray(row.categories) && row.categories.length > 0
       ? row.categories
       : createSampleCategories(),
@@ -78,14 +107,15 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, address, phone, email")
+    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
     .order("created_at", { ascending: true });
 
-  if (error || !data?.length) {
-    return SAMPLE_PROJECTS;
+  if (error) {
+    console.error("listProjects:", error.message);
+    return [];
   }
 
-  return data.map(mapProject);
+  return (data ?? []).map(mapProject);
 }
 
 export async function getProject(id: string): Promise<ProjectSummary | null> {
@@ -96,12 +126,17 @@ export async function getProject(id: string): Promise<ProjectSummary | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, address, phone, email")
+    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !data) {
-    return getSampleProjectById(id) ?? null;
+  if (error) {
+    console.error("getProject:", error.message);
+    return null;
+  }
+
+  if (!data) {
+    return null;
   }
 
   return mapProject(data);
@@ -111,8 +146,11 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
   const project = await getProject(id);
   if (!project) return null;
 
+  const companySettings = await getCompanySettings();
+  const validityDays = companySettings.estimateValidityDays;
+
   if (!isSupabaseAdminConfigured()) {
-    return defaultEstimateForProject(project);
+    return defaultEstimateForProject(project, validityDays);
   }
 
   const supabase = createAdminClient();
@@ -123,10 +161,10 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
     .maybeSingle();
 
   if (error) {
-    return defaultEstimateForProject(project);
+    return defaultEstimateForProject(project, validityDays);
   }
 
-  return parseEstimateRow(data as EstimateRow | null, project);
+  return parseEstimateRow(data as EstimateRow | null, project, validityDays);
 }
 
 export async function createProject(
@@ -142,6 +180,17 @@ export async function createProject(
 
   if (!address) {
     return { ok: false, error: "Ievadi adresi." };
+  }
+
+  if (input.buildingModuleId === undefined) {
+    return { ok: false, error: "Izvēlies moduli." };
+  }
+
+  if (input.buildingModuleId) {
+    const module = await getBuildingModule(input.buildingModuleId);
+    if (!module) {
+      return { ok: false, error: "Izvēlētais modulis vairs neeksistē." };
+    }
   }
 
   const contact = validateProjectContactFields({
@@ -169,21 +218,26 @@ export async function createProject(
       address,
       phone,
       email,
+      building_module_id: input.buildingModuleId,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (projectError || !project) {
     return { ok: false, error: "Neizdevās izveidot projektu." };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const companySettings = await getCompanySettings();
+  const estimateDate = projectCreatedDateIso(project.created_at);
   const meta: EstimateMeta = {
     client: clientName,
     project: address,
     author,
-    date: today,
-    deadline: defaultEstimateDeadline(today),
+    date: estimateDate,
+    deadline: defaultEstimateDeadline(
+      estimateDate,
+      companySettings.estimateValidityDays,
+    ),
     number: "",
   };
 
@@ -216,6 +270,17 @@ export async function updateProject(
     return { ok: false, error: "Ievadi adresi." };
   }
 
+  if (input.buildingModuleId === undefined) {
+    return { ok: false, error: "Izvēlies moduli." };
+  }
+
+  if (input.buildingModuleId) {
+    const module = await getBuildingModule(input.buildingModuleId);
+    if (!module) {
+      return { ok: false, error: "Izvēlētais modulis vairs neeksistē." };
+    }
+  }
+
   const contact = validateProjectContactFields({
     email: input.email,
     phone: input.phone,
@@ -238,6 +303,7 @@ export async function updateProject(
       address,
       phone: contact.phone,
       email: contact.email,
+      building_module_id: input.buildingModuleId,
     })
     .eq("id", input.id);
 
@@ -277,6 +343,43 @@ export async function updateProject(
   return { ok: true };
 }
 
+export async function updateProjectEstimateDates(
+  projectId: string,
+  dates: Pick<EstimateMeta, "date" | "deadline">,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const meta = {
+    ...((data.meta ?? {}) as EstimateMeta),
+    date: dates.date,
+    deadline: dates.deadline,
+  };
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās saglabāt datumus." };
+  }
+
+  return { ok: true };
+}
+
 export async function deleteProject(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -285,6 +388,8 @@ export async function deleteProject(
   }
 
   const supabase = createAdminClient();
+  await deleteAllProjectBlockFiles(id);
+
   const { error } = await supabase.from("projects").delete().eq("id", id);
 
   if (error) {

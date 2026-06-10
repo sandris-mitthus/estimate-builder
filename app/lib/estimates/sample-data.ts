@@ -11,6 +11,10 @@ export const SAMPLE_META = {
   number: "T-2026/014",
 };
 
+export function projectCreatedDateIso(createdAt: string): string {
+  return createdAt.slice(0, 10);
+}
+
 export function defaultEstimateDeadline(
   fromDate = new Date().toISOString().slice(0, 10),
   validityDays = 30,

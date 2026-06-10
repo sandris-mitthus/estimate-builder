@@ -46,6 +46,16 @@ export function normalizePhone(value: string, defaultCallingCode: string): strin
   return `+${codeDigits}${localDigits}`;
 }
 
+export function formatDisplayPhone(stored: string): string {
+  const trimmed = stored.trim();
+  if (!trimmed) return "";
+
+  const { callingCode, local } = parseStoredPhone(trimmed);
+  if (!local) return callingCode;
+
+  return `${callingCode} ${local}`;
+}
+
 export function parseStoredPhone(stored: string): {
   callingCode: string;
   local: string;

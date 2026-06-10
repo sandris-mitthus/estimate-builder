@@ -1,8 +1,6 @@
-export type PositionPriceSummary = {
-  id: string;
-  name: string;
-  unit: string;
-};
+import type { PositionPriceSummary } from "@/app/lib/positions/types";
+
+export type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 export const SAMPLE_POSITION_PRICES: PositionPriceSummary[] = [
   {

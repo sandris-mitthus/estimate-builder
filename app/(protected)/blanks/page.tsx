@@ -5,7 +5,7 @@ import { SAMPLE_DEFINED_BLOCKS } from "@/app/lib/blanks/sample-blocks";
 export default function BlanksPage() {
   return (
     <SectionPage
-      title="Sagataves"
+      title="Sagatave"
       subtitle={`${SAMPLE_DEFINED_BLOCKS.length} sagataves bibliotēkā`}
     >
       <ListEntryGrid>

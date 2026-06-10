@@ -3,8 +3,12 @@
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { saveCompanySettingsAction } from "@/app/(protected)/settings/actions";
 import { CompanyLogoDropzone } from "@/app/components/company-logo-dropzone";
+import { InputWithSuffix } from "@/app/components/input-with-suffix";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { CURRENCY_OPTIONS } from "@/app/lib/settings/currencies";
+import {
+  parseEstimateValidityDaysInput,
+} from "@/app/lib/settings/estimate-validity-days";
 import { formatCompanyDisplayLines } from "@/app/lib/settings/format-company-lines";
 import { resolveBankFromAccountNumber } from "@/app/lib/settings/resolve-bank-from-account";
 import type { CompanySettings } from "@/app/lib/settings/types";
@@ -106,6 +110,12 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
         <span className="text-zinc-500">Valūta: </span>
         {currencyLabel}
       </p>
+      <p className="mt-3 text-sm text-zinc-600">
+        <span className="text-zinc-500">Tāmes derīgums: </span>
+        {settings.estimateValidityDays > 0
+          ? `${settings.estimateValidityDays} dienas`
+          : "—"}
+      </p>
       {!settings.vatNumber.trim() ? (
         <p className="mt-3 text-xs text-zinc-400">
           PVN numurs netiks rādīts, kamēr lauks ir tukšs.
@@ -148,6 +158,14 @@ export function CompanySettingsForm({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     clearFeedback();
+
+    if (settings.estimateValidityDays < 1) {
+      showFeedback({
+        type: "error",
+        text: "Ievadi tāmes derīguma termiņu dienās.",
+      });
+      return;
+    }
 
     startTransition(async () => {
       const result = await saveCompanySettingsAction(settings);
@@ -234,6 +252,39 @@ export function CompanySettingsForm({
                 />
               </>
             ) : null}
+          </SettingsSection>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
+          <SettingsSection title="Tāme">
+            <div className="sm:col-span-2">
+              <label htmlFor="estimateValidityDays" className="block">
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                  Tāmes derīguma termiņš
+                </span>
+                <InputWithSuffix
+                  id="estimateValidityDays"
+                  name="estimateValidityDays"
+                  suffix="dienas"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={
+                    settings.estimateValidityDays > 0
+                      ? String(settings.estimateValidityDays)
+                      : ""
+                  }
+                  onChange={(event) => {
+                    const digits = parseEstimateValidityDaysInput(
+                      event.target.value,
+                    );
+                    updateField(
+                      "estimateValidityDays",
+                      digits === "" ? 0 : Number.parseInt(digits, 10),
+                    );
+                  }}
+                />
+              </label>
+            </div>
           </SettingsSection>
         </div>
 

@@ -1,0 +1,41 @@
+---
+description: Datumu attēlojums estimate-builder UI
+globs: app/**/*
+alwaysApply: false
+---
+
+# Datumu formāti
+
+## Noklusējums UI
+
+Lietotājam redzamos **datumus** (ne laiku) formatē ar **`formatDisplayDateDdMmYy()`** no `app/lib/format-display-date.ts` — formāts **`dd.mm.yy`** (piem. `10.06.26`).
+
+## Glabāšana
+
+- DB un iekšējais stāvoklis: **ISO** — `YYYY-MM-DD` vai pilns ISO-8601 (`toISOString()`).
+- Jaunam „šodienas” datumam: **`todayIsoDate()`** no tā paša moduļa.
+
+## Ko nedarīt
+
+- ❌ `new Date(value).toLocaleDateString()` / `toLocaleString()` lietotāja redzamiem datumiem
+- ❌ Cits formāts (piem. `MM/DD/YYYY`) bez skaidra uzdevuma vai jauna helpera
+
+## Piemērs
+
+```tsx
+import {
+  formatDisplayDateDdMmYy,
+  todayIsoDate,
+} from "@/app/lib/format-display-date";
+
+formatDisplayDateDdMmYy(position.unitPriceUpdatedAt);
+// saglabāšanā:
+unitPriceUpdatedAt: todayIsoDate();
+```
+
+## Izņēmumi
+
+- `new Date().getFullYear()` autortiesību gadā
+- `<input type="date">` — pārlūka/formas vērtība paliek ISO (`YYYY-MM-DD`)
+
+Ja projektā parādās lietotāja datuma iestatījumi, paplašini `format-display-date.ts`, nevis dublē formātu komponentēs.

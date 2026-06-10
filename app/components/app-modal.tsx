@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useRef,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -19,8 +20,16 @@ const backdropClassName = "absolute inset-0 bg-zinc-900/40";
 
 const confirmBackdropClassName = "absolute inset-0 bg-zinc-900/50";
 
-const panelClassName =
-  "relative max-h-[calc(100%-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl";
+const panelBaseClassName =
+  "relative max-h-[calc(100%-2rem)] w-full overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl";
+
+const defaultPanelMaxWidthClassName = "max-w-md";
+
+/** 20% wider than default `max-w-md` (28rem → 33.6rem). */
+export const appModalWidePanelMaxWidthClassName = "max-w-[33.6rem]";
+
+/** 40% wider than default `max-w-md` (28rem → 40.04rem). */
+export const appModalExtraWidePanelMaxWidthClassName = "max-w-[40.04rem]";
 
 type AppModalProps = {
   open: boolean;
@@ -29,6 +38,9 @@ type AppModalProps = {
   description?: string;
   children: ReactNode;
   blocking?: boolean;
+  /** When false, backdrop click closes without confirm exit dialog. */
+  dirty?: boolean;
+  panelMaxWidthClassName?: string;
 };
 
 export function AppModal({
@@ -38,9 +50,13 @@ export function AppModal({
   description,
   children,
   blocking = false,
+  dirty = false,
+  panelMaxWidthClassName = defaultPanelMaxWidthClassName,
 }: AppModalProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const confirmPanelRef = useRef<HTMLDivElement>(null);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
 
   const closeDirectly = useCallback(() => {
@@ -58,8 +74,41 @@ export function AppModal({
   useEffect(() => {
     if (!open) return;
 
+    function submitModalForm(target: EventTarget | null) {
+      const element = target instanceof HTMLElement ? target : null;
+      if (
+        element?.tagName === "TEXTAREA" ||
+        element?.tagName === "SELECT" ||
+        (element instanceof HTMLButtonElement && element.type !== "submit")
+      ) {
+        return;
+      }
+
+      const form =
+        element?.closest("form") ??
+        panelRef.current?.querySelector<HTMLFormElement>("form");
+
+      if (!form) return;
+
+      form.requestSubmit();
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || blocking) return;
+      if (blocking) return;
+
+      if (event.key === "Escape") {
+        if (confirmExitOpen) {
+          event.preventDefault();
+          setConfirmExitOpen(false);
+          return;
+        }
+
+        event.preventDefault();
+        closeDirectly();
+        return;
+      }
+
+      if (event.key !== "Enter" || event.shiftKey) return;
 
       if (confirmExitOpen) {
         event.preventDefault();
@@ -67,8 +116,13 @@ export function AppModal({
         return;
       }
 
+      const form =
+        panelRef.current?.querySelector<HTMLFormElement>("form");
+
+      if (!form) return;
+
       event.preventDefault();
-      closeDirectly();
+      submitModalForm(event.target);
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -100,12 +154,17 @@ export function AppModal({
   }
 
   function handleBackdropClick(event: MouseEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget || blocking) return;
-    requestBackdropConfirm();
+    if (blocking || confirmExitOpen) return;
+    if (panelRef.current?.contains(event.target as Node)) return;
+    if (dirty) {
+      requestBackdropConfirm();
+      return;
+    }
+    closeDirectly();
   }
 
   function handleConfirmBackdropClick(event: MouseEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) return;
+    if (confirmPanelRef.current?.contains(event.target as Node)) return;
     cancelExit();
   }
 
@@ -125,8 +184,8 @@ export function AppModal({
       >
         <div className={backdropClassName} aria-hidden="true" />
         <div
-          className={panelClassName}
-          onMouseDown={(event) => event.stopPropagation()}
+          ref={panelRef}
+          className={`${panelBaseClassName} ${panelMaxWidthClassName}`}
         >
           <div className="p-6">
             <div className="flex items-start justify-between gap-4">
@@ -166,8 +225,8 @@ export function AppModal({
         >
           <div className={confirmBackdropClassName} aria-hidden="true" />
           <div
-            className={`${panelClassName} max-w-sm`}
-            onMouseDown={(event) => event.stopPropagation()}
+            ref={confirmPanelRef}
+            className={`${panelBaseClassName} max-w-sm`}
           >
             <div className="p-6">
               <h2 id="confirm-exit-title" className="text-lg font-semibold text-zinc-900">

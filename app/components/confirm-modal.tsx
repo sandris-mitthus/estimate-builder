@@ -4,7 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
-  useState,
+  useRef,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -42,24 +42,58 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const onConfirmRef = useRef(onConfirm);
+  const blockingRef = useRef(blocking);
+
+  onConfirmRef.current = onConfirm;
+  blockingRef.current = blocking;
 
   const close = useCallback(() => {
-    if (blocking) return;
+    if (blockingRef.current) return;
     onOpenChange(false);
-  }, [blocking, onOpenChange]);
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || blocking) return;
+      if (blockingRef.current) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+
+      if (event.key !== "Enter" || event.shiftKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLButtonElement &&
+        panelRef.current?.contains(target)
+      ) {
+        return;
+      }
+
       event.preventDefault();
-      close();
+      onConfirmRef.current();
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, blocking, close]);
+  }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const frameId = requestAnimationFrame(() => {
+      confirmButtonRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,7 +107,8 @@ export function ConfirmModal({
   }, [open]);
 
   function handleBackdropClick(event: MouseEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget || blocking) return;
+    if (blocking) return;
+    if (panelRef.current?.contains(event.target as Node)) return;
     close();
   }
 
@@ -96,10 +131,7 @@ export function ConfirmModal({
       onMouseDown={handleBackdropClick}
     >
       <div className={backdropClassName} aria-hidden="true" />
-      <div
-        className={panelClassName}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+      <div ref={panelRef} className={panelClassName}>
         <div className="p-6">
           <h2 id={titleId} className="text-lg font-semibold text-zinc-900">
             {title}
@@ -117,6 +149,7 @@ export function ConfirmModal({
               {cancelLabel}
             </button>
             <button
+              ref={confirmButtonRef}
               type="button"
               onClick={onConfirm}
               disabled={blocking}

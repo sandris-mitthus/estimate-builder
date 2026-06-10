@@ -16,6 +16,7 @@ export async function saveCompanySettingsAction(settings: CompanySettings) {
 
   if (result.ok) {
     revalidatePath("/settings");
+    revalidatePath("/", "layout");
   }
 
   return result;

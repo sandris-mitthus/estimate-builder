@@ -7,6 +7,10 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     address: "Brīvības iela 45, Rīga, LV-1010",
     phone: "",
     email: "",
+    createdAt: "2026-06-09T10:00:00.000Z",
+    buildingModuleId: null,
+    visualizationBlocks: [],
+    projectBlocks: [],
   },
   {
     id: "proj-2",
@@ -14,6 +18,10 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     address: "Daugavgrīvas iela 12, Rīga, LV-1048",
     phone: "",
     email: "",
+    createdAt: "2026-05-15T10:00:00.000Z",
+    buildingModuleId: null,
+    visualizationBlocks: [],
+    projectBlocks: [],
   },
   {
     id: "proj-3",
@@ -21,6 +29,10 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     address: "Industriālais bulvāris 7, Jelgava, LV-3004",
     phone: "",
     email: "",
+    createdAt: "2026-04-20T10:00:00.000Z",
+    buildingModuleId: null,
+    visualizationBlocks: [],
+    projectBlocks: [],
   },
   {
     id: "proj-4",
@@ -28,6 +40,10 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     address: "Elizabetes iela 22, Rīga, LV-1050",
     phone: "",
     email: "",
+    createdAt: "2026-03-01T10:00:00.000Z",
+    buildingModuleId: null,
+    visualizationBlocks: [],
+    projectBlocks: [],
   },
 ];
 

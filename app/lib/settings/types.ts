@@ -10,6 +10,7 @@ export type CompanySettings = {
   email: string;
   currency: string;
   logoUrl: string;
+  estimateValidityDays: number;
 };
 
 export type CompanySettingsRow = {
@@ -25,4 +26,5 @@ export type CompanySettingsRow = {
   email: string;
   currency: string;
   logo_url: string;
+  estimate_validity_days?: number;
 };

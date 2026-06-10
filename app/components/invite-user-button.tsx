@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { inviteUserAction } from "@/app/(protected)/users/actions";
 import { AppModal } from "@/app/components/app-modal";
+import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import {
   formInputClassName,
@@ -99,6 +100,7 @@ export function InviteUserButton() {
         title="Uzaicināt lietotāju"
         description="Ievadi e-pasta adresi, lai nosūtītu uzaicinājumu"
         blocking={isPending}
+        dirty={email.trim().length > 0}
       >
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
           <label htmlFor="invite-email" className="block">
@@ -138,7 +140,10 @@ export function InviteUserButton() {
             </p>
           ) : null}
 
-          <div className="flex justify-end pt-2">
+          <ModalFormActions
+            onCancel={() => handleOpenChange(false)}
+            cancelDisabled={isPending}
+          >
             <button
               type="submit"
               disabled={isPending}
@@ -146,7 +151,7 @@ export function InviteUserButton() {
             >
               {isPending ? "Sūta…" : "Nosūtīt uzaicinājumu"}
             </button>
-          </div>
+          </ModalFormActions>
         </form>
       </AppModal>
     </>

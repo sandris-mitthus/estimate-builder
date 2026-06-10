@@ -1,9 +1,24 @@
 import Link from "next/link";
 import { ProjectCardActions } from "@/app/components/project-card-actions";
+import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
 const cardClassName =
   "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md";
+
+function resolveProjectModuleName(
+  buildingModuleId: string | null,
+  modules: BuildingModuleSummary[],
+): string {
+  if (!buildingModuleId) {
+    return "Individuāls projekts";
+  }
+
+  return (
+    modules.find((module) => module.id === buildingModuleId)?.name ??
+    "Individuāls projekts"
+  );
+}
 
 function ContactRow({
   icon,
@@ -22,9 +37,16 @@ function ContactRow({
   );
 }
 
-export function ProjectCard({ project }: { project: ProjectSummary }) {
+export function ProjectCard({
+  project,
+  modules,
+}: {
+  project: ProjectSummary;
+  modules: BuildingModuleSummary[];
+}) {
   const hasEmail = Boolean(project.email.trim());
   const hasPhone = Boolean(project.phone.trim());
+  const moduleName = resolveProjectModuleName(project.buildingModuleId, modules);
 
   return (
     <div className={cardClassName}>
@@ -33,7 +55,8 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           href={`/${project.id}`}
           className="group min-w-0 flex-1"
         >
-          <p className="text-base font-semibold text-zinc-900 group-hover:text-zinc-700">
+          <p className="text-sm font-medium text-zinc-500">{moduleName}</p>
+          <p className="mt-0.5 text-base font-semibold text-zinc-900 group-hover:text-zinc-700">
             {project.name}
           </p>
 
@@ -55,7 +78,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           ) : null}
         </Link>
 
-        <ProjectCardActions project={project} />
+        <ProjectCardActions project={project} modules={modules} />
       </div>
     </div>
   );

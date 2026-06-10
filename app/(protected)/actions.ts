@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
-import { createProject, deleteProject, updateProject } from "@/app/lib/projects/repository";
+import { createProject, deleteProject, updateProject, updateProjectEstimateDates } from "@/app/lib/projects/repository";
 import type { CreateProjectInput, UpdateProjectInput } from "@/app/lib/projects/types";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
 
@@ -58,6 +58,19 @@ export async function updateProjectAction(input: UpdateProjectInput) {
   if (result.ok) {
     revalidatePath("/");
     revalidatePath(`/${input.id}`);
+  }
+
+  return result;
+}
+
+export async function updateProjectEstimateDatesAction(
+  projectId: string,
+  dates: { date: string; deadline: string },
+) {
+  const result = await updateProjectEstimateDates(projectId, dates);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
   }
 
   return result;

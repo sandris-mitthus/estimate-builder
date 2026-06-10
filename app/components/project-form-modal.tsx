@@ -8,13 +8,18 @@ import {
 } from "@/app/(protected)/actions";
 import { AddressAutocompleteField } from "@/app/components/address-autocomplete-field";
 import { AppModal } from "@/app/components/app-modal";
+import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PhoneField } from "@/app/components/phone-field";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
-import type { ProjectSummary } from "@/app/lib/projects/types";
+import type { BuildingModuleSummary } from "@/app/lib/modules/types";
+import {
+  INDIVIDUAL_PROJECT_MODULE,
+  type ProjectSummary,
+} from "@/app/lib/projects/types";
 import {
   parseStoredPhone,
   validateEmail,
@@ -36,6 +41,14 @@ const emptyForm: FormState = {
   email: "",
   address: "",
 };
+
+function moduleSelectionFromProject(project: ProjectSummary): string {
+  if (project.buildingModuleId) {
+    return project.buildingModuleId;
+  }
+
+  return INDIVIDUAL_PROJECT_MODULE;
+}
 
 function formFromProject(project: ProjectSummary): {
   form: FormState;
@@ -100,6 +113,7 @@ type ProjectFormModalProps = {
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   project?: ProjectSummary;
+  modules?: BuildingModuleSummary[];
 };
 
 export function ProjectFormModal({
@@ -107,10 +121,13 @@ export function ProjectFormModal({
   onOpenChange,
   mode,
   project,
+  modules = [],
 }: ProjectFormModalProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [moduleSelection, setModuleSelection] = useState("");
+  const [moduleError, setModuleError] = useState<string | undefined>();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [phoneCallingCode, setPhoneCallingCode] = useState(DEFAULT_CALLING_CODE);
@@ -123,12 +140,15 @@ export function ProjectFormModal({
       const initial = formFromProject(project);
       setForm(initial.form);
       setPhoneCallingCode(initial.callingCode);
+      setModuleSelection(moduleSelectionFromProject(project));
     } else {
       setForm(emptyForm);
       setPhoneCallingCode(DEFAULT_CALLING_CODE);
+      setModuleSelection("");
     }
 
     setFieldErrors({});
+    setModuleError(undefined);
     setError(null);
   }, [open, isEdit, project]);
 
@@ -144,6 +164,8 @@ export function ProjectFormModal({
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && !isPending) {
       setForm(emptyForm);
+      setModuleSelection("");
+      setModuleError(undefined);
       setFieldErrors({});
       setError(null);
       setPhoneCallingCode(DEFAULT_CALLING_CODE);
@@ -151,8 +173,21 @@ export function ProjectFormModal({
     onOpenChange(nextOpen);
   }
 
+  function resolveBuildingModuleId(): string | null | undefined {
+    if (moduleSelection === INDIVIDUAL_PROJECT_MODULE) {
+      return null;
+    }
+
+    return moduleSelection;
+  }
+
   function validateForm(): boolean {
     const nextErrors: FieldErrors = {};
+    let nextModuleError: string | undefined;
+
+    if (!moduleSelection) {
+      nextModuleError = "Izvēlies moduli.";
+    }
 
     if (!form.clientName.trim()) {
       nextErrors.clientName = "Ievadi pasūtītāja vārdu un uzvārdu.";
@@ -169,7 +204,8 @@ export function ProjectFormModal({
     if (phoneError) nextErrors.phone = phoneError;
 
     setFieldErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setModuleError(nextModuleError);
+    return Object.keys(nextErrors).length === 0 && !nextModuleError;
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -188,6 +224,7 @@ export function ProjectFormModal({
           id: project.id,
           ...form,
           phoneCallingCode,
+          buildingModuleId: resolveBuildingModuleId() ?? null,
         });
 
         if (!result.ok) {
@@ -203,6 +240,7 @@ export function ProjectFormModal({
       const result = await createProjectAction({
         ...form,
         phoneCallingCode,
+        buildingModuleId: resolveBuildingModuleId() ?? null,
       });
 
       if (!result.ok) {
@@ -216,6 +254,28 @@ export function ProjectFormModal({
     });
   }
 
+  const isDirty =
+    isEdit && project
+      ? (() => {
+          const initial = formFromProject(project);
+          const initialModule = moduleSelectionFromProject(project);
+          return (
+            form.clientName !== initial.form.clientName ||
+            form.phone !== initial.form.phone ||
+            form.email !== initial.form.email ||
+            form.address !== initial.form.address ||
+            phoneCallingCode !== initial.callingCode ||
+            moduleSelection !== initialModule
+          );
+        })()
+      : Boolean(
+          form.clientName.trim() ||
+            form.phone.trim() ||
+            form.email.trim() ||
+            form.address.trim() ||
+            moduleSelection,
+        );
+
   return (
     <AppModal
       open={open}
@@ -223,6 +283,7 @@ export function ProjectFormModal({
       title={isEdit ? "Labot projektu" : "Jauns projekts"}
       description="Ievadi pasūtītāja kontaktinformāciju"
       blocking={isPending}
+      dirty={isDirty}
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <FormField
@@ -232,6 +293,41 @@ export function ProjectFormModal({
           onChange={(value) => updateField("clientName", value)}
           error={fieldErrors.clientName}
         />
+        <label htmlFor="moduleSelection" className="block">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            Modulis
+          </span>
+          <select
+            id="moduleSelection"
+            name="moduleSelection"
+            value={moduleSelection}
+            onChange={(event) => {
+              setModuleSelection(event.target.value);
+              setModuleError(undefined);
+            }}
+            className={`${formInputFullWidthClass} ${formInputClassName(Boolean(moduleError))}`}
+            aria-invalid={Boolean(moduleError)}
+            aria-describedby={moduleError ? "moduleSelection-error" : undefined}
+            required
+          >
+            <option value="">Izvēlies Moduli</option>
+            {modules.map((module) => (
+              <option key={module.id} value={module.id}>
+                {module.name}
+              </option>
+            ))}
+            <option value={INDIVIDUAL_PROJECT_MODULE}>Individuāls projekts</option>
+          </select>
+          {moduleError ? (
+            <p
+              id="moduleSelection-error"
+              className="mt-1 text-sm text-red-600"
+              role="alert"
+            >
+              {moduleError}
+            </p>
+          ) : null}
+        </label>
         <PhoneField
           id="phone"
           value={form.phone}
@@ -263,7 +359,10 @@ export function ProjectFormModal({
           </p>
         ) : null}
 
-        <div className="flex justify-end pt-2">
+        <ModalFormActions
+          onCancel={() => handleOpenChange(false)}
+          cancelDisabled={isPending}
+        >
           <button
             type="submit"
             disabled={isPending}
@@ -277,7 +376,7 @@ export function ProjectFormModal({
                 ? "Saglabāt"
                 : "Izveidot projektu"}
           </button>
-        </div>
+        </ModalFormActions>
       </form>
     </AppModal>
   );

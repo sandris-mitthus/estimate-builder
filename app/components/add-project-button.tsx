@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
+import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
-export function AddProjectButton() {
+type AddProjectButtonProps = {
+  modules: BuildingModuleSummary[];
+};
+
+export function AddProjectButton({ modules }: AddProjectButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -17,7 +22,12 @@ export function AddProjectButton() {
         Jauns projekts
       </button>
 
-      <ProjectFormModal open={open} onOpenChange={setOpen} mode="create" />
+      <ProjectFormModal
+        open={open}
+        onOpenChange={setOpen}
+        mode="create"
+        modules={modules}
+      />
     </>
   );
 }
