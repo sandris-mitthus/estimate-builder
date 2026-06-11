@@ -21,6 +21,7 @@ export function ProjectModuleDataContent({ project }: ProjectModuleDataContentPr
         scope={{ kind: "project", id: project.id }}
         visualizationBlocks={project.visualizationBlocks}
         projectBlocks={project.projectBlocks}
+        initialProjectDescription={project.projectDescription}
       />
     </div>
   );

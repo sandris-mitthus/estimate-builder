@@ -8,6 +8,7 @@ import type {
   ModuleContentBlock,
   ModuleOutline,
 } from "@/app/lib/modules/types";
+import type { ProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 
 type BlockActionResult =
   | { ok: true; block: ModuleContentBlock }
@@ -30,6 +31,10 @@ type ModuleDataEditorProps = {
   onProjectBlocksChange: (blocks: ModuleContentBlock[]) => void;
   showOutline?: boolean;
   outline?: ModuleOutline;
+  initialProjectDescription: ProjectDescriptionFormState;
+  onSaveProjectDescription: (
+    projectDescription: ProjectDescriptionFormState,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
 export function ModuleDataEditor({
@@ -43,6 +48,8 @@ export function ModuleDataEditor({
   onProjectBlocksChange,
   showOutline = false,
   outline,
+  initialProjectDescription,
+  onSaveProjectDescription,
 }: ModuleDataEditorProps) {
   return (
     <div className="space-y-6">
@@ -81,7 +88,10 @@ export function ModuleDataEditor({
           />
         </div>
 
-        <ModuleProjectDescriptionForm />
+        <ModuleProjectDescriptionForm
+          initialProjectDescription={initialProjectDescription}
+          onSave={onSaveProjectDescription}
+        />
       </div>
 
       {showOutline && outline ? <ModuleOutlineView outline={outline} /> : null}

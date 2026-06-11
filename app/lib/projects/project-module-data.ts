@@ -4,7 +4,9 @@ import {
   uploadProjectBlockFile,
 } from "@/app/lib/modules/file-storage";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
-import type { UpdateProjectModuleBlocksInput } from "@/app/lib/projects/types";
+import { parseProjectDescriptionFormState } from "@/app/lib/modules/parse-project-description";
+import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
+import type { UpdateProjectModuleBlocksInput, UpdateProjectProjectDescriptionInput } from "@/app/lib/projects/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -48,6 +50,26 @@ export async function updateProjectModuleBlocks(
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt bloku secību." };
+  }
+
+  return { ok: true };
+}
+
+export async function updateProjectProjectDescription(
+  input: UpdateProjectProjectDescriptionInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ project_description: input.projectDescription })
+    .eq("id", input.id);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt projekta aprakstu." };
   }
 
   return { ok: true };
@@ -132,10 +154,12 @@ export async function removeProjectModuleBlock(
 export function parseProjectModuleBlocks(row: {
   visualization_blocks?: unknown;
   project_blocks?: unknown;
+  project_description?: unknown;
 }) {
   return {
     visualizationBlocks: parseModuleContentBlocks(row.visualization_blocks),
     projectBlocks: parseModuleContentBlocks(row.project_blocks),
+    projectDescription: parseProjectDescriptionFormState(row.project_description),
   };
 }
 

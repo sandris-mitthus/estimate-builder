@@ -1,4 +1,7 @@
 import type { ProjectSummary } from "@/app/lib/projects/types";
+import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
+
+const SAMPLE_PROJECT_DESCRIPTION = createEmptyProjectDescriptionFormState();
 
 export const SAMPLE_PROJECTS: ProjectSummary[] = [
   {
@@ -11,6 +14,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     buildingModuleId: null,
     visualizationBlocks: [],
     projectBlocks: [],
+    projectDescription: SAMPLE_PROJECT_DESCRIPTION,
   },
   {
     id: "proj-2",
@@ -22,6 +26,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     buildingModuleId: null,
     visualizationBlocks: [],
     projectBlocks: [],
+    projectDescription: SAMPLE_PROJECT_DESCRIPTION,
   },
   {
     id: "proj-3",
@@ -33,6 +38,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     buildingModuleId: null,
     visualizationBlocks: [],
     projectBlocks: [],
+    projectDescription: SAMPLE_PROJECT_DESCRIPTION,
   },
   {
     id: "proj-4",
@@ -44,6 +50,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     buildingModuleId: null,
     visualizationBlocks: [],
     projectBlocks: [],
+    projectDescription: SAMPLE_PROJECT_DESCRIPTION,
   },
 ];
 

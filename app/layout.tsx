@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { FeedbackToastProvider } from "@/app/components/feedback-toast-provider";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
 
@@ -20,7 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="lv" className={`${geistSans.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <FeedbackToastProvider>{children}</FeedbackToastProvider>
+      </body>
     </html>
   );
 }

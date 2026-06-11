@@ -20,6 +20,7 @@ export function ModuleDetailContent({ module }: ModuleDetailContentProps) {
         scope={{ kind: "module", id: module.id }}
         visualizationBlocks={module.visualizationBlocks}
         projectBlocks={module.projectBlocks}
+        initialProjectDescription={module.projectDescription}
         showOutline
         outline={module.outline}
       />

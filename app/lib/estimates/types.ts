@@ -4,6 +4,14 @@ export type PriceBreakdown = {
   mechanisms: number;
 };
 
+/** Piesaistīts moduļa lielums tāmes rindai (vienlaikus tikai viens slēdzis). */
+export type LineItemModuleSizeAttachment = {
+  moduleId: string;
+  itemKey: string;
+  /** Korekcijas (+) pēc summary atslēgas — tikai šai tāmes pozīcijai. */
+  adjustments?: Record<string, string>;
+};
+
 export type EstimateLineItem = {
   id: string;
   name: string;
@@ -12,6 +20,7 @@ export type EstimateLineItem = {
   unitPrice: PriceBreakdown;
   /** Saite uz `position_prices`, ja rinda no kataloga */
   positionPriceId?: string;
+  moduleSizeAttachment?: LineItemModuleSizeAttachment;
 };
 
 export type EstimateMultiPositionOption = {
@@ -41,6 +50,8 @@ export type EstimateSubcategory = {
   id: string;
   title: string;
   items: EstimateRowItem[];
+  /** `true` — subkategorijas pozīcijas paslēptas piedāvājumā. */
+  hiddenInOffer?: boolean;
 };
 
 export type EstimateCategory = {

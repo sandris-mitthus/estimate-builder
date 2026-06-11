@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
+import {
+  buildProjectModuleSizeOptions,
+  syncCategoriesQuantitiesFromModuleSizes,
+} from "@/app/lib/estimates/sync-module-size-quantities";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -33,6 +37,22 @@ export default async function ProjectDetailPage({
     ? buildingModule.visualizationBlocks
     : project.visualizationBlocks;
 
+  const displayModuleName = buildingModule?.name ?? "Individuāls projekts";
+  const moduleSizeOptions = buildProjectModuleSizeOptions(
+    project,
+    buildingModule,
+    displayModuleName,
+    estimate.categories,
+  );
+  const initialCategories =
+    moduleSizeOptions.length > 0
+      ? syncCategoriesQuantitiesFromModuleSizes(
+          estimate.categories,
+          moduleSizeOptions[0].projectDescription,
+          catalogPositions,
+        )
+      : estimate.categories;
+
   return (
     <main className="page">
       <Link
@@ -45,9 +65,11 @@ export default async function ProjectDetailPage({
       <EstimateTable
         initialTitle={estimate.title}
         initialMeta={estimate.meta}
-        initialCategories={estimate.categories}
+        initialCategories={initialCategories}
+        initialMultiOptionLinks={estimate.multiOptionLinks}
         moduleName={buildingModule?.name ?? null}
         moduleVisualizations={moduleVisualizations}
+        moduleSizeOptions={moduleSizeOptions}
         project={project}
         modules={modules}
         estimateValidityDays={companySettings.estimateValidityDays}

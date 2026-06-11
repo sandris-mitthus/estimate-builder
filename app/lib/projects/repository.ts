@@ -1,11 +1,17 @@
-import { createSampleCategories, defaultEstimateDeadline, projectCreatedDateIso, SAMPLE_META } from "@/app/lib/estimates/sample-data";
+import { defaultEstimateDeadline, projectCreatedDateIso } from "@/app/lib/estimates/sample-data";
 import { resolveEstimateMeta } from "@/app/lib/estimates/resolve-estimate-meta";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
+import {
+  buildEstimatePositionSectionsStorage,
+  parseEstimatePositionDocumentPayload,
+} from "@/app/lib/estimate-positions/serialize-document";
+import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { isMissingColumnError } from "@/app/lib/supabase/missing-column";
 import {
   getProjectById as getSampleProjectById,
   SAMPLE_PROJECTS,
@@ -31,6 +37,7 @@ type ProjectRow = {
   building_module_id?: string | null;
   visualization_blocks?: unknown;
   project_blocks?: unknown;
+  project_description?: unknown;
 };
 
 type EstimateRow = {
@@ -52,6 +59,7 @@ function mapProject(row: ProjectRow): ProjectSummary {
     buildingModuleId: row.building_module_id ?? null,
     visualizationBlocks: moduleBlocks.visualizationBlocks,
     projectBlocks: moduleBlocks.projectBlocks,
+    projectDescription: moduleBlocks.projectDescription,
   };
 }
 
@@ -68,34 +76,42 @@ function estimateMetaForProject(
   );
 }
 
-function defaultEstimateForProject(
+async function defaultEstimateForProject(
   project: ProjectSummary,
   validityDays: number,
-): ProjectEstimate {
+): Promise<ProjectEstimate> {
+  const base = await getProjectEstimateBaseFromSagatave();
+
   return {
     title: project.name,
     meta: estimateMetaForProject(project, validityDays),
-    categories: createSampleCategories(),
+    categories: base.categories,
+    multiOptionLinks: base.multiOptionLinks,
   };
 }
 
-function parseEstimateRow(
+async function parseEstimateRow(
   row: EstimateRow | null,
   project: ProjectSummary,
   validityDays: number,
-): ProjectEstimate {
+): Promise<ProjectEstimate> {
   if (!row) {
     return defaultEstimateForProject(project, validityDays);
   }
+
+  const parsed = parseEstimatePositionDocumentPayload(row.categories);
+  const hasCategories = parsed.sections.length > 0;
+  const base = hasCategories ? null : await getProjectEstimateBaseFromSagatave();
 
   return {
     title: row.title || project.name,
     meta: estimateMetaForProject(project, validityDays, {
       ...row.meta,
     }),
-    categories: Array.isArray(row.categories) && row.categories.length > 0
-      ? row.categories
-      : createSampleCategories(),
+    categories: hasCategories ? parsed.sections : base!.categories,
+    multiOptionLinks: hasCategories
+      ? parsed.multiOptionLinks
+      : base!.multiOptionLinks,
   };
 }
 
@@ -107,15 +123,29 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
+    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks, project_description")
     .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("listProjects:", error.message);
+  if (!error) {
+    return (data ?? []).map(mapProject);
+  }
+
+  if (isMissingColumnError(error, "project_description")) {
+    const legacy = await supabase
+      .from("projects")
+      .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
+      .order("created_at", { ascending: true });
+
+    if (!legacy.error) {
+      return (legacy.data ?? []).map(mapProject);
+    }
+
+    console.error("listProjects:", legacy.error.message);
     return [];
   }
 
-  return (data ?? []).map(mapProject);
+  console.error("listProjects:", error.message);
+  return [];
 }
 
 export async function getProject(id: string): Promise<ProjectSummary | null> {
@@ -126,20 +156,37 @@ export async function getProject(id: string): Promise<ProjectSummary | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
+    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks, project_description")
     .eq("id", id)
     .maybeSingle();
 
+  if (!error && data) {
+    return mapProject(data);
+  }
+
+  if (error && isMissingColumnError(error, "project_description")) {
+    const legacy = await supabase
+      .from("projects")
+      .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!legacy.error && legacy.data) {
+      return mapProject(legacy.data);
+    }
+
+    if (legacy.error) {
+      console.error("getProject:", legacy.error.message);
+    }
+
+    return null;
+  }
+
   if (error) {
     console.error("getProject:", error.message);
-    return null;
   }
 
-  if (!data) {
-    return null;
-  }
-
-  return mapProject(data);
+  return null;
 }
 
 export async function getProjectEstimate(id: string): Promise<ProjectEstimate | null> {
@@ -241,11 +288,17 @@ export async function createProject(
     number: "",
   };
 
+  const estimateBase = await getProjectEstimateBaseFromSagatave();
+  const categories = buildEstimatePositionSectionsStorage(
+    estimateBase.categories,
+    estimateBase.multiOptionLinks,
+  );
+
   const { error: estimateError } = await supabase.from("estimates").insert({
     project_id: project.id,
     title: clientName,
     meta,
-    categories: [],
+    categories,
   });
 
   if (estimateError) {

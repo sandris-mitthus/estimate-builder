@@ -3,7 +3,11 @@ import {
   isEstimateMultiPosition,
 } from "@/app/lib/estimates/multi-position";
 import type { EstimateLineItem, EstimateRowItem } from "@/app/lib/estimates/types";
-import { applyCatalogPricesToLinkedLineItem } from "@/app/lib/positions/apply-catalog-to-line-item";
+import {
+  applyCatalogPricesToLinkedLineItem,
+  getMaterialsOrMechanismsUnitPrice,
+  isMaterialsOrMechanismsCostType,
+} from "@/app/lib/positions/apply-catalog-to-line-item";
 import { updatePositionNameAndUnit } from "@/app/lib/positions/repository";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
@@ -65,6 +69,18 @@ export function findCatalogPositionForLineItem(
   }
 
   return catalogPositions.find((position) => position.id === positionPriceId);
+}
+
+export function isMaterialsOrMechanismsLineItem(
+  item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
+): boolean {
+  const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
+  if (catalogPosition) {
+    return isMaterialsOrMechanismsCostType(catalogPosition.costType);
+  }
+
+  return getMaterialsOrMechanismsUnitPrice(item.unitPrice) != null;
 }
 
 export function attachCatalogLinkToLineItem(

@@ -5,11 +5,13 @@ import { useEffect, useState, useTransition } from "react";
 import {
   removeBuildingModuleBlockAction,
   updateBuildingModuleBlocksAction,
+  updateBuildingModuleProjectDescriptionAction,
   uploadBuildingModuleBlockAction,
 } from "@/app/(protected)/modules/actions";
 import {
   removeProjectModuleBlockAction,
   updateProjectModuleBlocksAction,
+  updateProjectProjectDescriptionAction,
   uploadProjectModuleBlockAction,
 } from "@/app/(protected)/project-module-actions";
 import { ModuleDataEditor } from "@/app/components/module-data-editor";
@@ -19,6 +21,7 @@ import type {
   ModuleContentBlock,
   ModuleOutline,
 } from "@/app/lib/modules/types";
+import type { ProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 
 type ModuleDataEditorScope = {
   kind: "module";
@@ -34,6 +37,7 @@ type ModuleDataEditorPanelProps = {
   scope: ModuleDataEditorScope | ProjectModuleDataEditorScope;
   visualizationBlocks: ModuleContentBlock[];
   projectBlocks: ModuleContentBlock[];
+  initialProjectDescription: ProjectDescriptionFormState;
   showOutline?: boolean;
   outline?: ModuleOutline;
 };
@@ -42,6 +46,7 @@ export function ModuleDataEditorPanel({
   scope,
   visualizationBlocks: initialVisualizationBlocks,
   projectBlocks: initialProjectBlocks,
+  initialProjectDescription,
   showOutline = false,
   outline,
 }: ModuleDataEditorPanelProps) {
@@ -113,6 +118,28 @@ export function ModuleDataEditorPanel({
     persistBlocks(visualizationBlocks, nextBlocks);
   }
 
+  async function saveProjectDescription(projectDescription: ProjectDescriptionFormState) {
+    const result =
+      scope.kind === "module"
+        ? await updateBuildingModuleProjectDescriptionAction({
+            id: scope.id,
+            projectDescription,
+          })
+        : await updateProjectProjectDescriptionAction({
+            id: scope.id,
+            projectDescription,
+          });
+
+    if (!result.ok) {
+      showFeedback({ type: "error", text: result.error });
+      return result;
+    }
+
+    showFeedback({ type: "success", text: "Projekta apraksts saglabāts." });
+    router.refresh();
+    return result;
+  }
+
   return (
     <ModuleDataEditor
       uploadBlockAction={uploadBlock}
@@ -125,6 +152,8 @@ export function ModuleDataEditorPanel({
       onProjectBlocksChange={setProjectBlocks}
       showOutline={showOutline}
       outline={outline}
+      initialProjectDescription={initialProjectDescription}
+      onSaveProjectDescription={saveProjectDescription}
     />
   );
 }

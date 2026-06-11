@@ -7,6 +7,7 @@ import {
   removeBuildingModuleBlock,
   updateBuildingModule,
   updateBuildingModuleBlocks,
+  updateBuildingModuleProjectDescription,
   uploadBuildingModuleBlock,
 } from "@/app/lib/modules/repository";
 import type {
@@ -14,6 +15,7 @@ import type {
   ModuleBlockKind,
   UpdateBuildingModuleBlocksInput,
   UpdateBuildingModuleInput,
+  UpdateBuildingModuleProjectDescriptionInput,
 } from "@/app/lib/modules/types";
 
 function revalidateModules() {
@@ -60,6 +62,19 @@ export async function updateBuildingModuleBlocksAction(
   const result = await updateBuildingModuleBlocks(input);
 
   if (result.ok) {
+    revalidateModules();
+    revalidateModuleDetail(input.id);
+  }
+
+  return result;
+}
+
+export async function updateBuildingModuleProjectDescriptionAction(
+  input: UpdateBuildingModuleProjectDescriptionInput,
+) {
+  const result = await updateBuildingModuleProjectDescription(input);
+
+  if (result.ok) {
     revalidateModuleDetail(input.id);
   }
 
@@ -80,6 +95,7 @@ export async function uploadBuildingModuleBlockAction(
   const result = await uploadBuildingModuleBlock(moduleId, kind, file);
 
   if (result.ok) {
+    revalidateModules();
     revalidateModuleDetail(moduleId);
   }
 
@@ -94,6 +110,7 @@ export async function removeBuildingModuleBlockAction(
   const result = await removeBuildingModuleBlock(moduleId, kind, blockId);
 
   if (result.ok) {
+    revalidateModules();
     revalidateModuleDetail(moduleId);
   }
 

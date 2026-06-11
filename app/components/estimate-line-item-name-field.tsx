@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import type { PriceBreakdown } from "@/app/lib/estimates/types";
@@ -35,6 +36,9 @@ type EstimateLineItemNameFieldProps = {
   excludedCatalogKeys?: ReadonlySet<string>;
   className?: string;
   placeholder?: string;
+  readOnly?: boolean;
+  /** Saturs tieši zem nosaukuma (piem. piesaistītais moduļa lielums). */
+  footer?: ReactNode;
 };
 
 const EMPTY_EXCLUDED_CATALOG_KEYS = new Set<string>();
@@ -72,7 +76,10 @@ export function EstimateLineItemNameField({
   excludedCatalogKeys = EMPTY_EXCLUDED_CATALOG_KEYS,
   className,
   placeholder = "Meklēt pozīciju katalogā",
+  readOnly = false,
+  footer,
 }: EstimateLineItemNameFieldProps) {
+  const compact = footer != null;
   const excludedKeysFingerprint = excludedCatalogKeysFingerprint(
     excludedCatalogKeys,
   );
@@ -92,6 +99,11 @@ export function EstimateLineItemNameField({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [dropdownRect, setDropdownRect] = useState<DropdownRect | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const suggestions = getVisiblePositions(
     availableCatalogPositions,
@@ -260,11 +272,19 @@ export function EstimateLineItemNameField({
       </ul>
     ) : null;
 
+  if (readOnly) {
+    return (
+      <div className={`min-w-0 flex-1 text-sm leading-snug text-zinc-800 ${className ?? ""}`}>
+        {value.trim() || "—"}
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef} className="min-w-0 flex-1">
       <textarea
         ref={inputRef}
-        rows={2}
+        rows={compact ? 1 : 2}
         value={value}
         placeholder={placeholder}
         autoComplete="off"
@@ -280,12 +300,14 @@ export function EstimateLineItemNameField({
             setOpen(true);
           }
         }}
-        className={className}
+        className={
+          compact
+            ? `${className ?? ""} !min-h-0 py-1`.trim()
+            : className
+        }
       />
-
-      {typeof document !== "undefined" && dropdown
-        ? createPortal(dropdown, document.body)
-        : null}
+      {footer}
+      {portalReady && dropdown ? createPortal(dropdown, document.body) : null}
     </div>
   );
 }

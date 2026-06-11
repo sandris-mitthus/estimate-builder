@@ -15,7 +15,11 @@ export default async function ProtectedLayout({
   if (isSupabaseConfigured()) {
     const user = await getCurrentUser();
     if (!user) {
-      return <LoginGate />;
+      return (
+        <FeedbackToastProvider>
+          <LoginGate />
+        </FeedbackToastProvider>
+      );
     }
 
     currentUser = mapUserDisplay(user);

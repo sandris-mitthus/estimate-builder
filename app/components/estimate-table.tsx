@@ -26,14 +26,24 @@ import {
   type SetStateAction,
 } from "react";
 import { updateProjectEstimateDatesAction } from "@/app/(protected)/actions";
-import { formatAmount, sumBreakdown } from "@/app/lib/estimates/calculate-line";
+import {
+  formatAmountDisplay,
+  isAmountDisplayEmpty,
+  sumBreakdown,
+} from "@/app/lib/estimates/calculate-line";
+import {
+  VolumeSumCells,
+  resolveLineItemVolumeSum,
+  volumeSumFooterCell,
+  volumeSumFooterCellTotal,
+} from "@/app/components/estimate-volume-sum-cells";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
-  createCategory,
   createLineItem,
   createSubcategory,
 } from "@/app/lib/estimates/create-empty";
-import { formatMoney } from "@/app/lib/estimates/format-money";
+import { createEstimatePositionSection } from "@/app/lib/estimate-positions/create-empty";
+import { formatMoneyDisplay } from "@/app/lib/estimates/format-money";
 import {
   createSampleCategories,
   defaultEstimateDeadline,
@@ -48,16 +58,26 @@ import { ProjectCardActions } from "@/app/components/project-card-actions";
 import { DeleteButton } from "@/app/components/delete-button";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
+import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
-import { applyCatalogPositionToLineItem } from "@/app/lib/positions/apply-catalog-to-line-item";
+import {
+  applyCatalogPositionToLineItem,
+  buildUnitPriceForCatalogPosition,
+} from "@/app/lib/positions/apply-catalog-to-line-item";
 import {
   applyLineItemCatalogEdit,
+  findCatalogPositionForLineItem,
   hydrateLineItemWithCatalog,
+  isMaterialsOrMechanismsLineItem,
 } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import {
-  hasAnyVariableQuantityPosition,
+  hasModuleSizeAttachment,
+  resolveLineItemDisplayQuantityFromModuleSize,
+} from "@/app/lib/estimates/sync-module-size-quantities";
+import {
+  formatQuantityDisplay,
   isVariableQuantityLineItem,
 } from "@/app/lib/positions/variable-quantity";
 import { getEstimateUnitOptions } from "@/app/lib/estimates/unit-options";
@@ -101,30 +121,25 @@ import type {
   EstimateSubcategory,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
-import type { BuildingModuleSummary, ModuleContentBlock } from "@/app/lib/modules/types";
+import type {
+  BuildingModuleSizeOption,
+  BuildingModuleSummary,
+  ModuleContentBlock,
+} from "@/app/lib/modules/types";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 import { isGoogleMapsEmbedConfigured } from "@/app/lib/google-maps/env";
 
 function getEstimateTableColCount(showQuantityColumn: boolean): number {
-  return showQuantityColumn ? 8 : 7;
-}
-
-function parseQuantityInput(value: string): number {
-  const normalized = value.trim().replace(",", ".");
-  if (!normalized) {
-    return 1;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+  return showQuantityColumn ? 12 : 7;
 }
 
 const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
 const nameInput =
   "w-full min-h-[2.75rem] resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
+const nameInputRightAlign = "text-right";
 const cellNum = `${cellInput} text-right tabular-nums`;
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
@@ -144,6 +159,19 @@ const subcategoryNameIndent = "ml-[10px]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 
+function resolveLineItemDisplayUnitPrice(
+  item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+): PriceBreakdown {
+  const position = findCatalogPositionForLineItem(item, catalogPositions);
+  if (position) {
+    return buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
+  }
+
+  return item.unitPrice;
+}
+
 function PriceCells({
   values,
   readOnly = false,
@@ -160,7 +188,13 @@ function PriceCells({
       {(["labor", "materials", "mechanisms"] as const).map((field) => (
         <td key={field} className={priceCell}>
           {readOnly ? (
-            <span className={readOnlyNum}>{formatAmount(values[field])}</span>
+            <span
+              className={`${readOnlyNum} ${
+                isAmountDisplayEmpty(values[field]) ? "text-zinc-300" : ""
+              }`}
+            >
+              {formatAmountDisplay(values[field])}
+            </span>
           ) : (
             <input
               type="number"
@@ -176,8 +210,14 @@ function PriceCells({
         </td>
       ))}
       <td className={priceCellTotal}>
-        <span className={`${readOnlyNum} font-medium text-zinc-900`}>
-          {formatAmount(total)}
+        <span
+          className={`${readOnlyNum} ${
+            isAmountDisplayEmpty(total)
+              ? "text-zinc-300"
+              : "font-medium text-zinc-900"
+          }`}
+        >
+          {formatAmountDisplay(total)}
         </span>
       </td>
     </>
@@ -198,6 +238,7 @@ function LineItemRow({
   catalogPositions,
   defaultHourlyRate,
   showQuantityColumn,
+  moduleSizeOptions = [],
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
@@ -212,9 +253,36 @@ function LineItemRow({
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
+  const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
+  const isCatalogLinked = catalogPosition != null;
+  const isMaterialsOrMechanisms = isMaterialsOrMechanismsLineItem(
+    item,
+    catalogPositions,
+  );
+  const displayName = catalogPosition?.name ?? item.name;
+  const displayUnit = catalogPosition?.unit ?? item.unit;
   const unitOptions = getEstimateUnitOptions(item.unit);
   const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
+  const attachedQuantity = resolveLineItemDisplayQuantityFromModuleSize(
+    item,
+    moduleSizeOptions,
+  );
+  const hasAttachedQuantity = hasModuleSizeAttachment(item) && attachedQuantity != null;
+  const effectiveQuantity = attachedQuantity ?? item.quantity;
+  const displayUnitPrice = resolveLineItemDisplayUnitPrice(
+    item,
+    catalogPositions,
+    defaultHourlyRate,
+  );
+  const volumeSum = showQuantityColumn
+    ? resolveLineItemVolumeSum(
+        effectiveQuantity,
+        displayUnitPrice,
+        showQuantityInput || hasAttachedQuantity,
+      )
+    : null;
 
   return (
     <tbody
@@ -228,10 +296,11 @@ function LineItemRow({
           <span className={dragHandleColumn}>{dragHandle}</span>
           <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
             <EstimateLineItemNameField
-              value={item.name}
+              value={displayName}
+              readOnly={isCatalogLinked}
               catalogPositions={catalogPositions}
               defaultHourlyRate={defaultHourlyRate}
-              className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
+              className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""} ${isMaterialsOrMechanisms ? nameInputRightAlign : ""}`}
               onNameChange={(name) => {
                 const next = applyLineItemCatalogEdit(
                   item,
@@ -275,52 +344,47 @@ function LineItemRow({
         </div>
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-        <select
-          className={`${cellInput} cursor-pointer`}
-          value={item.unit}
-          onChange={(event) => {
-            const next = { ...item, unit: event.target.value };
-            onChange(next);
-            onSyncCatalogPosition(next);
-          }}
-        >
-          {unitOptions.map((unit) => (
-            <option key={unit} value={unit}>
-              {unit}
-            </option>
-          ))}
-        </select>
+        {isCatalogLinked ? (
+          <span className={`${readOnlyNum} text-zinc-700`}>
+            {displayUnit.trim() || "—"}
+          </span>
+        ) : (
+          <select
+            className={`${cellInput} cursor-pointer`}
+            value={item.unit}
+            onChange={(event) => {
+              const next = { ...item, unit: event.target.value };
+              onChange(next);
+              onSyncCatalogPosition(next);
+            }}
+          >
+            {unitOptions.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        )}
       </td>
       {showQuantityColumn ? (
         <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-          {showQuantityInput ? (
-            <input
-              type="text"
-              inputMode="decimal"
+          {hasAttachedQuantity ? (
+            <span className={`${readOnlyNum} text-zinc-700`}>
+              {formatQuantityDisplay(attachedQuantity)}
+            </span>
+          ) : showQuantityInput ? (
+            <EstimateQuantityInput
               className={cellNum}
-              value={formatAmount(item.quantity)}
-              aria-label="Apjoms"
-              onChange={(event) =>
-                onChange({
-                  ...item,
-                  quantity: parseQuantityInput(event.target.value),
-                })
-              }
+              value={item.quantity}
+              onChange={(quantity) => onChange({ ...item, quantity })}
             />
           ) : (
             <span className={`${readOnlyNum} text-zinc-300`}>—</span>
           )}
         </td>
       ) : null}
-      <PriceCells
-        values={item.unitPrice}
-        onChange={(field, value) =>
-          onChange({
-            ...item,
-            unitPrice: { ...item.unitPrice, [field]: value },
-          })
-        }
-      />
+      <PriceCells readOnly values={displayUnitPrice} />
+      {showQuantityColumn ? <VolumeSumCells values={volumeSum} /> : null}
       <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
         <DeleteButton
           label="Dzēst pozīciju"
@@ -380,6 +444,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate,
   showQuantityColumn,
   allCategories,
+  moduleSizeOptions = [],
 }: {
   sortId: string;
   categoryId: string;
@@ -390,6 +455,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
   allCategories: EstimateCategory[];
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -415,7 +481,8 @@ function SortableMultiPositionRow({
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
       showQuantityColumn={showQuantityColumn}
-      readOnlyPrices={false}
+      moduleSizeOptions={moduleSizeOptions}
+      readOnlyPrices={true}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
@@ -432,6 +499,7 @@ function SortableMultiPositionRow({
 function SortableLineItemRow({
   sortId,
   subcategoryId,
+  moduleSizeOptions = [],
   ...props
 }: {
   sortId: string;
@@ -445,6 +513,7 @@ function SortableLineItemRow({
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -455,6 +524,7 @@ function SortableLineItemRow({
   return (
     <LineItemRow
       {...props}
+      moduleSizeOptions={moduleSizeOptions}
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
@@ -591,6 +661,7 @@ function SubcategoryBlock({
   colSpan,
   allCategories,
   optionLinkActions,
+  moduleSizeOptions = [],
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
@@ -604,6 +675,7 @@ function SubcategoryBlock({
   colSpan: number;
   allCategories: EstimateCategory[];
   optionLinkActions: MultiOptionLinkActions;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   return (
     <>
@@ -619,11 +691,14 @@ function SubcategoryBlock({
           <RowActions
             showSub={false}
             deleteLabel="Dzēst subkategoriju"
-            onAddMulti={() =>
-              onChange({
-                ...subcategory,
-                items: [...subcategory.items, createMultiPosition()],
-              })
+            onAddMulti={
+              showQuantityColumn
+                ? undefined
+                : () =>
+                    onChange({
+                      ...subcategory,
+                      items: [...subcategory.items, createMultiPosition()],
+                    })
             }
             onAddItem={() =>
               onChange({
@@ -647,6 +722,7 @@ function SubcategoryBlock({
             showQuantityColumn={showQuantityColumn}
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
+            moduleSizeOptions={moduleSizeOptions}
             value={row}
           />
         ) : (
@@ -658,6 +734,7 @@ function SubcategoryBlock({
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
             showQuantityColumn={showQuantityColumn}
+            moduleSizeOptions={moduleSizeOptions}
             onSyncCatalogPosition={onSyncCatalogPosition}
             onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
@@ -692,6 +769,7 @@ function CategoryBlock({
   colSpan,
   allCategories,
   optionLinkActions,
+  moduleSizeOptions = [],
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
@@ -704,6 +782,7 @@ function CategoryBlock({
   colSpan: number;
   allCategories: EstimateCategory[];
   optionLinkActions: MultiOptionLinkActions;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   return (
     <>
@@ -724,11 +803,14 @@ function CategoryBlock({
                 subcategories: [...category.subcategories, createSubcategory()],
               })
             }
-            onAddMulti={() =>
-              onChange({
-                ...category,
-                items: [...category.items, createMultiPosition()],
-              })
+            onAddMulti={
+              showQuantityColumn
+                ? undefined
+                : () =>
+                    onChange({
+                      ...category,
+                      items: [...category.items, createMultiPosition()],
+                    })
             }
             onAddItem={() =>
               onChange({
@@ -751,6 +833,7 @@ function CategoryBlock({
           colSpan={colSpan}
           allCategories={allCategories}
           optionLinkActions={optionLinkActions}
+          moduleSizeOptions={moduleSizeOptions}
           onSyncCatalogPosition={onSyncCatalogPosition}
           onScheduleCatalogSync={onScheduleCatalogSync}
           subcategory={subcategory}
@@ -784,6 +867,7 @@ function CategoryBlock({
             showQuantityColumn={showQuantityColumn}
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
+            moduleSizeOptions={moduleSizeOptions}
             value={row}
           />
         ) : (
@@ -794,6 +878,7 @@ function CategoryBlock({
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
             showQuantityColumn={showQuantityColumn}
+            moduleSizeOptions={moduleSizeOptions}
             onSyncCatalogPosition={onSyncCatalogPosition}
             onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
@@ -828,6 +913,7 @@ function EstimateDndTable({
   catalogPositions,
   defaultHourlyRate,
   showQuantityColumn,
+  moduleSizeOptions = [],
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -845,6 +931,7 @@ function EstimateDndTable({
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const colSpan = getEstimateTableColCount(showQuantityColumn);
 
@@ -862,6 +949,7 @@ function EstimateDndTable({
         catalogPositions={catalogPositions}
         defaultHourlyRate={defaultHourlyRate}
         showQuantityColumn={showQuantityColumn}
+        moduleSizeOptions={moduleSizeOptions}
         colSpan={colSpan}
       />
     </DropIndicatorProvider>
@@ -880,6 +968,7 @@ function EstimateDndTableInner({
   catalogPositions,
   defaultHourlyRate,
   showQuantityColumn,
+  moduleSizeOptions = [],
   colSpan,
 }: {
   categories: EstimateCategory[];
@@ -898,6 +987,7 @@ function EstimateDndTableInner({
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
   colSpan: number;
 }) {
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -997,12 +1087,23 @@ function EstimateDndTableInner({
     >
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
-          <col style={{ width: showQuantityColumn ? "32%" : "35%" }} />
-          <col style={{ width: "6%" }} />
-          {showQuantityColumn ? <col style={{ width: "7%" }} /> : null}
+          <col style={{ width: showQuantityColumn ? "26%" : "35%" }} />
+          <col style={{ width: "5%" }} />
+          {showQuantityColumn ? <col style={{ width: "6%" }} /> : null}
           {Array.from({ length: 4 }).map((_, index) => (
-            <col key={index} style={{ width: "12%" }} />
+            <col
+              key={`unit-${index}`}
+              style={{ width: showQuantityColumn ? "9%" : "12%" }}
+            />
           ))}
+          {showQuantityColumn
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <col
+                  key={`volume-${index}`}
+                  style={{ width: index === 3 ? "7%" : "7.5%" }}
+                />
+              ))
+            : null}
           <col style={{ width: "3%" }} />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgb(228_228_231)]">
@@ -1022,10 +1123,7 @@ function EstimateDndTableInner({
                 className="border-b border-r border-zinc-200 px-2 py-2.5 text-center"
                 title="Individuāls apjoms katram projektam"
               >
-                <span className="inline-flex items-center justify-center gap-1">
-                  <i className="fas fa-random text-sm text-red-600" aria-hidden="true" />
-                  Apj.
-                </span>
+                Apj.
               </th>
             ) : null}
             <th
@@ -1034,6 +1132,14 @@ function EstimateDndTableInner({
             >
               Vienības cena
             </th>
+            {showQuantityColumn ? (
+              <th
+                colSpan={4}
+                className="border-b border-r border-zinc-200 bg-emerald-50/80 px-2 py-2 text-center text-emerald-800/70"
+              >
+                Apjoma cena
+              </th>
+            ) : null}
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
@@ -1045,6 +1151,20 @@ function EstimateDndTableInner({
                 {label}
               </th>
             ))}
+            {showQuantityColumn
+              ? ["Darbs", "Materiāls", "Mehānismi", "Kopā"].map((label) => (
+                  <th
+                    key={`volume-${label}`}
+                    className={`border-b border-r border-zinc-200 px-2 py-1.5 text-right ${
+                      label === "Kopā"
+                        ? "bg-emerald-50/60"
+                        : "bg-emerald-50/40"
+                    }`}
+                  >
+                    {label}
+                  </th>
+                ))
+              : null}
           </tr>
         </thead>
         <SortableContext
@@ -1057,6 +1177,7 @@ function EstimateDndTableInner({
               catalogPositions={catalogPositions}
               defaultHourlyRate={defaultHourlyRate}
               showQuantityColumn={showQuantityColumn}
+              moduleSizeOptions={moduleSizeOptions}
               colSpan={colSpan}
               allCategories={categories}
               optionLinkActions={optionLinkActions}
@@ -1086,18 +1207,45 @@ function EstimateDndTableInner({
             >
               Kopā
             </td>
-            <td className={`${footerCell} bg-sky-50/50`}>
-              {formatMoney(totals.labor)}
-            </td>
-            <td className={`${footerCell} bg-sky-50/50`}>
-              {formatMoney(totals.materials)}
-            </td>
-            <td className={`${footerCell} bg-sky-50/50`}>
-              {formatMoney(totals.mechanisms)}
-            </td>
-            <td className={`${footerCell} bg-sky-100/60 text-base`}>
-              {formatMoney(totals.grand)}
-            </td>
+            {showQuantityColumn ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <td
+                  key={`footer-unit-${index}`}
+                  className="border-t-2 border-zinc-300 bg-sky-50/30"
+                />
+              ))
+            ) : (
+              <>
+                <td className={`${footerCell} bg-sky-50/50`}>
+                  {formatMoneyDisplay(totals.labor)}
+                </td>
+                <td className={`${footerCell} bg-sky-50/50`}>
+                  {formatMoneyDisplay(totals.materials)}
+                </td>
+                <td className={`${footerCell} bg-sky-50/50`}>
+                  {formatMoneyDisplay(totals.mechanisms)}
+                </td>
+                <td className={`${footerCell} bg-sky-100/60 text-base`}>
+                  {formatMoneyDisplay(totals.grand)}
+                </td>
+              </>
+            )}
+            {showQuantityColumn ? (
+              <>
+                <td className={volumeSumFooterCell}>
+                  {formatMoneyDisplay(totals.labor)}
+                </td>
+                <td className={volumeSumFooterCell}>
+                  {formatMoneyDisplay(totals.materials)}
+                </td>
+                <td className={volumeSumFooterCell}>
+                  {formatMoneyDisplay(totals.mechanisms)}
+                </td>
+                <td className={volumeSumFooterCellTotal}>
+                  {formatMoneyDisplay(totals.grand)}
+                </td>
+              </>
+            ) : null}
             <td className="border-t-2 border-zinc-300" />
           </tr>
         </tfoot>
@@ -1179,8 +1327,10 @@ type EstimateTableProps = {
   initialTitle?: string;
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
+  initialMultiOptionLinks?: MultiOptionLinkGroup[];
   moduleName?: string | null;
   moduleVisualizations?: ModuleContentBlock[];
+  moduleSizeOptions?: BuildingModuleSizeOption[];
   project?: ProjectSummary;
   modules?: BuildingModuleSummary[];
   estimateValidityDays?: number;
@@ -1193,8 +1343,10 @@ export function EstimateTable({
   initialTitle = SAMPLE_TITLE,
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
+  initialMultiOptionLinks = [],
   moduleName = null,
   moduleVisualizations = [],
+  moduleSizeOptions = [],
   project,
   modules = [],
   estimateValidityDays = DEFAULT_ESTIMATE_VALIDITY_DAYS,
@@ -1208,7 +1360,7 @@ export function EstimateTable({
   );
   const [multiOptionLinks, setMultiOptionLinks] = useState<
     MultiOptionLinkGroup[]
-  >([]);
+  >(initialMultiOptionLinks);
   const [moduleDataSpotlightDismissed, setModuleDataSpotlightDismissed] =
     useState(false);
   const [, startSaveDatesTransition] = useTransition();
@@ -1216,6 +1368,10 @@ export function EstimateTable({
   useEffect(() => {
     setMeta(initialMeta);
   }, [initialMeta]);
+
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
 
   useEffect(() => {
     setModuleDataSpotlightDismissed(false);
@@ -1244,12 +1400,16 @@ export function EstimateTable({
     persistEstimateDates({ date: nextMeta.date, deadline: nextMeta.deadline });
   }
 
-  const showQuantityColumn =
-    Boolean(project) && hasAnyVariableQuantityPosition(catalogPositions);
+  const showQuantityColumn = Boolean(project);
 
   const totals = useMemo(
-    () => calculateEstimateTotals(categories, catalogPositions),
-    [categories, catalogPositions],
+    () =>
+      calculateEstimateTotals(
+        categories,
+        catalogPositions,
+        defaultHourlyRate,
+      ),
+    [categories, catalogPositions, defaultHourlyRate],
   );
 
   const positionCount = collectEstimateLineItems(categories).length;
@@ -1283,14 +1443,16 @@ export function EstimateTable({
           />
         ) : null}
         <p className="text-xs text-zinc-500">
-          {positionCount} pozīcijas · {categories.length} kategorijas
+          {categories.length} tāmes pozīcijas · {positionCount} rindas
         </p>
         <button
           type="button"
-          onClick={() => setCategories([...categories, createCategory()])}
+          onClick={() =>
+            setCategories([...categories, createEstimatePositionSection()])
+          }
           className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
         >
-          + Kategorija
+          + Tāmes pozīcija
         </button>
       </div>
 
@@ -1307,6 +1469,7 @@ export function EstimateTable({
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
           showQuantityColumn={showQuantityColumn}
+          moduleSizeOptions={moduleSizeOptions}
         />
       </div>
     </div>
@@ -1378,7 +1541,7 @@ export function EstimateTable({
                 Kopā
               </p>
               <p className="text-sm font-semibold tabular-nums text-white">
-                {formatMoney(totals.grand)}
+                {formatMoneyDisplay(totals.grand)}
               </p>
             </div>
           </div>

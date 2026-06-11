@@ -1,5 +1,9 @@
-import type { EstimateCategory } from "@/app/lib/estimates/types";
+import type {
+  EstimateCategory,
+  MultiOptionLinkGroup,
+} from "@/app/lib/estimates/types";
 import type { ModuleContentBlock } from "@/app/lib/modules/types";
+import type { ProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 
 /** Form select value for projects without a catalog module. */
 export const INDIVIDUAL_PROJECT_MODULE = "__individual__" as const;
@@ -15,12 +19,18 @@ export type ProjectSummary = {
   buildingModuleId: string | null;
   visualizationBlocks: ModuleContentBlock[];
   projectBlocks: ModuleContentBlock[];
+  projectDescription: ProjectDescriptionFormState;
 };
 
 export type UpdateProjectModuleBlocksInput = {
   id: string;
   visualizationBlocks: ModuleContentBlock[];
   projectBlocks: ModuleContentBlock[];
+};
+
+export type UpdateProjectProjectDescriptionInput = {
+  id: string;
+  projectDescription: ProjectDescriptionFormState;
 };
 
 export type CreateProjectInput = {
@@ -50,4 +60,5 @@ export type ProjectEstimate = {
   title: string;
   meta: EstimateMeta;
   categories: EstimateCategory[];
+  multiOptionLinks: MultiOptionLinkGroup[];
 };

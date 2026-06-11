@@ -5,9 +5,13 @@ import type { ModuleBlockKind } from "@/app/lib/modules/types";
 import {
   removeProjectModuleBlock,
   updateProjectModuleBlocks,
+  updateProjectProjectDescription,
   uploadProjectModuleBlock,
 } from "@/app/lib/projects/project-module-data";
-import type { UpdateProjectModuleBlocksInput } from "@/app/lib/projects/types";
+import type {
+  UpdateProjectModuleBlocksInput,
+  UpdateProjectProjectDescriptionInput,
+} from "@/app/lib/projects/types";
 
 function revalidateProject(projectId: string) {
   revalidatePath(`/${projectId}`);
@@ -19,6 +23,18 @@ export async function updateProjectModuleBlocksAction(
   input: UpdateProjectModuleBlocksInput,
 ) {
   const result = await updateProjectModuleBlocks(input);
+
+  if (result.ok) {
+    revalidateProject(input.id);
+  }
+
+  return result;
+}
+
+export async function updateProjectProjectDescriptionAction(
+  input: UpdateProjectProjectDescriptionInput,
+) {
+  const result = await updateProjectProjectDescription(input);
 
   if (result.ok) {
     revalidateProject(input.id);

@@ -3,21 +3,29 @@ import {
   deleteModuleBlockFiles,
   uploadModuleBlockFile,
 } from "@/app/lib/modules/file-storage";
+import { isBuildingModuleDataComplete } from "@/app/lib/modules/building-module-data";
 import { parseModuleContentBlocks } from "@/app/lib/modules/parse-blocks";
 import { parseModuleOutline } from "@/app/lib/modules/parse-outline";
+import { buildModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
+import { hasProjectDescriptionData } from "@/app/lib/modules/has-project-description-data";
+import { parseProjectDescriptionFormState } from "@/app/lib/modules/parse-project-description";
+import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 import { SAMPLE_MODULE_BLOCKS } from "@/app/lib/modules/sample-blocks";
 import { SAMPLE_MODULE_OUTLINES } from "@/app/lib/modules/sample-outlines";
 import { SAMPLE_BUILDING_MODULES } from "@/app/lib/modules/sample-modules";
 import type {
   BuildingModuleDetail,
+  BuildingModuleSizeOption,
   BuildingModuleSummary,
   CreateBuildingModuleInput,
   ModuleBlockKind,
   UpdateBuildingModuleBlocksInput,
   UpdateBuildingModuleInput,
+  UpdateBuildingModuleProjectDescriptionInput,
 } from "@/app/lib/modules/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { isMissingColumnError } from "@/app/lib/supabase/missing-column";
 
 type BuildingModuleRow = {
   id: string;
@@ -25,13 +33,25 @@ type BuildingModuleRow = {
   outline?: unknown;
   visualization_blocks?: unknown;
   project_blocks?: unknown;
+  project_description?: unknown;
 };
 
-function mapBuildingModule(row: BuildingModuleRow): BuildingModuleSummary {
+function mapBuildingModuleSummary(row: BuildingModuleRow): BuildingModuleSummary {
+  const visualizationBlocks = parseModuleContentBlocks(row.visualization_blocks);
+  const projectBlocks = parseModuleContentBlocks(row.project_blocks);
+
   return {
     id: row.id,
     name: row.name,
+    moduleDataComplete: isBuildingModuleDataComplete({
+      visualizationBlocks,
+      projectBlocks,
+    }),
   };
+}
+
+function mapBuildingModule(row: BuildingModuleRow): BuildingModuleSummary {
+  return mapBuildingModuleSummary(row);
 }
 
 function mapBuildingModuleDetail(row: BuildingModuleRow): BuildingModuleDetail {
@@ -40,6 +60,7 @@ function mapBuildingModuleDetail(row: BuildingModuleRow): BuildingModuleDetail {
     outline: parseModuleOutline(row.outline),
     visualizationBlocks: parseModuleContentBlocks(row.visualization_blocks),
     projectBlocks: parseModuleContentBlocks(row.project_blocks),
+    projectDescription: parseProjectDescriptionFormState(row.project_description),
   };
 }
 
@@ -54,6 +75,7 @@ function getSampleBuildingModule(id: string): BuildingModuleDetail | null {
     outline: SAMPLE_MODULE_OUTLINES[id] ?? [],
     visualizationBlocks: sampleBlocks?.visualizationBlocks ?? [],
     projectBlocks: sampleBlocks?.projectBlocks ?? [],
+    projectDescription: createEmptyProjectDescriptionFormState(),
   };
 }
 
@@ -73,14 +95,54 @@ export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name")
+    .select("id, name, visualization_blocks, project_blocks")
     .order("name", { ascending: true });
 
   if (error || !data) {
     return SAMPLE_BUILDING_MODULES;
   }
 
-  return data.map((row) => mapBuildingModule(row as BuildingModuleRow));
+  return data.map((row) => mapBuildingModuleSummary(row as BuildingModuleRow));
+}
+
+export async function listBuildingModuleSizeOptions(): Promise<
+  BuildingModuleSizeOption[]
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return [];
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("building_modules")
+    .select("id, name, project_description")
+    .order("name", { ascending: true });
+
+  if (error && isMissingColumnError(error, "project_description")) {
+    return [];
+  }
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as BuildingModuleRow[])
+    .map((row) => {
+      const projectDescription = parseProjectDescriptionFormState(
+        row.project_description,
+      );
+      if (!hasProjectDescriptionData(projectDescription)) {
+        return null;
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        sections: buildModuleSizeSummarySections(projectDescription),
+        projectDescription,
+      } satisfies BuildingModuleSizeOption;
+    })
+    .filter((entry): entry is BuildingModuleSizeOption => entry != null);
 }
 
 export async function getBuildingModule(
@@ -93,15 +155,33 @@ export async function getBuildingModule(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, outline, visualization_blocks, project_blocks")
+    .select("id, name, outline, visualization_blocks, project_blocks, project_description")
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !data) {
-    return getSampleBuildingModule(id);
+  if (!error && data) {
+    return mapBuildingModuleDetail(data as BuildingModuleRow);
   }
 
-  return mapBuildingModuleDetail(data as BuildingModuleRow);
+  if (error && isMissingColumnError(error, "project_description")) {
+    const legacy = await supabase
+      .from("building_modules")
+      .select("id, name, outline, visualization_blocks, project_blocks")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!legacy.error && legacy.data) {
+      return mapBuildingModuleDetail(legacy.data as BuildingModuleRow);
+    }
+
+    if (legacy.error) {
+      console.error("getBuildingModule:", legacy.error.message);
+    }
+  } else if (error) {
+    console.error("getBuildingModule:", error.message);
+  }
+
+  return getSampleBuildingModule(id);
 }
 
 export async function createBuildingModule(
@@ -177,6 +257,26 @@ export async function updateBuildingModuleBlocks(
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt bloku secību." };
+  }
+
+  return { ok: true };
+}
+
+export async function updateBuildingModuleProjectDescription(
+  input: UpdateBuildingModuleProjectDescriptionInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("building_modules")
+    .update({ project_description: input.projectDescription })
+    .eq("id", input.id);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt projekta aprakstu." };
   }
 
   return { ok: true };

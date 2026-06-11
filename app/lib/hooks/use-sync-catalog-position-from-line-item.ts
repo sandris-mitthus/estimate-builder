@@ -22,10 +22,13 @@ export function useSyncCatalogPositionFromLineItem(
   const debounceTimersRef = useRef(
     new Map<string, ReturnType<typeof setTimeout>>(),
   );
+  const mountedRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     const timers = debounceTimersRef.current;
     return () => {
+      mountedRef.current = false;
       for (const timer of timers.values()) {
         clearTimeout(timer);
       }
@@ -64,6 +67,10 @@ export function useSyncCatalogPositionFromLineItem(
           name,
           unit,
         });
+
+        if (!mountedRef.current) {
+          return;
+        }
 
         if (!result.ok) {
           showFeedback({ type: "error", text: result.error });
