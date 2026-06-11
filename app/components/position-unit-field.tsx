@@ -144,6 +144,7 @@ export function PositionUnitField({
         ref={dropdownRef}
         id={listboxId}
         role="listbox"
+        data-app-modal-ignore-backdrop
         style={{
           position: "fixed",
           top: dropdownRect.top,
@@ -156,8 +157,11 @@ export function PositionUnitField({
           <li key={unit} role="option" aria-selected={index === activeIndex}>
             <button
               type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => selectSuggestion(unit)}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectSuggestion(unit);
+              }}
               className={`flex w-full items-center px-3 py-2.5 text-left text-sm text-zinc-700 transition hover:bg-zinc-50 ${
                 index === activeIndex ? "bg-zinc-50" : ""
               }`}

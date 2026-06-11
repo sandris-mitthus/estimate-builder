@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import {
   createPositionPrice,
   deletePositionPrice,
+  listPositionPriceHistory,
+  updatePositionNameAndUnit,
   updatePositionPrice,
   updatePositionUnitPrice,
 } from "@/app/lib/positions/repository";
@@ -15,10 +17,29 @@ import type {
 
 function revalidatePositions() {
   revalidatePath("/positions");
+  revalidatePath("/estimate");
 }
 
 export async function createPositionAction(input: CreatePositionInput) {
   const result = await createPositionPrice(input);
+
+  if (result.ok) {
+    revalidatePositions();
+  }
+
+  return result;
+}
+
+export async function syncPositionFromEstimateLineItemAction(input: {
+  positionPriceId: string;
+  name: string;
+  unit: string;
+}) {
+  const result = await updatePositionNameAndUnit({
+    id: input.positionPriceId,
+    name: input.name,
+    unit: input.unit,
+  });
 
   if (result.ok) {
     revalidatePositions();
@@ -57,4 +78,8 @@ export async function deletePositionAction(id: string) {
   }
 
   return result;
+}
+
+export async function getPositionPriceHistoryAction(positionId: string) {
+  return listPositionPriceHistory(positionId);
 }

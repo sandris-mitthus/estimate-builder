@@ -24,6 +24,8 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 
 import { UpdatePositionPriceModal } from "@/app/components/update-position-price-modal";
 
+import { PositionPriceHistoryModal } from "@/app/components/position-price-history-modal";
+
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 
 import type {
@@ -69,13 +71,20 @@ export function PositionRowActions({
 
   const [updatePriceOpen, setUpdatePriceOpen] = useState(false);
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [isPending, startTransition] = useTransition();
 
 
 
-  function handleEditSave(input: { name: string; unit: string }) {
+  function handleEditSave(input: {
+    name: string;
+    unit: string;
+    costType: PositionPriceSummary["costType"];
+    variableQuantity: boolean;
+  }) {
 
     startTransition(async () => {
 
@@ -86,6 +95,10 @@ export function PositionRowActions({
         name: input.name,
 
         unit: input.unit,
+
+        costType: input.costType,
+
+        variableQuantity: input.variableQuantity,
 
       });
 
@@ -205,6 +218,18 @@ export function PositionRowActions({
 
         <IconActionButton
 
+          label="Vēsture"
+
+          icon="fas fa-history"
+
+          variant="history"
+
+          onClick={() => setHistoryOpen(true)}
+
+        />
+
+        <IconActionButton
+
           label="Labot"
 
           icon="fas fa-pen"
@@ -262,6 +287,20 @@ export function PositionRowActions({
         onSave={handlePriceSave}
 
         blocking={isPending}
+
+      />
+
+
+
+      <PositionPriceHistoryModal
+
+        open={historyOpen}
+
+        onOpenChange={setHistoryOpen}
+
+        position={position}
+
+        currency={currency}
 
       />
 

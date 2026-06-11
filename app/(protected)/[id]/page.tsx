@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
+import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 
 export default async function ProjectDetailPage({
@@ -11,12 +12,14 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, estimate, modules, companySettings] = await Promise.all([
-    getProject(id),
-    getProjectEstimate(id),
-    listBuildingModules(),
-    getCompanySettings(),
-  ]);
+  const [project, estimate, modules, companySettings, catalogPositions] =
+    await Promise.all([
+      getProject(id),
+      getProjectEstimate(id),
+      listBuildingModules(),
+      getCompanySettings(),
+      listPositionPrices(),
+    ]);
 
   if (!project || !estimate) {
     notFound();
@@ -48,6 +51,8 @@ export default async function ProjectDetailPage({
         project={project}
         modules={modules}
         estimateValidityDays={companySettings.estimateValidityDays}
+        catalogPositions={catalogPositions}
+        defaultHourlyRate={companySettings.defaultHourlyRate}
       />
     </main>
   );

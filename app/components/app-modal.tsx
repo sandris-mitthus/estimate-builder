@@ -9,6 +9,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 const overlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center p-4";
@@ -24,6 +25,25 @@ const panelBaseClassName =
   "relative max-h-[calc(100%-2rem)] w-full overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl";
 
 const defaultPanelMaxWidthClassName = "max-w-md";
+
+/** Portaled dropdowns (unit hints, Google Places, …) must not count as backdrop clicks. */
+function isBackdropDismissTarget(target: Node, panel: HTMLElement | null): boolean {
+  if (panel?.contains(target)) {
+    return false;
+  }
+
+  if (target instanceof Element) {
+    if (target.closest("[data-app-modal-ignore-backdrop]")) {
+      return false;
+    }
+
+    if (target.closest(".pac-container")) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 /** 20% wider than default `max-w-md` (28rem → 33.6rem). */
 export const appModalWidePanelMaxWidthClassName = "max-w-[33.6rem]";
@@ -58,6 +78,11 @@ export function AppModal({
   const panelRef = useRef<HTMLDivElement>(null);
   const confirmPanelRef = useRef<HTMLDivElement>(null);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const closeDirectly = useCallback(() => {
     if (blocking) return;
@@ -155,7 +180,7 @@ export function AppModal({
 
   function handleBackdropClick(event: MouseEvent<HTMLDivElement>) {
     if (blocking || confirmExitOpen) return;
-    if (panelRef.current?.contains(event.target as Node)) return;
+    if (!isBackdropDismissTarget(event.target as Node, panelRef.current)) return;
     if (dirty) {
       requestBackdropConfirm();
       return;
@@ -168,11 +193,11 @@ export function AppModal({
     cancelExit();
   }
 
-  if (!open) {
+  if (!open || !mounted) {
     return null;
   }
 
-  return (
+  return createPortal(
     <>
       <div
         className={overlayClassName}
@@ -255,6 +280,7 @@ export function AppModal({
           </div>
         </div>
       ) : null}
-    </>
+    </>,
+    document.body,
   );
 }

@@ -5,7 +5,9 @@ import { saveCompanySettingsAction } from "@/app/(protected)/settings/actions";
 import { CompanyLogoDropzone } from "@/app/components/company-logo-dropzone";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { formatAmount } from "@/app/lib/estimates/calculate-line";
 import { CURRENCY_OPTIONS } from "@/app/lib/settings/currencies";
+import { parseDefaultHourlyRateInput } from "@/app/lib/settings/default-hourly-rate";
 import {
   parseEstimateValidityDaysInput,
 } from "@/app/lib/settings/estimate-validity-days";
@@ -116,6 +118,12 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
           ? `${settings.estimateValidityDays} dienas`
           : "—"}
       </p>
+      <p className="mt-3 text-sm text-zinc-600">
+        <span className="text-zinc-500">Stundas likme: </span>
+        {settings.defaultHourlyRate !== null
+          ? `${formatAmount(settings.defaultHourlyRate)} ${settings.currency}`
+          : "—"}
+      </p>
       {!settings.vatNumber.trim() ? (
         <p className="mt-3 text-xs text-zinc-400">
           PVN numurs netiks rādīts, kamēr lauks ir tukšs.
@@ -131,6 +139,11 @@ export function CompanySettingsForm({
   initialSettings: CompanySettings;
 }) {
   const [settings, setSettings] = useState(initialSettings);
+  const [hourlyRateInput, setHourlyRateInput] = useState(() =>
+    initialSettings.defaultHourlyRate !== null
+      ? formatAmount(initialSettings.defaultHourlyRate)
+      : "",
+  );
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [isPending, startTransition] = useTransition();
 
@@ -167,10 +180,25 @@ export function CompanySettingsForm({
       return;
     }
 
+    const parsedHourlyRate = parseDefaultHourlyRateInput(hourlyRateInput);
+    if (hourlyRateInput.trim() && parsedHourlyRate === null) {
+      showFeedback({
+        type: "error",
+        text: "Ievadi derīgu stundas likmi.",
+      });
+      return;
+    }
+
+    const settingsToSave = {
+      ...settings,
+      defaultHourlyRate: parsedHourlyRate,
+    };
+
     startTransition(async () => {
-      const result = await saveCompanySettingsAction(settings);
+      const result = await saveCompanySettingsAction(settingsToSave);
 
       if (result.ok) {
+        setSettings(settingsToSave);
         showFeedback({ type: "success", text: "Uzstādījumi saglabāti." });
         return;
       }
@@ -257,34 +285,56 @@ export function CompanySettingsForm({
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title="Tāme">
-            <div className="sm:col-span-2">
-              <label htmlFor="estimateValidityDays" className="block">
-                <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Tāmes derīguma termiņš
-                </span>
-                <InputWithSuffix
-                  id="estimateValidityDays"
-                  name="estimateValidityDays"
-                  suffix="dienas"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={
-                    settings.estimateValidityDays > 0
-                      ? String(settings.estimateValidityDays)
-                      : ""
-                  }
-                  onChange={(event) => {
-                    const digits = parseEstimateValidityDaysInput(
-                      event.target.value,
-                    );
-                    updateField(
-                      "estimateValidityDays",
-                      digits === "" ? 0 : Number.parseInt(digits, 10),
-                    );
-                  }}
-                />
-              </label>
-            </div>
+            <label htmlFor="estimateValidityDays" className="block">
+              <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Tāmes derīguma termiņš
+              </span>
+              <InputWithSuffix
+                id="estimateValidityDays"
+                name="estimateValidityDays"
+                suffix="dienas"
+                inputMode="numeric"
+                autoComplete="off"
+                value={
+                  settings.estimateValidityDays > 0
+                    ? String(settings.estimateValidityDays)
+                    : ""
+                }
+                onChange={(event) => {
+                  const digits = parseEstimateValidityDaysInput(
+                    event.target.value,
+                  );
+                  updateField(
+                    "estimateValidityDays",
+                    digits === "" ? 0 : Number.parseInt(digits, 10),
+                  );
+                }}
+              />
+            </label>
+            <label htmlFor="defaultHourlyRate" className="block">
+              <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Darbinieka standarta stundas likme
+              </span>
+              <InputWithSuffix
+                id="defaultHourlyRate"
+                name="defaultHourlyRate"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                suffix={settings.currency}
+                value={hourlyRateInput}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setHourlyRateInput(value);
+                  const parsed = parseDefaultHourlyRateInput(value);
+                  updateField(
+                    "defaultHourlyRate",
+                    value.trim() === "" ? null : parsed,
+                  );
+                  clearFeedback();
+                }}
+              />
+            </label>
           </SettingsSection>
         </div>
 

@@ -20,6 +20,8 @@ import {
 
 } from "@/app/lib/form/input-styles";
 
+import { PositionCostTypeDisplay } from "@/app/components/position-cost-type-display";
+import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { collectKnownUnits } from "@/app/lib/positions/collect-known-units";
 
 import { getVisiblePositions } from "@/app/lib/positions/filter-positions";
@@ -68,7 +70,7 @@ export function PositionsPageContent({
 
     <SectionPage
 
-      title="Tāmes Pozīcijas"
+      title="Pozicijas"
 
       subtitle={
 
@@ -132,13 +134,19 @@ export function PositionsPageContent({
 
                 </th>
 
+                <th className="w-32 border-b border-zinc-200 px-4 py-2.5 text-left">
+
+                  Veids
+
+                </th>
+
                 <th className="w-52 border-b border-zinc-200 px-4 py-2.5 text-left">
 
                   Cena
 
                 </th>
 
-                <th className="w-36 border-b border-zinc-200 px-4 py-2.5 text-right">
+                <th className="w-44 border-b border-zinc-200 px-4 py-2.5 text-right">
 
                   Darbības
 
@@ -156,7 +164,7 @@ export function PositionsPageContent({
 
                   <td
 
-                    colSpan={3}
+                    colSpan={4}
 
                     className="px-4 py-10 text-center text-sm text-zinc-500"
 
@@ -185,7 +193,16 @@ export function PositionsPageContent({
                   >
 
                     <td className="cursor-default px-4 py-3 text-zinc-900">
-                      {position.name}
+                      <span className="inline-flex items-center gap-1.5">
+                        {position.name}
+                        <PositionVariableQuantityIcon
+                          enabled={position.variableQuantity}
+                        />
+                      </span>
+                    </td>
+
+                    <td className="cursor-default px-4 py-3 text-zinc-600">
+                      <PositionCostTypeDisplay costType={position.costType} />
                     </td>
 
                     <td className="px-4 py-3">

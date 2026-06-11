@@ -11,6 +11,7 @@ export type CompanySettings = {
   currency: string;
   logoUrl: string;
   estimateValidityDays: number;
+  defaultHourlyRate: number | null;
 };
 
 export type CompanySettingsRow = {
@@ -27,4 +28,5 @@ export type CompanySettingsRow = {
   currency: string;
   logo_url: string;
   estimate_validity_days?: number;
+  default_hourly_rate?: number | null;
 };

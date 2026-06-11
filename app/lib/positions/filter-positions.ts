@@ -1,3 +1,4 @@
+import { POSITION_COST_TYPE_LABELS } from "@/app/lib/positions/position-cost-type";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 export function sortPositionsByName(
@@ -20,9 +21,13 @@ export function filterPositionsByQuery(
   return positions.filter((position) => {
     const name = position.name.toLocaleLowerCase("lv-LV");
     const unit = position.unit.toLocaleLowerCase("lv-LV");
+    const costType = POSITION_COST_TYPE_LABELS[position.costType]
+      .toLocaleLowerCase("lv-LV");
 
     return (
-      name.includes(normalizedQuery) || unit.includes(normalizedQuery)
+      name.includes(normalizedQuery) ||
+      unit.includes(normalizedQuery) ||
+      costType.includes(normalizedQuery)
     );
   });
 }

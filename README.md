@@ -1,9 +1,9 @@
 # Estimate Builder
 
-Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices, volume totals, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, blanks, position prices, users, settings).
+Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.1.12` (see [Changelog](#changelog))
+**Current version:** `1.1.24` (see [Changelog](#changelog))
 
 ---
 
@@ -24,16 +24,16 @@ English routes, Latvian labels:
 |-------|-------|
 | Projekti | `/` |
 | Ēku moduļi | `/modules` |
-| Tāmes Pozīcijas | `/positions` |
-| Sagatave | `/blanks` |
+| Sagatave | `/estimate` |
+| Pozicijas | `/positions` |
 | Lietotāji | `/users` |
 | Uzstādījumi | `/settings` |
 
 - **Projekti** — project cards (module name above client name, email, phone, address); **Jauns projekts** modal creates project + empty estimate in Supabase; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Labot**, **Dzēst**, Apstiprināts / Noraidīts (placeholders) with colored hover icon tooltips; list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error)
 - **Jauns projekts / Labot** — shared `ProjectFormModal` with **required Modulis** select (catalog modules + **Individuāls projekts** last); `building_module_id` on `projects`; client name, phone, email, address; phone country code from IP on create, parsed from stored number on edit; email/phone validation; **Google Places** autocomplete with map preview (including pre-filled address on edit)
 - **Ēku moduļi** (`/modules`, `/modules/[id]`) — module catalog in Supabase (`building_modules`); **Pievienot Moduli** (name only); card **Labot** / **Dzēst**; click name opens detail: left column **Vizualizācijas** (image upload grid, 2 per row, drag reorder) + **Projekts** (PDF only, same grid); right column **Projekta apraksts** dummy form (not persisted yet); **aptaksts** outline list below; empty states; toasts on file actions
-- **Sagatave** — placeholder catalog list
-- **Tāmes pozicijas** (`/positions`) — searchable sortable table of unit-price catalog items in Supabase (`position_prices`); columns **Nosaukums**, **Cena** (`2.91 EUR / gab.` + update date), **Darbības**; **Pievienot pozīciju** / **Labot** modals (name + unit with hints, 80/20); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`
+- **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.**, **Vienības cena** (Darbs / Materiāls / Mehānismi / Kopā, **read-only** — edit prices in **Uzstādījumi** or **Pozicijas**); line-item name **catalog hints** from `/positions`; hint or linked row fills unit + price from catalog (Darbs → stundas likme, Materiāls / Mehānismi → kataloga cena); **multi-pozīcija** — modal editor (click name or pen icon), drag-reorder options in modal, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; **multi opciju saites** — `fa-link` uz katras aizpildītas opcijas rindas, velc uz opciju **citā** multi (piem. siltinājums 145 mm ↔ konstrukcija 45×145 mm); zem opcijas rāda saistītās ar `×` atvienošanai; saglabā `multiOptionLinks` JSON (`sections` kolonnā, atpakaļsaderīgi ar masīvu); drag-and-drop reorder (categories, subcategories, multis, items); **Saglabāt** persists structure + syncs linked catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
+- **Pozicijas** (`/positions`) — searchable sortable table of unit-price catalog items in Supabase (`position_prices`); columns **Nosaukums**, **Veids** (Darbs / Materiāls / Mehānismi), **Cena** (`2.91 EUR / gab.` + update date), **Darbības**; **Pievienot pozīciju** / **Labot** modals (cost-type radio row above name + unit with hints, 80/20; optional **mainīgs apjoms** toggle — enables **Daudz.** column in project estimates for linked rows); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); **Vēsture** row action opens extra-wide modal with price log (date, amount, “No …” delta, supplier on two lines with phone/email icons); row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`; **nosaukums / mērvienība** atjaunināti arī no sagataves vai projekta tāmes, ja rinda saistīta ar katalogu (`positionPriceId` vai unikāla nosaukuma atbilstība)
 - **Lietotāji** — Supabase Auth users (name, email, Google avatar); **Uzaicināt** modal sends email invite via admin API (client + server validation)
 - **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo)
 
@@ -44,6 +44,7 @@ English routes, Latvian labels:
 - Info phone and email
 - Currency select (EUR, USD, GBP, PLN, SEK, NOK, DKK)
 - **Tāmes derīguma termiņš** — integer days (suffix **dienas**); default **30**; used for new projects and estimate **Tāmes termiņš** calculation
+- **Darbinieka standarta stundas likme** — optional decimal; currency suffix from company settings (e.g. `EUR`)
 - **Logo upload** — drag-and-drop or file picker → Supabase Storage (`company-assets` bucket)
 - Live preview of company block on the right (wider sidebar column)
 - Persisted in `public.company_settings` (singleton row)
@@ -54,9 +55,12 @@ English routes, Latvian labels:
 - Meta layout: bold module name + action icons; **Tāmes piedāvājums** title + **Kopā** total; client, full-width object address; **Sagatavotājs**, **Datums**, **Tāmes termiņš** in one row
 - **Datums** — defaults to project **created_at**; **Tāmes termiņš** — defaults to Datums + validity days from **Uzstādījumi**; both editable and **persisted** in `estimates.meta` (changing Datums recalculates termiņš)
 - **Individuāls projekts** — **Moduļa dati** icon opens `/[id]/module-data` (same upload UI as module detail: viz images, project PDFs, description form dummy); incomplete data → amber icon + optional full-page **spotlight** (blur overlay, ESC or **X** to dismiss)
-- Excel-style table: categories, optional subcategories, line items
-- Columns: name, unit, quantity, unit price (labor / materials / mechanisms / total), volume totals, delete
-- Drag-and-drop reorder for categories, subcategories, and items (cross-subcategory / cross-category item moves)
+- Excel-style table: categories, optional subcategories, line items, **multi-pozīcijas** (same UX as **Sagatave** — modal, option radios, DnD, **opciju saites**)
+- **Multi opciju saites** — sagatavē definētas pārus starp opcijām dažādos multi; projekta tāmē radio izvēle **divvirzienu** sinhronizē visas saistītās opcijas (session state; kopā ar pilnu tāmes persistenci roadmap)
+- **Collapse** category and subcategory rows (cookie per estimate id); **+ Sub** / **+ Multi** / **+ Pozīcija** auto-expands collapsed parent
+- Columns: name (catalog autocomplete hints), unit, optional **Daudz.** when catalog position has **mainīgs apjoms** (`variable_quantity`), unit price (labor / materials / mechanisms / total), delete — no volume-total column
+- Catalog hint select fills unit + unit price in the column for that position's cost type (same rules as **Sagatave**); linked rows can sync name/unit back to `/positions`
+- Drag-and-drop reorder for categories, subcategories, multi-pozīcijas, and items (cross-subcategory / cross-category item moves)
 - Drop indicator: thick horizontal line on hover (no slide animation)
 - Sticky table header, footer totals row
 - Editable estimate number in meta when set
@@ -146,7 +150,7 @@ npm run db:test
    - Redirect: `http://localhost:3100/auth/callback`
 6. Start the app — sign in, then `/` loads projects from `public.projects`
 
-**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` for individual projects, `007` + `015` + `017`), `estimates`, `position_prices` (`008`–`009`), `building_modules` (`010`–`014`), `company_settings` (incl. `estimate_validity_days`, `016`), `schema_migrations`, Storage `company-assets`, `module-assets` (module + project asset paths)
+**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` for individual projects, `007` + `015` + `017`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets`, `module-assets` (module + project asset paths)
 
 ---
 
@@ -163,8 +167,8 @@ app/
 │   │   ├── page.tsx
 │   │   └── module-data/page.tsx   # Individual project module uploads
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads)
-│   ├── blanks/
-│   ├── positions/      # page + CRUD / price-update server actions
+│   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
+│   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
 │   ├── users/          # page + inviteUserAction
 │   └── settings/
 ├── api/
@@ -174,15 +178,18 @@ app/
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate table, positions table/modals, AddressMapEmbed, nav, ModalFormActions, tooltips, toasts)
+├── components/         # UI (estimate-table, estimate-position-table, estimate-multi-position-row, multi-position-modal, multi-position-link-handle, estimate-line-item-name-field, positions modals, unsaved-changes modal, nav, toasts)
 ├── lib/
 │   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay
-│   ├── estimates/      # calculate-totals, resolve-estimate-meta, sample data, DnD reorder
+│   ├── client/         # cookie read/write helpers
+│   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, default sagatave
+│   ├── estimates/      # calculate-totals, multi-position, multi-position-links, resolve-estimate-meta, sample data, DnD reorder
+│   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-collapsed-estimate-sections
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
 │   ├── google-maps/    # Places API, build-embed-url
 │   ├── modules/        # repository, outline/blocks parse, file-storage (module-assets)
-│   ├── positions/      # repository, filter, unit hints, sample fallback
+│   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, variable-quantity, filter
 │   ├── projects/       # repository, project-module-data, sample fallback
 │   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
 │   ├── users/          # Auth user list + invite (admin API)
@@ -204,8 +211,13 @@ supabase/migrations/
 - [x] Individuāls projekts — per-project module data page, uploads, spotlight prompt
 - [x] Estimate meta dates — auto defaults + manual override persisted
 - [x] Ēku moduļi — catalog CRUD, detail page, image/PDF uploads, outline (DB); project description form still dummy
-- [ ] Sagataves CRUD
-- [x] Tāmes pozicijas catalog (`/positions`) — CRUD + unit price updates with supplier info
+- [x] Sagatave (`/estimate`) — template editor with subcategories, read-only catalog prices, DB persist, save + unsaved guard, catalog hints
+- [x] Pozicijas catalog (`/positions`) — CRUD + cost type (labor/materials/mechanisms) + unit price updates with supplier info
+- [x] Sagatave ↔ Pozicijas sync — linked line items update catalog name/unit on edit or save
+- [x] Multi-pozīcijas — modal editor, option DnD, table reorder, offer radio selection (sagatave + project estimates)
+- [x] Estimate table collapse — categories and subcategories with per-document cookie
+- [x] Pozicijas **mainīgs apjoms** — optional quantity column in project estimates (`024`)
+- [x] Multi **opciju saites** — drag link starp opcijām dažādos multi, divvirzienu izvēle, saglabāšana sagatavē
 - [ ] User management beyond read-only list and email invite
 - [ ] Use company settings + logo on estimate PDF/header
 - [ ] Export estimate (PDF / Excel)
@@ -223,7 +235,7 @@ Semantic versioning in `package.json`. Each **release** commit:
 **Commit message format:**
 
 ```
-Short description of what shipped. v1.1.12
+Short description of what shipped. v1.1.14
 ```
 
 ### README update (Cursor)
@@ -250,6 +262,105 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.1.24
+
+**Multi opciju saites (nevis visu multi bloku)**
+
+- **Opciju līmeņa saite** — `fa-link` uz katras aizpildītas multi opcijas rindas; velc uz opciju **citā** multi (ne uz vienu un to pašu multi); var apvienot 2+ opcijas vienā grupā
+- **UI** — zem opcijas nosaukuma pelēks saraksts ar saistītajām (`multi nosaukums · opcija`); `fa-times` atvieno abos virzienos
+- **Piedāvājums** (`/[id]`) — radio izvēle vienā multi **divvirzienu** ieslēdz atbilstošās saistītās opcijas citos multi; **Neviena opcija** notīra saistīto grupu
+- **Persist** — sagatavē `multiOptionLinks` JSON (`estimate_positions.sections` kā `{ sections, multiOptionLinks }` vai tikai masīvs bez saitēm); atpakaļsaderība ar veco masīva formātu
+- **Lib / UI** — `multi-position-links.ts`, `multi-position-link-handle.tsx`; `serialize-document.ts` parse/build wrapper
+
+### v1.1.23
+
+**Multi-pozīcijas, sekciju sakļaušana un mainīgs apjoms**
+
+- **Multi-pozīcija** — **+ Multi** pie tāmes pozīcijas vai subkategorijas (sagatave + projekta tāme); modālis ar nosaukumu, kataloga opcijām (OPCIJA 1, 2, …), drag-reorder opcijām, automātiska tukša nākamā rinda; klikšķis uz nosaukuma vai poga **Labot**; visa multi bloka pārvietošana tabulā ar grip; piedāvājumā radio izvēle — no citām multi **paslēptas tikai izvēlētās** opcijas; vienā multi aizliegti dublikāti, bet tā pati kataloga pozīcija atļauta dažādās multi
+- **Sakļaušana** — chevron uz tāmes pozīcijas un subkategorijas rindām; stāvoklis cookie `eb_estimate_collapsed_{documentId}`; **+ Sub** / **+ Multi** / **+ Pozīcija** atver sakļauto vecāku
+- **Mainīgs apjoms** — `/positions` pievienošanas/labošanas modāļos; `position_prices.variable_quantity` (`024`); projekta tāmē **Daudz.** kolonna tikai saistītām pozīcijām ar šo karodziņu; kopsummā `quantity × unit price`
+- **Tabula / DnD** — katra sortējama vienība savā `<tbody>` (derīgs HTML5, bez hydration kļūdām); `AppModal` renderē caur `createPortal` uz `document.body`
+- **Lib / UI** — `multi-position.ts`, `multi-position-modal.tsx`, `estimate-multi-position-row.tsx`, `collapsed-sections-cookie.ts`, `use-collapsed-estimate-sections.ts`, `variable-quantity.ts`, `PositionVariableQuantityField`
+
+### v1.1.22
+
+**Sagatave — subkategorijas un tikai lasāmas cenas**
+
+- **Sagatave** (`/estimate`) — **+ Sub** un subkategoriju rindas kā projekta tāmē (`/[id]`); pozīcijas zem tāmes pozīcijas vai subkategorijas; DnD (sekcijas, subkategorijas, rindas) caur `reorderEstimate`
+- **Vienības cena** sagatavē — **read-only**; darbs no **Uzstādījumi** stundas likmes, materiāli/mehānismi no **Pozicijas**; `forceCatalogPrices` ielādē un saglabā
+- **Struktūra** — `EstimatePositionSection` = `EstimateCategory` (`subcategories` + `items`); `normalizeEstimatePositionSection` migrē vecos JSON ierakstus; `hydrateSectionsWithCatalogLinks` apstrādā arī subkategoriju rindas
+
+### v1.1.21
+
+**Noņemts legacy maršruts `/estimate-positions`**
+
+- Dzēsts `app/(protected)/estimate-positions/` (redirect uz `/estimate` vairs nav); sagatave tikai **`/estimate`**
+- `app/lib/estimate-positions/` — bez izmaiņām (DB un tabulas loģika)
+
+### v1.1.20
+
+**Sagatave — cenas pēc veida, bez kopsummas rindas**
+
+- **Kataloga cenas** — Materiāls / Mehānismi / Darbs iet attiecīgajā **Vienības cena** kolonnā (ielāde, hint izvēle, blur, saglabāšana); `buildUnitPriceForCatalogPosition`, `hydrateLineItemWithCatalog`
+- **Sagatave** (`/estimate`) — noņemta apakšējā **Kopā** kopsummu rinda (`estimate-position-table`); projekta tāmē (`/[id]`) kopsumma paliek
+- **Dokumentācija** — `app/(protected)/estimate-positions/` tikai legacy redirect; `app/lib/estimate-positions/` sagataves loģika
+
+### v1.1.19
+
+**Sagatave table, catalog hints & Pozicijas sync**
+
+- **Tāmes tabula** (sagatave + projekts) — noņemtas **Daudz.** un **Apjoma summa** kolonnas; paliek **Vienības cena**; projekta tāmē kopsummas rindā summētas vienības cenas
+- **Kataloga hinti** — rindas nosaukuma laukā autocomplete no `/positions`; izvēle aizpilda mērvienību un cenas (darbs no stundas likmes, materiāli/mehānismi no kataloga)
+- **Sagatave** — **Saglabāt**, dirty stāvoklis, modālis pie navigācijas prom; `estimate_positions` (`020`–`021`)
+- **Sinhronizācija** — sagatavē vai projekta tāmē mainīts nosaukums/mērvienība atjaunina saistīto ierakstu `/positions` (`positionPriceId`, automātiska saite ielādē, sync pie blur/saglabāšanas)
+
+### v1.1.18
+
+**Route — Sagatave `/estimate`**
+
+- **Sagatave** maršruts: `/estimate-positions` → **`/estimate`**; vecie URL pārvirza uz jauno
+
+### v1.1.17
+
+**Sagatave — viena sagatave, tieša tabula**
+
+- **`/estimate-positions`** — atver tāmes tabulu uzreiz (nav kartīšu saraksta); `ensureDefaultEstimatePosition()` izmanto vienu DB ierakstu vai izveido **Sagatave**
+- **`/estimate-positions/[id]`** — pārvirza uz `/estimate-positions`
+- **Noņemts** — vairāku sagatavju CRUD UI (kartītes, pievienošanas modālis, dzēšana)
+
+### v1.1.16
+
+**Nav — Sagatave**
+
+- **Nav** label **Tāmes pozicijas** → **Sagatave** (`/estimate-positions` route unchanged); list page title and back link updated
+
+### v1.1.15
+
+**Nav — noņemta Sagatave**
+
+- **Nav** — no top menu: **Sagatave** (`/blanks`)
+- **Removed** — `app/(protected)/blanks/page.tsx`, `app/lib/blanks/sample-blocks.ts`
+
+### v1.1.14
+
+**Pozicijas — cenu vēsture**
+
+- **`/positions`** — row action **Vēsture** (`fa-history`, sky hover); extra-wide read-only modal lists each saved unit price (newest first) with `dd.mm.yy` date, amount + optional **No …** delta vs previous entry
+- **Veikals** column in history — line 1: store · contact; line 2: phone + email with Font Awesome icons
+- **Atjaunot cenu** — every save appends a row to `position_price_history` (price, date, supplier snapshot)
+- **Supabase** — `022_position_price_history.sql` (table + backfill from existing `position_prices`); RLS deny for clients
+- **Lib / UI** — `listPositionPriceHistory`, `getPositionPriceHistoryAction`, `PositionPriceHistoryModal`; `IconActionButton` variant `history`
+
+### v1.1.13
+
+**Nav split, position cost types & settings hourly rate**
+
+- **Nav** — **Pozicijas** (`/positions`, was **Tāmes Pozīcijas**); new **Tāmes pozicijas** (`/estimate-positions`, placeholder); order: Ēku moduļi → Sagatave → Tāmes pozicijas → Pozicijas
+- **Pozicijas** — **Izmaksu veids** per row: Darbs / Materiāls / Mehānismi (`cost_type`); table column **Veids**; add/edit modals use horizontal radio-style row above name + unit
+- **Uzstādījumi** — **Darbinieka standarta stundas likme** with currency suffix in input; preview sidebar shows saved rate
+- **Supabase** — `018_company_settings_default_hourly_rate.sql`; `019_position_prices_cost_type.sql`
+- **Lib** — `position-cost-type.ts`, `default-hourly-rate.ts`, `PositionCostTypeField`
 
 ### v1.1.12
 

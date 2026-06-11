@@ -26,11 +26,7 @@ import {
   type SetStateAction,
 } from "react";
 import { updateProjectEstimateDatesAction } from "@/app/(protected)/actions";
-import {
-  formatAmount,
-  multiplyBreakdown,
-  sumBreakdown,
-} from "@/app/lib/estimates/calculate-line";
+import { formatAmount, sumBreakdown } from "@/app/lib/estimates/calculate-line";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
   createCategory,
@@ -50,6 +46,21 @@ import { IndividualProjectModuleDataSpotlight } from "@/app/components/individua
 import { ModuleVisualizationGallery } from "@/app/components/module-visualization-gallery";
 import { ProjectCardActions } from "@/app/components/project-card-actions";
 import { DeleteButton } from "@/app/components/delete-button";
+import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
+import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
+import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
+import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
+import { applyCatalogPositionToLineItem } from "@/app/lib/positions/apply-catalog-to-line-item";
+import {
+  applyLineItemCatalogEdit,
+  hydrateLineItemWithCatalog,
+} from "@/app/lib/positions/sync-from-estimate-line-items";
+import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import {
+  hasAnyVariableQuantityPosition,
+  isVariableQuantityLineItem,
+} from "@/app/lib/positions/variable-quantity";
+import { getEstimateUnitOptions } from "@/app/lib/estimates/unit-options";
 import {
   DropIndicatorProvider,
   useDropIndicatorActions,
@@ -65,9 +76,28 @@ import {
   collectAllDragIds,
   reorderEstimate,
 } from "@/app/lib/estimates/reorder-estimate";
+import {
+  applyMultiChangeWithLinkSync,
+  cleanupLinksAfterMultiDelete,
+  findMultiById,
+  getLinkedOptionSummaries,
+  linkMultiOptions,
+  removeMultiFromCategories,
+  unlinkMultiOptions,
+  type MultiOptionLinkActions,
+} from "@/app/lib/estimates/multi-position-links";
+import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
+import {
+  collectSelectedMultiOptionKeys,
+  createMultiPosition,
+  isEstimateMultiPosition,
+  removeRowItemById,
+  updateRowItemById,
+} from "@/app/lib/estimates/multi-position";
 import type {
   EstimateCategory,
   EstimateLineItem,
+  EstimateMultiPosition,
   EstimateSubcategory,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
@@ -77,12 +107,24 @@ import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/projec
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 import { isGoogleMapsEmbedConfigured } from "@/app/lib/google-maps/env";
 
-const FULL_COL_COUNT = 12;
+function getEstimateTableColCount(showQuantityColumn: boolean): number {
+  return showQuantityColumn ? 8 : 7;
+}
+
+function parseQuantityInput(value: string): number {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) {
+    return 1;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+}
 
 const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
 const nameInput =
-  "w-full min-h-[2.75rem] resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
+  "w-full min-h-[2.75rem] resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
 const cellNum = `${cellInput} text-right tabular-nums`;
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
@@ -146,66 +188,130 @@ function LineItemRow({
   item,
   onChange,
   onDelete,
+  onSyncCatalogPosition,
+  onScheduleCatalogSync,
   dragHandle,
   rowRef,
   rowStyle,
   indentName,
   showDropLine,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   dragHandle?: ReactNode;
-  rowRef?: (element: HTMLTableRowElement | null) => void;
+  rowRef?: (element: HTMLTableSectionElement | null) => void;
   rowStyle?: CSSProperties;
   indentName?: boolean;
   showDropLine?: boolean;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
 }) {
-  const volume = multiplyBreakdown(item.quantity, item.unitPrice);
+  const unitOptions = getEstimateUnitOptions(item.unit);
+  const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
 
   return (
-    <tr
+    <tbody
       ref={rowRef}
       style={rowStyle}
-      className={`group align-middle hover:bg-sky-50/40 ${showDropLine ? dropLineClass : ""}`}
+      className={`group ${showDropLine ? dropLineClass : ""}`}
     >
+    <tr className="align-middle hover:bg-sky-50/40">
       <td className={nameCell}>
         <div className={`flex items-center gap-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
-          <textarea
-            rows={2}
-            className={`${nameInput} min-w-0 flex-1 ${indentName ? subcategoryItemNameIndent : ""}`}
-            value={item.name}
-            placeholder="Pozīcijas nosaukums"
-            onChange={(event) => onChange({ ...item, name: event.target.value })}
-          />
+          <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
+            <EstimateLineItemNameField
+              value={item.name}
+              catalogPositions={catalogPositions}
+              defaultHourlyRate={defaultHourlyRate}
+              className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
+              onNameChange={(name) => {
+                const next = applyLineItemCatalogEdit(
+                  item,
+                  { name },
+                  catalogPositions,
+                );
+                onChange(next);
+                onScheduleCatalogSync(next);
+              }}
+              onNameBlur={(name) => {
+                const linked = applyLineItemCatalogEdit(
+                  item,
+                  { name },
+                  catalogPositions,
+                );
+                const linkChanged = linked.positionPriceId !== item.positionPriceId;
+                const withPrices = hydrateLineItemWithCatalog(
+                  linked,
+                  catalogPositions,
+                  defaultHourlyRate,
+                  {
+                    forceCatalogPrices:
+                      linkChanged || !item.name.trim(),
+                  },
+                );
+                onChange(withPrices);
+                onSyncCatalogPosition(withPrices);
+              }}
+              onCatalogSelect={(position) =>
+                onChange(
+                  applyCatalogPositionToLineItem(
+                    item,
+                    position,
+                    defaultHourlyRate,
+                  ),
+                )
+              }
+            />
+            <PositionVariableQuantityIcon enabled={showQuantityInput} />
+          </span>
         </div>
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
         <select
           className={`${cellInput} cursor-pointer`}
           value={item.unit}
-          onChange={(event) => onChange({ ...item, unit: event.target.value })}
+          onChange={(event) => {
+            const next = { ...item, unit: event.target.value };
+            onChange(next);
+            onSyncCatalogPosition(next);
+          }}
         >
-          {ESTIMATE_UNITS.map((unit) => (
+          {unitOptions.map((unit) => (
             <option key={unit} value={unit}>
               {unit}
             </option>
           ))}
         </select>
       </td>
-      <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-        <input
-          type="number"
-          min={0}
-          step="any"
-          className={cellNum}
-          value={item.quantity}
-          onChange={(event) =>
-            onChange({ ...item, quantity: parseFloat(event.target.value) || 0 })
-          }
-        />
-      </td>
+      {showQuantityColumn ? (
+        <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
+          {showQuantityInput ? (
+            <input
+              type="text"
+              inputMode="decimal"
+              className={cellNum}
+              value={formatAmount(item.quantity)}
+              aria-label="Apjoms"
+              onChange={(event) =>
+                onChange({
+                  ...item,
+                  quantity: parseQuantityInput(event.target.value),
+                })
+              }
+            />
+          ) : (
+            <span className={`${readOnlyNum} text-zinc-300`}>—</span>
+          )}
+        </td>
+      ) : null}
       <PriceCells
         values={item.unitPrice}
         onChange={(field, value) =>
@@ -215,7 +321,6 @@ function LineItemRow({
           })
         }
       />
-      <PriceCells values={volume} readOnly />
       <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
         <DeleteButton
           label="Dzēst pozīciju"
@@ -224,6 +329,7 @@ function LineItemRow({
         />
       </td>
     </tr>
+    </tbody>
   );
 }
 
@@ -232,12 +338,14 @@ const actionBtn =
 
 function RowActions({
   onAddSub,
+  onAddMulti,
   onAddItem,
   onDelete,
   deleteLabel,
   showSub = true,
 }: {
   onAddSub?: () => void;
+  onAddMulti?: () => void;
   onAddItem: () => void;
   onDelete: () => void;
   deleteLabel: string;
@@ -250,11 +358,74 @@ function RowActions({
           + Sub
         </button>
       ) : null}
+      {onAddMulti ? (
+        <button type="button" className={actionBtn} onClick={onAddMulti}>
+          + Multi
+        </button>
+      ) : null}
       <button type="button" className={actionBtn} onClick={onAddItem}>
         + Pozīcija
       </button>
       <DeleteButton label={deleteLabel} onClick={onDelete} />
     </div>
+  );
+}
+
+function SortableMultiPositionRow({
+  sortId,
+  subcategoryId,
+  value,
+  optionLinkActions,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
+  allCategories,
+}: {
+  sortId: string;
+  categoryId: string;
+  subcategoryId?: string;
+  value: EstimateMultiPosition;
+  optionLinkActions: MultiOptionLinkActions;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
+  allCategories: EstimateCategory[];
+}) {
+  const showDropLine = useShowDropLine(sortId);
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
+    id: sortId,
+    animateLayoutChanges: () => false,
+  });
+  const excludedSelectionKeys = useMemo(
+    () => collectSelectedMultiOptionKeys(allCategories, value.id),
+    [allCategories, value.id],
+  );
+  return (
+    <EstimateMultiPositionRow
+      mode="offer"
+      value={value}
+      onChange={(next) =>
+        optionLinkActions.onMultiChange(value.id, next, true)
+      }
+      onDelete={() => optionLinkActions.onMultiDelete(value.id)}
+      catalogPositions={catalogPositions}
+      defaultHourlyRate={defaultHourlyRate}
+      excludedSelectionKeys={excludedSelectionKeys}
+      optionLinkActions={optionLinkActions}
+      indentName={subcategoryId != null}
+      showDropLine={showDropLine}
+      showQuantityColumn={showQuantityColumn}
+      readOnlyPrices={false}
+      rowRef={setNodeRef}
+      rowStyle={isDragging ? { opacity: 0.45 } : undefined}
+      dragHandle={
+        <DragHandle
+          label="Pārvietot multi-pozīciju"
+          attributes={attributes}
+          listeners={listeners}
+        />
+      }
+    />
   );
 }
 
@@ -269,6 +440,11 @@ function SortableLineItemRow({
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -304,6 +480,7 @@ function SectionRow({
   rowRef,
   rowStyle,
   showDropLine,
+  colSpan,
 }: {
   kind: "category" | "subcategory";
   placeholder: string;
@@ -311,9 +488,10 @@ function SectionRow({
   onChange: (value: string) => void;
   actions: ReactNode;
   dragHandle?: ReactNode;
-  rowRef?: (element: HTMLTableRowElement | null) => void;
+  rowRef?: (element: HTMLTableSectionElement | null) => void;
   rowStyle?: CSSProperties;
   showDropLine?: boolean;
+  colSpan: number;
 }) {
   const isCategory = kind === "category";
   const topBorderClass = showDropLine
@@ -323,13 +501,14 @@ function SectionRow({
       : "border-t border-t-zinc-300";
 
   return (
-    <tr
+    <tbody
       ref={rowRef}
       style={rowStyle}
-      className={isCategory ? "category-row" : "subcategory-row"}
+      className={`${isCategory ? "category-row" : "subcategory-row"} ${showDropLine ? dropLineClass : ""}`}
     >
+    <tr>
       <td
-        colSpan={FULL_COL_COUNT}
+        colSpan={colSpan}
         className={`p-0 ${
           isCategory
             ? "bg-zinc-200/90"
@@ -357,6 +536,7 @@ function SectionRow({
         </div>
       </td>
     </tr>
+    </tbody>
   );
 }
 
@@ -372,6 +552,7 @@ function SortableSectionRow({
   value: string;
   onChange: (value: string) => void;
   actions: ReactNode;
+  colSpan: number;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -382,6 +563,7 @@ function SortableSectionRow({
   return (
     <SectionRow
       {...props}
+      colSpan={props.colSpan}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
@@ -401,17 +583,34 @@ function SubcategoryBlock({
   subcategory,
   onChange,
   onDelete,
+  onSyncCatalogPosition,
+  onScheduleCatalogSync,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
+  colSpan,
+  allCategories,
+  optionLinkActions,
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
   onChange: (subcategory: EstimateSubcategory) => void;
   onDelete: () => void;
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
+  colSpan: number;
+  allCategories: EstimateCategory[];
+  optionLinkActions: MultiOptionLinkActions;
 }) {
   return (
     <>
       <SortableSectionRow
         sortId={subcategoryDragId(subcategory.id)}
         dragLabel="Pārvietot subkategoriju"
+        colSpan={colSpan}
         kind="subcategory"
         placeholder="Subkategorijas nosaukums"
         value={subcategory.title}
@@ -420,6 +619,12 @@ function SubcategoryBlock({
           <RowActions
             showSub={false}
             deleteLabel="Dzēst subkategoriju"
+            onAddMulti={() =>
+              onChange({
+                ...subcategory,
+                items: [...subcategory.items, createMultiPosition()],
+              })
+            }
             onAddItem={() =>
               onChange({
                 ...subcategory,
@@ -430,29 +635,47 @@ function SubcategoryBlock({
           />
         }
       />
-      {subcategory.items.map((item) => (
-        <SortableLineItemRow
-          key={item.id}
-          sortId={itemDragId(item.id)}
-          categoryId={categoryId}
-          subcategoryId={subcategory.id}
-          item={item}
-          onChange={(next) =>
-            onChange({
-              ...subcategory,
-              items: subcategory.items.map((entry) =>
-                entry.id === item.id ? next : entry,
-              ),
-            })
-          }
-          onDelete={() =>
-            onChange({
-              ...subcategory,
-              items: subcategory.items.filter((entry) => entry.id !== item.id),
-            })
-          }
-        />
-      ))}
+      {subcategory.items.map((row) =>
+        isEstimateMultiPosition(row) ? (
+          <SortableMultiPositionRow
+            key={row.id}
+            sortId={itemDragId(row.id)}
+            categoryId={categoryId}
+            subcategoryId={subcategory.id}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            showQuantityColumn={showQuantityColumn}
+            allCategories={allCategories}
+            optionLinkActions={optionLinkActions}
+            value={row}
+          />
+        ) : (
+          <SortableLineItemRow
+            key={row.id}
+            sortId={itemDragId(row.id)}
+            categoryId={categoryId}
+            subcategoryId={subcategory.id}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            showQuantityColumn={showQuantityColumn}
+            onSyncCatalogPosition={onSyncCatalogPosition}
+            onScheduleCatalogSync={onScheduleCatalogSync}
+            item={row}
+            onChange={(next) =>
+              onChange({
+                ...subcategory,
+                items: updateRowItemById(subcategory.items, row.id, next),
+              })
+            }
+            onDelete={() =>
+              onChange({
+                ...subcategory,
+                items: removeRowItemById(subcategory.items, row.id),
+              })
+            }
+          />
+        ),
+      )}
     </>
   );
 }
@@ -461,16 +684,33 @@ function CategoryBlock({
   category,
   onChange,
   onDelete,
+  onSyncCatalogPosition,
+  onScheduleCatalogSync,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
+  colSpan,
+  allCategories,
+  optionLinkActions,
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
   onDelete: () => void;
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
+  colSpan: number;
+  allCategories: EstimateCategory[];
+  optionLinkActions: MultiOptionLinkActions;
 }) {
   return (
     <>
       <SortableSectionRow
         sortId={categoryDragId(category.id)}
         dragLabel="Pārvietot kategoriju"
+        colSpan={colSpan}
         kind="category"
         placeholder="Kategorijas nosaukums"
         value={category.title}
@@ -482,6 +722,12 @@ function CategoryBlock({
               onChange({
                 ...category,
                 subcategories: [...category.subcategories, createSubcategory()],
+              })
+            }
+            onAddMulti={() =>
+              onChange({
+                ...category,
+                items: [...category.items, createMultiPosition()],
               })
             }
             onAddItem={() =>
@@ -499,6 +745,14 @@ function CategoryBlock({
         <SubcategoryBlock
           key={subcategory.id}
           categoryId={category.id}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          showQuantityColumn={showQuantityColumn}
+          colSpan={colSpan}
+          allCategories={allCategories}
+          optionLinkActions={optionLinkActions}
+          onSyncCatalogPosition={onSyncCatalogPosition}
+          onScheduleCatalogSync={onScheduleCatalogSync}
           subcategory={subcategory}
           onChange={(next) =>
             onChange({
@@ -519,28 +773,45 @@ function CategoryBlock({
         />
       ))}
 
-      {category.items.map((item) => (
-        <SortableLineItemRow
-          key={item.id}
-          sortId={itemDragId(item.id)}
-          categoryId={category.id}
-          item={item}
-          onChange={(next) =>
-            onChange({
-              ...category,
-              items: category.items.map((entry) =>
-                entry.id === item.id ? next : entry,
-              ),
-            })
-          }
-          onDelete={() =>
-            onChange({
-              ...category,
-              items: category.items.filter((entry) => entry.id !== item.id),
-            })
-          }
-        />
-      ))}
+      {category.items.map((row) =>
+        isEstimateMultiPosition(row) ? (
+          <SortableMultiPositionRow
+            key={row.id}
+            sortId={itemDragId(row.id)}
+            categoryId={category.id}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            showQuantityColumn={showQuantityColumn}
+            allCategories={allCategories}
+            optionLinkActions={optionLinkActions}
+            value={row}
+          />
+        ) : (
+          <SortableLineItemRow
+            key={row.id}
+            sortId={itemDragId(row.id)}
+            categoryId={category.id}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            showQuantityColumn={showQuantityColumn}
+            onSyncCatalogPosition={onSyncCatalogPosition}
+            onScheduleCatalogSync={onScheduleCatalogSync}
+            item={row}
+            onChange={(next) =>
+              onChange({
+                ...category,
+                items: updateRowItemById(category.items, row.id, next),
+              })
+            }
+            onDelete={() =>
+              onChange({
+                ...category,
+                items: removeRowItemById(category.items, row.id),
+              })
+            }
+          />
+        ),
+      )}
     </>
   );
 }
@@ -549,25 +820,49 @@ function EstimateDndTable({
   categories,
   allDragIds,
   setCategories,
+  multiOptionLinks,
+  setMultiOptionLinks,
   totals,
+  onSyncCatalogPosition,
+  onScheduleCatalogSync,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
   setCategories: Dispatch<SetStateAction<EstimateCategory[]>>;
+  multiOptionLinks: MultiOptionLinkGroup[];
+  setMultiOptionLinks: Dispatch<SetStateAction<MultiOptionLinkGroup[]>>;
   totals: {
     labor: number;
     materials: number;
     mechanisms: number;
     grand: number;
   };
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
 }) {
+  const colSpan = getEstimateTableColCount(showQuantityColumn);
+
   return (
     <DropIndicatorProvider>
       <EstimateDndTableInner
         categories={categories}
         allDragIds={allDragIds}
         setCategories={setCategories}
+        multiOptionLinks={multiOptionLinks}
+        setMultiOptionLinks={setMultiOptionLinks}
         totals={totals}
+        onSyncCatalogPosition={onSyncCatalogPosition}
+        onScheduleCatalogSync={onScheduleCatalogSync}
+        catalogPositions={catalogPositions}
+        defaultHourlyRate={defaultHourlyRate}
+        showQuantityColumn={showQuantityColumn}
+        colSpan={colSpan}
       />
     </DropIndicatorProvider>
   );
@@ -577,19 +872,93 @@ function EstimateDndTableInner({
   categories,
   allDragIds,
   setCategories,
+  multiOptionLinks,
+  setMultiOptionLinks,
   totals,
+  onSyncCatalogPosition,
+  onScheduleCatalogSync,
+  catalogPositions,
+  defaultHourlyRate,
+  showQuantityColumn,
+  colSpan,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
   setCategories: Dispatch<SetStateAction<EstimateCategory[]>>;
+  multiOptionLinks: MultiOptionLinkGroup[];
+  setMultiOptionLinks: Dispatch<SetStateAction<MultiOptionLinkGroup[]>>;
   totals: {
     labor: number;
     materials: number;
     mechanisms: number;
     grand: number;
   };
+  onSyncCatalogPosition: (item: EstimateLineItem) => void;
+  onScheduleCatalogSync: (item: EstimateLineItem) => void;
+  catalogPositions: PositionPriceSummary[];
+  defaultHourlyRate: number | null;
+  showQuantityColumn: boolean;
+  colSpan: number;
 }) {
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
+  const [linkDragSourceOptionId, setLinkDragSourceOptionId] = useState<
+    string | null
+  >(null);
+
+  const optionLinkActions = useMemo<MultiOptionLinkActions>(
+    () => ({
+      linkDragSourceOptionId,
+      onLinkDragStart: (optionId) => setLinkDragSourceOptionId(optionId),
+      onLinkDragEnd: () => setLinkDragSourceOptionId(null),
+      getLinkedOptions: (optionId) =>
+        getLinkedOptionSummaries(categories, multiOptionLinks, optionId),
+      onLinkDrop: (sourceOptionId, targetOptionId) => {
+        setMultiOptionLinks((current) =>
+          linkMultiOptions(
+            categories,
+            current,
+            sourceOptionId,
+            targetOptionId,
+          ),
+        );
+      },
+      onUnlink: (sourceOptionId, targetOptionId) => {
+        setMultiOptionLinks((current) =>
+          unlinkMultiOptions(current, sourceOptionId, targetOptionId),
+        );
+      },
+      onMultiChange: (multiId, next, syncSelection) => {
+        setCategories((current) =>
+          applyMultiChangeWithLinkSync(
+            current,
+            multiOptionLinks,
+            multiId,
+            next,
+            syncSelection,
+          ),
+        );
+      },
+      onMultiDelete: (multiId) => {
+        setCategories((current) => {
+          const multi = findMultiById(current, multiId);
+          if (multi) {
+            setMultiOptionLinks((links) =>
+              cleanupLinksAfterMultiDelete(links, multi),
+            );
+          }
+
+          return removeMultiFromCategories(current, multiId);
+        });
+      },
+    }),
+    [
+      categories,
+      linkDragSourceOptionId,
+      multiOptionLinks,
+      setCategories,
+      setMultiOptionLinks,
+    ],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -628,11 +997,11 @@ function EstimateDndTableInner({
     >
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
-          <col style={{ width: "30%" }} />
-          <col style={{ width: "5%" }} />
-          <col style={{ width: "5%" }} />
-          {Array.from({ length: 8 }).map((_, index) => (
-            <col key={index} style={{ width: "7%" }} />
+          <col style={{ width: showQuantityColumn ? "32%" : "35%" }} />
+          <col style={{ width: "6%" }} />
+          {showQuantityColumn ? <col style={{ width: "7%" }} /> : null}
+          {Array.from({ length: 4 }).map((_, index) => (
+            <col key={index} style={{ width: "12%" }} />
           ))}
           <col style={{ width: "3%" }} />
         </colgroup>
@@ -647,82 +1016,86 @@ function EstimateDndTableInner({
             <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
               Mērv.
             </th>
-            <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
-              Daudz.
-            </th>
+            {showQuantityColumn ? (
+              <th
+                rowSpan={2}
+                className="border-b border-r border-zinc-200 px-2 py-2.5 text-center"
+                title="Individuāls apjoms katram projektam"
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  <i className="fas fa-random text-sm text-red-600" aria-hidden="true" />
+                  Apj.
+                </span>
+              </th>
+            ) : null}
             <th
               colSpan={4}
               className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
             >
               Vienības cena
             </th>
-            <th
-              colSpan={4}
-              className="border-b border-r border-zinc-200 bg-emerald-50/80 px-2 py-2 text-center text-emerald-800/70"
-            >
-              Apjoma summa
-            </th>
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {["Darbs", "Materiāls", "Mehānismi", "Kopā", "Darbs", "Materiāls", "Mehānismi", "Kopā"].map(
-              (label, index) => (
-                <th
-                  key={`${label}-${index}`}
-                  className={`border-b border-r border-zinc-200 px-2 py-1.5 text-right ${
-                    index < 4 ? "bg-sky-50/40" : "bg-emerald-50/40"
-                  }`}
-                >
-                  {label}
-                </th>
-              ),
-            )}
+            {["Darbs", "Materiāls", "Mehānismi", "Kopā"].map((label) => (
+              <th
+                key={label}
+                className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
+              >
+                {label}
+              </th>
+            ))}
           </tr>
         </thead>
-        <tbody>
-          <SortableContext
-            items={allDragIds}
-            strategy={verticalListSortingStrategy}
-          >
-            {categories.map((category) => (
-              <CategoryBlock
-                key={category.id}
-                category={category}
-                onChange={(next) =>
-                  setCategories((current) =>
-                    current.map((entry) =>
-                      entry.id === category.id ? next : entry,
-                    ),
-                  )
-                }
-                onDelete={() =>
-                  setCategories((current) =>
-                    current.filter((entry) => entry.id !== category.id),
-                  )
-                }
-              />
-            ))}
-          </SortableContext>
-        </tbody>
+        <SortableContext
+          items={allDragIds}
+          strategy={verticalListSortingStrategy}
+        >
+          {categories.map((category) => (
+            <CategoryBlock
+              key={category.id}
+              catalogPositions={catalogPositions}
+              defaultHourlyRate={defaultHourlyRate}
+              showQuantityColumn={showQuantityColumn}
+              colSpan={colSpan}
+              allCategories={categories}
+              optionLinkActions={optionLinkActions}
+              onSyncCatalogPosition={onSyncCatalogPosition}
+              onScheduleCatalogSync={onScheduleCatalogSync}
+              category={category}
+              onChange={(next) =>
+                setCategories((current) =>
+                  current.map((entry) =>
+                    entry.id === category.id ? next : entry,
+                  ),
+                )
+              }
+              onDelete={() =>
+                setCategories((current) =>
+                  current.filter((entry) => entry.id !== category.id),
+                )
+              }
+            />
+          ))}
+        </SortableContext>
         <tfoot>
           <tr className="bg-zinc-100/90">
             <td
-              colSpan={3}
+              colSpan={showQuantityColumn ? 3 : 2}
               className="border-t-2 border-zinc-300 px-3 py-2.5 text-right text-sm font-semibold text-zinc-600"
             >
               Kopā
             </td>
-            <td colSpan={4} className="border-t-2 border-r border-zinc-300 bg-sky-50/30" />
-            <td className={`${footerCell} bg-emerald-50/50`}>
+            <td className={`${footerCell} bg-sky-50/50`}>
               {formatMoney(totals.labor)}
             </td>
-            <td className={`${footerCell} bg-emerald-50/50`}>
+            <td className={`${footerCell} bg-sky-50/50`}>
               {formatMoney(totals.materials)}
             </td>
-            <td className={`${footerCell} bg-emerald-50/50`}>
+            <td className={`${footerCell} bg-sky-50/50`}>
               {formatMoney(totals.mechanisms)}
             </td>
-            <td className={`${footerCell} bg-emerald-100/60 text-base`}>
+            <td className={`${footerCell} bg-sky-100/60 text-base`}>
               {formatMoney(totals.grand)}
             </td>
             <td className="border-t-2 border-zinc-300" />
@@ -802,6 +1175,7 @@ function MetaField({
 }
 
 type EstimateTableProps = {
+  variant?: "full" | "tableOnly";
   initialTitle?: string;
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
@@ -810,9 +1184,12 @@ type EstimateTableProps = {
   project?: ProjectSummary;
   modules?: BuildingModuleSummary[];
   estimateValidityDays?: number;
+  catalogPositions?: PositionPriceSummary[];
+  defaultHourlyRate?: number | null;
 };
 
 export function EstimateTable({
+  variant = "full",
   initialTitle = SAMPLE_TITLE,
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
@@ -821,12 +1198,17 @@ export function EstimateTable({
   project,
   modules = [],
   estimateValidityDays = DEFAULT_ESTIMATE_VALIDITY_DAYS,
+  catalogPositions = [],
+  defaultHourlyRate = null,
 }: EstimateTableProps = {}) {
   const [title, setTitle] = useState(initialTitle);
   const [meta, setMeta] = useState(initialMeta);
   const [categories, setCategories] = useState<EstimateCategory[]>(
     initialCategories,
   );
+  const [multiOptionLinks, setMultiOptionLinks] = useState<
+    MultiOptionLinkGroup[]
+  >([]);
   const [moduleDataSpotlightDismissed, setModuleDataSpotlightDismissed] =
     useState(false);
   const [, startSaveDatesTransition] = useTransition();
@@ -862,9 +1244,12 @@ export function EstimateTable({
     persistEstimateDates({ date: nextMeta.date, deadline: nextMeta.deadline });
   }
 
+  const showQuantityColumn =
+    Boolean(project) && hasAnyVariableQuantityPosition(catalogPositions);
+
   const totals = useMemo(
-    () => calculateEstimateTotals(categories),
-    [categories],
+    () => calculateEstimateTotals(categories, catalogPositions),
+    [categories, catalogPositions],
   );
 
   const positionCount = collectEstimateLineItems(categories).length;
@@ -873,6 +1258,8 @@ export function EstimateTable({
     () => collectAllDragIds(categories),
     [categories],
   );
+  const { flushSyncFromLineItem, scheduleSyncFromLineItem } =
+    useSyncCatalogPositionFromLineItem(catalogPositions);
 
   const mapEmbedEnabled = isGoogleMapsEmbedConfigured();
   const displayModuleName = moduleName ?? "Individuāls projekts";
@@ -882,6 +1269,52 @@ export function EstimateTable({
       !isIndividualProjectModuleDataComplete(project) &&
       !moduleDataSpotlightDismissed,
   );
+
+  const tablePanel = (
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
+        {variant === "tableOnly" ? (
+          <input
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
+            aria-label="Tāmes nosaukums"
+          />
+        ) : null}
+        <p className="text-xs text-zinc-500">
+          {positionCount} pozīcijas · {categories.length} kategorijas
+        </p>
+        <button
+          type="button"
+          onClick={() => setCategories([...categories, createCategory()])}
+          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
+        >
+          + Kategorija
+        </button>
+      </div>
+
+      <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
+        <EstimateDndTable
+          categories={categories}
+          allDragIds={allDragIds}
+          setCategories={setCategories}
+          multiOptionLinks={multiOptionLinks}
+          setMultiOptionLinks={setMultiOptionLinks}
+          totals={totals}
+          onSyncCatalogPosition={flushSyncFromLineItem}
+          onScheduleCatalogSync={scheduleSyncFromLineItem}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          showQuantityColumn={showQuantityColumn}
+        />
+      </div>
+    </div>
+  );
+
+  if (variant === "tableOnly") {
+    return <div className="max-w-full space-y-4">{tablePanel}</div>;
+  }
 
   return (
     <>
@@ -986,31 +1419,7 @@ export function EstimateTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
-        <p className="text-xs text-zinc-500">
-          {positionCount} pozīcijas · {categories.length} kategorijas
-        </p>
-        <button
-          type="button"
-          onClick={() => setCategories([...categories, createCategory()])}
-          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
-        >
-          + Kategorija
-        </button>
-      </div>
-
-      {/* Table — DndContext wraps <table>, not inside it (valid HTML) */}
-      <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
-        <EstimateDndTable
-          categories={categories}
-          allDragIds={allDragIds}
-          setCategories={setCategories}
-          totals={totals}
-        />
-      </div>
-    </div>
+      {tablePanel}
     </div>
     </>
   );

@@ -16,7 +16,13 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 
+import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
+import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
+import {
+  DEFAULT_POSITION_COST_TYPE,
+  type PositionCostType,
+} from "@/app/lib/positions/position-cost-type";
 
 
 
@@ -25,6 +31,8 @@ type FieldErrors = {
   name?: string;
 
   unit?: string;
+
+  costType?: string;
 
 };
 
@@ -43,6 +51,10 @@ const emptyForm = {
   name: "",
 
   unit: "",
+
+  costType: DEFAULT_POSITION_COST_TYPE,
+
+  variableQuantity: false,
 
 };
 
@@ -122,7 +134,10 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
 
 
-  function updateField(field: keyof typeof emptyForm, value: string) {
+  function updateField<K extends keyof typeof emptyForm>(
+    field: K,
+    value: (typeof emptyForm)[K],
+  ) {
 
     setForm((current) => ({ ...current, [field]: value }));
 
@@ -160,6 +175,10 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         unit: form.unit.trim(),
 
+        costType: form.costType,
+
+        variableQuantity: form.variableQuantity,
+
       });
 
 
@@ -169,6 +188,8 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
           setFieldErrors({ name: result.error });
         } else if (result.error === "Ievadi mērvienību.") {
           setFieldErrors({ unit: result.error });
+        } else if (result.error === "Izvēlies izmaksu veidu.") {
+          setFieldErrors({ costType: result.error });
         } else {
           setError(result.error);
         }
@@ -219,17 +240,30 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         title="Pievienot pozīciju"
 
-        description="Norādi pozīcijas nosaukumu un mērvienību"
+        description="Norādi pozīcijas nosaukumu, mērvienību un izmaksu veidu"
 
         blocking={isPending}
 
-        dirty={Boolean(form.name.trim() || form.unit.trim())}
+        dirty={
+          Boolean(form.name.trim() || form.unit.trim()) ||
+          form.costType !== DEFAULT_POSITION_COST_TYPE ||
+          form.variableQuantity
+        }
 
         panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
 
       >
 
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
+
+          <PositionCostTypeField
+            id="position-cost-type"
+            value={form.costType}
+            onChange={(value: PositionCostType) =>
+              updateField("costType", value)
+            }
+            error={fieldErrors.costType}
+          />
 
           <PositionNameUnitFields
 
@@ -255,7 +289,11 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
           />
 
-
+          <PositionVariableQuantityField
+            id="position-variable-quantity"
+            enabled={form.variableQuantity}
+            onChange={(value) => updateField("variableQuantity", value)}
+          />
 
           {error ? (
 

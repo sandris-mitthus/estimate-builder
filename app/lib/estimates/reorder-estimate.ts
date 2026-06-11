@@ -5,9 +5,10 @@ import {
   parseDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
+import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import type {
   EstimateCategory,
-  EstimateLineItem,
+  EstimateRowItem,
   EstimateSubcategory,
 } from "@/app/lib/estimates/types";
 
@@ -25,13 +26,13 @@ export function collectAllDragIds(categories: EstimateCategory[]): string[] {
 
     for (const subcategory of category.subcategories) {
       ids.push(subcategoryDragId(subcategory.id));
-      for (const item of subcategory.items) {
-        ids.push(itemDragId(item.id));
+      for (const row of subcategory.items) {
+        ids.push(itemDragId(getRowItemId(row)));
       }
     }
 
-    for (const item of category.items) {
-      ids.push(itemDragId(item.id));
+    for (const row of category.items) {
+      ids.push(itemDragId(getRowItemId(row)));
     }
   }
 
@@ -117,16 +118,20 @@ function moveSubcategory(
 
 function findItemLocation(
   categories: EstimateCategory[],
-  itemId: string,
+  rowId: string,
 ): ItemLocation | null {
   for (const category of categories) {
-    const directIndex = category.items.findIndex((item) => item.id === itemId);
+    const directIndex = category.items.findIndex(
+      (row) => getRowItemId(row) === rowId,
+    );
     if (directIndex >= 0) {
       return { categoryId: category.id, index: directIndex };
     }
 
     for (const subcategory of category.subcategories) {
-      const subIndex = subcategory.items.findIndex((item) => item.id === itemId);
+      const subIndex = subcategory.items.findIndex(
+        (row) => getRowItemId(row) === rowId,
+      );
       if (subIndex >= 0) {
         return {
           categoryId: category.id,
@@ -144,26 +149,26 @@ function sameContainer(a: ItemLocation, b: ItemLocation): boolean {
   return a.categoryId === b.categoryId && a.subcategoryId === b.subcategoryId;
 }
 
-function extractItem(
+function extractRowItem(
   categories: EstimateCategory[],
-  itemId: string,
-): { categories: EstimateCategory[]; item: EstimateLineItem | null } {
-  let extracted: EstimateLineItem | null = null;
+  rowId: string,
+): { categories: EstimateCategory[]; row: EstimateRowItem | null } {
+  let extracted: EstimateRowItem | null = null;
 
   const next = categories.map((category) => ({
     ...category,
-    items: category.items.filter((item) => {
-      if (item.id === itemId) {
-        extracted = item;
+    items: category.items.filter((row) => {
+      if (getRowItemId(row) === rowId) {
+        extracted = row;
         return false;
       }
       return true;
     }),
     subcategories: category.subcategories.map((subcategory) => ({
       ...subcategory,
-      items: subcategory.items.filter((item) => {
-        if (item.id === itemId) {
-          extracted = item;
+      items: subcategory.items.filter((row) => {
+        if (getRowItemId(row) === rowId) {
+          extracted = row;
           return false;
         }
         return true;
@@ -171,12 +176,12 @@ function extractItem(
     })),
   }));
 
-  return { categories: next, item: extracted };
+  return { categories: next, row: extracted };
 }
 
-function insertItem(
+function insertRowItem(
   categories: EstimateCategory[],
-  item: EstimateLineItem,
+  row: EstimateRowItem,
   location: ItemLocation,
 ): EstimateCategory[] {
   return categories.map((category) => {
@@ -189,14 +194,14 @@ function insertItem(
           if (subcategory.id !== location.subcategoryId) return subcategory;
 
           const items = [...subcategory.items];
-          items.splice(location.index, 0, item);
+          items.splice(location.index, 0, row);
           return { ...subcategory, items };
         }),
       };
     }
 
     const items = [...category.items];
-    items.splice(location.index, 0, item);
+    items.splice(location.index, 0, row);
     return { ...category, items };
   });
 }
@@ -233,13 +238,13 @@ function reorderItemsInContainer(
 
 function moveItem(
   categories: EstimateCategory[],
-  activeItemId: string,
+  activeRowId: string,
   overDragId: string,
 ): EstimateCategory[] {
   const over = parseDragId(overDragId);
   if (!over) return categories;
 
-  const activeLoc = findItemLocation(categories, activeItemId);
+  const activeLoc = findItemLocation(categories, activeRowId);
   if (!activeLoc) return categories;
 
   if (over.kind === "item") {
@@ -255,25 +260,25 @@ function moveItem(
       );
     }
 
-    const { categories: reduced, item } = extractItem(categories, activeItemId);
-    if (!item) return categories;
+    const { categories: reduced, row } = extractRowItem(categories, activeRowId);
+    if (!row) return categories;
 
     const targetLoc = findItemLocation(reduced, over.id);
     if (!targetLoc) return categories;
 
-    return insertItem(reduced, item, targetLoc);
+    return insertRowItem(reduced, row, targetLoc);
   }
 
   if (over.kind === "subcategory") {
-    const { categories: reduced, item } = extractItem(categories, activeItemId);
-    if (!item) return categories;
+    const { categories: reduced, row } = extractRowItem(categories, activeRowId);
+    if (!row) return categories;
 
     const category = reduced.find((entry) =>
       entry.subcategories.some((sub) => sub.id === over.id),
     );
     if (!category) return categories;
 
-    return insertItem(reduced, item, {
+    return insertRowItem(reduced, row, {
       categoryId: category.id,
       subcategoryId: over.id,
       index: 0,
@@ -281,10 +286,10 @@ function moveItem(
   }
 
   if (over.kind === "category") {
-    const { categories: reduced, item } = extractItem(categories, activeItemId);
-    if (!item) return categories;
+    const { categories: reduced, row } = extractRowItem(categories, activeRowId);
+    if (!row) return categories;
 
-    return insertItem(reduced, item, {
+    return insertRowItem(reduced, row, {
       categoryId: over.id,
       index: 0,
     });

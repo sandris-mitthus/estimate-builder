@@ -15,4 +15,5 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   currency: DEFAULT_CURRENCY,
   logoUrl: "",
   estimateValidityDays: DEFAULT_ESTIMATE_VALIDITY_DAYS,
+  defaultHourlyRate: null,
 };

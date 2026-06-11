@@ -6,12 +6,16 @@ import {
   appModalWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
+import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
+import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
+import type { PositionCostType } from "@/app/lib/positions/position-cost-type";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 type FieldErrors = {
   name?: string;
   unit?: string;
+  costType?: string;
 };
 
 type EditPositionModalProps = {
@@ -19,7 +23,12 @@ type EditPositionModalProps = {
   onOpenChange: (open: boolean) => void;
   position: PositionPriceSummary;
   knownUnits: string[];
-  onSave: (input: { name: string; unit: string }) => void;
+  onSave: (input: {
+    name: string;
+    unit: string;
+    costType: PositionCostType;
+    variableQuantity: boolean;
+  }) => void;
   blocking?: boolean;
 };
 
@@ -33,12 +42,18 @@ export function EditPositionModal({
 }: EditPositionModalProps) {
   const [name, setName] = useState(position.name);
   const [unit, setUnit] = useState(position.unit);
+  const [costType, setCostType] = useState(position.costType);
+  const [variableQuantity, setVariableQuantity] = useState(
+    position.variableQuantity,
+  );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     if (!open) return;
     setName(position.name);
     setUnit(position.unit);
+    setCostType(position.costType);
+    setVariableQuantity(position.variableQuantity);
     setFieldErrors({});
   }, [open, position]);
 
@@ -67,6 +82,8 @@ export function EditPositionModal({
     onSave({
       name: name.trim(),
       unit: unit.trim(),
+      costType,
+      variableQuantity,
     });
   }
 
@@ -75,12 +92,27 @@ export function EditPositionModal({
       open={open}
       onOpenChange={onOpenChange}
       title="Labot pozīciju"
-      description="Atjaunini pozīcijas nosaukumu un mērvienību"
+      description="Atjaunini pozīcijas nosaukumu, mērvienību un izmaksu veidu"
       blocking={blocking}
-      dirty={name !== position.name || unit !== position.unit}
+      dirty={
+        name !== position.name ||
+        unit !== position.unit ||
+        costType !== position.costType ||
+        variableQuantity !== position.variableQuantity
+      }
       panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
+        <PositionCostTypeField
+          id={`edit-position-cost-type-${position.id}`}
+          value={costType}
+          onChange={(value) => {
+            setCostType(value);
+            setFieldErrors((current) => ({ ...current, costType: undefined }));
+          }}
+          error={fieldErrors.costType}
+        />
+
         <PositionNameUnitFields
           nameId={`edit-position-name-${position.id}`}
           unitId={`edit-position-unit-${position.id}`}
@@ -97,6 +129,12 @@ export function EditPositionModal({
           knownUnits={knownUnits}
           nameError={fieldErrors.name}
           unitError={fieldErrors.unit}
+        />
+
+        <PositionVariableQuantityField
+          id={`edit-position-variable-quantity-${position.id}`}
+          enabled={variableQuantity}
+          onChange={setVariableQuantity}
         />
 
         <ModalFormActions
