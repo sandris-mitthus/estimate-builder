@@ -50,6 +50,20 @@ function moduleSelectionFromProject(project: ProjectSummary): string {
   return INDIVIDUAL_PROJECT_MODULE;
 }
 
+function moduleLabelFromSelection(
+  moduleSelection: string,
+  modules: BuildingModuleSummary[],
+): string {
+  if (moduleSelection === INDIVIDUAL_PROJECT_MODULE) {
+    return "Individuāls projekts";
+  }
+
+  return (
+    modules.find((module) => module.id === moduleSelection)?.name ??
+    "Individuāls projekts"
+  );
+}
+
 function formFromProject(project: ProjectSummary): {
   form: FormState;
   callingCode: string;
@@ -114,6 +128,8 @@ type ProjectFormModalProps = {
   mode: "create" | "edit";
   project?: ProjectSummary;
   modules?: BuildingModuleSummary[];
+  /** Clone estimate from this project when creating (empty form, optional module prefill). */
+  copyFromProject?: ProjectSummary;
 };
 
 export function ProjectFormModal({
@@ -122,9 +138,11 @@ export function ProjectFormModal({
   mode,
   project,
   modules = [],
+  copyFromProject,
 }: ProjectFormModalProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
+  const isCopyCreate = !isEdit && Boolean(copyFromProject);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [moduleSelection, setModuleSelection] = useState("");
   const [moduleError, setModuleError] = useState<string | undefined>();
@@ -141,6 +159,10 @@ export function ProjectFormModal({
       setForm(initial.form);
       setPhoneCallingCode(initial.callingCode);
       setModuleSelection(moduleSelectionFromProject(project));
+    } else if (copyFromProject) {
+      setForm(emptyForm);
+      setPhoneCallingCode(DEFAULT_CALLING_CODE);
+      setModuleSelection(moduleSelectionFromProject(copyFromProject));
     } else {
       setForm(emptyForm);
       setPhoneCallingCode(DEFAULT_CALLING_CODE);
@@ -150,7 +172,7 @@ export function ProjectFormModal({
     setFieldErrors({});
     setModuleError(undefined);
     setError(null);
-  }, [open, isEdit, project]);
+  }, [open, isEdit, project, copyFromProject]);
 
   const handleCallingCodeChange = useCallback((code: string) => {
     setPhoneCallingCode(code);
@@ -241,6 +263,7 @@ export function ProjectFormModal({
         ...form,
         phoneCallingCode,
         buildingModuleId: resolveBuildingModuleId() ?? null,
+        copyEstimateFromProjectId: copyFromProject?.id,
       });
 
       if (!result.ok) {
@@ -268,13 +291,20 @@ export function ProjectFormModal({
             moduleSelection !== initialModule
           );
         })()
-      : Boolean(
-          form.clientName.trim() ||
-            form.phone.trim() ||
-            form.email.trim() ||
-            form.address.trim() ||
-            moduleSelection,
-        );
+      : isCopyCreate
+        ? Boolean(
+            form.clientName.trim() ||
+              form.phone.trim() ||
+              form.email.trim() ||
+              form.address.trim(),
+          )
+        : Boolean(
+            form.clientName.trim() ||
+              form.phone.trim() ||
+              form.email.trim() ||
+              form.address.trim() ||
+              moduleSelection,
+          );
 
   return (
     <AppModal
@@ -297,27 +327,39 @@ export function ProjectFormModal({
           <span className="mb-1.5 block text-sm font-medium text-zinc-700">
             Modulis
           </span>
-          <select
-            id="moduleSelection"
-            name="moduleSelection"
-            value={moduleSelection}
-            onChange={(event) => {
-              setModuleSelection(event.target.value);
-              setModuleError(undefined);
-            }}
-            className={`${formInputFullWidthClass} ${formInputClassName(Boolean(moduleError))}`}
-            aria-invalid={Boolean(moduleError)}
-            aria-describedby={moduleError ? "moduleSelection-error" : undefined}
-            required
-          >
-            <option value="">Izvēlies Moduli</option>
-            {modules.map((module) => (
-              <option key={module.id} value={module.id}>
-                {module.name}
-              </option>
-            ))}
-            <option value={INDIVIDUAL_PROJECT_MODULE}>Individuāls projekts</option>
-          </select>
+          {isCopyCreate ? (
+            <input
+              id="moduleSelection"
+              name="moduleSelection"
+              type="text"
+              value={moduleLabelFromSelection(moduleSelection, modules)}
+              readOnly
+              className={`${formInputFullWidthClass} ${formInputClassName()} cursor-not-allowed bg-zinc-50 text-zinc-600`}
+              aria-readonly="true"
+            />
+          ) : (
+            <select
+              id="moduleSelection"
+              name="moduleSelection"
+              value={moduleSelection}
+              onChange={(event) => {
+                setModuleSelection(event.target.value);
+                setModuleError(undefined);
+              }}
+              className={`${formInputFullWidthClass} ${formInputClassName(Boolean(moduleError))}`}
+              aria-invalid={Boolean(moduleError)}
+              aria-describedby={moduleError ? "moduleSelection-error" : undefined}
+              required
+            >
+              <option value="">Izvēlies Moduli</option>
+              {modules.map((module) => (
+                <option key={module.id} value={module.id}>
+                  {module.name}
+                </option>
+              ))}
+              <option value={INDIVIDUAL_PROJECT_MODULE}>Individuāls projekts</option>
+            </select>
+          )}
           {moduleError ? (
             <p
               id="moduleSelection-error"

@@ -4,8 +4,19 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
-import { createProject, deleteProject, updateProject, updateProjectEstimateDates } from "@/app/lib/projects/repository";
+import {
+  createProject,
+  deleteProject,
+  saveProjectEstimate,
+  updateProject,
+  updateProjectEstimateDates,
+  updateProjectStatus,
+} from "@/app/lib/projects/repository";
+import type { ProjectStatus } from "@/app/lib/projects/project-status";
 import type { CreateProjectInput, UpdateProjectInput } from "@/app/lib/projects/types";
+import type { EstimateMeta } from "@/app/lib/projects/types";
+import type { EstimateCategory } from "@/app/lib/estimates/types";
+import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
 
 export async function createProjectAction(input: CreateProjectInput) {
@@ -76,11 +87,43 @@ export async function updateProjectEstimateDatesAction(
   return result;
 }
 
+export async function saveProjectEstimateAction(
+  projectId: string,
+  payload: {
+    title: string;
+    meta: EstimateMeta;
+    categories: EstimateCategory[];
+    multiOptionLinks: MultiOptionLinkGroup[];
+  },
+) {
+  const result = await saveProjectEstimate(projectId, payload);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
 export async function deleteProjectAction(id: string) {
   const result = await deleteProject(id);
 
   if (result.ok) {
     revalidatePath("/");
+  }
+
+  return result;
+}
+
+export async function updateProjectStatusAction(
+  projectId: string,
+  status: ProjectStatus,
+) {
+  const result = await updateProjectStatus(projectId, status);
+
+  if (result.ok) {
+    revalidatePath("/");
+    revalidatePath(`/${projectId}`);
   }
 
   return result;

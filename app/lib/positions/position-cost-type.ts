@@ -6,7 +6,18 @@ export const POSITION_COST_TYPES = [
 
 export type PositionCostType = (typeof POSITION_COST_TYPES)[number];
 
+export const CATALOG_POSITION_COST_TYPES = [
+  "materials",
+  "mechanisms",
+] as const;
+
+export type CatalogPositionCostType =
+  (typeof CATALOG_POSITION_COST_TYPES)[number];
+
 export const DEFAULT_POSITION_COST_TYPE: PositionCostType = "labor";
+
+export const DEFAULT_CATALOG_POSITION_COST_TYPE: CatalogPositionCostType =
+  "materials";
 
 export const POSITION_COST_TYPE_LABELS: Record<PositionCostType, string> = {
   labor: "Darbs",
@@ -25,6 +36,17 @@ export const POSITION_COST_TYPE_OPTIONS = POSITION_COST_TYPES.map((value) => ({
   label: POSITION_COST_TYPE_LABELS[value],
   icon: POSITION_COST_TYPE_ICONS[value],
 }));
+
+export const CATALOG_POSITION_COST_TYPE_OPTIONS =
+  POSITION_COST_TYPE_OPTIONS.filter((option) =>
+    (CATALOG_POSITION_COST_TYPES as readonly string[]).includes(option.value),
+  );
+
+export function isCatalogPositionCostType(
+  value: PositionCostType,
+): value is CatalogPositionCostType {
+  return (CATALOG_POSITION_COST_TYPES as readonly string[]).includes(value);
+}
 
 export function isPositionCostType(value: unknown): value is PositionCostType {
   return (

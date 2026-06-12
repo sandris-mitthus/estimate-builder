@@ -6,13 +6,23 @@ import type { ProjectSummary } from "@/app/lib/projects/types";
 type ProjectListProps = {
   projects: ProjectSummary[];
   modules: BuildingModuleSummary[];
+  staleCatalogPriceProjectIds?: ReadonlySet<string>;
 };
 
-export function ProjectList({ projects, modules }: ProjectListProps) {
+export function ProjectList({
+  projects,
+  modules,
+  staleCatalogPriceProjectIds = new Set(),
+}: ProjectListProps) {
   return (
     <ListEntryGrid>
       {projects.map((project) => (
-        <ProjectCard key={project.id} project={project} modules={modules} />
+        <ProjectCard
+          key={project.id}
+          project={project}
+          modules={modules}
+          hasStaleCatalogPrices={staleCatalogPriceProjectIds.has(project.id)}
+        />
       ))}
     </ListEntryGrid>
   );

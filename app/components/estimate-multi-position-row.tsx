@@ -10,14 +10,12 @@ import {
 import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { MultiPositionLinkHandle } from "@/app/components/multi-position-link-handle";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
-import { AttachModuleSizeButton } from "@/app/components/attach-module-size-button";
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import {
-  formatAmountDisplay,
-  isAmountDisplayEmpty,
-  sumBreakdown,
-} from "@/app/lib/estimates/calculate-line";
+  UNIT_PRICE_COLUMN_COUNT,
+} from "@/app/lib/estimates/unit-price-columns";
 import {
   MULTI_POSITION_NONE_OPTION_ID,
   getMultiOptionIdentityKey,
@@ -32,12 +30,23 @@ import {
 } from "@/app/lib/estimates/multi-position-links";
 import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import {
+  resolveFrozenEstimateDisplayUnitPrice,
+  resolveLiveDisplayUnitPrice,
+  resolveStaleCatalogPriceHints,
+} from "@/app/lib/positions/stale-catalog-price";
+import {
   findCatalogPositionForLineItem,
   isMaterialsOrMechanismsLineItem,
 } from "@/app/lib/positions/sync-from-estimate-line-items";
+import {
+  deriveCompositeUnitPrice,
+  isCompositeLineItem,
+} from "@/app/lib/estimates/composite-line-item";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import {
+  EmptyVolumePriceCells,
   VolumeSumCells,
+  resolveLaborWorkloadHours,
   resolveLineItemVolumeSum,
 } from "@/app/components/estimate-volume-sum-cells";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -62,8 +71,6 @@ const readOnlyNum =
 const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
 const cellNum = `${cellInput} text-right tabular-nums`;
-const priceCell = "border-b border-zinc-100 px-1 py-0.5 align-top";
-const priceCellTotal = `${priceCell} bg-zinc-50/60`;
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const rowActionCell =
@@ -97,6 +104,7 @@ type EstimateMultiPositionRowProps = {
   showDropLine?: boolean;
   showQuantityColumn?: boolean;
   readOnlyPrices?: boolean;
+  highlightStaleCatalogPrices?: boolean;
   optionLinkActions?: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 };
@@ -106,50 +114,33 @@ function resolveDisplayUnitPrice(
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   readOnlyPrices: boolean,
+  highlightStaleCatalogPrices: boolean,
 ): PriceBreakdown {
   if (!item) {
     return { labor: 0, materials: 0, mechanisms: 0 };
   }
 
+  if (highlightStaleCatalogPrices) {
+    return resolveFrozenEstimateDisplayUnitPrice(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+    );
+  }
+
   if (readOnlyPrices) {
-    const position = findCatalogPositionForLineItem(item, catalogPositions);
-    if (position) {
-      return buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
-    }
+    return resolveLiveDisplayUnitPrice(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+    );
+  }
+
+  if (isCompositeLineItem(item)) {
+    return deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
   }
 
   return item.unitPrice;
-}
-
-function PriceCells({ values }: { values: PriceBreakdown }) {
-  const total = sumBreakdown(values);
-
-  return (
-    <>
-      {(["labor", "materials", "mechanisms"] as const).map((field) => (
-        <td key={field} className={priceCell}>
-          <span
-            className={`${readOnlyNum} ${
-              isAmountDisplayEmpty(values[field]) ? "text-zinc-300" : ""
-            }`}
-          >
-            {formatAmountDisplay(values[field])}
-          </span>
-        </td>
-      ))}
-      <td className={priceCellTotal}>
-        <span
-          className={`${readOnlyNum} ${
-            isAmountDisplayEmpty(total)
-              ? "text-zinc-300"
-              : "font-medium text-zinc-900"
-          }`}
-        >
-          {formatAmountDisplay(total)}
-        </span>
-      </td>
-    </>
-  );
 }
 
 function EmptyHeaderMetricCells({
@@ -163,24 +154,15 @@ function EmptyHeaderMetricCells({
       {showQuantityColumn ? (
         <td className="border-b border-zinc-100 px-1 py-0.5 align-top" />
       ) : null}
-      {Array.from({ length: 4 }).map((_, index) => (
+      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
         <td
           key={index}
           className={`border-b border-zinc-100 px-1 py-0.5 align-top ${
-            index === 3 ? "bg-zinc-50/60" : ""
+            index === UNIT_PRICE_COLUMN_COUNT - 1 ? "bg-zinc-50/60" : ""
           }`}
         />
       ))}
-      {showQuantityColumn
-        ? Array.from({ length: 4 }).map((_, index) => (
-            <td
-              key={`volume-${index}`}
-              className={`border-b border-zinc-100 px-1 py-0.5 align-top ${
-                index === 3 ? "bg-emerald-50/50" : "bg-emerald-50/25"
-              }`}
-            />
-          ))
-        : null}
+      {showQuantityColumn ? <EmptyVolumePriceCells /> : null}
     </>
   );
 }
@@ -190,6 +172,7 @@ function MultiOptionSubRow({
   catalogPositions,
   defaultHourlyRate,
   readOnlyPrices,
+  highlightStaleCatalogPrices = false,
   indentName,
   showQuantityColumn,
   linkedOptions,
@@ -198,12 +181,14 @@ function MultiOptionSubRow({
   onLinkDragEnd,
   onLinkDrop,
   onUnlink,
+  onTimeNormChange,
   moduleSizeOptions = [],
 }: {
   option: EstimateMultiPosition["options"][number];
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   readOnlyPrices: boolean;
+  highlightStaleCatalogPrices?: boolean;
   indentName: boolean;
   showQuantityColumn: boolean;
   linkedOptions: LinkedOptionSummary[];
@@ -212,6 +197,7 @@ function MultiOptionSubRow({
   onLinkDragEnd?: () => void;
   onLinkDrop?: (sourceOptionId: string) => void;
   onUnlink?: (targetOptionId: string) => void;
+  onTimeNormChange?: (value: number) => void;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
@@ -230,7 +216,15 @@ function MultiOptionSubRow({
     catalogPositions,
     defaultHourlyRate,
     readOnlyPrices,
+    highlightStaleCatalogPrices,
   );
+  const staleCatalogPriceHints = highlightStaleCatalogPrices
+    ? resolveStaleCatalogPriceHints(
+        option.lineItem,
+        catalogPositions,
+        defaultHourlyRate,
+      )
+    : undefined;
   const linkable = isLinkableMultiOption(option);
   const canAcceptLinkDrop =
     linkable &&
@@ -301,9 +295,9 @@ function MultiOptionSubRow({
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1.5">
-              <div className="min-w-0 flex-1 leading-snug">
+              <div className="flex min-w-0 flex-1 flex-col gap-0 leading-snug">
                 <div
-                  className={`text-sm text-zinc-700 ${showAttachModuleSize ? "font-semibold" : ""} ${isMaterialsOrMechanisms ? "text-right" : ""}`}
+                  className={`text-sm text-zinc-700 ${showAttachModuleSize ? "font-semibold" : ""}`}
                 >
                   {label}
                 </div>
@@ -312,11 +306,6 @@ function MultiOptionSubRow({
                   moduleSizeOptions={moduleSizeOptions}
                 />
               </div>
-              <AttachModuleSizeButton
-                enabled={showAttachModuleSize}
-                lineItemId={option.lineItem.id}
-                positionName={option.lineItem.name}
-              />
             </div>
             {linkedOptions.length > 0 ? (
               <ul className="mt-0.5 space-y-0.5">
@@ -365,12 +354,24 @@ function MultiOptionSubRow({
           <span className={`${readOnlyNum} text-zinc-300`}>—</span>
         </td>
       ) : null}
-      <PriceCells values={displayPrices} />
+      <EstimateUnitPriceCells
+        item={option.lineItem}
+        defaultHourlyRate={defaultHourlyRate}
+        values={displayPrices}
+        staleCatalogPriceHints={staleCatalogPriceHints}
+        onTimeNormChange={onTimeNormChange}
+      />
       {showQuantityColumn ? (
         <VolumeSumCells
           values={resolveLineItemVolumeSum(
             option.lineItem.quantity,
             displayPrices,
+            isVariableQuantityLineItem(option.lineItem, catalogPositions),
+          )}
+          staleCatalogPriceHints={staleCatalogPriceHints}
+          laborWorkloadHours={resolveLaborWorkloadHours(
+            option.lineItem.quantity,
+            option.lineItem,
             isVariableQuantityLineItem(option.lineItem, catalogPositions),
           )}
         />
@@ -395,6 +396,7 @@ export function EstimateMultiPositionRow({
   showDropLine = false,
   showQuantityColumn = false,
   readOnlyPrices = true,
+  highlightStaleCatalogPrices = false,
   optionLinkActions,
   moduleSizeOptions = [],
 }: EstimateMultiPositionRowProps) {
@@ -431,6 +433,7 @@ export function EstimateMultiPositionRow({
     catalogPositions,
     defaultHourlyRate,
     readOnlyPrices,
+    highlightStaleCatalogPrices,
   );
   const showQuantityInput =
     selectedLineItem != null &&
@@ -447,14 +450,31 @@ export function EstimateMultiPositionRow({
     hasModuleSizeAttachment(selectedLineItem) &&
     attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? selectedLineItem?.quantity ?? 0;
+  const volumeVariable = showQuantityInput || hasAttachedQuantity;
   const volumeSum =
     showQuantityColumn && selectedLineItem
       ? resolveLineItemVolumeSum(
           effectiveQuantity,
           displayPrices,
-          showQuantityInput || hasAttachedQuantity,
+          volumeVariable,
         )
       : null;
+  const laborWorkloadHours =
+    showQuantityColumn && selectedLineItem
+      ? resolveLaborWorkloadHours(
+          effectiveQuantity,
+          selectedLineItem,
+          volumeVariable,
+        )
+      : null;
+  const selectedStaleCatalogPriceHints =
+    highlightStaleCatalogPrices && selectedLineItem
+      ? resolveStaleCatalogPriceHints(
+          selectedLineItem,
+          catalogPositions,
+          defaultHourlyRate,
+        )
+      : undefined;
   const linkedOptions =
     selectedOption && optionLinkActions
       ? optionLinkActions.getLinkedOptions(selectedOption.id)
@@ -564,8 +584,19 @@ export function EstimateMultiPositionRow({
                 )}
               </td>
             ) : null}
-            <PriceCells values={displayPrices} />
-            {showQuantityColumn ? <VolumeSumCells values={volumeSum} /> : null}
+            <EstimateUnitPriceCells
+              item={selectedLineItem}
+              defaultHourlyRate={defaultHourlyRate}
+              values={displayPrices}
+              staleCatalogPriceHints={selectedStaleCatalogPriceHints}
+            />
+            {showQuantityColumn ? (
+              <VolumeSumCells
+                values={volumeSum}
+                laborWorkloadHours={laborWorkloadHours}
+                staleCatalogPriceHints={selectedStaleCatalogPriceHints}
+              />
+            ) : null}
             <td className={rowActionCell} />
           </tr>
         ) : (
@@ -626,6 +657,7 @@ export function EstimateMultiPositionRow({
                 catalogPositions={catalogPositions}
                 defaultHourlyRate={defaultHourlyRate}
                 readOnlyPrices={readOnlyPrices}
+                highlightStaleCatalogPrices={highlightStaleCatalogPrices}
                 indentName={indentName}
                 showQuantityColumn={showQuantityColumn}
                 linkedOptions={
@@ -648,6 +680,19 @@ export function EstimateMultiPositionRow({
                         optionLinkActions.onUnlink(option.id, targetId)
                     : undefined
                 }
+                onTimeNormChange={(laborTimeNorm) =>
+                  onChange({
+                    ...value,
+                    options: value.options.map((o) =>
+                      o.id === option.id
+                        ? {
+                            ...o,
+                            lineItem: { ...o.lineItem, laborTimeNorm },
+                          }
+                        : o,
+                    ),
+                  })
+                }
                 moduleSizeOptions={moduleSizeOptions}
               />
             ))}
@@ -663,8 +708,7 @@ export function EstimateMultiPositionRow({
           onSave={onChange}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
-          hydrateCatalogPrices
-          lockCatalogIdentity={false}
+          moduleSizeOptions={moduleSizeOptions}
         />
       ) : null}
     </>

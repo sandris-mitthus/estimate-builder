@@ -9,7 +9,14 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
-import type { PositionCostType } from "@/app/lib/positions/position-cost-type";
+import type {
+  CatalogPositionCostType,
+  PositionCostType,
+} from "@/app/lib/positions/position-cost-type";
+import {
+  DEFAULT_CATALOG_POSITION_COST_TYPE,
+  isCatalogPositionCostType,
+} from "@/app/lib/positions/position-cost-type";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 type FieldErrors = {
@@ -32,6 +39,14 @@ type EditPositionModalProps = {
   blocking?: boolean;
 };
 
+function resolveCatalogCostType(
+  costType: PositionCostType,
+): CatalogPositionCostType {
+  return isCatalogPositionCostType(costType)
+    ? costType
+    : DEFAULT_CATALOG_POSITION_COST_TYPE;
+}
+
 export function EditPositionModal({
   open,
   onOpenChange,
@@ -42,7 +57,9 @@ export function EditPositionModal({
 }: EditPositionModalProps) {
   const [name, setName] = useState(position.name);
   const [unit, setUnit] = useState(position.unit);
-  const [costType, setCostType] = useState(position.costType);
+  const [costType, setCostType] = useState<CatalogPositionCostType>(
+    resolveCatalogCostType(position.costType),
+  );
   const [variableQuantity, setVariableQuantity] = useState(
     position.variableQuantity,
   );
@@ -52,7 +69,7 @@ export function EditPositionModal({
     if (!open) return;
     setName(position.name);
     setUnit(position.unit);
-    setCostType(position.costType);
+    setCostType(resolveCatalogCostType(position.costType));
     setVariableQuantity(position.variableQuantity);
     setFieldErrors({});
   }, [open, position]);
@@ -97,7 +114,7 @@ export function EditPositionModal({
       dirty={
         name !== position.name ||
         unit !== position.unit ||
-        costType !== position.costType ||
+        costType !== resolveCatalogCostType(position.costType) ||
         variableQuantity !== position.variableQuantity
       }
       panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
@@ -111,6 +128,7 @@ export function EditPositionModal({
             setFieldErrors((current) => ({ ...current, costType: undefined }));
           }}
           error={fieldErrors.costType}
+          catalogOnly
         />
 
         <PositionNameUnitFields

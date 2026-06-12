@@ -1,21 +1,36 @@
 import {
+  CATALOG_POSITION_COST_TYPE_OPTIONS,
   POSITION_COST_TYPE_OPTIONS,
+  type CatalogPositionCostType,
   type PositionCostType,
 } from "@/app/lib/positions/position-cost-type";
 
 type PositionCostTypeFieldProps = {
   id: string;
-  value: PositionCostType;
-  onChange: (value: PositionCostType) => void;
   error?: string;
-};
+} & (
+  | {
+      catalogOnly?: false;
+      value: PositionCostType;
+      onChange: (value: PositionCostType) => void;
+    }
+  | {
+      catalogOnly: true;
+      value: CatalogPositionCostType;
+      onChange: (value: CatalogPositionCostType) => void;
+    }
+);
 
 export function PositionCostTypeField({
   id,
   value,
   onChange,
   error,
+  catalogOnly = false,
 }: PositionCostTypeFieldProps) {
+  const options = catalogOnly
+    ? CATALOG_POSITION_COST_TYPE_OPTIONS
+    : POSITION_COST_TYPE_OPTIONS;
   return (
     <fieldset>
       <legend
@@ -33,7 +48,7 @@ export function PositionCostTypeField({
           error ? "border-red-300" : "border-zinc-200"
         }`}
       >
-        {POSITION_COST_TYPE_OPTIONS.map((option, index) => {
+        {options.map((option, index) => {
           const isSelected = value === option.value;
           const inputId = `${id}-${option.value}`;
 
@@ -55,7 +70,16 @@ export function PositionCostTypeField({
                 name={id}
                 value={option.value}
                 checked={isSelected}
-                onChange={() => onChange(option.value)}
+                onChange={() => {
+                  if (catalogOnly) {
+                    (onChange as (value: CatalogPositionCostType) => void)(
+                      option.value as CatalogPositionCostType,
+                    );
+                    return;
+                  }
+
+                  (onChange as (value: PositionCostType) => void)(option.value);
+                }}
                 className="sr-only"
               />
               <span className="inline-flex items-center gap-2">

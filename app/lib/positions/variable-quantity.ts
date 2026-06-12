@@ -1,4 +1,4 @@
-import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
+import { addThousandSeparators, roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
 import type { EstimateLineItem } from "@/app/lib/estimates/types";
 import { findCatalogPositionForLineItem } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -72,6 +72,45 @@ export function parseQuantityInput(value: string): number {
 
 export function formatQuantityDisplay(value: number): string {
   if (!Number.isFinite(value) || value < 0) {
+    return "";
+  }
+
+  return addThousandSeparators(roundQuantity(value).toFixed(2)).replace(".", ",");
+}
+
+/** Atļauj ciparus un vienu decimālo atdalītāju, max 2 cipari aiz komata. */
+export function sanitizeTimeNormInputString(value: string): string {
+  const sanitized = sanitizeQuantityInputString(value);
+  const separatorIndex = sanitized.search(/[.,]/);
+  if (separatorIndex === -1) {
+    return sanitized;
+  }
+
+  const beforeSeparator = sanitized.slice(0, separatorIndex + 1);
+  const afterSeparator = sanitized.slice(separatorIndex + 1).slice(0, 2);
+  return beforeSeparator + afterSeparator;
+}
+
+export function parseTimeNormInput(value: string): number {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) {
+    return 0;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return roundQuantity(parsed);
+}
+
+export function formatTimeNormDisplay(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "";
+  }
+
+  if (value === 0) {
     return "";
   }
 

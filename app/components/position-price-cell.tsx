@@ -45,7 +45,11 @@ export function PositionPriceCell({
   }, [hovered, showTooltip]);
 
   if (position.unitPrice === undefined) {
-    return <span className="cursor-default text-zinc-400">—</span>;
+    return (
+      <span className="cursor-default text-zinc-400">
+        {`- ${currency} / ${position.unit}`}
+      </span>
+    );
   }
 
   const updatedLabel = position.unitPriceUpdatedAt

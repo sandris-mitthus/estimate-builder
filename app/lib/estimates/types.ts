@@ -12,6 +12,13 @@ export type LineItemModuleSizeAttachment = {
   adjustments?: Record<string, string>;
 };
 
+/** Atsauce uz kataloga pozīciju (materiāls / mehānisms) ar uzglabātu nosaukumu un mērvienību. */
+export type LineItemCatalogRef = {
+  positionPriceId: string;
+  name: string;
+  unit: string;
+};
+
 export type EstimateLineItem = {
   id: string;
   name: string;
@@ -21,6 +28,12 @@ export type EstimateLineItem = {
   /** Saite uz `position_prices`, ja rinda no kataloga */
   positionPriceId?: string;
   moduleSizeAttachment?: LineItemModuleSizeAttachment;
+  /** Laika norma (c/h) — stundas uz vienību; darbs = laika norma × stundas likme. */
+  laborTimeNorm?: number;
+  /** Piesaistītais materiāls — cena no kataloga. */
+  material?: LineItemCatalogRef | null;
+  /** Piesaistītais mehānisms — mehānisms = kataloga likme (EUR/h) × laika norma. */
+  mechanism?: LineItemCatalogRef | null;
 };
 
 export type EstimateMultiPositionOption = {

@@ -4,7 +4,9 @@ import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
 const cardClassName =
-  "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md";
+  "rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md";
+const cardClassNameDefault = `${cardClassName} border-zinc-200 hover:border-zinc-300`;
+const cardClassNameStalePrices = `${cardClassName} border-red-300 hover:border-red-400`;
 
 function resolveProjectModuleName(
   buildingModuleId: string | null,
@@ -40,16 +42,22 @@ function ContactRow({
 export function ProjectCard({
   project,
   modules,
+  hasStaleCatalogPrices = false,
 }: {
   project: ProjectSummary;
   modules: BuildingModuleSummary[];
+  hasStaleCatalogPrices?: boolean;
 }) {
   const hasEmail = Boolean(project.email.trim());
   const hasPhone = Boolean(project.phone.trim());
   const moduleName = resolveProjectModuleName(project.buildingModuleId, modules);
 
   return (
-    <div className={cardClassName}>
+    <div
+      className={
+        hasStaleCatalogPrices ? cardClassNameStalePrices : cardClassNameDefault
+      }
+    >
       <div className="flex items-start gap-3">
         <Link
           href={`/${project.id}`}
@@ -74,6 +82,13 @@ export function ProjectCard({
                 aria-hidden="true"
               />
               <span className="min-w-0 break-words">{project.address}</span>
+            </p>
+          ) : null}
+
+          {hasStaleCatalogPrices ? (
+            <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-red-600">
+              <i className="fas fa-sync-alt text-[11px]" aria-hidden="true" />
+              Ir jauninājumi izcenojumos
             </p>
           ) : null}
         </Link>

@@ -274,8 +274,11 @@ export function EstimateLineItemNameField({
 
   if (readOnly) {
     return (
-      <div className={`min-w-0 flex-1 text-sm leading-snug text-zinc-800 ${className ?? ""}`}>
-        {value.trim() || "—"}
+      <div
+        className={`min-w-0 flex-1 text-sm leading-snug text-zinc-800 ${className ?? ""}`}
+      >
+        <div>{value.trim() || "—"}</div>
+        {footer}
       </div>
     );
   }

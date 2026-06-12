@@ -118,6 +118,29 @@ export function hasModuleSizeAttachment(item: EstimateLineItem): boolean {
   );
 }
 
+/** Mērvienība no piesaistītā moduļa lieluma pozīcijas (piem. "m²", "m"). */
+export function resolveLineItemDisplayUnitFromModuleSize(
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): string | null {
+  const attachment = normalizeLineItemModuleSizeAttachment(
+    item.moduleSizeAttachment,
+  );
+  if (!attachment || moduleSizeOptions.length === 0) {
+    return null;
+  }
+
+  const moduleOption =
+    moduleSizeOptions.find((entry) => entry.id === attachment.moduleId) ??
+    moduleSizeOptions[0];
+
+  const sections = buildModuleSizeSummarySections(
+    moduleOption.projectDescription,
+  );
+  const summaryItem = findModuleSizeSummaryItem(sections, attachment.itemKey);
+  return summaryItem?.unit ?? null;
+}
+
 export function resolveLineItemDisplayQuantityFromModuleSize(
   item: EstimateLineItem,
   moduleSizeOptions: BuildingModuleSizeOption[],

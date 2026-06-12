@@ -21,10 +21,15 @@ import {
 } from "@/app/lib/form/input-styles";
 
 import { PositionCostTypeDisplay } from "@/app/components/position-cost-type-display";
+import { PositionCostTypeFilter as PositionCostTypeFilterControl } from "@/app/components/position-cost-type-filter";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { collectKnownUnits } from "@/app/lib/positions/collect-known-units";
 
-import { getVisiblePositions } from "@/app/lib/positions/filter-positions";
+import {
+  getVisiblePositions,
+  filterCatalogPositions,
+  type PositionCostTypeFilter,
+} from "@/app/lib/positions/filter-positions";
 
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
@@ -51,18 +56,27 @@ export function PositionsPageContent({
 }: PositionsPageContentProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [costTypeFilter, setCostTypeFilter] =
+    useState<PositionCostTypeFilter>("all");
 
-  const knownUnits = collectKnownUnits(initialPositions);
+  const catalogPositions = useMemo(
+    () => filterCatalogPositions(initialPositions),
+    [initialPositions],
+  );
+
+  const knownUnits = collectKnownUnits(catalogPositions);
 
   const visiblePositions = useMemo(
 
-    () => getVisiblePositions(initialPositions, searchQuery),
+    () =>
+      getVisiblePositions(catalogPositions, searchQuery, costTypeFilter),
 
-    [initialPositions, searchQuery],
+    [catalogPositions, searchQuery, costTypeFilter],
 
   );
 
   const isSearching = searchQuery.trim().length > 0;
+  const isFiltering = isSearching || costTypeFilter !== "all";
 
 
 
@@ -74,11 +88,11 @@ export function PositionsPageContent({
 
       subtitle={
 
-        isSearching
+        isFiltering
 
-          ? `${visiblePositions.length} no ${initialPositions.length} pozīcijām`
+          ? `${visiblePositions.length} no ${catalogPositions.length} pozīcijām`
 
-          : `${initialPositions.length} pozīcijas katalogā`
+          : `${catalogPositions.length} pozīcijas katalogā`
 
       }
 
@@ -118,7 +132,11 @@ export function PositionsPageContent({
 
         </label>
 
-
+        <PositionCostTypeFilterControl
+          id="positions-cost-type-filter"
+          value={costTypeFilter}
+          onChange={setCostTypeFilter}
+        />
 
         <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
 
@@ -170,7 +188,7 @@ export function PositionsPageContent({
 
                   >
 
-                    {isSearching
+                    {isFiltering
 
                       ? "Nav atrastu pozīciju."
 
@@ -220,7 +238,7 @@ export function PositionsPageContent({
 
                         position={position}
 
-                        knownUnits={collectKnownUnits(initialPositions, {
+                        knownUnits={collectKnownUnits(catalogPositions, {
 
                           excludePositionId: position.id,
 

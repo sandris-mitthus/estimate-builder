@@ -25,18 +25,23 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { updateProjectEstimateDatesAction } from "@/app/(protected)/actions";
 import {
-  formatAmountDisplay,
-  isAmountDisplayEmpty,
-  sumBreakdown,
-} from "@/app/lib/estimates/calculate-line";
+  saveProjectEstimateAction,
+  updateProjectEstimateDatesAction,
+} from "@/app/(protected)/actions";
+import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import {
   VolumeSumCells,
+  resolveLaborWorkloadHours,
   resolveLineItemVolumeSum,
   volumeSumFooterCell,
   volumeSumFooterCellTotal,
 } from "@/app/components/estimate-volume-sum-cells";
+import {
+  VOLUME_PRICE_COLUMN_COUNT,
+  VOLUME_PRICE_SUBHEADER_LABELS,
+} from "@/app/lib/estimates/volume-price-columns";
+import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
   createLineItem,
@@ -50,13 +55,26 @@ import {
   SAMPLE_META,
   SAMPLE_TITLE,
 } from "@/app/lib/estimates/sample-data";
+import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
+import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
 import { AddressMapEmbed } from "@/app/components/address-map-embed";
 import { IndividualProjectModuleDataSpotlight } from "@/app/components/individual-project-module-data-spotlight";
 import { ModuleVisualizationGallery } from "@/app/components/module-visualization-gallery";
 import { ProjectCardActions } from "@/app/components/project-card-actions";
 import { DeleteButton } from "@/app/components/delete-button";
+import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
+import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
+import {
+  deriveCompositeUnitPrice,
+  isCompositeLineItem,
+} from "@/app/lib/estimates/composite-line-item";
+import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import {
+  UNIT_PRICE_COLUMN_COUNT,
+  UNIT_PRICE_SUBHEADER_LABELS,
+} from "@/app/lib/estimates/unit-price-columns";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
@@ -65,6 +83,14 @@ import {
   applyCatalogPositionToLineItem,
   buildUnitPriceForCatalogPosition,
 } from "@/app/lib/positions/apply-catalog-to-line-item";
+import {
+  estimateHasStaleCatalogPrices,
+  isProjectEstimateSaved,
+  refreshEstimateCatalogPrices,
+  resolveFrozenEstimateDisplayUnitPrice,
+  resolveLiveDisplayUnitPrice,
+  resolveStaleCatalogPriceHints,
+} from "@/app/lib/positions/stale-catalog-price";
 import {
   applyLineItemCatalogEdit,
   findCatalogPositionForLineItem,
@@ -118,6 +144,7 @@ import type {
   EstimateCategory,
   EstimateLineItem,
   EstimateMultiPosition,
+  EstimateRowItem,
   EstimateSubcategory,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
@@ -126,25 +153,94 @@ import type {
   BuildingModuleSummary,
   ModuleContentBlock,
 } from "@/app/lib/modules/types";
+import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 import { isGoogleMapsEmbedConfigured } from "@/app/lib/google-maps/env";
 
 function getEstimateTableColCount(showQuantityColumn: boolean): number {
-  return showQuantityColumn ? 12 : 7;
+  return showQuantityColumn ? 15 : 9;
+}
+
+function bakeInCatalogPrices(
+  categories: EstimateCategory[],
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+): EstimateCategory[] {
+  const catalogById = new Map(
+    catalogPositions.map((p) => [p.id, p]),
+  );
+
+  function bakeItem(item: EstimateRowItem): EstimateRowItem {
+    if (isEstimateMultiPosition(item)) {
+      return {
+        ...item,
+        options: item.options.map((opt) => ({
+          ...opt,
+          lineItem: bakeLineItem(opt.lineItem),
+        })),
+      };
+    }
+    return bakeLineItem(item);
+  }
+
+  function bakeLineItem(item: EstimateLineItem): EstimateLineItem {
+    if (isCompositeLineItem(item)) {
+      return {
+        ...item,
+        unitPrice: deriveCompositeUnitPrice(
+          item,
+          catalogPositions,
+          defaultHourlyRate,
+        ),
+      };
+    }
+
+    if (!item.positionPriceId) return item;
+    const position = catalogById.get(item.positionPriceId);
+    if (!position) return item;
+    return {
+      ...item,
+      unitPrice: buildUnitPriceForCatalogPosition(position, defaultHourlyRate),
+      positionPriceId: undefined,
+    };
+  }
+
+  return categories.map((cat) => ({
+    ...cat,
+    items: cat.items.map(bakeItem),
+    subcategories: cat.subcategories.map((sub) => ({
+      ...sub,
+      items: sub.items.map(bakeItem),
+    })),
+  }));
+}
+
+function daysUntilDeadline(deadline: string): number | null {
+  if (!deadline) return null;
+  const d = new Date(`${deadline}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatDeadlineDays(days: number): string {
+  if (days === 0) return "Termiņš šodien";
+  if (days < 0) return `Termiņš beidzies pirms ${Math.abs(days)} d.`;
+  const abs = Math.abs(days);
+  const label = abs === 1 ? "diena" : "dienas";
+  return `${abs} ${label} līdz termiņam`;
 }
 
 const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
 const nameInput =
   "w-full min-h-[2.75rem] resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
-const nameInputRightAlign = "text-right";
 const cellNum = `${cellInput} text-right tabular-nums`;
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
-const priceCell = "border-b border-zinc-100 px-1 py-0.5 align-top";
-const priceCellTotal = `${priceCell} bg-zinc-50/60`;
 /** Stable DndContext id — avoids SSR/client mismatch on aria-describedby. */
 const ESTIMATE_DND_CONTEXT_ID = "estimate-table-dnd";
 
@@ -158,71 +254,6 @@ const dragHandleColumn =
 const subcategoryNameIndent = "ml-[10px]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
-
-function resolveLineItemDisplayUnitPrice(
-  item: EstimateLineItem,
-  catalogPositions: PositionPriceSummary[],
-  defaultHourlyRate: number | null,
-): PriceBreakdown {
-  const position = findCatalogPositionForLineItem(item, catalogPositions);
-  if (position) {
-    return buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
-  }
-
-  return item.unitPrice;
-}
-
-function PriceCells({
-  values,
-  readOnly = false,
-  onChange,
-}: {
-  values: PriceBreakdown;
-  readOnly?: boolean;
-  onChange?: (field: keyof PriceBreakdown, value: number) => void;
-}) {
-  const total = sumBreakdown(values);
-
-  return (
-    <>
-      {(["labor", "materials", "mechanisms"] as const).map((field) => (
-        <td key={field} className={priceCell}>
-          {readOnly ? (
-            <span
-              className={`${readOnlyNum} ${
-                isAmountDisplayEmpty(values[field]) ? "text-zinc-300" : ""
-              }`}
-            >
-              {formatAmountDisplay(values[field])}
-            </span>
-          ) : (
-            <input
-              type="number"
-              min={0}
-              step="any"
-              className={cellNum}
-              value={values[field]}
-              onChange={(event) =>
-                onChange?.(field, parseFloat(event.target.value) || 0)
-              }
-            />
-          )}
-        </td>
-      ))}
-      <td className={priceCellTotal}>
-        <span
-          className={`${readOnlyNum} ${
-            isAmountDisplayEmpty(total)
-              ? "text-zinc-300"
-              : "font-medium text-zinc-900"
-          }`}
-        >
-          {formatAmountDisplay(total)}
-        </span>
-      </td>
-    </>
-  );
-}
 
 function LineItemRow({
   item,
@@ -239,6 +270,8 @@ function LineItemRow({
   defaultHourlyRate,
   showQuantityColumn,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
@@ -254,15 +287,21 @@ function LineItemRow({
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
   const isCatalogLinked = catalogPosition != null;
+  const isComposite = isCompositeLineItem(item);
   const isMaterialsOrMechanisms = isMaterialsOrMechanismsLineItem(
     item,
     catalogPositions,
   );
   const displayName = catalogPosition?.name ?? item.name;
-  const displayUnit = catalogPosition?.unit ?? item.unit;
+  const moduleSizeUnit = isComposite
+    ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions ?? [])
+    : null;
+  const displayUnit = moduleSizeUnit ?? catalogPosition?.unit ?? item.unit;
   const unitOptions = getEstimateUnitOptions(item.unit);
   const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
   const attachedQuantity = resolveLineItemDisplayQuantityFromModuleSize(
@@ -271,17 +310,30 @@ function LineItemRow({
   );
   const hasAttachedQuantity = hasModuleSizeAttachment(item) && attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? item.quantity;
-  const displayUnitPrice = resolveLineItemDisplayUnitPrice(
-    item,
-    catalogPositions,
-    defaultHourlyRate,
-  );
+  const displayUnitPrice = highlightStaleCatalogPrices
+    ? resolveFrozenEstimateDisplayUnitPrice(
+        item,
+        catalogPositions,
+        defaultHourlyRate,
+      )
+    : resolveLiveDisplayUnitPrice(item, catalogPositions, defaultHourlyRate);
+  const staleCatalogPriceHints = highlightStaleCatalogPrices
+    ? resolveStaleCatalogPriceHints(
+        item,
+        catalogPositions,
+        defaultHourlyRate,
+      )
+    : undefined;
+  const volumeVariable = showQuantityInput || hasAttachedQuantity;
   const volumeSum = showQuantityColumn
     ? resolveLineItemVolumeSum(
         effectiveQuantity,
         displayUnitPrice,
-        showQuantityInput || hasAttachedQuantity,
+        volumeVariable,
       )
+    : null;
+  const laborWorkloadHours = showQuantityColumn
+    ? resolveLaborWorkloadHours(effectiveQuantity, item, volumeVariable)
     : null;
 
   return (
@@ -295,56 +347,66 @@ function LineItemRow({
         <div className={`flex items-center gap-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
           <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
-            <EstimateLineItemNameField
-              value={displayName}
-              readOnly={isCatalogLinked}
-              catalogPositions={catalogPositions}
-              defaultHourlyRate={defaultHourlyRate}
-              className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""} ${isMaterialsOrMechanisms ? nameInputRightAlign : ""}`}
-              onNameChange={(name) => {
-                const next = applyLineItemCatalogEdit(
-                  item,
-                  { name },
-                  catalogPositions,
-                );
-                onChange(next);
-                onScheduleCatalogSync(next);
-              }}
-              onNameBlur={(name) => {
-                const linked = applyLineItemCatalogEdit(
-                  item,
-                  { name },
-                  catalogPositions,
-                );
-                const linkChanged = linked.positionPriceId !== item.positionPriceId;
-                const withPrices = hydrateLineItemWithCatalog(
-                  linked,
-                  catalogPositions,
-                  defaultHourlyRate,
-                  {
-                    forceCatalogPrices:
-                      linkChanged || !item.name.trim(),
-                  },
-                );
-                onChange(withPrices);
-                onSyncCatalogPosition(withPrices);
-              }}
-              onCatalogSelect={(position) =>
-                onChange(
-                  applyCatalogPositionToLineItem(
+            <span className="min-w-0 flex-1">
+              <EstimateLineItemNameField
+                value={displayName}
+                readOnly={estimateLocked || isCatalogLinked}
+                catalogPositions={catalogPositions}
+                defaultHourlyRate={defaultHourlyRate}
+                className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
+                footer={
+                  isComposite ? (
+                    <AttachedModuleSizeLabel
+                      attachment={item.moduleSizeAttachment}
+                      moduleSizeOptions={moduleSizeOptions ?? []}
+                    />
+                  ) : undefined
+                }
+                onNameChange={(name) => {
+                  const next = applyLineItemCatalogEdit(
                     item,
-                    position,
+                    { name },
+                    catalogPositions,
+                  );
+                  onChange(next);
+                  onScheduleCatalogSync(next);
+                }}
+                onNameBlur={(name) => {
+                  const linked = applyLineItemCatalogEdit(
+                    item,
+                    { name },
+                    catalogPositions,
+                  );
+                  const linkChanged = linked.positionPriceId !== item.positionPriceId;
+                  const withPrices = hydrateLineItemWithCatalog(
+                    linked,
+                    catalogPositions,
                     defaultHourlyRate,
-                  ),
-                )
-              }
-            />
+                    {
+                      forceCatalogPrices:
+                        linkChanged || !item.name.trim(),
+                    },
+                  );
+                  onChange(withPrices);
+                  onSyncCatalogPosition(withPrices);
+                }}
+                onCatalogSelect={(position) =>
+                  onChange(
+                    applyCatalogPositionToLineItem(
+                      item,
+                      position,
+                      defaultHourlyRate,
+                    ),
+                  )
+                }
+              />
+            </span>
             <PositionVariableQuantityIcon enabled={showQuantityInput} />
           </span>
         </div>
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-        {isCatalogLinked ? (
+        {isCatalogLinked || isComposite ? (
           <span className={`${readOnlyNum} text-zinc-700`}>
             {displayUnit.trim() || "—"}
           </span>
@@ -373,24 +435,43 @@ function LineItemRow({
               {formatQuantityDisplay(attachedQuantity)}
             </span>
           ) : showQuantityInput ? (
-            <EstimateQuantityInput
-              className={cellNum}
-              value={item.quantity}
-              onChange={(quantity) => onChange({ ...item, quantity })}
-            />
+            estimateLocked ? (
+              <span className={`${readOnlyNum} text-zinc-700`}>
+                {formatQuantityDisplay(item.quantity)}
+              </span>
+            ) : (
+              <EstimateQuantityInput
+                className={cellNum}
+                value={item.quantity}
+                onChange={(quantity) => onChange({ ...item, quantity })}
+              />
+            )
           ) : (
             <span className={`${readOnlyNum} text-zinc-300`}>—</span>
           )}
         </td>
       ) : null}
-      <PriceCells readOnly values={displayUnitPrice} />
-      {showQuantityColumn ? <VolumeSumCells values={volumeSum} /> : null}
-      <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
-        <DeleteButton
-          label="Dzēst pozīciju"
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100"
+      <EstimateUnitPriceCells
+        item={item}
+        defaultHourlyRate={defaultHourlyRate}
+        values={displayUnitPrice}
+        staleCatalogPriceHints={staleCatalogPriceHints}
+      />
+      {showQuantityColumn ? (
+        <VolumeSumCells
+          values={volumeSum}
+          laborWorkloadHours={laborWorkloadHours}
+          staleCatalogPriceHints={staleCatalogPriceHints}
         />
+      ) : null}
+      <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
+        {estimateLocked ? null : (
+          <DeleteButton
+            label="Dzēst pozīciju"
+            onClick={onDelete}
+            className="opacity-0 group-hover:opacity-100"
+          />
+        )}
       </td>
     </tr>
     </tbody>
@@ -407,6 +488,7 @@ function RowActions({
   onDelete,
   deleteLabel,
   showSub = true,
+  estimateLocked = false,
 }: {
   onAddSub?: () => void;
   onAddMulti?: () => void;
@@ -414,7 +496,12 @@ function RowActions({
   onDelete: () => void;
   deleteLabel: string;
   showSub?: boolean;
+  estimateLocked?: boolean;
 }) {
+  if (estimateLocked) {
+    return null;
+  }
+
   return (
     <div className="flex h-7 shrink-0 items-center gap-1 self-center">
       {showSub && onAddSub ? (
@@ -445,6 +532,8 @@ function SortableMultiPositionRow({
   showQuantityColumn,
   allCategories,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
 }: {
   sortId: string;
   categoryId: string;
@@ -456,10 +545,13 @@ function SortableMultiPositionRow({
   showQuantityColumn: boolean;
   allCategories: EstimateCategory[];
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
+    disabled: estimateLocked,
     animateLayoutChanges: () => false,
   });
   const excludedSelectionKeys = useMemo(
@@ -470,10 +562,16 @@ function SortableMultiPositionRow({
     <EstimateMultiPositionRow
       mode="offer"
       value={value}
-      onChange={(next) =>
-        optionLinkActions.onMultiChange(value.id, next, true)
+      onChange={
+        estimateLocked
+          ? () => {}
+          : (next) => optionLinkActions.onMultiChange(value.id, next, true)
       }
-      onDelete={() => optionLinkActions.onMultiDelete(value.id)}
+      onDelete={
+        estimateLocked
+          ? () => {}
+          : () => optionLinkActions.onMultiDelete(value.id)
+      }
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
       excludedSelectionKeys={excludedSelectionKeys}
@@ -483,14 +581,17 @@ function SortableMultiPositionRow({
       showQuantityColumn={showQuantityColumn}
       moduleSizeOptions={moduleSizeOptions}
       readOnlyPrices={true}
+      highlightStaleCatalogPrices={highlightStaleCatalogPrices}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        <DragHandle
-          label="Pārvietot multi-pozīciju"
-          attributes={attributes}
-          listeners={listeners}
-        />
+        estimateLocked ? null : (
+          <DragHandle
+            label="Pārvietot multi-pozīciju"
+            attributes={attributes}
+            listeners={listeners}
+          />
+        )
       }
     />
   );
@@ -514,27 +615,34 @@ function SortableLineItemRow({
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
+    disabled: props.estimateLocked,
     animateLayoutChanges: () => false,
   });
 
   return (
     <LineItemRow
       {...props}
+      highlightStaleCatalogPrices={props.highlightStaleCatalogPrices}
+      estimateLocked={props.estimateLocked}
       moduleSizeOptions={moduleSizeOptions}
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        <DragHandle
-          label="Pārvietot pozīciju"
-          attributes={attributes}
-          listeners={listeners}
-        />
+        props.estimateLocked ? null : (
+          <DragHandle
+            label="Pārvietot pozīciju"
+            attributes={attributes}
+            listeners={listeners}
+          />
+        )
       }
     />
   );
@@ -551,6 +659,7 @@ function SectionRow({
   rowStyle,
   showDropLine,
   colSpan,
+  estimateLocked = false,
 }: {
   kind: "category" | "subcategory";
   placeholder: string;
@@ -562,6 +671,7 @@ function SectionRow({
   rowStyle?: CSSProperties;
   showDropLine?: boolean;
   colSpan: number;
+  estimateLocked?: boolean;
 }) {
   const isCategory = kind === "category";
   const topBorderClass = showDropLine
@@ -588,19 +698,31 @@ function SectionRow({
         <div
           className={`flex min-h-[3.25rem] items-center gap-2 py-2 pr-3 ${rowLead} ${topBorderClass}`}
         >
-          <span className={dragHandleColumn}>{dragHandle}</span>
+          <span className={dragHandleColumn}>
+            {estimateLocked ? null : dragHandle}
+          </span>
           <div
             className={`min-w-0 flex-1 ${isCategory ? "" : subcategoryNameIndent}`}
           >
-            <input
-              type="text"
-              className={`w-full border-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none ${
-                isCategory ? "font-semibold" : "font-normal"
-              }`}
-              value={value}
-              placeholder={placeholder}
-              onChange={(event) => onChange(event.target.value)}
-            />
+            {estimateLocked ? (
+              <span
+                className={`block w-full text-sm text-zinc-900 ${
+                  isCategory ? "font-semibold" : "font-normal"
+                }`}
+              >
+                {value.trim() || placeholder}
+              </span>
+            ) : (
+              <input
+                type="text"
+                className={`w-full border-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none ${
+                  isCategory ? "font-semibold" : "font-normal"
+                }`}
+                value={value}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+              />
+            )}
           </div>
           {actions}
         </div>
@@ -613,6 +735,7 @@ function SectionRow({
 function SortableSectionRow({
   sortId,
   dragLabel,
+  estimateLocked = false,
   ...props
 }: {
   sortId: string;
@@ -623,26 +746,31 @@ function SortableSectionRow({
   onChange: (value: string) => void;
   actions: ReactNode;
   colSpan: number;
+  estimateLocked?: boolean;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
+    disabled: estimateLocked,
     animateLayoutChanges: () => false,
   });
 
   return (
     <SectionRow
       {...props}
+      estimateLocked={estimateLocked}
       colSpan={props.colSpan}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        <DragHandle
-          label={dragLabel}
-          attributes={attributes}
-          listeners={listeners}
-        />
+        estimateLocked ? null : (
+          <DragHandle
+            label={dragLabel}
+            attributes={attributes}
+            listeners={listeners}
+          />
+        )
       }
     />
   );
@@ -662,6 +790,8 @@ function SubcategoryBlock({
   allCategories,
   optionLinkActions,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
@@ -676,6 +806,8 @@ function SubcategoryBlock({
   allCategories: EstimateCategory[];
   optionLinkActions: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   return (
     <>
@@ -687,10 +819,12 @@ function SubcategoryBlock({
         placeholder="Subkategorijas nosaukums"
         value={subcategory.title}
         onChange={(title) => onChange({ ...subcategory, title })}
+        estimateLocked={estimateLocked}
         actions={
           <RowActions
             showSub={false}
             deleteLabel="Dzēst subkategoriju"
+            estimateLocked={estimateLocked}
             onAddMulti={
               showQuantityColumn
                 ? undefined
@@ -723,6 +857,8 @@ function SubcategoryBlock({
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
             moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            estimateLocked={estimateLocked}
             value={row}
           />
         ) : (
@@ -735,6 +871,8 @@ function SubcategoryBlock({
             defaultHourlyRate={defaultHourlyRate}
             showQuantityColumn={showQuantityColumn}
             moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            estimateLocked={estimateLocked}
             onSyncCatalogPosition={onSyncCatalogPosition}
             onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
@@ -770,6 +908,8 @@ function CategoryBlock({
   allCategories,
   optionLinkActions,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
@@ -783,6 +923,8 @@ function CategoryBlock({
   allCategories: EstimateCategory[];
   optionLinkActions: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   return (
     <>
@@ -794,9 +936,11 @@ function CategoryBlock({
         placeholder="Kategorijas nosaukums"
         value={category.title}
         onChange={(title) => onChange({ ...category, title })}
+        estimateLocked={estimateLocked}
         actions={
           <RowActions
             deleteLabel="Dzēst kategoriju"
+            estimateLocked={estimateLocked}
             onAddSub={() =>
               onChange({
                 ...category,
@@ -834,6 +978,8 @@ function CategoryBlock({
           allCategories={allCategories}
           optionLinkActions={optionLinkActions}
           moduleSizeOptions={moduleSizeOptions}
+          highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+          estimateLocked={estimateLocked}
           onSyncCatalogPosition={onSyncCatalogPosition}
           onScheduleCatalogSync={onScheduleCatalogSync}
           subcategory={subcategory}
@@ -868,6 +1014,8 @@ function CategoryBlock({
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
             moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            estimateLocked={estimateLocked}
             value={row}
           />
         ) : (
@@ -879,6 +1027,8 @@ function CategoryBlock({
             defaultHourlyRate={defaultHourlyRate}
             showQuantityColumn={showQuantityColumn}
             moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            estimateLocked={estimateLocked}
             onSyncCatalogPosition={onSyncCatalogPosition}
             onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
@@ -914,6 +1064,8 @@ function EstimateDndTable({
   defaultHourlyRate,
   showQuantityColumn,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -932,6 +1084,8 @@ function EstimateDndTable({
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
 }) {
   const colSpan = getEstimateTableColCount(showQuantityColumn);
 
@@ -950,6 +1104,8 @@ function EstimateDndTable({
         defaultHourlyRate={defaultHourlyRate}
         showQuantityColumn={showQuantityColumn}
         moduleSizeOptions={moduleSizeOptions}
+        highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+        estimateLocked={estimateLocked}
         colSpan={colSpan}
       />
     </DropIndicatorProvider>
@@ -969,6 +1125,8 @@ function EstimateDndTableInner({
   defaultHourlyRate,
   showQuantityColumn,
   moduleSizeOptions = [],
+  highlightStaleCatalogPrices = false,
+  estimateLocked = false,
   colSpan,
 }: {
   categories: EstimateCategory[];
@@ -988,6 +1146,8 @@ function EstimateDndTableInner({
   defaultHourlyRate: number | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  highlightStaleCatalogPrices?: boolean;
+  estimateLocked?: boolean;
   colSpan: number;
 }) {
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1090,17 +1250,17 @@ function EstimateDndTableInner({
           <col style={{ width: showQuantityColumn ? "26%" : "35%" }} />
           <col style={{ width: "5%" }} />
           {showQuantityColumn ? <col style={{ width: "6%" }} /> : null}
-          {Array.from({ length: 4 }).map((_, index) => (
+          {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
             <col
               key={`unit-${index}`}
-              style={{ width: showQuantityColumn ? "9%" : "12%" }}
+              style={{ width: showQuantityColumn ? "6.5%" : "8%" }}
             />
           ))}
           {showQuantityColumn
-            ? Array.from({ length: 4 }).map((_, index) => (
+            ? Array.from({ length: VOLUME_PRICE_COLUMN_COUNT }).map((_, index) => (
                 <col
                   key={`volume-${index}`}
-                  style={{ width: index === 3 ? "7%" : "7.5%" }}
+                  style={{ width: index === VOLUME_PRICE_COLUMN_COUNT - 1 ? "6.5%" : "6%" }}
                 />
               ))
             : null}
@@ -1127,14 +1287,14 @@ function EstimateDndTableInner({
               </th>
             ) : null}
             <th
-              colSpan={4}
+              colSpan={UNIT_PRICE_COLUMN_COUNT}
               className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
             >
               Vienības cena
             </th>
             {showQuantityColumn ? (
               <th
-                colSpan={4}
+                colSpan={VOLUME_PRICE_COLUMN_COUNT}
                 className="border-b border-r border-zinc-200 bg-emerald-50/80 px-2 py-2 text-center text-emerald-800/70"
               >
                 Apjoma cena
@@ -1143,7 +1303,7 @@ function EstimateDndTableInner({
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {["Darbs", "Materiāls", "Mehānismi", "Kopā"].map((label) => (
+            {UNIT_PRICE_SUBHEADER_LABELS.map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -1152,7 +1312,7 @@ function EstimateDndTableInner({
               </th>
             ))}
             {showQuantityColumn
-              ? ["Darbs", "Materiāls", "Mehānismi", "Kopā"].map((label) => (
+              ? VOLUME_PRICE_SUBHEADER_LABELS.map((label) => (
                   <th
                     key={`volume-${label}`}
                     className={`border-b border-r border-zinc-200 px-2 py-1.5 text-right ${
@@ -1178,6 +1338,8 @@ function EstimateDndTableInner({
               defaultHourlyRate={defaultHourlyRate}
               showQuantityColumn={showQuantityColumn}
               moduleSizeOptions={moduleSizeOptions}
+              highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+              estimateLocked={estimateLocked}
               colSpan={colSpan}
               allCategories={categories}
               optionLinkActions={optionLinkActions}
@@ -1208,7 +1370,7 @@ function EstimateDndTableInner({
               Kopā
             </td>
             {showQuantityColumn ? (
-              Array.from({ length: 4 }).map((_, index) => (
+              Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
                 <td
                   key={`footer-unit-${index}`}
                   className="border-t-2 border-zinc-300 bg-sky-50/30"
@@ -1216,33 +1378,36 @@ function EstimateDndTableInner({
               ))
             ) : (
               <>
+                <td className="border-t-2 border-zinc-300 bg-sky-50/30" />
+                <td className="border-t-2 border-zinc-300 bg-sky-50/30" />
                 <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatMoneyDisplay(totals.labor)}
+                  {formatAmountDisplay(totals.labor)}
                 </td>
                 <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatMoneyDisplay(totals.materials)}
+                  {formatAmountDisplay(totals.materials)}
                 </td>
                 <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatMoneyDisplay(totals.mechanisms)}
+                  {formatAmountDisplay(totals.mechanisms)}
                 </td>
                 <td className={`${footerCell} bg-sky-100/60 text-base`}>
-                  {formatMoneyDisplay(totals.grand)}
+                  {formatAmountDisplay(totals.grand)}
                 </td>
               </>
             )}
             {showQuantityColumn ? (
               <>
+                <td className="border-t-2 border-zinc-300 bg-emerald-50/40" />
                 <td className={volumeSumFooterCell}>
-                  {formatMoneyDisplay(totals.labor)}
+                  {formatAmountDisplay(totals.labor)}
                 </td>
                 <td className={volumeSumFooterCell}>
-                  {formatMoneyDisplay(totals.materials)}
+                  {formatAmountDisplay(totals.materials)}
                 </td>
                 <td className={volumeSumFooterCell}>
-                  {formatMoneyDisplay(totals.mechanisms)}
+                  {formatAmountDisplay(totals.mechanisms)}
                 </td>
                 <td className={volumeSumFooterCellTotal}>
-                  {formatMoneyDisplay(totals.grand)}
+                  {formatAmountDisplay(totals.grand)}
                 </td>
               </>
             ) : null}
@@ -1328,6 +1493,8 @@ type EstimateTableProps = {
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
   initialMultiOptionLinks?: MultiOptionLinkGroup[];
+  /** ISO timestamp of last save (`estimates.updated_at` from DB). */
+  estimateUpdatedAt?: string;
   moduleName?: string | null;
   moduleVisualizations?: ModuleContentBlock[];
   moduleSizeOptions?: BuildingModuleSizeOption[];
@@ -1344,6 +1511,7 @@ export function EstimateTable({
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
   initialMultiOptionLinks = [],
+  estimateUpdatedAt,
   moduleName = null,
   moduleVisualizations = [],
   moduleSizeOptions = [],
@@ -1364,9 +1532,18 @@ export function EstimateTable({
   const [moduleDataSpotlightDismissed, setModuleDataSpotlightDismissed] =
     useState(false);
   const [, startSaveDatesTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
+    serializeEstimatePositionDocument(initialTitle, initialCategories, initialMultiOptionLinks),
+  );
+  const [savedAt, setSavedAt] = useState<string | undefined>(
+    initialMeta.savedAt,
+  );
+  const { showFeedback, clearFeedback } = useFeedbackToast();
 
   useEffect(() => {
     setMeta(initialMeta);
+    setSavedAt(initialMeta.savedAt);
   }, [initialMeta]);
 
   useEffect(() => {
@@ -1400,7 +1577,86 @@ export function EstimateTable({
     persistEstimateDates({ date: nextMeta.date, deadline: nextMeta.deadline });
   }
 
+  function handleRefreshCatalogPrices() {
+    if (!highlightStaleCatalogPrices || estimateLocked) return;
+
+    const refreshed = refreshEstimateCatalogPrices(
+      categories,
+      catalogPositions,
+      defaultHourlyRate,
+    );
+    setCategories(refreshed);
+  }
+
+  async function handleSave() {
+    if (!project || isSaving || estimateLocked) return;
+    setIsSaving(true);
+    clearFeedback();
+
+    const bakedCategories = bakeInCatalogPrices(
+      categories,
+      catalogPositions,
+      defaultHourlyRate,
+    );
+
+    const savedAtIso = new Date().toISOString();
+    const nextMeta = {
+      ...meta,
+      savedAt: savedAtIso,
+      pricesFrozen: true,
+    };
+
+    const result = await saveProjectEstimateAction(project.id, {
+      title,
+      meta: nextMeta,
+      categories: bakedCategories,
+      multiOptionLinks,
+    });
+
+    setIsSaving(false);
+
+    if (result.ok) {
+      setMeta(nextMeta);
+      setCategories(bakedCategories);
+      setSavedSnapshot(
+        serializeEstimatePositionDocument(title, bakedCategories, multiOptionLinks),
+      );
+      setSavedAt(savedAtIso);
+      showFeedback({ type: "success", text: "Tāme saglabāta." });
+    } else {
+      showFeedback({ type: "error", text: result.error });
+    }
+  }
+
+  const isDirty =
+    serializeEstimatePositionDocument(title, categories, multiOptionLinks) !==
+    savedSnapshot;
+
   const showQuantityColumn = Boolean(project);
+  const estimateLocked = project
+    ? isProjectEstimateLocked(project.status)
+    : false;
+  const isEstimateSaved = isProjectEstimateSaved(meta, {
+    projectCreatedAt: project?.createdAt,
+    estimateUpdatedAt,
+  });
+  const highlightStaleCatalogPrices = isEstimateSaved && !estimateLocked;
+
+  const hasStaleCatalogPrices = useMemo(
+    () =>
+      highlightStaleCatalogPrices &&
+      estimateHasStaleCatalogPrices(
+        categories,
+        catalogPositions,
+        defaultHourlyRate,
+      ),
+    [
+      highlightStaleCatalogPrices,
+      categories,
+      catalogPositions,
+      defaultHourlyRate,
+    ],
+  );
 
   const totals = useMemo(
     () =>
@@ -1445,15 +1701,17 @@ export function EstimateTable({
         <p className="text-xs text-zinc-500">
           {categories.length} tāmes pozīcijas · {positionCount} rindas
         </p>
-        <button
-          type="button"
-          onClick={() =>
-            setCategories([...categories, createEstimatePositionSection()])
-          }
-          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
-        >
-          + Tāmes pozīcija
-        </button>
+        {!estimateLocked ? (
+          <button
+            type="button"
+            onClick={() =>
+              setCategories([...categories, createEstimatePositionSection()])
+            }
+            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
+          >
+            + Tāmes pozīcija
+          </button>
+        ) : null}
       </div>
 
       <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
@@ -1470,6 +1728,8 @@ export function EstimateTable({
           defaultHourlyRate={defaultHourlyRate}
           showQuantityColumn={showQuantityColumn}
           moduleSizeOptions={moduleSizeOptions}
+          highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+          estimateLocked={estimateLocked}
         />
       </div>
     </div>
@@ -1523,12 +1783,18 @@ export function EstimateTable({
             <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
               Tāmes piedāvājums
             </p>
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="mt-1 w-full border-0 bg-transparent text-xl font-semibold tracking-tight text-zinc-900 focus:outline-none"
-            />
+            {estimateLocked ? (
+              <p className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">
+                {title}
+              </p>
+            ) : (
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="mt-1 w-full border-0 bg-transparent text-xl font-semibold tracking-tight text-zinc-900 focus:outline-none"
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {meta.number.trim() ? (
@@ -1551,38 +1817,127 @@ export function EstimateTable({
           <MetaField
             label="Pasūtītāja vārds, uzvārds"
             value={meta.client}
+            readOnly={estimateLocked}
             onChange={(client) => setMeta({ ...meta, client })}
           />
           <MetaField
             label="Objekts"
             value={meta.project}
+            readOnly={estimateLocked}
             onChange={(project) => setMeta({ ...meta, project })}
             fullWidth
           />
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-            <MetaField
-              label="Sagatavotājs"
-              value={meta.author}
-              onChange={(author) => setMeta({ ...meta, author })}
-            />
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <MetaField
               label="Datums"
               type="date"
               value={meta.date}
+              readOnly={estimateLocked}
               onChange={handleEstimateDateChange}
             />
-            <MetaField
-              label="Tāmes termiņš"
-              type="date"
-              value={meta.deadline}
-              onChange={handleEstimateDeadlineChange}
-            />
+            <div>
+              <MetaField
+                label="Tāmes termiņš"
+                type="date"
+                value={meta.deadline}
+                readOnly={estimateLocked}
+                onChange={handleEstimateDeadlineChange}
+              />
+              {!isDirty && isEstimateSaved && savedAt && meta.deadline ? (() => {
+                const days = daysUntilDeadline(meta.deadline);
+                if (days === null) return null;
+                const isExpired = days < 0;
+                return (
+                  <p className={`mt-1 text-[11px] font-medium ${isExpired ? "text-red-500" : "text-zinc-400"}`}>
+                    {formatDeadlineDays(days)}
+                  </p>
+                );
+              })() : null}
+            </div>
           </div>
         </div>
         </div>
       </div>
 
+      {project && estimateLocked ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+        >
+          <i className="fas fa-check text-xs" aria-hidden="true" />
+          Tāme apstiprināta — izmaiņas vairs nav iespējamas
+        </div>
+      ) : null}
+
+      {project && hasStaleCatalogPrices ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+        >
+          <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
+          Pieejami jauni izcenojumi
+        </div>
+      ) : null}
+
       {tablePanel}
+
+      {project ? (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {isDirty ? (
+            <span className="text-xs text-zinc-400">Nesaglabātas izmaiņas</span>
+          ) : isEstimateSaved && savedAt ? (
+            <span className="text-xs text-zinc-400">
+              Saglabāts: {formatDisplayDateDdMmYy(savedAt)}
+            </span>
+          ) : null}
+
+          {!isDirty && isEstimateSaved && savedAt ? (
+            <>
+              <a
+                href={`/api/estimates/${project.id}/pdf`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              >
+                <i className="fas fa-file-pdf text-red-500 text-xs" aria-hidden="true" />
+                PDF
+                <span className="text-xs text-zinc-400">(piedāvājums)</span>
+              </a>
+              <a
+                href={`/api/estimates/${project.id}/excel`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              >
+                <i className="fas fa-file-excel text-green-600 text-xs" aria-hidden="true" />
+                Excel
+                <span className="text-xs text-zinc-400">(tāme)</span>
+              </a>
+            </>
+          ) : null}
+
+          {!estimateLocked ? (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSaving ? "Saglabā..." : "Saglabāt tāmi"}
+            </button>
+          ) : null}
+
+          {hasStaleCatalogPrices ? (
+            <button
+              type="button"
+              onClick={handleRefreshCatalogPrices}
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
+              Atjaunot cenas
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
     </>
   );

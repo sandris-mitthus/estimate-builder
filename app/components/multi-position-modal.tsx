@@ -1,49 +1,29 @@
 "use client";
 
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AppModal,
-  appModalWidePanelMaxWidthClassName,
+  appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
-import { DragHandle } from "@/app/components/drag-handle";
-import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
+import { CatalogHintField } from "@/app/components/catalog-hint-field";
+import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
+import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
+import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { DeleteButton } from "@/app/components/delete-button";
 import {
-  applyLineItemCatalogEdit,
-  findCatalogPositionForLineItem,
-  hydrateLineItemWithCatalog,
-} from "@/app/lib/positions/sync-from-estimate-line-items";
-import { applyCatalogPositionToLineItem } from "@/app/lib/positions/apply-catalog-to-line-item";
-import {
-  createMultiPositionOption,
-  ensureTrailingEmptyMultiOption,
-  getExcludedKeysForMultiOptionEdit,
-  hasDuplicateMultiOptions,
-  isBlankLineItem,
-  normalizeMultiPosition,
-  wouldDuplicateMultiOption,
-} from "@/app/lib/estimates/multi-position";
+  formatAmountDisplay,
+  sumBreakdown,
+} from "@/app/lib/estimates/calculate-line";
+import { deriveCompositeUnitPrice } from "@/app/lib/estimates/composite-line-item";
+import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
   EstimateLineItem,
   EstimateMultiPosition,
-  EstimateMultiPositionOption,
+  LineItemCatalogRef,
+  LineItemModuleSizeAttachment,
 } from "@/app/lib/estimates/types";
+import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 type MultiPositionModalProps = {
@@ -53,97 +33,68 @@ type MultiPositionModalProps = {
   onSave: (value: EstimateMultiPosition) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
-  hydrateCatalogPrices?: boolean;
-  lockCatalogIdentity?: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 };
 
-const hydrateCatalogPricesDefault = { forceCatalogPrices: true } as const;
-const EMPTY_EXCLUDED_CATALOG_KEYS = new Set<string>();
-const MULTI_POSITION_MODAL_DND_CONTEXT_ID = "multi-position-modal-options-dnd";
-
-type SortableMultiOptionBlockProps = {
-  option: EstimateMultiPositionOption;
-  index: number;
-  sortable: boolean;
-  canDelete: boolean;
-  catalogPositions: PositionPriceSummary[];
-  defaultHourlyRate: number | null;
-  excludedCatalogKeys: ReadonlySet<string>;
-  hydrateOptions: typeof hydrateCatalogPricesDefault | undefined;
-  onDelete: () => void;
-  onNameChange: (name: string) => void;
-  onNameBlur: (name: string) => void;
-  onCatalogSelect: (position: PositionPriceSummary) => void;
-  lockCatalogIdentity?: boolean;
+type OptionDraft = {
+  optionId: string;
+  lineItemId: string;
+  label: string;
+  timeNorm: number;
+  material: LineItemCatalogRef | null;
+  mechanism: LineItemCatalogRef | null;
 };
 
-function SortableMultiOptionBlock({
-  option,
-  index,
-  sortable,
-  canDelete,
-  catalogPositions,
-  defaultHourlyRate,
-  excludedCatalogKeys,
-  hydrateOptions,
-  onDelete,
-  onNameChange,
-  onNameBlur,
-  onCatalogSelect,
-  lockCatalogIdentity = false,
-}: SortableMultiOptionBlockProps) {
-  const catalogPosition = lockCatalogIdentity
-    ? findCatalogPositionForLineItem(option.lineItem, catalogPositions)
-    : undefined;
-  const isCatalogLinked = catalogPosition != null;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: option.id,
-      disabled: !sortable,
-    });
+const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
+const subLabelClassName = "mb-1 block text-xs font-medium text-zinc-500";
+const inputClassName =
+  "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none";
 
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.55 : undefined,
+function createOptionDraft(): OptionDraft {
+  return {
+    optionId: crypto.randomUUID(),
+    lineItemId: crypto.randomUUID(),
+    label: "",
+    timeNorm: 0,
+    material: null,
+    mechanism: null,
   };
+}
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3"
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {sortable ? (
-            <DragHandle
-              label="Pārvietot opciju"
-              attributes={attributes}
-              listeners={listeners}
-            />
-          ) : null}
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Opcija {index + 1}
-          </span>
-        </div>
-        {canDelete ? (
-          <DeleteButton label="Dzēst opciju" onClick={onDelete} />
-        ) : null}
-      </div>
-      <EstimateLineItemNameField
-        value={catalogPosition?.name ?? option.lineItem.name}
-        readOnly={isCatalogLinked}
-        catalogPositions={catalogPositions}
-        defaultHourlyRate={defaultHourlyRate}
-        excludedCatalogKeys={excludedCatalogKeys}
-        className="w-full min-h-[2.75rem] resize-none rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:outline-none"
-        onNameChange={onNameChange}
-        onNameBlur={onNameBlur}
-        onCatalogSelect={onCatalogSelect}
-      />
-    </div>
-  );
+function deriveSharedState(value: EstimateMultiPosition) {
+  const first = value.options[0]?.lineItem;
+  return {
+    name: value.name,
+    attachment: first?.moduleSizeAttachment ?? null,
+    options:
+      value.options.length > 0
+        ? value.options.map<OptionDraft>((option) => ({
+            optionId: option.id,
+            lineItemId: option.lineItem.id,
+            label: option.lineItem.name,
+            timeNorm: option.lineItem.laborTimeNorm ?? 0,
+            material: option.lineItem.material ?? null,
+            mechanism: option.lineItem.mechanism ?? null,
+          }))
+        : [createOptionDraft()],
+  };
+}
+
+function snapshot(state: {
+  name: string;
+  attachment: LineItemModuleSizeAttachment | null;
+  options: OptionDraft[];
+}): string {
+  return JSON.stringify({
+    name: state.name.trim(),
+    attachment: state.attachment,
+    options: state.options.map((option) => ({
+      label: option.label.trim(),
+      timeNorm: option.timeNorm,
+      material: option.material,
+      mechanism: option.mechanism,
+    })),
+  });
 }
 
 export function MultiPositionModal({
@@ -153,269 +104,272 @@ export function MultiPositionModal({
   onSave,
   catalogPositions,
   defaultHourlyRate,
-  hydrateCatalogPrices = true,
-  lockCatalogIdentity = false,
+  moduleSizeOptions = [],
 }: MultiPositionModalProps) {
-  const [draft, setDraft] = useState(value);
-  const [initialSnapshot, setInitialSnapshot] = useState(() =>
-    JSON.stringify(normalizeMultiPosition(value)),
-  );
-  const [duplicateError, setDuplicateError] = useState(false);
-
-  const hydrateOptions = hydrateCatalogPrices
-    ? hydrateCatalogPricesDefault
-    : undefined;
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 },
-    }),
-  );
-
-  const excludedCatalogKeysByOptionId = useMemo(() => {
-    const entries = draft.options.map((option) => [
-      option.id,
-      getExcludedKeysForMultiOptionEdit(draft, option.id),
-    ] as const);
-
-    return new Map(entries);
-  }, [draft]);
-
-  const sortableOptionIds = useMemo(
-    () =>
-      draft.options
-        .filter((option, index) => {
-          const isTrailingBlank =
-            index === draft.options.length - 1 &&
-            isBlankLineItem(option.lineItem);
-          return !isTrailingBlank;
-        })
-        .map((option) => option.id),
-    [draft.options],
-  );
-
-  const dirty = useMemo(
-    () =>
-      JSON.stringify(normalizeMultiPosition(draft)) !== initialSnapshot,
-    [draft, initialSnapshot],
-  );
+  const [name, setName] = useState(value.name);
+  const [attachment, setAttachment] =
+    useState<LineItemModuleSizeAttachment | null>(null);
+  const [options, setOptions] = useState<OptionDraft[]>([createOptionDraft()]);
+  const [initialSnapshot, setInitialSnapshot] = useState("");
 
   useEffect(() => {
     if (!open) {
       return;
     }
-
-    const normalized = normalizeMultiPosition(value);
-    const withTrailingOption = {
-      ...normalized,
-      options: ensureTrailingEmptyMultiOption(normalized.options),
-    };
-    setDraft(withTrailingOption);
-    setInitialSnapshot(JSON.stringify(normalized));
+    const shared = deriveSharedState(value);
+    setName(shared.name);
+    setAttachment(shared.attachment);
+    setOptions(shared.options);
+    setInitialSnapshot(snapshot(shared));
   }, [open, value]);
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) {
-      const normalized = normalizeMultiPosition(value);
-      setDraft({
-        ...normalized,
-        options: ensureTrailingEmptyMultiOption(normalized.options),
-      });
-      setInitialSnapshot(JSON.stringify(normalized));
-      setDuplicateError(false);
-    }
-    onOpenChange(nextOpen);
+  const materialPositions = useMemo(
+    () => catalogPositions.filter((position) => position.costType === "materials"),
+    [catalogPositions],
+  );
+  const mechanismPositions = useMemo(
+    () =>
+      catalogPositions.filter((position) => position.costType === "mechanisms"),
+    [catalogPositions],
+  );
+
+  const dirty =
+    snapshot({ name, attachment, options }) !== initialSnapshot;
+
+  function updateOption(optionId: string, updates: Partial<OptionDraft>) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId ? { ...entry, ...updates } : entry,
+      ),
+    );
   }
 
-  function applyOptionLineItem(
-    optionId: string,
-    nextLineItem: EstimateLineItem,
-  ) {
-    if (wouldDuplicateMultiOption(draft, optionId, nextLineItem)) {
-      setDuplicateError(true);
-      return;
-    }
-
-    setDuplicateError(false);
-    setDraft({
-      ...draft,
-      options: ensureTrailingEmptyMultiOption(
-        draft.options.map((entry) =>
-          entry.id === optionId ? { ...entry, lineItem: nextLineItem } : entry,
-        ),
-      ),
-    });
+  function optionUnitPrice(option: OptionDraft) {
+    return deriveCompositeUnitPrice(
+      {
+        id: "preview",
+        name: "",
+        unit: "gab.",
+        quantity: 1,
+        unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
+        laborTimeNorm: option.timeNorm,
+        material: option.material,
+        mechanism: option.mechanism,
+      },
+      catalogPositions,
+      defaultHourlyRate,
+    );
   }
 
-  function handleOptionDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) {
-      return;
-    }
-
-    const oldIndex = draft.options.findIndex((entry) => entry.id === active.id);
-    const newIndex = draft.options.findIndex((entry) => entry.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) {
-      return;
-    }
-
-    setDraft({
-      ...draft,
-      options: ensureTrailingEmptyMultiOption(
-        arrayMove(draft.options, oldIndex, newIndex),
-      ),
-    });
+  function isMeaningfulOption(option: OptionDraft): boolean {
+    return Boolean(
+      option.label.trim() ||
+        option.timeNorm > 0 ||
+        option.material ||
+        option.mechanism,
+    );
   }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
-    if (hasDuplicateMultiOptions(draft)) {
-      setDuplicateError(true);
-      return;
-    }
+    const meaningful = options.filter(isMeaningfulOption);
+    const finalOptions = meaningful.length > 0 ? meaningful : [options[0]];
 
-    onSave(normalizeMultiPosition(draft));
+    const builtOptions = finalOptions.map((option) => {
+      const label =
+        option.label.trim() ||
+        option.material?.name ||
+        option.mechanism?.name ||
+        "";
+      const partialItem: EstimateLineItem = {
+        id: option.lineItemId,
+        name: label,
+        unit: "gab.",
+        quantity: 1,
+        laborTimeNorm: option.timeNorm,
+        material: option.material,
+        mechanism: option.mechanism,
+        moduleSizeAttachment: attachment ?? undefined,
+        unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
+      };
+      const lineItem: EstimateLineItem = {
+        ...partialItem,
+        unit:
+          resolveLineItemDisplayUnitFromModuleSize(
+            partialItem,
+            moduleSizeOptions,
+          ) ?? "gab.",
+      };
+      return {
+        id: option.optionId,
+        lineItem: {
+          ...lineItem,
+          unitPrice: deriveCompositeUnitPrice(
+            lineItem,
+            catalogPositions,
+            defaultHourlyRate,
+          ),
+        },
+      };
+    });
+
+    onSave({
+      ...value,
+      kind: "multi",
+      name: name.trim(),
+      options: builtOptions,
+      selectedOptionId: value.selectedOptionId ?? null,
+    });
     onOpenChange(false);
   }
 
   return (
     <AppModal
       open={open}
-      onOpenChange={handleOpenChange}
+      onOpenChange={onOpenChange}
       title="Multi-pozīcija"
-      description="Definē nosaukumu un vairākas izvēles pozīcijas. Piedāvājumā pēdējā opcija būs Neviena opcija."
-      panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
+      description="Vienots apjoms; katrai opcijai sava laika norma, materiāls un mehānisms."
+      panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
       dirty={dirty}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-zinc-700">
-            Multi-pozīcijas nosaukums
-          </span>
+          <span className={labelClassName}>Nosaukums</span>
           <input
             type="text"
-            value={draft.name}
-            onChange={(event) =>
-              setDraft({ ...draft, name: event.target.value })
-            }
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={inputClassName}
             placeholder="piem. Fasādes apdare"
             autoFocus
           />
         </label>
 
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className={labelClassName}>
+              Apjoms no moduļa lieluma (vienots)
+            </span>
+            {attachment ? (
+              <AttachedModuleSizeLabel
+                attachment={attachment}
+                moduleSizeOptions={moduleSizeOptions}
+              />
+            ) : null}
+          </div>
+          <ModuleSizeAttachPicker
+            controlPrefix={`multi-attach-${value.id}`}
+            moduleSizeOptions={moduleSizeOptions}
+            attachment={attachment}
+            onChange={setAttachment}
+          />
+        </div>
+
         <div className="space-y-3">
-          {duplicateError ? (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Vienā multi-pozīcijā nevar atkārtot vienu un to pašu pozīciju.
-            </p>
-          ) : null}
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-zinc-700">Pozīcijas</p>
+            <p className="text-sm font-medium text-zinc-700">Opcijas</p>
             <button
               type="button"
               className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
-              onClick={() => {
-                setDuplicateError(false);
-                setDraft({
-                  ...draft,
-                  options: [...draft.options, createMultiPositionOption()],
-                });
-              }}
+              onClick={() =>
+                setOptions((current) => [...current, createOptionDraft()])
+              }
             >
-              + Pozīcija
+              + Opcija
             </button>
           </div>
 
-          <DndContext
-            id={MULTI_POSITION_MODAL_DND_CONTEXT_ID}
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleOptionDragEnd}
-          >
-            <SortableContext
-              items={sortableOptionIds}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-3">
-                {draft.options.map((option, index) => {
-                  const isTrailingBlank =
-                    index === draft.options.length - 1 &&
-                    isBlankLineItem(option.lineItem);
-                  const entry = option;
+          <div className="space-y-3">
+            {options.map((option, index) => {
+              const unitTotal = sumBreakdown(optionUnitPrice(option));
+              return (
+                <div
+                  key={option.optionId}
+                  className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Opcija {index + 1}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm tabular-nums text-zinc-700">
+                        {formatAmountDisplay(unitTotal)}
+                      </span>
+                      {options.length > 1 ? (
+                        <DeleteButton
+                          label="Dzēst opciju"
+                          onClick={() =>
+                            setOptions((current) =>
+                              current.filter(
+                                (entry) => entry.optionId !== option.optionId,
+                              ),
+                            )
+                          }
+                        />
+                      ) : null}
+                    </div>
+                  </div>
 
-                  return (
-                    <SortableMultiOptionBlock
-                      key={option.id}
-                      option={option}
-                      index={index}
-                      sortable={
-                        !isTrailingBlank && sortableOptionIds.length > 1
-                      }
-                      canDelete={draft.options.length > 1}
-                      catalogPositions={catalogPositions}
-                      defaultHourlyRate={defaultHourlyRate}
-                      excludedCatalogKeys={
-                        excludedCatalogKeysByOptionId.get(option.id) ??
-                        EMPTY_EXCLUDED_CATALOG_KEYS
-                      }
-                      hydrateOptions={hydrateOptions}
-                      onDelete={() =>
-                        setDraft({
-                          ...draft,
-                          options: ensureTrailingEmptyMultiOption(
-                            draft.options.filter(
-                              (candidate) => candidate.id !== option.id,
-                            ),
-                          ),
-                        })
-                      }
-                      onNameChange={(name) => {
-                        applyOptionLineItem(
-                          option.id,
-                          applyLineItemCatalogEdit(
-                            entry.lineItem,
-                            { name },
-                            catalogPositions,
-                          ),
-                        );
-                      }}
-                      onNameBlur={(name) => {
-                        const linked = applyLineItemCatalogEdit(
-                          entry.lineItem,
-                          { name },
-                          catalogPositions,
-                        );
-                        const withPrices = hydrateLineItemWithCatalog(
-                          linked,
-                          catalogPositions,
-                          defaultHourlyRate,
-                          hydrateOptions,
-                        );
+                  <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3">
+                    <label className="block">
+                      <span className={subLabelClassName}>Nosaukums</span>
+                      <input
+                        type="text"
+                        value={option.label}
+                        onChange={(event) =>
+                          updateOption(option.optionId, {
+                            label: event.target.value,
+                          })
+                        }
+                        className={inputClassName}
+                        placeholder="piem. Standarta (nav obligāts)"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className={subLabelClassName}>Laika norma (c/h)</span>
+                      <LaborTimeNormInput
+                        value={option.timeNorm}
+                        onChange={(timeNorm) =>
+                          updateOption(option.optionId, { timeNorm })
+                        }
+                      />
+                    </label>
+                  </div>
 
-                        applyOptionLineItem(option.id, withPrices);
-                      }}
-                      onCatalogSelect={(position) => {
-                        applyOptionLineItem(
-                          option.id,
-                          applyCatalogPositionToLineItem(
-                            entry.lineItem,
-                            position,
-                            defaultHourlyRate,
-                          ),
-                        );
-                      }}
-                      lockCatalogIdentity={lockCatalogIdentity}
-                    />
-                  );
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className={subLabelClassName}>Materiāls</span>
+                      <CatalogHintField
+                        value={option.material}
+                        onChange={(material) =>
+                          updateOption(option.optionId, { material })
+                        }
+                        catalogPositions={materialPositions}
+                        defaultHourlyRate={defaultHourlyRate}
+                        placeholder="Meklēt materiālu"
+                      />
+                    </div>
+                    <div>
+                      <span className={subLabelClassName}>Mehānisms</span>
+                      <CatalogHintField
+                        value={option.mechanism}
+                        onChange={(mechanism) =>
+                          updateOption(option.optionId, { mechanism })
+                        }
+                        catalogPositions={mechanismPositions}
+                        defaultHourlyRate={defaultHourlyRate}
+                        placeholder="Meklēt mehānismu"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <ModalFormActions onCancel={() => handleOpenChange(false)}>
+        <ModalFormActions onCancel={() => onOpenChange(false)}>
           <button
             type="submit"
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700"
@@ -427,4 +381,3 @@ export function MultiPositionModal({
     </AppModal>
   );
 }
-

@@ -20,8 +20,8 @@ import { PositionCostTypeField } from "@/app/components/position-cost-type-field
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import {
-  DEFAULT_POSITION_COST_TYPE,
-  type PositionCostType,
+  DEFAULT_CATALOG_POSITION_COST_TYPE,
+  type CatalogPositionCostType,
 } from "@/app/lib/positions/position-cost-type";
 
 
@@ -46,13 +46,18 @@ type AddPositionButtonProps = {
 
 
 
-const emptyForm = {
+const emptyForm: {
+  name: string;
+  unit: string;
+  costType: CatalogPositionCostType;
+  variableQuantity: boolean;
+} = {
 
   name: "",
 
   unit: "",
 
-  costType: DEFAULT_POSITION_COST_TYPE,
+  costType: DEFAULT_CATALOG_POSITION_COST_TYPE,
 
   variableQuantity: false,
 
@@ -246,7 +251,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         dirty={
           Boolean(form.name.trim() || form.unit.trim()) ||
-          form.costType !== DEFAULT_POSITION_COST_TYPE ||
+          form.costType !== DEFAULT_CATALOG_POSITION_COST_TYPE ||
           form.variableQuantity
         }
 
@@ -259,10 +264,9 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
           <PositionCostTypeField
             id="position-cost-type"
             value={form.costType}
-            onChange={(value: PositionCostType) =>
-              updateField("costType", value)
-            }
+            onChange={(value) => updateField("costType", value)}
             error={fieldErrors.costType}
+            catalogOnly
           />
 
           <PositionNameUnitFields

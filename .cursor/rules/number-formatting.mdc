@@ -1,0 +1,42 @@
+---
+description: Skaitļu formatēšana — tūkstošu atdalītāji
+alwaysApply: true
+---
+
+# Skaitļu formatēšana
+
+## Tūkstošu atdalītāji
+
+Visi lietotājam redzamie skaitļi (summas, daudzumi, cenas) formatē ar **atstarpi** kā tūkstošu atdalītāju:
+
+```
+1 000 000.00   ✅
+1000000.00     ❌
+```
+
+## Vienots avots
+
+| Funkcija | Fails | Lietojums |
+|---|---|---|
+| `addThousandSeparators(formatted)` | `app/lib/estimates/calculate-line.ts` | Zemākā līmeņa helper |
+| `formatAmount(value)` | `calculate-line.ts` | Summas ar `.` decimālatdalītāju |
+| `formatAmountDisplay(value)` | `calculate-line.ts` | Summas tāmes šūnās (0 → "—") |
+| `formatMoney(value)` | `app/lib/estimates/format-money.ts` | `€ 1 234.56` |
+| `formatMoneyDisplay(value)` | `format-money.ts` | Kopsummas (0/invalid → "—") |
+| `formatQuantityDisplay(value)` | `app/lib/positions/variable-quantity.ts` | Daudzumi ar `,` decimālatdalītāju |
+
+## Ko nedarīt
+
+- ❌ `value.toFixed(2)` tieši komponentē vai helper funkcijā bez `addThousandSeparators`
+- ❌ Jauna tūkstošu formatēšanas loģika — izmanto `addThousandSeparators` no `calculate-line.ts`
+- ❌ `toLocaleString()` — nav stils, nav kontrole pār formātu
+
+## Piemērs
+
+```ts
+import { addThousandSeparators, roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
+
+// Jauns displeja helpers:
+const display = addThousandSeparators(roundToTwoDecimals(value).toFixed(2));
+// → "1 234 567.89"
+```

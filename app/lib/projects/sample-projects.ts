@@ -15,6 +15,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     visualizationBlocks: [],
     projectBlocks: [],
     projectDescription: SAMPLE_PROJECT_DESCRIPTION,
+    status: "active",
   },
   {
     id: "proj-2",
@@ -27,6 +28,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     visualizationBlocks: [],
     projectBlocks: [],
     projectDescription: SAMPLE_PROJECT_DESCRIPTION,
+    status: "active",
   },
   {
     id: "proj-3",
@@ -39,6 +41,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     visualizationBlocks: [],
     projectBlocks: [],
     projectDescription: SAMPLE_PROJECT_DESCRIPTION,
+    status: "active",
   },
   {
     id: "proj-4",
@@ -51,6 +54,7 @@ export const SAMPLE_PROJECTS: ProjectSummary[] = [
     visualizationBlocks: [],
     projectBlocks: [],
     projectDescription: SAMPLE_PROJECT_DESCRIPTION,
+    status: "active",
   },
 ];
 

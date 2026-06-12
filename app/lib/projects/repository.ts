@@ -1,11 +1,18 @@
 import { defaultEstimateDeadline, projectCreatedDateIso } from "@/app/lib/estimates/sample-data";
 import { resolveEstimateMeta } from "@/app/lib/estimates/resolve-estimate-meta";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
+import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import {
   buildEstimatePositionSectionsStorage,
   parseEstimatePositionDocumentPayload,
 } from "@/app/lib/estimate-positions/serialize-document";
+import { cloneSagataveDocumentForProject } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
+import { listPositionPrices } from "@/app/lib/positions/repository";
+import {
+  estimateHasStaleCatalogPrices,
+  isProjectEstimateSaved,
+} from "@/app/lib/positions/stale-catalog-price";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
@@ -16,6 +23,12 @@ import {
   getProjectById as getSampleProjectById,
   SAMPLE_PROJECTS,
 } from "@/app/lib/projects/sample-projects";
+import {
+  isProjectEstimateLocked,
+  isProjectVisibleInList,
+  normalizeProjectStatus,
+  type ProjectStatus,
+} from "@/app/lib/projects/project-status";
 import type {
   CreateProjectInput,
   EstimateMeta,
@@ -38,12 +51,14 @@ type ProjectRow = {
   visualization_blocks?: unknown;
   project_blocks?: unknown;
   project_description?: unknown;
+  status?: string | null;
 };
 
 type EstimateRow = {
   title: string;
   meta: EstimateMeta;
   categories: EstimateCategory[];
+  updated_at?: string;
 };
 
 function mapProject(row: ProjectRow): ProjectSummary {
@@ -60,7 +75,91 @@ function mapProject(row: ProjectRow): ProjectSummary {
     visualizationBlocks: moduleBlocks.visualizationBlocks,
     projectBlocks: moduleBlocks.projectBlocks,
     projectDescription: moduleBlocks.projectDescription,
+    status: normalizeProjectStatus(row.status),
   };
+}
+
+const PROJECT_BASE_COLUMNS =
+  "id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks";
+
+const PROJECT_SELECT_VARIANTS = [
+  `${PROJECT_BASE_COLUMNS}, project_description, status`,
+  `${PROJECT_BASE_COLUMNS}, project_description`,
+  `${PROJECT_BASE_COLUMNS}, status`,
+  PROJECT_BASE_COLUMNS,
+] as const;
+
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
+
+function isRetryableProjectSelectError(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  return (
+    isMissingColumnError(error, "project_description") ||
+    isMissingColumnError(error, "status")
+  );
+}
+
+async function fetchProjectRows(
+  supabase: SupabaseAdminClient,
+): Promise<ProjectRow[] | null> {
+  let lastError: { message?: string } | null = null;
+
+  for (const select of PROJECT_SELECT_VARIANTS) {
+    const { data, error } = await supabase
+      .from("projects")
+      .select(select)
+      .order("created_at", { ascending: true });
+
+    if (!error) {
+      return (data ?? []) as unknown as ProjectRow[];
+    }
+
+    lastError = error;
+
+    if (!isRetryableProjectSelectError(error)) {
+      console.error("listProjects:", error.message);
+      return null;
+    }
+  }
+
+  if (lastError) {
+    console.error("listProjects:", lastError.message);
+  }
+
+  return null;
+}
+
+async function fetchProjectRowById(
+  supabase: SupabaseAdminClient,
+  id: string,
+): Promise<ProjectRow | null | undefined> {
+  let lastError: { message?: string } | null = null;
+
+  for (const select of PROJECT_SELECT_VARIANTS) {
+    const { data, error } = await supabase
+      .from("projects")
+      .select(select)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!error) {
+      return (data as unknown as ProjectRow | null) ?? null;
+    }
+
+    lastError = error;
+
+    if (!isRetryableProjectSelectError(error)) {
+      console.error("getProject:", error.message);
+      return undefined;
+    }
+  }
+
+  if (lastError) {
+    console.error("getProject:", lastError.message);
+  }
+
+  return undefined;
 }
 
 function estimateMetaForProject(
@@ -103,16 +202,104 @@ async function parseEstimateRow(
   const hasCategories = parsed.sections.length > 0;
   const base = hasCategories ? null : await getProjectEstimateBaseFromSagatave();
 
+  const meta = estimateMetaForProject(project, validityDays, {
+    ...row.meta,
+  });
+
+  if (
+    hasCategories &&
+    row.updated_at &&
+    !meta.savedAt &&
+    isProjectEstimateSaved(meta, {
+      projectCreatedAt: project.createdAt,
+      estimateUpdatedAt: row.updated_at,
+    })
+  ) {
+    meta.savedAt = row.updated_at;
+    meta.pricesFrozen = true;
+  }
+
   return {
     title: row.title || project.name,
-    meta: estimateMetaForProject(project, validityDays, {
-      ...row.meta,
-    }),
+    meta,
     categories: hasCategories ? parsed.sections : base!.categories,
     multiOptionLinks: hasCategories
       ? parsed.multiOptionLinks
       : base!.multiOptionLinks,
+    updatedAt: row.updated_at,
   };
+}
+
+export async function listProjectIdsWithStaleCatalogPrices(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  if (!isSupabaseAdminConfigured() || projects.length === 0) {
+    return new Set();
+  }
+
+  const [catalogPositions, companySettings] = await Promise.all([
+    listPositionPrices(),
+    getCompanySettings(),
+  ]);
+  const defaultHourlyRate = companySettings.defaultHourlyRate;
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("project_id, meta, categories, updated_at")
+    .in(
+      "project_id",
+      projects.map((project) => project.id),
+    );
+
+  if (error || !data) {
+    return new Set();
+  }
+
+  const staleProjectIds = new Set<string>();
+
+  for (const row of data) {
+    const project = projectById.get(row.project_id as string);
+    if (!project || isProjectEstimateLocked(project.status)) {
+      continue;
+    }
+
+    const parsed = parseEstimatePositionDocumentPayload(
+      row.categories as EstimateCategory[],
+    );
+    if (parsed.sections.length === 0) {
+      continue;
+    }
+
+    const meta = estimateMetaForProject(
+      project,
+      companySettings.estimateValidityDays,
+      {
+        ...((row.meta ?? {}) as EstimateMeta),
+      },
+    );
+
+    if (
+      !isProjectEstimateSaved(meta, {
+        projectCreatedAt: project.createdAt,
+        estimateUpdatedAt: row.updated_at as string | undefined,
+      })
+    ) {
+      continue;
+    }
+
+    if (
+      estimateHasStaleCatalogPrices(
+        parsed.sections,
+        catalogPositions,
+        defaultHourlyRate,
+      )
+    ) {
+      staleProjectIds.add(project.id);
+    }
+  }
+
+  return staleProjectIds;
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
@@ -121,31 +308,15 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks, project_description")
-    .order("created_at", { ascending: true });
+  const rows = await fetchProjectRows(supabase);
 
-  if (!error) {
-    return (data ?? []).map(mapProject);
-  }
-
-  if (isMissingColumnError(error, "project_description")) {
-    const legacy = await supabase
-      .from("projects")
-      .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
-      .order("created_at", { ascending: true });
-
-    if (!legacy.error) {
-      return (legacy.data ?? []).map(mapProject);
-    }
-
-    console.error("listProjects:", legacy.error.message);
+  if (!rows) {
     return [];
   }
 
-  console.error("listProjects:", error.message);
-  return [];
+  return rows
+    .map(mapProject)
+    .filter((project) => isProjectVisibleInList(project.status));
 }
 
 export async function getProject(id: string): Promise<ProjectSummary | null> {
@@ -154,39 +325,13 @@ export async function getProject(id: string): Promise<ProjectSummary | null> {
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks, project_description")
-    .eq("id", id)
-    .maybeSingle();
+  const row = await fetchProjectRowById(supabase, id);
 
-  if (!error && data) {
-    return mapProject(data);
-  }
-
-  if (error && isMissingColumnError(error, "project_description")) {
-    const legacy = await supabase
-      .from("projects")
-      .select("id, name, address, phone, email, created_at, building_module_id, visualization_blocks, project_blocks")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (!legacy.error && legacy.data) {
-      return mapProject(legacy.data);
-    }
-
-    if (legacy.error) {
-      console.error("getProject:", legacy.error.message);
-    }
-
+  if (!row) {
     return null;
   }
 
-  if (error) {
-    console.error("getProject:", error.message);
-  }
-
-  return null;
+  return mapProject(row);
 }
 
 export async function getProjectEstimate(id: string): Promise<ProjectEstimate | null> {
@@ -203,7 +348,7 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
-    .select("title, meta, categories")
+    .select("title, meta, categories, updated_at")
     .eq("project_id", id)
     .maybeSingle();
 
@@ -237,6 +382,21 @@ export async function createProject(
     const module = await getBuildingModule(input.buildingModuleId);
     if (!module) {
       return { ok: false, error: "Izvēlētais modulis vairs neeksistē." };
+    }
+  }
+
+  if (input.copyEstimateFromProjectId) {
+    const sourceProject = await getProject(input.copyEstimateFromProjectId);
+
+    if (!sourceProject) {
+      return { ok: false, error: "Avota projekts nav atrasts." };
+    }
+
+    if (sourceProject.buildingModuleId !== input.buildingModuleId) {
+      return {
+        ok: false,
+        error: "Kopējot projektu, moduli nevar mainīt.",
+      };
     }
   }
 
@@ -288,10 +448,32 @@ export async function createProject(
     number: "",
   };
 
-  const estimateBase = await getProjectEstimateBaseFromSagatave();
+  let estimateCategories: EstimateCategory[];
+  let estimateMultiOptionLinks: MultiOptionLinkGroup[];
+
+  if (input.copyEstimateFromProjectId) {
+    const sourceEstimate = await getProjectEstimate(input.copyEstimateFromProjectId);
+
+    if (!sourceEstimate) {
+      await supabase.from("projects").delete().eq("id", project.id);
+      return { ok: false, error: "Avota projekta tāme nav atrasta." };
+    }
+
+    const cloned = cloneSagataveDocumentForProject(
+      sourceEstimate.categories,
+      sourceEstimate.multiOptionLinks,
+    );
+    estimateCategories = cloned.categories;
+    estimateMultiOptionLinks = cloned.multiOptionLinks;
+  } else {
+    const estimateBase = await getProjectEstimateBaseFromSagatave();
+    estimateCategories = estimateBase.categories;
+    estimateMultiOptionLinks = estimateBase.multiOptionLinks;
+  }
+
   const categories = buildEstimatePositionSectionsStorage(
-    estimateBase.categories,
-    estimateBase.multiOptionLinks,
+    estimateCategories,
+    estimateMultiOptionLinks,
   );
 
   const { error: estimateError } = await supabase.from("estimates").insert({
@@ -396,12 +578,75 @@ export async function updateProject(
   return { ok: true };
 }
 
+async function assertProjectEstimateEditable(
+  projectId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const project = await getProject(projectId);
+
+  if (!project) {
+    return { ok: false, error: "Projekts nav atrasts." };
+  }
+
+  if (isProjectEstimateLocked(project.status)) {
+    return { ok: false, error: "Tāme ir apstiprināta un to vairs nevar labot." };
+  }
+
+  return { ok: true };
+}
+
+export async function updateProjectStatus(
+  projectId: string,
+  status: ProjectStatus,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const project = await getProject(projectId);
+
+  if (!project) {
+    return { ok: false, error: "Projekts nav atrasts." };
+  }
+
+  if (status === "approved" && project.status !== "active") {
+    return { ok: false, error: "Projektu nevar apstiprināt šajā statusā." };
+  }
+
+  if (status === "rejected" && project.status === "rejected") {
+    return { ok: false, error: "Projekts jau ir noraidīts." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ status })
+    .eq("id", projectId);
+
+  if (error) {
+    if (isMissingColumnError(error, "status")) {
+      return {
+        ok: false,
+        error: "Projekta statuss vēl nav pieejams. Palaid npm run db:migrate.",
+      };
+    }
+
+    return { ok: false, error: "Neizdevās atjaunināt projekta statusu." };
+  }
+
+  return { ok: true };
+}
+
 export async function updateProjectEstimateDates(
   projectId: string,
   dates: Pick<EstimateMeta, "date" | "deadline">,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
   }
 
   const supabase = createAdminClient();
@@ -428,6 +673,42 @@ export async function updateProjectEstimateDates(
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt datumus." };
+  }
+
+  return { ok: true };
+}
+
+export async function saveProjectEstimate(
+  projectId: string,
+  payload: {
+    title: string;
+    meta: EstimateMeta;
+    categories: EstimateCategory[];
+    multiOptionLinks: MultiOptionLinkGroup[];
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const supabase = createAdminClient();
+  const categories = buildEstimatePositionSectionsStorage(
+    payload.categories,
+    payload.multiOptionLinks,
+  );
+
+  const { error } = await supabase
+    .from("estimates")
+    .update({ title: payload.title, meta: payload.meta, categories })
+    .eq("project_id", projectId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt tāmi." };
   }
 
   return { ok: true };

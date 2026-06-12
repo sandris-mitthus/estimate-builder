@@ -1,5 +1,16 @@
-import { POSITION_COST_TYPE_LABELS } from "@/app/lib/positions/position-cost-type";
+import {
+  POSITION_COST_TYPE_LABELS,
+  type CatalogPositionCostType,
+} from "@/app/lib/positions/position-cost-type";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+
+export type PositionCostTypeFilter = "all" | CatalogPositionCostType;
+
+export function filterCatalogPositions(
+  positions: PositionPriceSummary[],
+): PositionPriceSummary[] {
+  return positions.filter((position) => position.costType !== "labor");
+}
 
 export function sortPositionsByName(
   positions: PositionPriceSummary[],
@@ -32,9 +43,26 @@ export function filterPositionsByQuery(
   });
 }
 
+export function filterPositionsByCostType(
+  positions: PositionPriceSummary[],
+  costTypeFilter: PositionCostTypeFilter,
+): PositionPriceSummary[] {
+  if (costTypeFilter === "all") {
+    return positions;
+  }
+
+  return positions.filter(
+    (position) => position.costType === costTypeFilter,
+  );
+}
+
 export function getVisiblePositions(
   positions: PositionPriceSummary[],
   query: string,
+  costTypeFilter: PositionCostTypeFilter = "all",
 ): PositionPriceSummary[] {
-  return filterPositionsByQuery(sortPositionsByName(positions), query);
+  const sorted = sortPositionsByName(positions);
+  const byCostType = filterPositionsByCostType(sorted, costTypeFilter);
+
+  return filterPositionsByQuery(byCostType, query);
 }

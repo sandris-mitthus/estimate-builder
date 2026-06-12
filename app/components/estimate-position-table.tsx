@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useMemo,
   useState,
   useEffect,
@@ -30,24 +31,11 @@ import {
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
-import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
 import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guard";
-import {
-  applyLineItemCatalogEdit,
-  findCatalogPositionForLineItem,
-  hydrateLineItemWithCatalog,
-  hydrateSectionsWithCatalogLinks,
-  isMaterialsOrMechanismsLineItem,
-} from "@/app/lib/positions/sync-from-estimate-line-items";
+import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
 import {
-  formatAmountDisplay,
-  isAmountDisplayEmpty,
-  sumBreakdown,
-} from "@/app/lib/estimates/calculate-line";
-import {
   createEstimatePositionSection,
-  createLineItem,
   createSubcategory,
   ensureSectionHasLineItem,
 } from "@/app/lib/estimate-positions/create-empty";
@@ -83,33 +71,28 @@ import type {
   MultiOptionLinkGroup,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
-import { AttachModuleSizeProvider } from "@/app/components/attach-module-size-context";
-import { AttachModuleSizeModal } from "@/app/components/attach-module-size-modal";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
-import { AttachModuleSizeButton } from "@/app/components/attach-module-size-button";
-import {
-  createAttachItemStateKey,
-  findLineItemInSections,
-  lineItemModuleSizeAttachmentToAttachState,
-  parseAttachItemStateKey,
-  updateLineItemModuleSizeAttachmentInSections,
-  type ModuleSizeAttachItemState,
-} from "@/app/lib/estimates/module-size-attachment";
-import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
 import { DeleteButton } from "@/app/components/delete-button";
+import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
-import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
-import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
+import { PositionModal } from "@/app/components/position-modal";
 import {
-  applyCatalogPositionToLineItem,
-  buildUnitPriceForCatalogPosition,
-} from "@/app/lib/positions/apply-catalog-to-line-item";
+  PositionModalProvider,
+  usePositionModal,
+} from "@/app/components/position-modal-context";
+import { resolveLiveDisplayUnitPrice } from "@/app/lib/positions/stale-catalog-price";
+import { createCompositePosition } from "@/app/lib/estimates/composite-line-item";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
-import { hasDefinedLaborLineItem } from "@/app/lib/positions/has-defined-labor";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
-import { isVariableQuantityLineItem } from "@/app/lib/positions/variable-quantity";
-import { getEstimateUnitOptions } from "@/app/lib/estimates/unit-options";
+import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
+import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
+import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
+import {
+  UNIT_PRICE_COLUMN_COUNT,
+  UNIT_PRICE_SUBHEADER_LABELS,
+} from "@/app/lib/estimates/unit-price-columns";
 import {
   DropIndicatorProvider,
   useDropIndicatorActions,
@@ -122,19 +105,11 @@ import {
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
 
-const FULL_COL_COUNT = 7;
+const FULL_COL_COUNT = 9;
 const ESTIMATE_POSITION_DND_CONTEXT_ID = "estimate-position-table-dnd";
 
-const cellInput =
-  "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
-const nameInput =
-  "w-full min-h-[2.75rem] resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
-const nameInputRightAlign = "text-right";
-const cellNum = `${cellInput} text-right tabular-nums`;
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
-const priceCell = "border-b border-zinc-100 px-1 py-0.5 align-top";
-const priceCellTotal = `${priceCell} bg-zinc-50/60`;
 const rowLead = "pl-3";
 const dragHandleColumn =
   "flex h-7 w-6 shrink-0 items-center justify-center self-center";
@@ -148,77 +123,11 @@ const rowActionCell =
 
 const hydrateCatalogPrices = { forceCatalogPrices: true } as const;
 
-function resolveLineItemDisplayUnitPrice(
-  item: EstimateLineItem,
-  catalogPositions: PositionPriceSummary[],
-  defaultHourlyRate: number | null,
-): PriceBreakdown {
-  const position = findCatalogPositionForLineItem(item, catalogPositions);
-  if (position) {
-    return buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
-  }
-
-  return item.unitPrice;
-}
-
-function PriceCells({
-  values,
-  readOnly = false,
-  onChange,
-}: {
-  values: PriceBreakdown;
-  readOnly?: boolean;
-  onChange?: (field: keyof PriceBreakdown, value: number) => void;
-}) {
-  const total = sumBreakdown(values);
-
-  return (
-    <>
-      {(["labor", "materials", "mechanisms"] as const).map((field) => (
-        <td key={field} className={priceCell}>
-          {readOnly ? (
-            <span
-              className={`${readOnlyNum} ${
-                isAmountDisplayEmpty(values[field]) ? "text-zinc-300" : ""
-              }`}
-            >
-              {formatAmountDisplay(values[field])}
-            </span>
-          ) : (
-            <input
-              type="number"
-              min={0}
-              step="any"
-              className={cellNum}
-              value={values[field]}
-              onChange={(event) =>
-                onChange?.(field, parseFloat(event.target.value) || 0)
-              }
-            />
-          )}
-        </td>
-      ))}
-      <td className={priceCellTotal}>
-        <span
-          className={`${readOnlyNum} ${
-            isAmountDisplayEmpty(total)
-              ? "text-zinc-300"
-              : "font-medium text-zinc-900"
-          }`}
-        >
-          {formatAmountDisplay(total)}
-        </span>
-      </td>
-    </>
-  );
-}
 
 function LineItemRow({
   item,
   onChange,
   onDelete,
-  onSyncCatalogPosition,
-  onScheduleCatalogSync,
   dragHandle,
   rowRef,
   rowStyle,
@@ -231,8 +140,6 @@ function LineItemRow({
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
-  onSyncCatalogPosition: (item: EstimateLineItem) => void;
-  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   dragHandle?: ReactNode;
   rowRef?: (element: HTMLTableSectionElement | null) => void;
   rowStyle?: CSSProperties;
@@ -242,17 +149,7 @@ function LineItemRow({
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
-  const unitOptions = getEstimateUnitOptions(item.unit);
-  const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
-  const showAttachModuleSize = hasDefinedLaborLineItem(
-    item,
-    catalogPositions,
-    defaultHourlyRate,
-  );
-  const isMaterialsOrMechanisms = isMaterialsOrMechanismsLineItem(
-    item,
-    catalogPositions,
-  );
+  const { openPositionModal } = usePositionModal();
 
   return (
     <tbody
@@ -262,101 +159,59 @@ function LineItemRow({
     >
     <tr className="align-middle hover:bg-sky-50/40">
       <td className={nameCell}>
-        <div className={`flex items-center gap-1 ${rowLead}`}>
+        <div className={`flex items-start gap-1 py-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
-          <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
-            <div
-              className={`min-w-0 flex-1 ${indentName ? subcategoryItemNameIndent : ""}`}
-            >
-              <EstimateLineItemNameField
-                value={item.name}
-                catalogPositions={catalogPositions}
-                defaultHourlyRate={defaultHourlyRate}
-                className={`${nameInput} ${showAttachModuleSize ? "font-semibold" : ""} ${isMaterialsOrMechanisms ? nameInputRightAlign : ""}`}
-                footer={
-                  item.moduleSizeAttachment ? (
-                    <AttachedModuleSizeLabel
-                      attachment={item.moduleSizeAttachment}
-                      moduleSizeOptions={moduleSizeOptions}
-                      className="px-2"
-                    />
-                  ) : undefined
-                }
-                onNameChange={(name) => {
-                  const next = applyLineItemCatalogEdit(
-                    item,
-                    { name },
-                    catalogPositions,
-                  );
-                  onChange(next);
-                  onScheduleCatalogSync(next);
-                }}
-                onNameBlur={(name) => {
-                  const linked = applyLineItemCatalogEdit(
-                    item,
-                    { name },
-                    catalogPositions,
-                  );
-                  const withPrices = hydrateLineItemWithCatalog(
-                    linked,
-                    catalogPositions,
-                    defaultHourlyRate,
-                    hydrateCatalogPrices,
-                  );
-                  onChange(withPrices);
-                  onSyncCatalogPosition(withPrices);
-                }}
-                onCatalogSelect={(position) =>
-                  onChange(
-                    applyCatalogPositionToLineItem(
-                      item,
-                      position,
-                      defaultHourlyRate,
-                    ),
-                  )
-                }
+          <div
+            className={`min-w-0 flex-1 ${indentName ? subcategoryItemNameIndent : ""}`}
+          >
+            <div className="flex min-w-0 flex-col gap-0 leading-snug">
+              <button
+                type="button"
+                onClick={() => openPositionModal(item, onChange)}
+                className={`block w-full text-left text-sm font-medium text-zinc-900 transition hover:text-sky-700 hover:underline ${item.name.trim() ? "" : "text-zinc-400 italic"}`}
+              >
+                {item.name.trim() || "Nenosaukta pozīcija"}
+              </button>
+              <AttachedModuleSizeLabel
+                attachment={item.moduleSizeAttachment}
+                moduleSizeOptions={moduleSizeOptions}
               />
             </div>
-            <PositionVariableQuantityIcon enabled={showQuantityInput} />
-            <AttachModuleSizeButton
-              enabled={showAttachModuleSize}
-              lineItemId={item.id}
-              positionName={item.name}
-            />
-          </span>
+          </div>
         </div>
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-        <select
-          className={`${cellInput} cursor-pointer`}
-          value={item.unit}
-          onChange={(event) => {
-            const next = { ...item, unit: event.target.value };
-            onChange(next);
-            onSyncCatalogPosition(next);
-          }}
-        >
-          {unitOptions.map((unit) => (
-            <option key={unit} value={unit}>
-              {unit}
-            </option>
-          ))}
-        </select>
+        <span className={`${readOnlyNum} text-zinc-500`}>
+          {(isCompositeLineItem(item)
+            ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions)
+            : item.unit.trim()) || "—"}
+        </span>
       </td>
-      <PriceCells
-        readOnly
-        values={resolveLineItemDisplayUnitPrice(
+      <EstimateUnitPriceCells
+        item={item}
+        defaultHourlyRate={defaultHourlyRate}
+        values={resolveLiveDisplayUnitPrice(
           item,
           catalogPositions,
           defaultHourlyRate,
         )}
+        onTimeNormChange={(laborTimeNorm) => onChange({ ...item, laborTimeNorm })}
       />
       <td className={rowActionCell}>
-        <DeleteButton
-          label="Dzēst pozīciju"
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100"
-        />
+        <div className="flex items-center justify-center gap-0.5">
+          <IconActionButton
+            label="Labot pozīciju"
+            icon="fas fa-pen"
+            variant="edit"
+            onClick={() => openPositionModal(item, onChange)}
+            className="opacity-0 group-hover:opacity-100"
+          />
+          <DeleteButton
+            label="Dzēst pozīciju"
+            onClick={onDelete}
+            className="opacity-0 group-hover:opacity-100"
+          />
+        </div>
       </td>
     </tr>
     </tbody>
@@ -374,8 +229,6 @@ function SortableLineItemRow({
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
-  onSyncCatalogPosition: (item: EstimateLineItem) => void;
-  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
@@ -640,8 +493,6 @@ function SubcategoryBlock({
   subcategory,
   onChange,
   onDelete,
-  onSyncCatalogPosition,
-  onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
   moduleSizeOptions,
@@ -655,8 +506,6 @@ function SubcategoryBlock({
   subcategory: EstimateSubcategory;
   onChange: (subcategory: EstimateSubcategory) => void;
   onDelete: () => void;
-  onSyncCatalogPosition: (item: EstimateLineItem) => void;
-  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
@@ -666,11 +515,22 @@ function SubcategoryBlock({
   onEnsureExpanded: () => void;
   optionLinkActions: MultiOptionLinkActions;
 }) {
+  const { openPositionModal } = usePositionModal();
+
   function withExpandedContent(
     updater: (current: EstimateSubcategory) => EstimateSubcategory,
   ) {
     onEnsureExpanded();
     onChange(updater(subcategory));
+  }
+
+  function handleAddItem() {
+    openPositionModal(createCompositePosition(), (saved) =>
+      withExpandedContent((current) => ({
+        ...current,
+        items: [...current.items, saved],
+      })),
+    );
   }
 
   return (
@@ -703,12 +563,7 @@ function SubcategoryBlock({
                 items: [...current.items, createMultiPosition()],
               }))
             }
-            onAddItem={() =>
-              withExpandedContent((current) => ({
-                ...current,
-                items: [...current.items, createLineItem()],
-              }))
-            }
+            onAddItem={handleAddItem}
             onDelete={onDelete}
           />
         }
@@ -735,8 +590,6 @@ function SubcategoryBlock({
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
             moduleSizeOptions={moduleSizeOptions}
-            onSyncCatalogPosition={onSyncCatalogPosition}
-            onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
             onChange={(next) =>
               onChange({
@@ -761,8 +614,6 @@ function SectionBlock({
   section,
   onChange,
   onDelete,
-  onSyncCatalogPosition,
-  onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
   moduleSizeOptions,
@@ -778,8 +629,6 @@ function SectionBlock({
   section: EstimatePositionSection;
   onChange: (section: EstimatePositionSection) => void;
   onDelete: () => void;
-  onSyncCatalogPosition: (item: EstimateLineItem) => void;
-  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
@@ -792,11 +641,22 @@ function SectionBlock({
   expandSection: (rowId: string) => void;
   optionLinkActions: MultiOptionLinkActions;
 }) {
+  const { openPositionModal } = usePositionModal();
+
   function withExpandedContent(
     updater: (current: EstimatePositionSection) => EstimatePositionSection,
   ) {
     onEnsureExpanded();
     onChange(updater(section));
+  }
+
+  function handleAddItem() {
+    openPositionModal(createCompositePosition(), (saved) =>
+      withExpandedContent((current) => ({
+        ...current,
+        items: [...current.items, saved],
+      })),
+    );
   }
 
   return (
@@ -826,12 +686,7 @@ function SectionBlock({
                 items: [...current.items, createMultiPosition()],
               }))
             }
-            onAddItem={() =>
-              withExpandedContent((current) => ({
-                ...current,
-                items: [...current.items, createLineItem()],
-              }))
-            }
+            onAddItem={handleAddItem}
             onDelete={onDelete}
           />
         }
@@ -849,8 +704,6 @@ function SectionBlock({
           onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
           onEnsureExpanded={() => expandSection(subcategory.id)}
           optionLinkActions={optionLinkActions}
-          onSyncCatalogPosition={onSyncCatalogPosition}
-          onScheduleCatalogSync={onScheduleCatalogSync}
           subcategory={subcategory}
           onChange={(next) =>
             onChange({
@@ -891,8 +744,6 @@ function SectionBlock({
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
             moduleSizeOptions={moduleSizeOptions}
-            onSyncCatalogPosition={onSyncCatalogPosition}
-            onScheduleCatalogSync={onScheduleCatalogSync}
             item={row}
             onChange={(next) =>
               onChange({
@@ -919,8 +770,6 @@ function EstimatePositionDndTable({
   setSections,
   multiOptionLinks,
   setMultiOptionLinks,
-  onSyncCatalogPosition,
-  onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
   moduleSizeOptions,
@@ -933,8 +782,6 @@ function EstimatePositionDndTable({
   setSections: Dispatch<SetStateAction<EstimatePositionSection[]>>;
   multiOptionLinks: MultiOptionLinkGroup[];
   setMultiOptionLinks: Dispatch<SetStateAction<MultiOptionLinkGroup[]>>;
-  onSyncCatalogPosition: (item: EstimateLineItem) => void;
-  onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
@@ -1045,8 +892,8 @@ function EstimatePositionDndTable({
         <colgroup>
           <col style={{ width: "35%" }} />
           <col style={{ width: "6%" }} />
-          {Array.from({ length: 4 }).map((_, index) => (
-            <col key={index} style={{ width: "12%" }} />
+          {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
+            <col key={index} style={{ width: "8%" }} />
           ))}
           <col style={{ width: "5%" }} />
         </colgroup>
@@ -1062,7 +909,7 @@ function EstimatePositionDndTable({
               Mērv.
             </th>
             <th
-              colSpan={4}
+              colSpan={UNIT_PRICE_COLUMN_COUNT}
               className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
             >
               Vienības cena
@@ -1070,7 +917,7 @@ function EstimatePositionDndTable({
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {["Darbs", "Materiāls", "Mehānismi", "Kopā"].map((label) => (
+            {UNIT_PRICE_SUBHEADER_LABELS.map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -1098,8 +945,6 @@ function EstimatePositionDndTable({
                 collapsedSectionIds={collapsedSectionIds}
                 toggleSectionCollapsed={toggleSectionCollapsed}
                 expandSection={expandSection}
-                onSyncCatalogPosition={onSyncCatalogPosition}
-              onScheduleCatalogSync={onScheduleCatalogSync}
               section={section}
               onChange={(next) =>
                 setSections((current) =>
@@ -1196,172 +1041,17 @@ export function EstimatePositionTable({
   const { confirmOpen, stayOnPage, confirmLeave } = useUnsavedChangesGuard({
     isDirty,
   });
-  const { flushSyncFromLineItem, scheduleSyncFromLineItem } =
-    useSyncCatalogPositionFromLineItem(catalogPositions);
-  const [attachModalTarget, setAttachModalTarget] = useState<{
-    lineItemId: string;
-    positionName: string;
+  const [positionModalState, setPositionModalState] = useState<{
+    item: EstimateLineItem;
+    onSave: (next: EstimateLineItem) => void;
   } | null>(null);
-  const adjustmentSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
+
+  const openPositionModal = useCallback(
+    (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
+      setPositionModalState({ item, onSave });
+    },
+    [],
   );
-
-  useEffect(() => {
-    return () => {
-      if (adjustmentSaveTimerRef.current) {
-        clearTimeout(adjustmentSaveTimerRef.current);
-      }
-    };
-  }, []);
-
-  const attachModalAttachState = useMemo(() => {
-    if (!attachModalTarget) {
-      return {};
-    }
-
-    const lineItem = findLineItemInSections(
-      sections,
-      attachModalTarget.lineItemId,
-    );
-    return lineItemModuleSizeAttachmentToAttachState(
-      lineItem?.moduleSizeAttachment,
-    );
-  }, [attachModalTarget, sections]);
-
-  function persistModuleSizeAttachment(
-    nextSections: EstimatePositionSection[],
-    showSuccessToast: boolean,
-  ) {
-    if (isSaving) {
-      return;
-    }
-
-    clearFeedback();
-    startSaveTransition(async () => {
-      const linkedSections = hydrateSectionsWithCatalogLinks(
-        nextSections,
-        catalogPositions,
-        defaultHourlyRate,
-        hydrateCatalogPrices,
-      );
-
-      const result = await saveEstimatePositionDocumentAction({
-        id: estimatePositionId,
-        title,
-        sections: linkedSections,
-        multiOptionLinks,
-      });
-
-      if (!mountedRef.current) {
-        return;
-      }
-
-      if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
-        return;
-      }
-
-      setSections(linkedSections);
-      const nextSnapshot = serializeEstimatePositionDocument(
-        title,
-        linkedSections,
-        multiOptionLinks,
-      );
-      setSavedSnapshot(nextSnapshot);
-      router.refresh();
-
-      if (showSuccessToast) {
-        showFeedback({ type: "success", text: "Izmaiņas saglabātas." });
-      }
-    });
-  }
-
-  function handleAttachItemStateChange(
-    lineItemId: string,
-    stateKey: string,
-    patch: Partial<ModuleSizeAttachItemState>,
-  ) {
-    const lineItem = findLineItemInSections(sections, lineItemId);
-    if (!lineItem) {
-      return;
-    }
-
-    const currentAttachment = lineItem.moduleSizeAttachment ?? null;
-    const currentStateKey = currentAttachment
-      ? createAttachItemStateKey(
-          currentAttachment.moduleId,
-          currentAttachment.itemKey,
-        )
-      : null;
-
-    if (patch.enabled === true) {
-      const { moduleId, itemKey } = parseAttachItemStateKey(stateKey);
-      const nextAttachment: LineItemModuleSizeAttachment = {
-        moduleId,
-        itemKey,
-        adjustments: currentAttachment?.adjustments ?? {},
-      };
-      const nextSections = updateLineItemModuleSizeAttachmentInSections(
-        sections,
-        lineItemId,
-        nextAttachment,
-      );
-      setSections(nextSections);
-      persistModuleSizeAttachment(nextSections, true);
-      return;
-    }
-
-    if (patch.enabled === false) {
-      if (currentStateKey !== stateKey) {
-        return;
-      }
-
-      const nextSections = updateLineItemModuleSizeAttachmentInSections(
-        sections,
-        lineItemId,
-        null,
-      );
-      setSections(nextSections);
-      persistModuleSizeAttachment(nextSections, true);
-      return;
-    }
-
-    if (patch.adjustment !== undefined) {
-      if (!currentAttachment) {
-        return;
-      }
-
-      const { itemKey: adjustedItemKey } = parseAttachItemStateKey(stateKey);
-      const nextAdjustments = {
-        ...(currentAttachment.adjustments ?? {}),
-      };
-
-      if (patch.adjustment.trim().length > 0) {
-        nextAdjustments[adjustedItemKey] = patch.adjustment;
-      } else {
-        delete nextAdjustments[adjustedItemKey];
-      }
-
-      const nextAttachment: LineItemModuleSizeAttachment = {
-        ...currentAttachment,
-        adjustments: nextAdjustments,
-      };
-      const nextSections = updateLineItemModuleSizeAttachmentInSections(
-        sections,
-        lineItemId,
-        nextAttachment,
-      );
-      setSections(nextSections);
-
-      if (adjustmentSaveTimerRef.current) {
-        clearTimeout(adjustmentSaveTimerRef.current);
-      }
-
-      adjustmentSaveTimerRef.current = setTimeout(() => {
-        persistModuleSizeAttachment(nextSections, false);
-      }, 600);
-    }
-  }
 
   function handleSave() {
     if (!isDirty || isSaving) {
@@ -1431,11 +1121,7 @@ export function EstimatePositionTable({
         </div>
 
         <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
-          <AttachModuleSizeProvider
-            openAttachModal={(lineItemId, positionName) =>
-              setAttachModalTarget({ lineItemId, positionName })
-            }
-          >
+          <PositionModalProvider openPositionModal={openPositionModal}>
             <DropIndicatorProvider>
               <EstimatePositionDndTable
                 sections={sections}
@@ -1443,8 +1129,6 @@ export function EstimatePositionTable({
                 setSections={setSections}
                 multiOptionLinks={multiOptionLinks}
                 setMultiOptionLinks={setMultiOptionLinks}
-                onSyncCatalogPosition={flushSyncFromLineItem}
-                onScheduleCatalogSync={scheduleSyncFromLineItem}
                 catalogPositions={catalogPositions}
                 defaultHourlyRate={defaultHourlyRate}
                 moduleSizeOptions={moduleSizeOptions}
@@ -1453,32 +1137,25 @@ export function EstimatePositionTable({
                 expandSection={expandSection}
               />
             </DropIndicatorProvider>
-          </AttachModuleSizeProvider>
+          </PositionModalProvider>
         </div>
       </div>
 
-      <AttachModuleSizeModal
-        open={attachModalTarget != null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setAttachModalTarget(null);
-          }
-        }}
-        lineItemId={attachModalTarget?.lineItemId ?? ""}
-        positionName={attachModalTarget?.positionName ?? ""}
-        moduleSizeOptions={moduleSizeOptions}
-        attachState={attachModalAttachState}
-        onAttachStateChange={(stateKey, patch) => {
-          if (!attachModalTarget) {
-            return;
-          }
-          handleAttachItemStateChange(
-            attachModalTarget.lineItemId,
-            stateKey,
-            patch,
-          );
-        }}
-      />
+      {positionModalState ? (
+        <PositionModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setPositionModalState(null);
+            }
+          }}
+          value={positionModalState.item}
+          onSave={(next) => positionModalState.onSave(next)}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          moduleSizeOptions={moduleSizeOptions}
+        />
+      ) : null}
 
       <div className="flex justify-end">
         <button

@@ -1,4 +1,7 @@
-import { isEstimateMultiPosition } from "@/app/lib/estimates/multi-position";
+import {
+  isEstimateMultiPosition,
+  MULTI_POSITION_NONE_OPTION_ID,
+} from "@/app/lib/estimates/multi-position";
 import type {
   EstimateCategory,
   EstimateLineItem,
@@ -30,6 +33,17 @@ function cloneMultiOption(
   };
 }
 
+function remapSelectedOptionId(
+  selectedOptionId: string | null | undefined,
+  optionIdMap: Map<string, string>,
+): string | null {
+  if (!selectedOptionId || selectedOptionId === MULTI_POSITION_NONE_OPTION_ID) {
+    return null;
+  }
+
+  return optionIdMap.get(selectedOptionId) ?? null;
+}
+
 function cloneRowItem(
   row: EstimateRowItem,
   optionIdMap: Map<string, string>,
@@ -39,12 +53,13 @@ function cloneRowItem(
   }
 
   const multi = row as EstimateMultiPosition;
+  const options = multi.options.map((option) => cloneMultiOption(option, optionIdMap));
 
   return {
     ...multi,
     id: crypto.randomUUID(),
-    selectedOptionId: null,
-    options: multi.options.map((option) => cloneMultiOption(option, optionIdMap)),
+    selectedOptionId: remapSelectedOptionId(multi.selectedOptionId, optionIdMap),
+    options,
   };
 }
 

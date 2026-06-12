@@ -1,4 +1,5 @@
 import { multiplyBreakdown } from "@/app/lib/estimates/calculate-line";
+import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
 import { collectRowLineItems } from "@/app/lib/estimates/multi-position";
 import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import type {
@@ -44,7 +45,12 @@ function resolveLineItemBreakdown(
     ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
     : item.unitPrice;
 
-  if (position?.variableQuantity && item.quantity > 0) {
+  const hasModuleSize =
+    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
+  const shouldApplyQuantity =
+    (position?.variableQuantity === true || hasModuleSize) && item.quantity > 0;
+
+  if (shouldApplyQuantity) {
     return multiplyBreakdown(item.quantity, unitPrice);
   }
 

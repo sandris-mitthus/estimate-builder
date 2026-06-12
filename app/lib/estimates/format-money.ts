@@ -1,6 +1,8 @@
 import {
+  addThousandSeparators,
   formatAmount,
   isAmountDisplayEmpty,
+  roundToTwoDecimals,
 } from "@/app/lib/estimates/calculate-line";
 
 export function formatMoney(value: number): string {
@@ -13,5 +15,5 @@ export function formatMoneyDisplay(value: number): string {
     return "—";
   }
 
-  return `€ ${value.toFixed(2)}`;
+  return `€ ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
 }

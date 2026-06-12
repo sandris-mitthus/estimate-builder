@@ -1,4 +1,8 @@
 import {
+  hydrateCompositeLineItem,
+  isCompositeLineItem,
+} from "@/app/lib/estimates/composite-line-item";
+import {
   collectRowLineItems,
   isEstimateMultiPosition,
 } from "@/app/lib/estimates/multi-position";
@@ -113,6 +117,15 @@ export function hydrateLineItemWithCatalog(
   defaultHourlyRate: number | null,
   options?: { forceCatalogPrices?: boolean },
 ): EstimateLineItem {
+  if (isCompositeLineItem(item)) {
+    return hydrateCompositeLineItem(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+      options,
+    );
+  }
+
   const position = findCatalogPositionForLineItem(item, catalogPositions);
   if (!position) {
     return item;
@@ -235,6 +248,10 @@ export async function syncEstimateLineItemsToCatalog(
   const syncedIds = new Set<string>();
 
   for (const item of items) {
+    if (isCompositeLineItem(item)) {
+      continue;
+    }
+
     const positionPriceId = resolveLineItemPositionPriceId(item, catalogPositions);
     const name = item.name.trim();
     const unit = item.unit.trim();

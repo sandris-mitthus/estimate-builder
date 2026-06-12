@@ -67,6 +67,7 @@ export default async function ProjectDetailPage({
         initialMeta={estimate.meta}
         initialCategories={initialCategories}
         initialMultiOptionLinks={estimate.multiOptionLinks}
+        estimateUpdatedAt={estimate.updatedAt}
         moduleName={buildingModule?.name ?? null}
         moduleVisualizations={moduleVisualizations}
         moduleSizeOptions={moduleSizeOptions}
