@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.15` (see [Changelog](#changelog))
+**Current version:** `1.3.16` (see [Changelog](#changelog))
 
 ---
 
@@ -323,6 +323,13 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.16
+
+**CI lint**
+
+- **`estimate-table.tsx`** — `hasStaleCatalogPrices` useMemo (React Compiler `preserve-manual-memoization`)
+- **`sagatave-has-new-positions.ts`** — `prefer-const` (`projectCategory`, `projectSubcategory`)
 
 ### v1.3.15
 

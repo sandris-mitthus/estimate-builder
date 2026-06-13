@@ -1822,21 +1822,19 @@ export function EstimateTable({
       shouldShowStaleCatalogPriceWarnings(project.status),
   );
 
-  const hasStaleCatalogPrices = useMemo(
-    () =>
-      highlightStaleCatalogPrices &&
-      estimateHasStaleCatalogPrices(
-        categories,
-        catalogPositions,
-        defaultHourlyRate,
-      ),
-    [
-      highlightStaleCatalogPrices,
+  const hasStaleCatalogPrices = useMemo(() => {
+    if (!project || !isEstimateSaved) {
+      return false;
+    }
+    if (!shouldShowStaleCatalogPriceWarnings(project.status)) {
+      return false;
+    }
+    return estimateHasStaleCatalogPrices(
       categories,
       catalogPositions,
       defaultHourlyRate,
-    ],
-  );
+    );
+  }, [project, isEstimateSaved, categories, catalogPositions, defaultHourlyRate]);
 
   const highlightNewSagatavePositions = Boolean(
     project &&

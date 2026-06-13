@@ -195,7 +195,7 @@ export function mergeNewSagatavePositionsIntoProject(
   const addedNodeIds: string[] = [];
 
   for (const [categoryIndex, sagataveCategory] of sagataveSections.entries()) {
-    let projectCategory = findProjectCategory(
+    const projectCategory = findProjectCategory(
       categories,
       sagataveCategory,
       categoryIndex,
@@ -209,7 +209,7 @@ export function mergeNewSagatavePositionsIntoProject(
     }
 
     for (const [subcategoryIndex, sagataveSubcategory] of sagataveCategory.subcategories.entries()) {
-      let projectSubcategory = findProjectSubcategory(
+      const projectSubcategory = findProjectSubcategory(
         projectCategory.subcategories,
         sagataveSubcategory,
         subcategoryIndex,
