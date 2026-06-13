@@ -129,9 +129,9 @@ export function VolumeSumCells({
 }
 
 export const volumeSumFooterCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-sm font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
+  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-xs font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
 
-export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60 text-base`;
+export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60 text-sm`;
 
 /** Tukšas šūnas kategoriju / multi galvenes rindām. */
 export function EmptyVolumePriceCells({

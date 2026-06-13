@@ -246,7 +246,7 @@ const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc
 const ESTIMATE_DND_CONTEXT_ID = "estimate-table-dnd";
 
 const footerCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-sm font-semibold tabular-nums text-zinc-900";
+  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-xs font-semibold tabular-nums text-zinc-900";
 
 /** Shared left gutter + fixed drag column so handles align across all row types. */
 const rowLead = "pl-3";
@@ -1428,7 +1428,7 @@ function EstimateDndTableInner({
                 <td className={`${footerCell} bg-sky-50/50`}>
                   {formatAmountDisplay(totals.mechanisms)}
                 </td>
-                <td className={`${footerCell} bg-sky-100/60 text-base`}>
+                <td className={`${footerCell} bg-sky-100/60 text-sm`}>
                   {formatAmountDisplay(totals.grand)}
                 </td>
               </>

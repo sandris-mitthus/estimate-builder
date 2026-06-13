@@ -113,9 +113,5 @@ export function formatTimeNormDisplay(value: number): string {
     return "";
   }
 
-  if (value === 0) {
-    return "";
-  }
-
   return roundQuantity(value).toFixed(2).replace(".", ",");
 }

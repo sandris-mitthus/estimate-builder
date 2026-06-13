@@ -155,6 +155,14 @@ function LineItemRow({
     moduleSizeOptions.length > 0 &&
     !item.moduleSizeAttachment &&
     !item.variableQuantity;
+  const missingTimeNorm =
+    isCompositeLineItem(item) && !((item.laborTimeNorm ?? 0) > 0);
+
+  const rowBg = missingModuleSize
+    ? "bg-red-50/60 hover:bg-red-50"
+    : missingTimeNorm
+      ? "bg-amber-50/60 hover:bg-amber-50"
+      : "hover:bg-sky-50/40";
 
   return (
     <tbody
@@ -163,7 +171,7 @@ function LineItemRow({
       className={`group ${showDropLine ? dropLineClass : ""}`}
     >
     <tr
-      className={`align-middle ${missingModuleSize ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-sky-50/40"}`}
+      className={`align-middle ${rowBg}`}
     >
       <td className={nameCell}>
         <div className={`flex items-start gap-1 py-1 ${rowLead}`}>
@@ -180,7 +188,9 @@ function LineItemRow({
                     item.name.trim()
                       ? missingModuleSize
                         ? "text-red-700 hover:text-red-900"
-                        : "text-zinc-900 hover:text-sky-700"
+                        : missingTimeNorm
+                          ? "text-amber-700 hover:text-amber-900"
+                          : "text-zinc-900 hover:text-sky-700"
                       : "italic text-zinc-400"
                   }`}
                 >
@@ -190,6 +200,11 @@ function LineItemRow({
                       className="fas fa-exclamation-triangle ml-1.5 text-xs text-red-500"
                       aria-hidden="true"
                     />
+                  ) : missingTimeNorm ? (
+                    <i
+                      className="fas fa-exclamation-triangle ml-1.5 text-xs text-amber-500"
+                      aria-hidden="true"
+                    />
                   ) : null}
                 </button>
                 <PositionVariableQuantityIcon enabled={item.variableQuantity ?? false} />
@@ -197,6 +212,12 @@ function LineItemRow({
               {missingModuleSize ? (
                 <span className="text-xs text-red-500">
                   Nav pievienots moduļa apjoms
+                </span>
+              ) : null}
+              {missingTimeNorm ? (
+                <span className="text-xs text-amber-600">
+                  <i className="fas fa-exclamation-triangle mr-1" aria-hidden="true" />
+                  Nav ievadīta Laika norma
                 </span>
               ) : null}
               <AttachedModuleSizeLabel

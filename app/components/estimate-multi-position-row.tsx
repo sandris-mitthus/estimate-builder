@@ -211,6 +211,9 @@ function MultiOptionSubRow({
     option.lineItem,
     catalogPositions,
   );
+  const missingTimeNorm =
+    isCompositeLineItem(option.lineItem) &&
+    !((option.lineItem.laborTimeNorm ?? 0) > 0);
   const displayPrices = resolveDisplayUnitPrice(
     option.lineItem,
     catalogPositions,
@@ -271,11 +274,15 @@ function MultiOptionSubRow({
     onLinkDrop(sourceId);
   }
 
+  const rowBg = isLinkDropTarget
+    ? "bg-violet-100/70 ring-1 ring-inset ring-violet-300"
+    : missingTimeNorm
+      ? "bg-amber-50/60"
+      : "bg-violet-50/20";
+
   return (
     <tr
-      className={`align-middle bg-violet-50/20 ${
-        isLinkDropTarget ? "bg-violet-100/70 ring-1 ring-inset ring-violet-300" : ""
-      }`}
+      className={`align-middle ${rowBg}`}
       onDragOver={handleLinkDragOver}
       onDragLeave={handleLinkDragLeave}
       onDrop={handleLinkDrop}
@@ -297,10 +304,27 @@ function MultiOptionSubRow({
             <div className="flex items-start gap-1.5">
               <div className="flex min-w-0 flex-1 flex-col gap-0 leading-snug">
                 <div
-                  className={`text-sm text-zinc-700 ${showAttachModuleSize ? "font-semibold" : ""}`}
+                  className={`text-sm ${
+                    missingTimeNorm
+                      ? "text-amber-700 font-medium"
+                      : showAttachModuleSize
+                        ? "font-semibold text-zinc-700"
+                        : "text-zinc-700"
+                  }`}
                 >
                   {label}
+                  {missingTimeNorm ? (
+                    <i
+                      className="fas fa-exclamation-triangle ml-1.5 text-xs text-amber-500"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </div>
+                {missingTimeNorm ? (
+                  <span className="text-xs text-amber-600">
+                    Nav ievadīta Laika norma
+                  </span>
+                ) : null}
                 <AttachedModuleSizeLabel
                   attachment={option.lineItem.moduleSizeAttachment}
                   moduleSizeOptions={moduleSizeOptions}

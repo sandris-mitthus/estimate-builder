@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.2.6` (see [Changelog](#changelog))
+**Current version:** `1.2.7` (see [Changelog](#changelog))
 
 ---
 
@@ -280,6 +280,13 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.2.7
+
+**Laika norma — vienmēr 2 cipari aiz komata**
+
+- **`formatTimeNormDisplay`** (`variable-quantity.ts`) — noņemts `value === 0` agrais atgriešanās; tagad 0 formatējas kā `"0,00"` nevis `""` (tukšums); ne-nulle vērtības jau izmantoja `.toFixed(2)`, tāpēc tās nav mainītas
+- **`LaborTimeNormInput`** — `placeholder` mainīts no `"0"` uz `"0,00"`; blur notikums normalizē jebkuru nepilnu ievadi (piem. `"0,0"`) uz `"0,00"` caur `formatTimeNormDisplay(parseTimeNormInput(draft))`
 
 ### v1.2.6
 
