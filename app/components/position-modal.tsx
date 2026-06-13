@@ -6,19 +6,26 @@ import {
   appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
+import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
+import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import {
   formatAmountDisplay,
   roundToTwoDecimals,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
-import { deriveCompositeUnitPrice } from "@/app/lib/estimates/composite-line-item";
+import {
+  deriveCompositeUnitPrice,
+  resolveEffectiveMaterials,
+  resolveEffectiveMechanisms,
+} from "@/app/lib/estimates/composite-line-item";
 import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
   EstimateLineItem,
+  LineItemCatalogRef,
   LineItemModuleSizeAttachment,
 } from "@/app/lib/estimates/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -38,13 +45,25 @@ const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
 const inputClassName =
   "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none";
 
+/** Migrē vecos singular laukus uz masīviem pirms rediģēšanas. */
+function prepareDraft(item: EstimateLineItem): EstimateLineItem {
+  return {
+    ...item,
+    materials: item.materials ?? (item.material ? [item.material] : []),
+    mechanisms: item.mechanisms ?? (item.mechanism ? [item.mechanism] : []),
+    material: undefined,
+    mechanism: undefined,
+  };
+}
+
 function snapshot(item: EstimateLineItem): string {
   return JSON.stringify({
     name: item.name.trim(),
     laborTimeNorm: item.laborTimeNorm ?? 0,
-    material: item.material ?? null,
-    mechanism: item.mechanism ?? null,
+    materials: item.materials ?? [],
+    mechanisms: item.mechanisms ?? [],
     moduleSizeAttachment: item.moduleSizeAttachment ?? null,
+    variableQuantity: item.variableQuantity ?? false,
   });
 }
 
@@ -57,15 +76,22 @@ export function PositionModal({
   defaultHourlyRate,
   moduleSizeOptions,
 }: PositionModalProps) {
-  const [draft, setDraft] = useState<EstimateLineItem>(value);
-  const [initialSnapshot, setInitialSnapshot] = useState(() => snapshot(value));
+  const [draft, setDraft] = useState<EstimateLineItem>(() => prepareDraft(value));
+  const [initialSnapshot, setInitialSnapshot] = useState(() =>
+    snapshot(prepareDraft(value)),
+  );
+  const [materialAddKey, setMaterialAddKey] = useState(0);
+  const [mechanismAddKey, setMechanismAddKey] = useState(0);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    setDraft(value);
-    setInitialSnapshot(snapshot(value));
+    const prepared = prepareDraft(value);
+    setDraft(prepared);
+    setInitialSnapshot(snapshot(prepared));
+    setMaterialAddKey((k) => k + 1);
+    setMechanismAddKey((k) => k + 1);
   }, [open, value]);
 
   const materialPositions = useMemo(
@@ -89,18 +115,49 @@ export function PositionModal({
     setDraft((current) => ({ ...current, ...updates }));
   }
 
+  function removeMaterial(index: number) {
+    patch({
+      materials: (draft.materials ?? []).filter((_, i) => i !== index),
+    });
+  }
+
+  function addMaterial(ref: LineItemCatalogRef) {
+    patch({ materials: [...(draft.materials ?? []), ref] });
+    setMaterialAddKey((k) => k + 1);
+  }
+
+  function removeMechanism(index: number) {
+    patch({
+      mechanisms: (draft.mechanisms ?? []).filter((_, i) => i !== index),
+    });
+  }
+
+  function addMechanism(ref: LineItemCatalogRef) {
+    patch({ mechanisms: [...(draft.mechanisms ?? []), ref] });
+    setMechanismAddKey((k) => k + 1);
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
+    // Kad variableQuantity = true, mērvienība no pirmā materiāla (ja ir), citādi draft.unit vai "gab."
+    const resolvedVariableUnit = (() => {
+      const firstMaterial = (draft.materials ?? [])[0];
+      if (firstMaterial?.unit.trim()) return firstMaterial.unit.trim();
+      return draft.unit.trim() || "gab.";
+    })();
 
     const normalized: EstimateLineItem = {
       ...draft,
       name: draft.name.trim(),
-      unit:
-        resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ??
-        "gab.",
+      unit: draft.variableQuantity
+        ? resolvedVariableUnit
+        : (resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ?? "gab."),
       laborTimeNorm: roundToTwoDecimals(draft.laborTimeNorm ?? 0),
-      material: draft.material ?? null,
-      mechanism: draft.mechanism ?? null,
+      materials: draft.materials ?? [],
+      mechanisms: draft.mechanisms ?? [],
+      material: undefined,
+      mechanism: undefined,
       unitPrice: deriveCompositeUnitPrice(
         draft,
         catalogPositions,
@@ -112,12 +169,15 @@ export function PositionModal({
     onOpenChange(false);
   }
 
+  const draftMaterials = resolveEffectiveMaterials(draft);
+  const draftMechanisms = resolveEffectiveMechanisms(draft);
+
   return (
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
       title="Pozīcija"
-      description="Definē nosaukumu, apjomu, laika normu, materiālu un mehānismu."
+      description="Definē nosaukumu, apjomu, laika normu, materiālus un mehānismus."
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
       dirty={dirty}
     >
@@ -149,25 +209,76 @@ export function PositionModal({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          {/* Materiāli */}
           <div>
-            <span className={labelClassName}>Materiāls</span>
-            <CatalogHintField
-              value={draft.material ?? null}
-              onChange={(material) => patch({ material })}
-              catalogPositions={materialPositions}
-              defaultHourlyRate={defaultHourlyRate}
-              placeholder="Meklēt materiālu"
-            />
+            <span className={labelClassName}>Materiāli</span>
+            <div className="space-y-1.5">
+              {draftMaterials.map((mat, index) => (
+                <div
+                  key={`${mat.positionPriceId}-${index}`}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate text-zinc-800">
+                    {mat.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-zinc-400">
+                    {mat.unit}
+                  </span>
+                  <IconActionButton
+                    label="Noņemt materiālu"
+                    icon="fas fa-times"
+                    variant="delete"
+                    onClick={() => removeMaterial(index)}
+                  />
+                </div>
+              ))}
+              <CatalogHintField
+                key={materialAddKey}
+                value={null}
+                onChange={(ref) => {
+                  if (ref) addMaterial(ref);
+                }}
+                catalogPositions={materialPositions}
+                defaultHourlyRate={defaultHourlyRate}
+                placeholder="Pievienot materiālu..."
+              />
+            </div>
           </div>
+
+          {/* Mehānismi */}
           <div>
-            <span className={labelClassName}>Mehānisms</span>
-            <CatalogHintField
-              value={draft.mechanism ?? null}
-              onChange={(mechanism) => patch({ mechanism })}
-              catalogPositions={mechanismPositions}
-              defaultHourlyRate={defaultHourlyRate}
-              placeholder="Meklēt mehānismu"
-            />
+            <span className={labelClassName}>Mehānismi</span>
+            <div className="space-y-1.5">
+              {draftMechanisms.map((mech, index) => (
+                <div
+                  key={`${mech.positionPriceId}-${index}`}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate text-zinc-800">
+                    {mech.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-zinc-400">
+                    {mech.unit}
+                  </span>
+                  <IconActionButton
+                    label="Noņemt mehānismu"
+                    icon="fas fa-times"
+                    variant="delete"
+                    onClick={() => removeMechanism(index)}
+                  />
+                </div>
+              ))}
+              <CatalogHintField
+                key={mechanismAddKey}
+                value={null}
+                onChange={(ref) => {
+                  if (ref) addMechanism(ref);
+                }}
+                catalogPositions={mechanismPositions}
+                defaultHourlyRate={defaultHourlyRate}
+                placeholder="Pievienot mehānismu..."
+              />
+            </div>
           </div>
         </div>
 
@@ -175,7 +286,7 @@ export function PositionModal({
           {(
             [
               ["Darbs", unitPrice.labor],
-              ["Materiāls", unitPrice.materials],
+              ["Materiāli", unitPrice.materials],
               ["Mehānismi", unitPrice.mechanisms],
             ] as const
           ).map(([label, amount]) => (
@@ -194,6 +305,18 @@ export function PositionModal({
           </div>
         </dl>
 
+        <PositionVariableQuantityField
+          id={`position-variable-quantity-${draft.id}`}
+          enabled={draft.variableQuantity ?? false}
+          onChange={(variableQuantity) =>
+            patch({
+              variableQuantity,
+              // Ieslēdzot individuālo apjomu: notīra moduļa piesaisti
+              ...(variableQuantity ? { moduleSizeAttachment: undefined } : {}),
+            })
+          }
+        />
+
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className={labelClassName}>Apjoms no moduļa lieluma</span>
@@ -205,6 +328,7 @@ export function PositionModal({
             ) : null}
           </div>
           <ModuleSizeAttachPicker
+            key={draft.id}
             controlPrefix={`position-attach-${draft.id}`}
             moduleSizeOptions={moduleSizeOptions}
             attachment={draft.moduleSizeAttachment ?? null}

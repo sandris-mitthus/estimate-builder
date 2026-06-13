@@ -5,7 +5,11 @@ import {
   isAmountDisplayEmpty,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
-import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
+import {
+  isCompositeLineItem,
+  resolveEffectiveMaterials,
+  resolveEffectiveMechanisms,
+} from "@/app/lib/estimates/composite-line-item";
 import type { EstimateLineItem, PriceBreakdown } from "@/app/lib/estimates/types";
 import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
 import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns";
@@ -98,18 +102,24 @@ export function EstimateUnitPriceCells({
         </>
       )}
       {(["labor", "materials", "mechanisms"] as const).map((field) => {
-        const catalogRef =
-          field === "materials"
-            ? item?.material
-            : field === "mechanisms"
-              ? item?.mechanism
-              : null;
         const staleHint =
           field === "materials" || field === "mechanisms"
             ? staleCatalogPriceHints?.[field]
             : undefined;
-        const tooltipLabel =
-          staleHint ?? (catalogRef ? catalogRef.name : null);
+        let tooltipLabel: string | null = staleHint ?? null;
+        if (!tooltipLabel && item) {
+          const refs =
+            field === "materials"
+              ? resolveEffectiveMaterials(item)
+              : field === "mechanisms"
+                ? resolveEffectiveMechanisms(item)
+                : [];
+          if (refs.length === 1) {
+            tooltipLabel = refs[0].name;
+          } else if (refs.length > 1) {
+            tooltipLabel = refs.map((r) => r.name).join(", ");
+          }
+        }
         const cellClassName = staleHint
           ? `${estimateUnitPriceCell} bg-red-100 ring-1 ring-inset ring-red-300`
           : estimateUnitPriceCell;

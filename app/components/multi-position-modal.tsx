@@ -6,6 +6,7 @@ import {
   appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
+import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
@@ -15,7 +16,11 @@ import {
   formatAmountDisplay,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
-import { deriveCompositeUnitPrice } from "@/app/lib/estimates/composite-line-item";
+import {
+  deriveCompositeUnitPrice,
+  resolveEffectiveMaterials,
+  resolveEffectiveMechanisms,
+} from "@/app/lib/estimates/composite-line-item";
 import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
   EstimateLineItem,
@@ -41,8 +46,10 @@ type OptionDraft = {
   lineItemId: string;
   label: string;
   timeNorm: number;
-  material: LineItemCatalogRef | null;
-  mechanism: LineItemCatalogRef | null;
+  materials: LineItemCatalogRef[];
+  mechanisms: LineItemCatalogRef[];
+  materialAddKey: number;
+  mechanismAddKey: number;
 };
 
 const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
@@ -56,8 +63,10 @@ function createOptionDraft(): OptionDraft {
     lineItemId: crypto.randomUUID(),
     label: "",
     timeNorm: 0,
-    material: null,
-    mechanism: null,
+    materials: [],
+    mechanisms: [],
+    materialAddKey: 0,
+    mechanismAddKey: 0,
   };
 }
 
@@ -73,8 +82,10 @@ function deriveSharedState(value: EstimateMultiPosition) {
             lineItemId: option.lineItem.id,
             label: option.lineItem.name,
             timeNorm: option.lineItem.laborTimeNorm ?? 0,
-            material: option.lineItem.material ?? null,
-            mechanism: option.lineItem.mechanism ?? null,
+            materials: resolveEffectiveMaterials(option.lineItem),
+            mechanisms: resolveEffectiveMechanisms(option.lineItem),
+            materialAddKey: 0,
+            mechanismAddKey: 0,
           }))
         : [createOptionDraft()],
   };
@@ -91,8 +102,8 @@ function snapshot(state: {
     options: state.options.map((option) => ({
       label: option.label.trim(),
       timeNorm: option.timeNorm,
-      material: option.material,
-      mechanism: option.mechanism,
+      materials: option.materials,
+      mechanisms: option.mechanisms,
     })),
   });
 }
@@ -144,6 +155,60 @@ export function MultiPositionModal({
     );
   }
 
+  function addMaterial(optionId: string, ref: LineItemCatalogRef) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              materials: [...entry.materials, ref],
+              materialAddKey: entry.materialAddKey + 1,
+            }
+          : entry,
+      ),
+    );
+  }
+
+  function removeMaterial(optionId: string, index: number) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              materials: entry.materials.filter((_, i) => i !== index),
+            }
+          : entry,
+      ),
+    );
+  }
+
+  function addMechanism(optionId: string, ref: LineItemCatalogRef) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              mechanisms: [...entry.mechanisms, ref],
+              mechanismAddKey: entry.mechanismAddKey + 1,
+            }
+          : entry,
+      ),
+    );
+  }
+
+  function removeMechanism(optionId: string, index: number) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              mechanisms: entry.mechanisms.filter((_, i) => i !== index),
+            }
+          : entry,
+      ),
+    );
+  }
+
   function optionUnitPrice(option: OptionDraft) {
     return deriveCompositeUnitPrice(
       {
@@ -153,8 +218,8 @@ export function MultiPositionModal({
         quantity: 1,
         unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
         laborTimeNorm: option.timeNorm,
-        material: option.material,
-        mechanism: option.mechanism,
+        materials: option.materials,
+        mechanisms: option.mechanisms,
       },
       catalogPositions,
       defaultHourlyRate,
@@ -165,8 +230,8 @@ export function MultiPositionModal({
     return Boolean(
       option.label.trim() ||
         option.timeNorm > 0 ||
-        option.material ||
-        option.mechanism,
+        option.materials.length > 0 ||
+        option.mechanisms.length > 0,
     );
   }
 
@@ -179,8 +244,8 @@ export function MultiPositionModal({
     const builtOptions = finalOptions.map((option) => {
       const label =
         option.label.trim() ||
-        option.material?.name ||
-        option.mechanism?.name ||
+        option.materials[0]?.name ||
+        option.mechanisms[0]?.name ||
         "";
       const partialItem: EstimateLineItem = {
         id: option.lineItemId,
@@ -188,8 +253,8 @@ export function MultiPositionModal({
         unit: "gab.",
         quantity: 1,
         laborTimeNorm: option.timeNorm,
-        material: option.material,
-        mechanism: option.mechanism,
+        materials: option.materials,
+        mechanisms: option.mechanisms,
         moduleSizeAttachment: attachment ?? undefined,
         unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
       };
@@ -229,7 +294,7 @@ export function MultiPositionModal({
       open={open}
       onOpenChange={onOpenChange}
       title="Multi-pozīcija"
-      description="Vienots apjoms; katrai opcijai sava laika norma, materiāls un mehānisms."
+      description="Vienots apjoms; katrai opcijai sava laika norma, materiāli un mehānismi."
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
       dirty={dirty}
     >
@@ -282,7 +347,8 @@ export function MultiPositionModal({
 
           <div className="space-y-3">
             {options.map((option, index) => {
-              const unitTotal = sumBreakdown(optionUnitPrice(option));
+              const unitPrice = optionUnitPrice(option);
+              const unitTotal = sumBreakdown(unitPrice);
               return (
                 <div
                   key={option.optionId}
@@ -338,31 +404,105 @@ export function MultiPositionModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
+                    {/* Materiāli */}
                     <div>
-                      <span className={subLabelClassName}>Materiāls</span>
-                      <CatalogHintField
-                        value={option.material}
-                        onChange={(material) =>
-                          updateOption(option.optionId, { material })
-                        }
-                        catalogPositions={materialPositions}
-                        defaultHourlyRate={defaultHourlyRate}
-                        placeholder="Meklēt materiālu"
-                      />
+                      <span className={subLabelClassName}>Materiāli</span>
+                      <div className="space-y-1.5">
+                        {option.materials.map((mat, matIdx) => (
+                          <div
+                            key={`${mat.positionPriceId}-${matIdx}`}
+                            className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-zinc-800">
+                              {mat.name}
+                            </span>
+                            <span className="shrink-0 text-xs text-zinc-400">
+                              {mat.unit}
+                            </span>
+                            <IconActionButton
+                              label="Noņemt materiālu"
+                              icon="fas fa-times"
+                              variant="delete"
+                              onClick={() =>
+                                removeMaterial(option.optionId, matIdx)
+                              }
+                            />
+                          </div>
+                        ))}
+                        <CatalogHintField
+                          key={`${option.optionId}-mat-${option.materialAddKey}`}
+                          value={null}
+                          onChange={(ref) => {
+                            if (ref) addMaterial(option.optionId, ref);
+                          }}
+                          catalogPositions={materialPositions}
+                          defaultHourlyRate={defaultHourlyRate}
+                          placeholder="Pievienot materiālu..."
+                        />
+                      </div>
                     </div>
+
+                    {/* Mehānismi */}
                     <div>
-                      <span className={subLabelClassName}>Mehānisms</span>
-                      <CatalogHintField
-                        value={option.mechanism}
-                        onChange={(mechanism) =>
-                          updateOption(option.optionId, { mechanism })
-                        }
-                        catalogPositions={mechanismPositions}
-                        defaultHourlyRate={defaultHourlyRate}
-                        placeholder="Meklēt mehānismu"
-                      />
+                      <span className={subLabelClassName}>Mehānismi</span>
+                      <div className="space-y-1.5">
+                        {option.mechanisms.map((mech, mechIdx) => (
+                          <div
+                            key={`${mech.positionPriceId}-${mechIdx}`}
+                            className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-zinc-800">
+                              {mech.name}
+                            </span>
+                            <span className="shrink-0 text-xs text-zinc-400">
+                              {mech.unit}
+                            </span>
+                            <IconActionButton
+                              label="Noņemt mehānismu"
+                              icon="fas fa-times"
+                              variant="delete"
+                              onClick={() =>
+                                removeMechanism(option.optionId, mechIdx)
+                              }
+                            />
+                          </div>
+                        ))}
+                        <CatalogHintField
+                          key={`${option.optionId}-mech-${option.mechanismAddKey}`}
+                          value={null}
+                          onChange={(ref) => {
+                            if (ref) addMechanism(option.optionId, ref);
+                          }}
+                          catalogPositions={mechanismPositions}
+                          defaultHourlyRate={defaultHourlyRate}
+                          placeholder="Pievienot mehānismu..."
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  <dl className="grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm">
+                    {(
+                      [
+                        ["Darbs", unitPrice.labor],
+                        ["Materiāli", unitPrice.materials],
+                        ["Mehānismi", unitPrice.mechanisms],
+                      ] as const
+                    ).map(([label, amount]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-zinc-500">{label}</dt>
+                        <dd className="tabular-nums text-zinc-800">
+                          {formatAmountDisplay(amount)}
+                        </dd>
+                      </div>
+                    ))}
+                    <div>
+                      <dt className="text-xs text-zinc-500">Vienības cena</dt>
+                      <dd className="font-semibold tabular-nums text-zinc-900">
+                        {formatAmountDisplay(unitTotal)}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
               );
             })}

@@ -6,7 +6,7 @@ type IconActionButtonProps = {
   label: string;
   icon: string;
   onClick: () => void;
-  variant?: "edit" | "delete" | "approve" | "reject" | "moduleData" | "history" | "copy";
+  variant?: "edit" | "delete" | "approve" | "reject" | "moduleData" | "history" | "copy" | "complete";
   highlighted?: boolean;
   spotlight?: boolean;
   className?: string;
@@ -20,6 +20,7 @@ const variantClassName = {
   moduleData: "text-zinc-400 hover:bg-violet-50 hover:text-violet-600",
   history: "text-zinc-400 hover:bg-sky-50 hover:text-sky-700",
   copy: "text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600",
+  complete: "text-zinc-400 hover:bg-teal-50 hover:text-teal-600",
 };
 
 const highlightedVariantClassName = {

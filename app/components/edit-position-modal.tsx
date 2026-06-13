@@ -8,7 +8,6 @@ import {
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
-import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import type {
   CatalogPositionCostType,
   PositionCostType,
@@ -60,9 +59,6 @@ export function EditPositionModal({
   const [costType, setCostType] = useState<CatalogPositionCostType>(
     resolveCatalogCostType(position.costType),
   );
-  const [variableQuantity, setVariableQuantity] = useState(
-    position.variableQuantity,
-  );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
@@ -70,7 +66,6 @@ export function EditPositionModal({
     setName(position.name);
     setUnit(position.unit);
     setCostType(resolveCatalogCostType(position.costType));
-    setVariableQuantity(position.variableQuantity);
     setFieldErrors({});
   }, [open, position]);
 
@@ -100,7 +95,7 @@ export function EditPositionModal({
       name: name.trim(),
       unit: unit.trim(),
       costType,
-      variableQuantity,
+      variableQuantity: position.variableQuantity,
     });
   }
 
@@ -114,8 +109,7 @@ export function EditPositionModal({
       dirty={
         name !== position.name ||
         unit !== position.unit ||
-        costType !== resolveCatalogCostType(position.costType) ||
-        variableQuantity !== position.variableQuantity
+        costType !== resolveCatalogCostType(position.costType)
       }
       panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
     >
@@ -147,12 +141,6 @@ export function EditPositionModal({
           knownUnits={knownUnits}
           nameError={fieldErrors.name}
           unitError={fieldErrors.unit}
-        />
-
-        <PositionVariableQuantityField
-          id={`edit-position-variable-quantity-${position.id}`}
-          enabled={variableQuantity}
-          onChange={setVariableQuantity}
         />
 
         <ModalFormActions

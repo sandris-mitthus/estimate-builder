@@ -72,6 +72,7 @@ import type {
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
@@ -91,7 +92,7 @@ import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sy
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import {
   UNIT_PRICE_COLUMN_COUNT,
-  UNIT_PRICE_SUBHEADER_LABELS,
+  getUnitPriceSubheaderLabels,
 } from "@/app/lib/estimates/unit-price-columns";
 import {
   DropIndicatorProvider,
@@ -150,6 +151,10 @@ function LineItemRow({
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
   const { openPositionModal } = usePositionModal();
+  const missingModuleSize =
+    moduleSizeOptions.length > 0 &&
+    !item.moduleSizeAttachment &&
+    !item.variableQuantity;
 
   return (
     <tbody
@@ -157,7 +162,9 @@ function LineItemRow({
       style={rowStyle}
       className={`group ${showDropLine ? dropLineClass : ""}`}
     >
-    <tr className="align-middle hover:bg-sky-50/40">
+    <tr
+      className={`align-middle ${missingModuleSize ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-sky-50/40"}`}
+    >
       <td className={nameCell}>
         <div className={`flex items-start gap-1 py-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
@@ -165,13 +172,33 @@ function LineItemRow({
             className={`min-w-0 flex-1 ${indentName ? subcategoryItemNameIndent : ""}`}
           >
             <div className="flex min-w-0 flex-col gap-0 leading-snug">
-              <button
-                type="button"
-                onClick={() => openPositionModal(item, onChange)}
-                className={`block w-full text-left text-sm font-medium text-zinc-900 transition hover:text-sky-700 hover:underline ${item.name.trim() ? "" : "text-zinc-400 italic"}`}
-              >
-                {item.name.trim() || "Nenosaukta pozīcija"}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => openPositionModal(item, onChange)}
+                  className={`block min-w-0 flex-1 text-left text-sm font-medium transition hover:underline ${
+                    item.name.trim()
+                      ? missingModuleSize
+                        ? "text-red-700 hover:text-red-900"
+                        : "text-zinc-900 hover:text-sky-700"
+                      : "italic text-zinc-400"
+                  }`}
+                >
+                  {item.name.trim() || "Nenosaukta pozīcija"}
+                  {missingModuleSize ? (
+                    <i
+                      className="fas fa-exclamation-triangle ml-1.5 text-xs text-red-500"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </button>
+                <PositionVariableQuantityIcon enabled={item.variableQuantity ?? false} />
+              </div>
+              {missingModuleSize ? (
+                <span className="text-xs text-red-500">
+                  Nav pievienots moduļa apjoms
+                </span>
+              ) : null}
               <AttachedModuleSizeLabel
                 attachment={item.moduleSizeAttachment}
                 moduleSizeOptions={moduleSizeOptions}
@@ -182,7 +209,7 @@ function LineItemRow({
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
         <span className={`${readOnlyNum} text-zinc-500`}>
-          {(isCompositeLineItem(item)
+          {(isCompositeLineItem(item) && !item.variableQuantity
             ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions)
             : item.unit.trim()) || "—"}
         </span>
@@ -772,6 +799,7 @@ function EstimatePositionDndTable({
   setMultiOptionLinks,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
   collapsedSectionIds,
   toggleSectionCollapsed,
@@ -784,6 +812,7 @@ function EstimatePositionDndTable({
   setMultiOptionLinks: Dispatch<SetStateAction<MultiOptionLinkGroup[]>>;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   collapsedSectionIds: ReadonlySet<string>;
   toggleSectionCollapsed: (sectionId: string) => void;
@@ -917,7 +946,7 @@ function EstimatePositionDndTable({
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {UNIT_PRICE_SUBHEADER_LABELS.map((label) => (
+            {getUnitPriceSubheaderLabels(currency).map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -973,6 +1002,7 @@ type EstimatePositionTableProps = {
   initialMultiOptionLinks?: MultiOptionLinkGroup[];
   catalogPositions?: PositionPriceSummary[];
   defaultHourlyRate?: number | null;
+  currency?: string | null;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 };
 
@@ -983,6 +1013,7 @@ export function EstimatePositionTable({
   initialMultiOptionLinks = [],
   catalogPositions = [],
   defaultHourlyRate = null,
+  currency = null,
   moduleSizeOptions = [],
 }: EstimatePositionTableProps) {
   const router = useRouter();
@@ -1131,6 +1162,7 @@ export function EstimatePositionTable({
                 setMultiOptionLinks={setMultiOptionLinks}
                 catalogPositions={catalogPositions}
                 defaultHourlyRate={defaultHourlyRate}
+                currency={currency}
                 moduleSizeOptions={moduleSizeOptions}
                 collapsedSectionIds={collapsedSectionIds}
                 toggleSectionCollapsed={toggleSectionCollapsed}

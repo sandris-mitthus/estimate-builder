@@ -11,7 +11,6 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
-import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
 type ProjectCardActionsProps = {
@@ -31,14 +30,16 @@ export function ProjectCardActions({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isIndividualProject = project.buildingModuleId === null;
   const moduleDataComplete = isIndividualProjectModuleDataComplete(project);
-  const isApproved = isProjectEstimateLocked(project.status);
+  const canEditOrDelete = project.status === "active";
   const canApprove = project.status === "active";
-  const canReject = project.status !== "rejected";
+  const canReject = project.status === "active";
+  const canComplete = project.status === "approved";
 
   function handleDeleteOpenChange(open: boolean) {
     if (!open && !isPending) {
@@ -54,6 +55,7 @@ export function ProjectCardActions({
     if (!open) {
       setApproveOpen(false);
       setRejectOpen(false);
+      setCompleteOpen(false);
     }
   }
 
@@ -106,6 +108,23 @@ export function ProjectCardActions({
     });
   }
 
+  function handleConfirmComplete() {
+    setStatusError(null);
+
+    startTransition(async () => {
+      const result = await updateProjectStatusAction(project.id, "completed");
+
+      if (!result.ok) {
+        setStatusError(result.error);
+        return;
+      }
+
+      setCompleteOpen(false);
+      router.push("/");
+      router.refresh();
+    });
+  }
+
   return (
     <>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -123,14 +142,14 @@ export function ProjectCardActions({
             onClick={() => router.push(`/${project.id}/module-data`)}
           />
         ) : null}
-        {!isApproved ? (
+        <IconActionButton
+          label="Kopēt"
+          icon="fas fa-copy"
+          variant="copy"
+          onClick={() => setCopyOpen(true)}
+        />
+        {canEditOrDelete ? (
           <>
-            <IconActionButton
-              label="Kopēt"
-              icon="fas fa-copy"
-              variant="copy"
-              onClick={() => setCopyOpen(true)}
-            />
             <IconActionButton
               label="Labot"
               icon="fas fa-pen"
@@ -151,6 +170,14 @@ export function ProjectCardActions({
             icon="fas fa-check"
             variant="approve"
             onClick={() => setApproveOpen(true)}
+          />
+        ) : null}
+        {canComplete ? (
+          <IconActionButton
+            label="Pabeigts"
+            icon="fas fa-check-double"
+            variant="complete"
+            onClick={() => setCompleteOpen(true)}
           />
         ) : null}
         {canReject ? (
@@ -221,6 +248,28 @@ export function ProjectCardActions({
         }
         confirmLabel={isPending ? "Apstiprina…" : "Apstiprināt"}
         onConfirm={handleConfirmApprove}
+        blocking={isPending}
+      />
+
+      <ConfirmModal
+        open={completeOpen}
+        onOpenChange={handleStatusOpenChange}
+        title="Atzīmēt projektu kā pabeigtu?"
+        description={
+          <>
+            <p>
+              Projekts pazudīs no saraksta, bet netiks dzēsts — vēlāk varēsi
+              atvērt to tieši pēc saites.
+            </p>
+            {statusError ? (
+              <p className="mt-2 text-red-600" role="alert">
+                {statusError}
+              </p>
+            ) : null}
+          </>
+        }
+        confirmLabel={isPending ? "Saglabā…" : "Pabeigts"}
+        onConfirm={handleConfirmComplete}
         blocking={isPending}
       />
 

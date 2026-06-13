@@ -447,6 +447,7 @@ export function EstimateMultiPositionRow({
       : null;
   const hasAttachedQuantity =
     selectedLineItem != null &&
+    !selectedLineItem.variableQuantity &&
     hasModuleSizeAttachment(selectedLineItem) &&
     attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? selectedLineItem?.quantity ?? 0;
@@ -488,7 +489,7 @@ export function EstimateMultiPositionRow({
         className={`group/multi align-middle ${showDropLine ? dropLineClass : ""}`}
       >
         {mode === "offer" ? (
-          <tr className="align-middle hover:bg-violet-50/30">
+          <tr className={`align-middle ${showQuantityInput && selectedLineItem && selectedLineItem.quantity <= 0 ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-violet-50/30"}`}>
             <td className="border-b border-zinc-100 py-1 pr-2 align-top">
               <div
                 className={`flex items-start gap-1 py-1 pl-3 ${indentName ? subcategoryItemNameIndent : ""}`}
@@ -568,7 +569,7 @@ export function EstimateMultiPositionRow({
                   </span>
                 ) : showQuantityInput && selectedOption && selectedLineItem ? (
                   <EstimateQuantityInput
-                    className={cellNum}
+                    className={`${cellNum} ${selectedLineItem.quantity <= 0 ? "border-red-300 bg-red-50 text-red-700" : ""}`}
                     value={selectedLineItem.quantity}
                     onChange={(quantity) =>
                       onChange(
@@ -578,6 +579,7 @@ export function EstimateMultiPositionRow({
                         }),
                       )
                     }
+                    emptyValue={0}
                   />
                 ) : (
                   <span className={`${readOnlyNum} text-zinc-300`}>—</span>

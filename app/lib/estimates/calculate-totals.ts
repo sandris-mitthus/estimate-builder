@@ -46,9 +46,11 @@ function resolveLineItemBreakdown(
     : item.unitPrice;
 
   const hasModuleSize =
+    !item.variableQuantity &&
     normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
   const shouldApplyQuantity =
-    (position?.variableQuantity === true || hasModuleSize) && item.quantity > 0;
+    (item.variableQuantity === true || position?.variableQuantity === true || hasModuleSize) &&
+    item.quantity > 0;
 
   if (shouldApplyQuantity) {
     return multiplyBreakdown(item.quantity, unitPrice);

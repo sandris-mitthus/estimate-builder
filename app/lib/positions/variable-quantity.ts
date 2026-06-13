@@ -26,6 +26,9 @@ export function isVariableQuantityLineItem(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
 ): boolean {
+  if (item.variableQuantity === true) {
+    return true;
+  }
   const position = findCatalogPositionForLineItem(item, catalogPositions);
   return position?.variableQuantity === true;
 }

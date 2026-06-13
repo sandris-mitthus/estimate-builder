@@ -22,7 +22,6 @@ import {
 
 import { PositionCostTypeDisplay } from "@/app/components/position-cost-type-display";
 import { PositionCostTypeFilter as PositionCostTypeFilterControl } from "@/app/components/position-cost-type-filter";
-import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { collectKnownUnits } from "@/app/lib/positions/collect-known-units";
 
 import {
@@ -211,12 +210,7 @@ export function PositionsPageContent({
                   >
 
                     <td className="cursor-default px-4 py-3 text-zinc-900">
-                      <span className="inline-flex items-center gap-1.5">
-                        {position.name}
-                        <PositionVariableQuantityIcon
-                          enabled={position.variableQuantity}
-                        />
-                      </span>
+                      {position.name}
                     </td>
 
                     <td className="cursor-default px-4 py-3 text-zinc-600">

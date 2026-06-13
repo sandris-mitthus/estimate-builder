@@ -73,11 +73,12 @@ import {
 import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
   UNIT_PRICE_COLUMN_COUNT,
-  UNIT_PRICE_SUBHEADER_LABELS,
+  getUnitPriceSubheaderLabels,
 } from "@/app/lib/estimates/unit-price-columns";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
+import { Tooltip } from "@/app/components/tooltip";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
 import {
   applyCatalogPositionToLineItem,
@@ -153,7 +154,7 @@ import type {
   BuildingModuleSummary,
   ModuleContentBlock,
 } from "@/app/lib/modules/types";
-import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
+import { isProjectEstimateLocked, shouldShowStaleCatalogPriceWarnings } from "@/app/lib/projects/project-status";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
@@ -268,6 +269,7 @@ function LineItemRow({
   showDropLine,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   moduleSizeOptions = [],
   highlightStaleCatalogPrices = false,
@@ -285,6 +287,7 @@ function LineItemRow({
   showDropLine?: boolean;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
   highlightStaleCatalogPrices?: boolean;
@@ -298,17 +301,20 @@ function LineItemRow({
     catalogPositions,
   );
   const displayName = catalogPosition?.name ?? item.name;
-  const moduleSizeUnit = isComposite
-    ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions ?? [])
-    : null;
+  const moduleSizeUnit =
+    isComposite && !item.variableQuantity
+      ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions ?? [])
+      : null;
   const displayUnit = moduleSizeUnit ?? catalogPosition?.unit ?? item.unit;
   const unitOptions = getEstimateUnitOptions(item.unit);
   const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
+  const quantityMissing = showQuantityInput && item.quantity <= 0;
   const attachedQuantity = resolveLineItemDisplayQuantityFromModuleSize(
     item,
     moduleSizeOptions,
   );
-  const hasAttachedQuantity = hasModuleSizeAttachment(item) && attachedQuantity != null;
+  const hasAttachedQuantity =
+    !item.variableQuantity && hasModuleSizeAttachment(item) && attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? item.quantity;
   const displayUnitPrice = highlightStaleCatalogPrices
     ? resolveFrozenEstimateDisplayUnitPrice(
@@ -342,7 +348,9 @@ function LineItemRow({
       style={rowStyle}
       className={`group ${showDropLine ? dropLineClass : ""}`}
     >
-    <tr className="align-middle hover:bg-sky-50/40">
+    <tr
+      className={`align-middle ${quantityMissing && !estimateLocked ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-sky-50/40"}`}
+    >
       <td className={nameCell}>
         <div className={`flex items-center gap-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
@@ -353,6 +361,7 @@ function LineItemRow({
                 readOnly={estimateLocked || isCatalogLinked}
                 catalogPositions={catalogPositions}
                 defaultHourlyRate={defaultHourlyRate}
+                currency={currency}
                 className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
                 footer={
                   isComposite ? (
@@ -401,7 +410,22 @@ function LineItemRow({
                 }
               />
             </span>
-            <PositionVariableQuantityIcon enabled={showQuantityInput} />
+            {showQuantityColumn && !estimateLocked && item.variableQuantity ? (
+              <Tooltip label="Noņemt individuālo apjomu">
+                <button
+                  type="button"
+                  aria-label="Noņemt individuālo apjomu"
+                  onClick={() =>
+                    onChange({ ...item, variableQuantity: undefined })
+                  }
+                  className="relative top-[5px] inline-flex shrink-0 items-center text-red-600 transition hover:text-red-400"
+                >
+                  <i className="fas fa-random text-sm" aria-hidden="true" />
+                </button>
+              </Tooltip>
+            ) : (
+              <PositionVariableQuantityIcon enabled={showQuantityInput} />
+            )}
           </span>
         </div>
       </td>
@@ -436,14 +460,15 @@ function LineItemRow({
             </span>
           ) : showQuantityInput ? (
             estimateLocked ? (
-              <span className={`${readOnlyNum} text-zinc-700`}>
-                {formatQuantityDisplay(item.quantity)}
+              <span className={`${readOnlyNum} ${item.quantity <= 0 ? "text-red-500" : "text-zinc-700"}`}>
+                {item.quantity <= 0 ? "—" : formatQuantityDisplay(item.quantity)}
               </span>
             ) : (
               <EstimateQuantityInput
-                className={cellNum}
+                className={`${cellNum} ${quantityMissing ? "border-red-300 bg-red-50 text-red-700 placeholder-red-300" : ""}`}
                 value={item.quantity}
                 onChange={(quantity) => onChange({ ...item, quantity })}
+                emptyValue={0}
               />
             )
           ) : (
@@ -613,6 +638,7 @@ function SortableLineItemRow({
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
   highlightStaleCatalogPrices?: boolean;
@@ -785,6 +811,7 @@ function SubcategoryBlock({
   onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   colSpan,
   allCategories,
@@ -801,6 +828,7 @@ function SubcategoryBlock({
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   colSpan: number;
   allCategories: EstimateCategory[];
@@ -869,6 +897,7 @@ function SubcategoryBlock({
             subcategoryId={subcategory.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             showQuantityColumn={showQuantityColumn}
             moduleSizeOptions={moduleSizeOptions}
             highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -903,6 +932,7 @@ function CategoryBlock({
   onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   colSpan,
   allCategories,
@@ -918,6 +948,7 @@ function CategoryBlock({
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   colSpan: number;
   allCategories: EstimateCategory[];
@@ -973,6 +1004,7 @@ function CategoryBlock({
           categoryId={category.id}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           showQuantityColumn={showQuantityColumn}
           colSpan={colSpan}
           allCategories={allCategories}
@@ -1025,6 +1057,7 @@ function CategoryBlock({
             categoryId={category.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             showQuantityColumn={showQuantityColumn}
             moduleSizeOptions={moduleSizeOptions}
             highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -1062,6 +1095,7 @@ function EstimateDndTable({
   onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   moduleSizeOptions = [],
   highlightStaleCatalogPrices = false,
@@ -1082,6 +1116,7 @@ function EstimateDndTable({
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
   highlightStaleCatalogPrices?: boolean;
@@ -1102,6 +1137,7 @@ function EstimateDndTable({
         onScheduleCatalogSync={onScheduleCatalogSync}
         catalogPositions={catalogPositions}
         defaultHourlyRate={defaultHourlyRate}
+        currency={currency}
         showQuantityColumn={showQuantityColumn}
         moduleSizeOptions={moduleSizeOptions}
         highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -1123,6 +1159,7 @@ function EstimateDndTableInner({
   onScheduleCatalogSync,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   moduleSizeOptions = [],
   highlightStaleCatalogPrices = false,
@@ -1144,6 +1181,7 @@ function EstimateDndTableInner({
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
   highlightStaleCatalogPrices?: boolean;
@@ -1303,7 +1341,7 @@ function EstimateDndTableInner({
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {UNIT_PRICE_SUBHEADER_LABELS.map((label) => (
+            {getUnitPriceSubheaderLabels(currency).map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -1336,6 +1374,7 @@ function EstimateDndTableInner({
               key={category.id}
               catalogPositions={catalogPositions}
               defaultHourlyRate={defaultHourlyRate}
+              currency={currency}
               showQuantityColumn={showQuantityColumn}
               moduleSizeOptions={moduleSizeOptions}
               highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -1503,6 +1542,7 @@ type EstimateTableProps = {
   estimateValidityDays?: number;
   catalogPositions?: PositionPriceSummary[];
   defaultHourlyRate?: number | null;
+  currency?: string | null;
 };
 
 export function EstimateTable({
@@ -1520,6 +1560,7 @@ export function EstimateTable({
   estimateValidityDays = DEFAULT_ESTIMATE_VALIDITY_DAYS,
   catalogPositions = [],
   defaultHourlyRate = null,
+  currency = null,
 }: EstimateTableProps = {}) {
   const [title, setTitle] = useState(initialTitle);
   const [meta, setMeta] = useState(initialMeta);
@@ -1590,6 +1631,19 @@ export function EstimateTable({
 
   async function handleSave() {
     if (!project || isSaving || estimateLocked) return;
+
+    const missingQuantityCount = collectEstimateLineItems(categories).filter(
+      (item) => isVariableQuantityLineItem(item, catalogPositions) && item.quantity <= 0,
+    ).length;
+
+    if (missingQuantityCount > 0) {
+      showFeedback({
+        type: "error",
+        text: `Jāievada apjoms ${missingQuantityCount === 1 ? "1 pozīcijai" : `${missingQuantityCount} pozīcijām`} ar individuālu apjomu.`,
+      });
+      return;
+    }
+
     setIsSaving(true);
     clearFeedback();
 
@@ -1640,7 +1694,11 @@ export function EstimateTable({
     projectCreatedAt: project?.createdAt,
     estimateUpdatedAt,
   });
-  const highlightStaleCatalogPrices = isEstimateSaved && !estimateLocked;
+  const highlightStaleCatalogPrices = Boolean(
+    project &&
+      isEstimateSaved &&
+      shouldShowStaleCatalogPriceWarnings(project.status),
+  );
 
   const hasStaleCatalogPrices = useMemo(
     () =>
@@ -1726,6 +1784,7 @@ export function EstimateTable({
           onScheduleCatalogSync={scheduleSyncFromLineItem}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           showQuantityColumn={showQuantityColumn}
           moduleSizeOptions={moduleSizeOptions}
           highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -1807,7 +1866,7 @@ export function EstimateTable({
                 Kopā
               </p>
               <p className="text-sm font-semibold tabular-nums text-white">
-                {formatMoneyDisplay(totals.grand)}
+                {formatMoneyDisplay(totals.grand, currency)}
               </p>
             </div>
           </div>

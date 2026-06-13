@@ -4,16 +4,17 @@ import {
   isAmountDisplayEmpty,
   roundToTwoDecimals,
 } from "@/app/lib/estimates/calculate-line";
+import { getCurrencySymbol } from "@/app/lib/settings/currencies";
 
-export function formatMoney(value: number): string {
-  return `€ ${formatAmount(value)}`;
+export function formatMoney(value: number, currency?: string | null): string {
+  return `${getCurrencySymbol(currency)} ${formatAmount(value)}`;
 }
 
 /** Tāmes kopsummām: 0 vai nederīgs → "—". */
-export function formatMoneyDisplay(value: number): string {
+export function formatMoneyDisplay(value: number, currency?: string | null): string {
   if (isAmountDisplayEmpty(value)) {
     return "—";
   }
 
-  return `€ ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
+  return `${getCurrencySymbol(currency)} ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
 }

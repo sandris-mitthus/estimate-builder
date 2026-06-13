@@ -30,10 +30,16 @@ export type EstimateLineItem = {
   moduleSizeAttachment?: LineItemModuleSizeAttachment;
   /** Laika norma (c/h) — stundas uz vienību; darbs = laika norma × stundas likme. */
   laborTimeNorm?: number;
-  /** Piesaistītais materiāls — cena no kataloga. */
+  /** @deprecated Izmanto `materials` (masīvs). Vecs datu formāts — migrācija notiek `hydrateCompositeLineItem`. */
   material?: LineItemCatalogRef | null;
-  /** Piesaistītais mehānisms — mehānisms = kataloga likme (EUR/h) × laika norma. */
+  /** @deprecated Izmanto `mechanisms` (masīvs). Vecs datu formāts — migrācija notiek `hydrateCompositeLineItem`. */
   mechanism?: LineItemCatalogRef | null;
+  /** Piesaistītie materiāli — cenas summējas. */
+  materials?: LineItemCatalogRef[];
+  /** Piesaistītie mehānismi — katrs: kataloga likme (EUR/h) × laika norma; summējas. */
+  mechanisms?: LineItemCatalogRef[];
+  /** Ja `true` — apjoms nav saistīts ar moduļa lielumu; katrā projektā ierakstāms manuāli. */
+  variableQuantity?: boolean;
 };
 
 export type EstimateMultiPositionOption = {

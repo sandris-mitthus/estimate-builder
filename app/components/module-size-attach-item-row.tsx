@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   createAttachItemStateKey,
   defaultModuleSizeAttachItemState,
@@ -53,6 +54,15 @@ function CompactAttachSwitch({
   );
 }
 
+/** Atgriež zīmi un absolūto vērtību no saglabātās korekcijas virknes. */
+function parseSignAndMagnitude(adjustment: string): { sign: "+" | "-"; magnitude: string } {
+  const trimmed = adjustment.trim();
+  if (trimmed.startsWith("-")) {
+    return { sign: "-", magnitude: trimmed.slice(1) };
+  }
+  return { sign: "+", magnitude: trimmed };
+}
+
 export function ModuleSizeAttachItemRow({
   controlId,
   item,
@@ -67,6 +77,31 @@ export function ModuleSizeAttachItemRow({
   const struckThroughValue = valueChanged ? baseDisplayValue : null;
   const highlightedValue = valueChanged ? item.value : null;
 
+  const initial = parseSignAndMagnitude(state.adjustment);
+
+  // Lokālais ievades stāvoklis — nodrošina tūlītēju atjauninājumu.
+  const [sign, setSign] = useState<"+" | "-">(initial.sign);
+  const [inputValue, setInputValue] = useState(initial.magnitude);
+
+  // Sinhronizē tikai tad, kad vecāks mainās ārēji (piem. piesaistot citu moduli).
+  useEffect(() => {
+    const parsed = parseSignAndMagnitude(state.adjustment);
+    setSign(parsed.sign);
+    setInputValue(parsed.magnitude);
+  }, [state.adjustment]);
+
+  function emitAdjustment(nextSign: "+" | "-", nextMagnitude: string) {
+    const magnitude = sanitizeQuantityInputString(nextMagnitude);
+    const value = magnitude ? (nextSign === "-" ? `-${magnitude}` : magnitude) : "";
+    onAdjustmentChange(value);
+  }
+
+  function handleSignToggle() {
+    const nextSign = sign === "+" ? "-" : "+";
+    setSign(nextSign);
+    emitAdjustment(nextSign, inputValue);
+  }
+
   return (
     <li
       className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 rounded-lg px-1 py-1.5 text-sm transition ${
@@ -80,7 +115,12 @@ export function ModuleSizeAttachItemRow({
         label={item.label}
       />
 
-      <span className="min-w-0 text-zinc-600">{item.label}</span>
+      <span
+        className="min-w-0 cursor-pointer select-none text-zinc-600"
+        onClick={() => onEnabledChange(!state.enabled)}
+      >
+        {item.label}
+      </span>
 
       <div className="flex shrink-0 items-center gap-1.5 justify-end">
         <span
@@ -99,16 +139,29 @@ export function ModuleSizeAttachItemRow({
 
       {canAdjust ? (
         <div className="flex shrink-0 items-center gap-1">
-          <span className="text-xs text-zinc-400">+</span>
+          <button
+            type="button"
+            aria-label={sign === "+" ? "Pārslēgt uz atņemšanu" : "Pārslēgt uz saskaitīšanu"}
+            onClick={handleSignToggle}
+            className={`w-4 text-center text-xs font-semibold transition ${
+              sign === "-"
+                ? "text-red-500 hover:text-red-400"
+                : "text-zinc-400 hover:text-zinc-600"
+            }`}
+          >
+            {sign}
+          </button>
           <input
             type="text"
             inputMode="decimal"
-            value={state.adjustment}
+            value={inputValue}
             placeholder="0"
             aria-label={`Korekcija: ${item.label}`}
-            onChange={(event) =>
-              onAdjustmentChange(sanitizeQuantityInputString(event.target.value))
-            }
+            onChange={(event) => {
+              const sanitized = sanitizeQuantityInputString(event.target.value);
+              setInputValue(sanitized);
+              emitAdjustment(sign, sanitized);
+            }}
             className="h-7 w-14 rounded-md border border-zinc-200 bg-white px-1.5 text-right text-xs tabular-nums text-zinc-900 transition focus:border-violet-300 focus:outline-none"
           />
         </div>

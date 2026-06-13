@@ -43,7 +43,7 @@ export default async function SagatavePage() {
         catalogPositions={catalogPositions}
 
         defaultHourlyRate={companySettings.defaultHourlyRate}
-
+        currency={companySettings.currency}
         moduleSizeOptions={moduleSizeOptions}
 
       />

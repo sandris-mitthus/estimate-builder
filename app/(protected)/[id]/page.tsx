@@ -5,6 +5,8 @@ import {
   buildProjectModuleSizeOptions,
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
+import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
+import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -16,13 +18,14 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, estimate, modules, companySettings, catalogPositions] =
+  const [project, estimate, modules, companySettings, catalogPositions, sagatave] =
     await Promise.all([
       getProject(id),
       getProjectEstimate(id),
       listBuildingModules(),
       getCompanySettings(),
       listPositionPrices(),
+      ensureDefaultEstimatePosition(),
     ]);
 
   if (!project || !estimate) {
@@ -44,14 +47,18 @@ export default async function ProjectDetailPage({
     displayModuleName,
     estimate.categories,
   );
+  const categoriesWithVariableQty = syncVariableQuantityFromSagatave(
+    estimate.categories,
+    sagatave.sections,
+  );
   const initialCategories =
     moduleSizeOptions.length > 0
       ? syncCategoriesQuantitiesFromModuleSizes(
-          estimate.categories,
+          categoriesWithVariableQty,
           moduleSizeOptions[0].projectDescription,
           catalogPositions,
         )
-      : estimate.categories;
+      : categoriesWithVariableQty;
 
   return (
     <main className="page">
@@ -76,6 +83,7 @@ export default async function ProjectDetailPage({
         estimateValidityDays={companySettings.estimateValidityDays}
         catalogPositions={catalogPositions}
         defaultHourlyRate={companySettings.defaultHourlyRate}
+        currency={companySettings.currency}
       />
     </main>
   );

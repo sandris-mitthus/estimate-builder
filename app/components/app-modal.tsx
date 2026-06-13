@@ -22,7 +22,7 @@ const backdropClassName = "absolute inset-0 bg-zinc-900/40";
 const confirmBackdropClassName = "absolute inset-0 bg-zinc-900/50";
 
 const panelBaseClassName =
-  "relative max-h-[calc(100%-2rem)] w-full overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl";
+  "relative max-h-[calc(100%-2rem)] w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl";
 
 const defaultPanelMaxWidthClassName = "max-w-md";
 

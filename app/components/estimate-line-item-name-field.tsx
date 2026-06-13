@@ -33,6 +33,7 @@ type EstimateLineItemNameFieldProps = {
   onCatalogSelect: (position: PositionPriceSummary) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate?: number | null;
+  currency?: string | null;
   excludedCatalogKeys?: ReadonlySet<string>;
   className?: string;
   placeholder?: string;
@@ -73,6 +74,7 @@ export function EstimateLineItemNameField({
   onCatalogSelect,
   catalogPositions,
   defaultHourlyRate = null,
+  currency = null,
   excludedCatalogKeys = EMPTY_EXCLUDED_CATALOG_KEYS,
   className,
   placeholder = "Meklēt pozīciju katalogā",
@@ -260,6 +262,7 @@ export function EstimateLineItemNameField({
                       {getCatalogHintPrice(position, defaultHourlyRate) != null
                         ? formatMoney(
                             getCatalogHintPrice(position, defaultHourlyRate) ?? 0,
+                            currency,
                           )
                         : "—"}
                     </span>

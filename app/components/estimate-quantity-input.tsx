@@ -12,6 +12,8 @@ type EstimateQuantityInputProps = {
   onChange: (value: number) => void;
   className?: string;
   "aria-label"?: string;
+  /** Vērtība, kas tiek iestatīta, ja ievade ir tukša. Noklusējums: 1. */
+  emptyValue?: number;
 };
 
 export function EstimateQuantityInput({
@@ -19,6 +21,7 @@ export function EstimateQuantityInput({
   onChange,
   className,
   "aria-label": ariaLabel = "Apjoms",
+  emptyValue = 1,
 }: EstimateQuantityInputProps) {
   const [draft, setDraft] = useState(() => formatQuantityDisplay(value));
   const [focused, setFocused] = useState(false);
@@ -40,7 +43,7 @@ export function EstimateQuantityInput({
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);
-        const parsed = parseQuantityInput(draft);
+        const parsed = draft.trim() ? parseQuantityInput(draft) : emptyValue;
         onChange(parsed);
         setDraft(formatQuantityDisplay(parsed));
       }}

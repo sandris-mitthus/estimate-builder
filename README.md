@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.2.0` (see [Changelog](#changelog))
+**Current version:** `1.2.6` (see [Changelog](#changelog))
 
 ---
 
@@ -29,10 +29,10 @@ English routes, Latvian labels:
 | Lietotāji | `/users` |
 | Uzstādījumi | `/settings` |
 
-- **Projekti** — project cards (module name above client name, email, phone, address); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt**, **Labot**, **Dzēst**, **Apstiprināts**, **Noraidīts** (`ConfirmModal`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos**, ja saglabātajā tāmē ir novecojušas kataloga cenas; list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); **noraidītie** (`status = rejected`) netiek rādīti sarakstā, bet netiek dzēsti no DB
+- **Projekti** — project cards (module name above client name, email, phone, address); galvenē **Jauns projekts** + **Arhīvs** (`fa-archive`, `/?archive=1`); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt** (vienmēr redzama), **Labot**, **Dzēst** (tikai `active`), **Apstiprināts**, **Noraidīts** (tikai `active`), **Pabeigts** (`fa-check-double`, tikai `approved`; `ConfirmModal`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos** tikai `active` projektiem ar novecojušām kataloga cenām; list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); sarakstā tikai `active` un `approved`; **Arhīvs** rāda visus statusus ar radio filtru (**Visi**, **Aktīvie**, **Procesā**, **Pabeigtie**, **Noraidītie**); **noraidītie** un **pabeigtie** paslēpti no galvenā saraksta, bet netiek dzēsti no DB
 - **Jauns projekts / Labot / Kopēt** — shared `ProjectFormModal` with **required Modulis** select (catalog modules + **Individuāls projekts** last); `building_module_id` on `projects`; client name, phone, email, address; phone country code from IP on create, parsed from stored number on edit; email/phone validation; **Google Places** autocomplete with map preview (including pre-filled address on edit); **Kopēt** (`fa-copy`) atver **Jauns projekts** modāli ar tukšiem kontaktu laukiem un avota moduli, bet izveides laikā tāme tiek klonēta no avota projekta (`copyEstimateFromProjectId`)
 - **Ēku moduļi** (`/modules`, `/modules/[id]`) — module catalog in Supabase (`building_modules`); **Pievienot Moduli** (name only); cards with **Labot** / **Dzēst**; red **`fa-house-damage`** icon + tooltip **Nav ievadīti moduļu dati** when viz or project PDF missing; click name opens detail: left column **Vizualizācijas** (image upload grid, 2 per row, drag reorder) + **Projekts** (PDF only, same grid); right column **Projekta apraksts** (Pamats, L veida pamats, izgriezumi, Sienas ar **Frontoni** — augstums, skaits, pamata plakne; platums × augstums / 2 × skaits pieskaitīts ārsienu neto kvadratūrai; Logi, Durvis, Jumts — calculated fields, **Saglabāt** persists `project_description` JSON); **aptaksts** outline list below; empty states; toasts on file actions
-- **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāls · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `material`, `mechanism` (kataloga atsauces); Darbs = laika norma × stundas likme; **Laika norma** tieši rediģējama sarakstā (inline `LaborTimeNormInput` ar `−`/`+`, hover-only border/pogas); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāls/Mehānismi šūnās tooltip ar kataloga nosaukumu; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder; **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
+- **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāli · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `materials[]`, `mechanisms[]` (kataloga atsauces masīvi; vairāki materiāli summējas, vairāki mehānismi summējas × laika norma); Darbs = laika norma × stundas likme; **Laika norma** tieši rediģējama sarakstā (inline `LaborTimeNormInput` ar `−`/`+`, hover-only border/pogas); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāli/Mehānismi šūnās tooltip ar kataloga nosaukumu (ja vairāki — komatu atdalīti); rinda **sarkanā tonī** + `fa-exclamation-triangle` + teksts **Nav pievienots moduļa apjoms** pozīcijām bez `moduleSizeAttachment`, kad moduļu lielumi definēti; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; katras opcijas apakšā cenu kopsāvilkums (Darbs / Materiāli / Mehānismi / Vienības cena); **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder; **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
 - **Pozicijas** (`/positions`) — **materiālu un mehānismu** unit-price katalogs Supabase (`position_prices`; **Darbs** — no **Uzstādījumi** stundas likmes, ne šeit); searchable sortable table; kompakts **Veids** filtrs zem meklēšanas (**Visi** / **Materiāls** / **Mehānismi**); columns **Nosaukums**, **Veids**, **Cena** (`2.91 EUR / gab.` + update date; bez cenas `- EUR / gab.`), **Darbības**; **Pievienot pozīciju** / **Labot** modals (tikai Materiāls / Mehānismi — cost-type radio above name + unit with hints, 80/20; optional **mainīgs apjoms** toggle — enables editable **Apj.** cell in project estimates for linked rows); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); **Vēsture** row action opens extra-wide modal with price log (date, amount, “No …” delta, supplier on two lines with phone/email icons); row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`; **nosaukums / mērvienība** atjaunināti arī no sagataves vai projekta tāmes, ja rinda saistīta ar katalogu (`positionPriceId` vai unikāla nosaukuma atbilstība)
 - **Lietotāji** — Supabase Auth users (name, email, Google avatar); **Uzaicināt** modal sends email invite via admin API (client + server validation)
 - **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo)
@@ -58,8 +58,8 @@ English routes, Latvian labels:
 - Excel-style table: categories, optional subcategories, line items, **multi-pozīcijas** (modal, DnD, **opciju saites**; piedāvājumā **viena rinda** ar opciju **select** + **Multi** badge zem nosaukuma)
 - **Jauns projekts** — tāmes struktūra **klonēta no Sagataves** (`clone-sagatave-for-project.ts`); **Kopēt** no projekta kartes klonē esošas projekta tāmes pozīcijas un `multiOptionLinks` (jauni ID); tukšām esošām tāmēm fallback no sagataves; galvenē `{N} tāmes pozīcijas · {M} rindas` un **+ Tāmes pozīcija**
 - **Saglabāt tāmi** — poga zem tabulas; nospiežot, tāme (title, meta, categories ar **iesaldētām cenām**) tiek saglabāta `estimates` tabulā; "Nesaglabātas izmaiņas" / "Saglabāts: DD.MM.YY" indikators; cenu iesaldēšana: `positionPriceId` atsauces tiek nomainītas uz faktiskajām cenām — kataloga izmaiņas neieetekmē saglabātās tāmes; pēc saglabāšanas **saglabātās cenas** salīdzināmas ar katalogu — atšķirības **sarkanās šūnās** (materiāli/mehanismi, arī apjoma kolonnās)
-- **Jauni izcenojumi** — baneris **Pieejami jauni izcenojumi** (tikai saglabātām, neapstiprinātām tāmēm); **Atjaunot cenas** atjaunina tabulas cenas no kataloga **tikai UI** (nesaglabā DB; **Saglabāt** paliek aktīvs)
-- **Apstiprināta tāme** — **Apstiprināts** (`status = approved`) bloķē labošanu (read-only meta, bez drag/dzēšanas/pozīciju pievienošanas); zaļš baneris **Tāme apstiprināta — izmaiņas vairs nav iespējamas**; bez brīdinājumiem par jauniem izcenojumiem; PDF/Excel joprojām pieejami; **Kopēt/Labot/Dzēst** paslēpti uz kartes
+- **Jauni izcenojumi** — baneris **Pieejami jauni izcenojumi** un **Atjaunot cenas** tikai `active` projektiem (`shouldShowStaleCatalogPriceWarnings`); **Atjaunot cenas** atjaunina tabulas cenas no kataloga **tikai UI** (nesaglabā DB; **Saglabāt** paliek aktīvs)
+- **Apstiprināta tāme** — **Apstiprināts** (`status = approved`) bloķē labošanu (read-only meta, bez drag/dzēšanas/pozīciju pievienošanas); zaļš baneris **Tāme apstiprināta — izmaiņas vairs nav iespējamas**; bez brīdinājumiem par jauniem izcenojumiem; PDF/Excel joprojām pieejami; **Kopēt** vienmēr pieejama; **Labot/Dzēst** paslēpti; **Pabeigts** pārvieto uz `completed` (pazūd no saraksta, saglabāts DB, atverams caur `/{id}`)
 - **Eksports** (tikai kad saglabāts) — **PDF (piedāvājums)** via `@react-pdf/renderer` (A4, kategorijas, `hiddenInOffer` apakšsadaļas → vienā rindā, lapas numurs); **Excel (tāme)** via `xlsx` (pilna cenu detaļa: V.cena + Kopā pa Darbs/Materiāli/Mehānismi); lejupielāde no `/api/estimates/[id]/pdf` un `/api/estimates/[id]/excel`
 - **Multi opciju saites** — sagatavē definētas pārus starp opcijām dažādos multi; projekta tāmē izvēle **divvirzienu** sinhronizē saistītās opcijas (session state; kopā ar pilnu tāmes persistenci roadmap)
 - **Moduļa lieluma apjomi** — rindām ar `moduleSizeAttachment` **Apj.** kolonnā rāda piesaistīto lielumu (ne zem nosaukuma); sinhronizēts no sagataves / moduļa `project_description` (`sync-module-size-quantities.ts`); read-only, ja ir piesaiste
@@ -160,7 +160,7 @@ npm run db:test
    - Redirect: `http://localhost:3100/auth/callback`
 6. Start the app — sign in, then `/` loads projects from `public.projects`
 
-**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` / `project_description` for individual projects, `status` `active` | `approved` | `rejected` in `026`, `007` + `015` + `017` + `025`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`, `project_description` in `025`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets`, `module-assets` (module + project asset paths)
+**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` / `project_description` for individual projects, `status` `active` | `approved` | `rejected` | `completed` in `026` + `027`, `007` + `015` + `017` + `025`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`, `project_description` in `025`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets`, `module-assets` (module + project asset paths)
 
 ---
 
@@ -170,7 +170,7 @@ npm run db:test
 app/
 ├── (protected)/      # Auth-gated routes (nav + pages)
 │   ├── layout.tsx      # Login gate or AppNav + children
-│   ├── page.tsx        # Project list (/) + create modal
+│   ├── page.tsx        # Project list (/) + archive (?archive=1)
 │   ├── actions.ts      # create/update/delete project; save estimate; updateProjectStatusAction; updateProjectEstimateDatesAction
 │   ├── project-module-actions.ts  # individual project viz/PDF blocks + project description
 │   ├── [id]/           # Estimate editor + module-data/
@@ -190,7 +190,7 @@ app/
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate-table, estimate-position-table, estimate-unit-price-cells, estimate-volume-sum-cells, labor-time-norm-input, attach-module-size-*, attached-module-size-label, subcategory-offer-visibility-toggle, estimate-multi-position-row, estimate-quantity-input, multi-position-modal, multi-position-link-handle, estimate-line-item-name-field, position-modal, position-modal-context, catalog-hint-field, positions-page-content, position-cost-type-filter, positions modals, unsaved-changes modal, nav, feedback-toast-provider)
+├── components/         # UI (estimate-table, project-page-actions, project-archive-content, project-status-filter, estimate-position-table, …)
 ├── lib/
 │   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay
 │   ├── client/         # cookie read/write helpers
@@ -203,7 +203,7 @@ app/
 │   ├── google-maps/    # Places API, build-embed-url
 │   ├── modules/        # repository, outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (module-assets)
 │   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, has-defined-labor, variable-quantity, stale-catalog-price, filter-positions (catalog filter + search)
-│   ├── projects/       # repository, project-status, project-module-data, sample fallback
+│   ├── projects/       # repository, project-status, filter-projects, project-module-data, sample fallback
 │   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
 │   ├── users/          # Auth user list + invite (admin API)
 │   ├── validation/     # email, phone, formatDisplayPhone
@@ -236,11 +236,11 @@ supabase/migrations/
 - [x] Piedāvājumā (`/[id]`) — `moduleSizeAttachment` apjomi **Apj.** kolonnā; multi tikai select; materiālu/mehānismu nosaukumi labajā pusē
 - [x] Projekta apraksts — **Frontoni** sadaļā Sienas (pamata plakne, skaits, formula; pieskaitīts ārsienu neto)
 - [x] Pozicijas — **Veids** filtrs (Visi / Materiāls / Mehānismi); bez cenas `- VALŪTA / mērv.`
-- [x] Kompozīts pozīciju modelis — laika norma, Darbs = norma × likme, Materiāls/Mehānismi no kataloga; inline rediģēšana; multi-pozīcijām arī
+- [x] Kompozīts pozīciju modelis — laika norma, Darbs = norma × likme, Materiāli/Mehānismi no kataloga (masīvi, cenas summējas); inline rediģēšana; multi-pozīcijām arī; moduļa apjoma brīdinājums; opciju kopsāvilkums multi modālī
 - [x] Piedāvājumā `hiddenInOffer` — PDF eksportā apakšsadaļas ar `hiddenInOffer: true` rāda kā vienu kopsummas rindu
 - [x] Export estimate — **PDF (piedāvājums)** un **Excel (tāme)**
 - [x] Saglabātas tāmes — novecojušu kataloga cenu indikators (saraksts + projekta lapa + sarkanās šūnas); **Atjaunot cenas** (UI)
-- [x] Projekta statuss — **Apstiprināts** (read-only tāme) / **Noraidīts** (paslēpts sarakstā, netiek dzēsts)
+- [x] Projekta statuss — **Apstiprināts** / **Noraidīts** / **Pabeigts** + **Arhīvs** ar statusa filtru
 - [ ] User management beyond read-only list and email invite
 - [ ] Use company settings + logo on estimate PDF/header
 
@@ -281,9 +281,70 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 
 ## Changelog
 
-### Unreleased
+### v1.2.6
 
-- (none)
+**Valūtas simbols no uzstādījumiem — tāmes kolonnu virsraksti un naudas formatēšana**
+
+- **`getCurrencySymbol()`** — jauna funkcija `currencies.ts`; katrai valūtai pievienots `symbol` lauks (EUR → €, USD → $, GBP → £, PLN → zł, SEK/NOK/DKK → kr)
+- **`formatMoney` / `formatMoneyDisplay`** — tagad pieņem `currency?: string | null` parametru un izmanto `getCurrencySymbol()` simbolu; iepriekš bija hardkodēts `€`
+- **`estimate-table.tsx`** — `currency` prop propagēts caur visu komponentu ķēdi: `EstimateTable` → `EstimateDndTable` → `EstimateDndTableInner` → `CategoryBlock` → `SubcategoryBlock` → `SortableLineItemRow` → `LineItemRow`; **KOPĀ** žetons tagad rāda pareizo valūtas simbolu; kataloga hintu cenas `EstimateLineItemNameField` arī iegūst `currency`
+- **`estimate-position-table.tsx`** — `currency` prop pievienots `EstimatePositionDndTable` sub-komponentam un propagēts no `EstimatePositionTable` caur `EstimatePositionDndTable`
+- **Kolonu virsraksti** — `getUnitPriceSubheaderLabels(currency)` jau bija ieviests v1.2.5; šajā versijā salabota prop propagācija, kas iepriekš nenonāca līdz renderēšanas slānim
+
+### v1.2.5
+
+**Individuāls apjoms katram projektam — mērvienība, ikona, korekciju inputs**
+
+- **`variableQuantity` uz `EstimateLineItem`** — karodziņš pārvietots no kataloga pozīcijas uz tāmes rindu (`item.variableQuantity`); `isVariableQuantityLineItem` pārbauda vispirms rindu, tad katalogu; klonējot no sagataves (`clone-sagatave-for-project.ts`) `variableQuantity` rindām `quantity = 0`; sinhronizācija no sagataves uz projektu pie lapas ielādes (`sync-variable-quantity.ts`)
+- **Mērvienība no materiāla** — kad `variableQuantity = true`, saglabājot pozīciju modalī mērvienību ņem no pirmā piesaistītā materiāla (piem. "Kanalizācija d.110" → "m"); ja materiāla nav — `draft.unit` vai "gab."
+- **Sagatave (`/estimate`)** — slēdzis **Individuāls apjoms katram projektam** katrā pozīciju modalī (`PositionVariableQuantityField`); ieslēdzot: notīra `moduleSizeAttachment`; `fa-random` ikona rindā pie nosaukuma (`estimate-position-table`); moduļa apjoma brīdinājums slēpts, ja `variableQuantity`; mērvienība tabulā — `item.unit` nevis moduļa atvasinājums
+- **Projekta tāme (`/[id]`)** — `fa-random` ikona (sarkanā) redzama **tikai** rindām ar `variableQuantity = true`; klikšķis uz ikonas noņem `variableQuantity`; ikona nobīdīta 5 px uz leju; `variableQuantity` rindām `EstimateQuantityInput` ar `emptyValue={0}`; sarkana rinda (`bg-red-50/60`) ja apjoms ≤ 0; **Saglabāt** bloķēts, ja kāda `variableQuantity` rinda bez apjoma; `displayUnit` ignorē `moduleSizeUnit` šādām rindām
+- **Moduļa korekciju inputs** (`module-size-attach-item-row.tsx`) — lokāls `useState` (`inputValue`) nodrošina tūlītēju ievades atjauninājumu neatkarīgi no vecāka re-render; `useEffect` sinhronizē no `state.adjustment` tikai ārēju izmaiņu gadījumā
+- **Modālis** — `app-modal.tsx` pievienots `overflow-x-hidden` panelim, lai novērstu horizontālo ritināšanu
+- **Katalogs (`/positions`)** — `variableQuantity` toggle noņemts no pozīciju kataloga UI (pārvietots uz sagataves tāmes rindu līmeni)
+
+### v1.2.4
+
+**Moduļa lieluma picker — akordeons un auto-atvēršana**
+
+- **Akordeons** — katras `ModuleCard` sadaļas galvene (`PAMATS`, `PAMATA IZGRIEZUMI` u.c.) ir klikšķināma: atvērt vienu sadaļu aizver pārējās; chevron ikona rāda stāvokli
+- **Auto-atvēršana pie labošanas** — ja pozīcijai jau ir saglabāts `moduleSizeAttachment`, modāli atverot automātiski atveras tā sadaļa, kurā atrodas piesaistītais `itemKey` (`findSectionForItemKey`); sākotnēji visas sadaļas aizvērtas
+- **Sync ar `useEffect`** — `isAttachedModule` vai `attachment.itemKey` mainoties (piemēram, atverot modāli ar saglabātu piesaisti), atveras pareizā sadaļa bez manuālas iejaukšanās
+- **`key={draft.id}`** uz `ModuleSizeAttachPicker` `position-modal.tsx` — garantē pilnu remount un `useState` inicializāciju, kad modālī tiek atvērts cits elements
+
+### v1.2.3
+
+**Vairāki materiāli un mehānismi, multi kopsāvilkums, moduļa apjoma brīdinājums**
+
+- **Vairāki materiāli un mehānismi** — `EstimateLineItem` tagad satur `materials: LineItemCatalogRef[]` un `mechanisms: LineItemCatalogRef[]` masīvus; vecais `material`/`mechanism` (singular) saglabāts backward compat kā deprecated; `hydrateCompositeLineItem` automātiski migrē vecos datus uz masīviem
+- **Cenu summēšana** — `deriveCompositeUnitPrice` summē visu materiālu cenas un `Σ (kataloga likme × laika norma)` katram mehānismam
+- **Position modālis** — katrai pozīcijai var pievienot neierobežotu skaitu materiālu un mehānismu; esošie rāda kā kartītes ar nosaukumu, mērvienību un × noņemšanas pogu; meklēšanas lauks apakšā pievieno nākamo (atiestatās ar `key` triku pēc izvēles)
+- **Multi-pozīciju modālis** — tas pats multi-materiālu/mehānismu atjauninājums katrai opcijai (per-opcija `materialAddKey`/`mechanismAddKey`)
+- **Multi opciju kopsāvilkums** — katras opcijas kartiņas apakšā `dl` ar Darbs / Materiāli / Mehānismi / Vienības cena (dinamiski atjauninās)
+- **Moduļa apjoma brīdinājums** — pozīcijas rinda sarkanā tonī (`bg-red-50/60`) + `fa-exclamation-triangle` aiz nosaukuma + teksts **Nav pievienots moduļa apjoms** zem nosaukuma, ja `moduleSizeOptions.length > 0` un `!item.moduleSizeAttachment`
+- **Tooltip** — Materiāli/Mehānismi šūnās tooltip rāda viena nosaukumu vai vairāku nosaukumus komatu atdalītus
+- **Stale cenu indikators** — pārbaudīts pret masīvu (`resolveEffectiveMaterials`/`resolveEffectiveMechanisms`), nevis singular lauku
+
+### v1.2.2
+
+**Projektu arhīvs un stale brīdinājumu precizēšana**
+
+- **Arhīvs** — poga `fa-archive` blakus **Jauns projekts** (`project-page-actions.tsx`); skats `/?archive=1` ar visiem projektiem
+- **Statusa filtrs** — radio rinda pirms saraksta: **Visi**, **Aktīvie**, **Procesā** (`approved`), **Pabeigtie**, **Noraidītie** (`project-status-filter.tsx`, `filter-projects.ts`)
+- **Repository** — `listAllProjects()` visiem statusiem; galvenais saraksts joprojām filtrē `active` + `approved`
+- **Stale brīdinājumi** — `shouldShowStaleCatalogPriceWarnings()` tikai `active`; noraidītiem (un apstiprinātiem/pabeigtiem) bez sarkanās apmales, banera un **Atjaunot cenas**
+- **Noņemts** — `add-project-button.tsx` (aizstāts ar `project-page-actions.tsx`)
+
+### v1.2.1
+
+**Kopēt vienmēr un pabeigts projekts**
+
+- **Kopēt** — `fa-copy` redzama **vienmēr** (arī apstiprinātiem projektiem), lai var klonēt tāmi kā tā bija
+- **Pabeigts** — jauna poga `fa-check-double` apstiprinātiem projektiem (`approved` → `completed`); pēc apstiprināšanas modālā projekts pazūd no `/` saraksta, bet paliek DB; atverams caur tiešu saiti `/{id}`
+- **Kartes darbības** — Labot/Dzēst un Noraidīts tikai `active`; Apstiprināts tikai `active`; Pabeigts tikai `approved`
+- **Statusa loģika** — `isProjectVisibleInList`: `active` + `approved`; `isProjectEstimateLocked`: `approved` + `completed`
+- **Supabase** — `027_project_completed_status.sql` (paplašina `projects_status_check` ar `completed`)
+- **UI** — `IconActionButton` variants `complete` (teal hover)
 
 ### v1.2.0
 

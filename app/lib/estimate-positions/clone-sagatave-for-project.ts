@@ -17,6 +17,8 @@ function cloneLineItem(item: EstimateLineItem): EstimateLineItem {
     ...item,
     id: crypto.randomUUID(),
     unitPrice: { ...item.unitPrice },
+    // variableQuantity pozīcijām apjoms tiek ievadīts katrā projektā atsevišķi
+    ...(item.variableQuantity === true ? { quantity: 0 } : {}),
   };
 }
 

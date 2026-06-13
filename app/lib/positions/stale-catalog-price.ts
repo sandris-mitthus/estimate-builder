@@ -6,6 +6,8 @@ import {
 import {
   deriveCompositeUnitPrice,
   isCompositeLineItem,
+  resolveEffectiveMaterials,
+  resolveEffectiveMechanisms,
 } from "@/app/lib/estimates/composite-line-item";
 import { isEstimateMultiPosition } from "@/app/lib/estimates/multi-position";
 import type {
@@ -130,14 +132,14 @@ export function resolveStaleCatalogPriceHints(
     );
 
     if (
-      item.material?.positionPriceId &&
+      resolveEffectiveMaterials(item).some((m) => m.positionPriceId) &&
       pricesDiffer(stored.materials, live.materials)
     ) {
       hints.materials = staleHintLabel(live.materials);
     }
 
     if (
-      item.mechanism?.positionPriceId &&
+      resolveEffectiveMechanisms(item).some((m) => m.positionPriceId) &&
       pricesDiffer(stored.mechanisms, live.mechanisms)
     ) {
       hints.mechanisms = staleHintLabel(live.mechanisms);

@@ -9,17 +9,39 @@ import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 /**
  * Kompozītā pozīcija (jaunais modelis): nosaukums + laika norma (darbs) +
- * piesaistīts materiāls + piesaistīts mehānisms. Cenas:
+ * piesaistīti materiāli + piesaistīti mehānismi. Cenas:
  * - darbs = laika norma (c/h) × stundas likme
- * - materiāls = piesaistītā kataloga pozīcijas cena
- * - mehānisms = kataloga likme (EUR/h) × laika norma (c/h)
+ * - materiāls = piesaistīto kataloga pozīciju cenu summa
+ * - mehānisms = Σ (kataloga likme (EUR/h) × laika norma) katram mehānismam
  */
 export function isCompositeLineItem(item: EstimateLineItem): boolean {
   return (
     item.laborTimeNorm !== undefined ||
     item.material !== undefined ||
-    item.mechanism !== undefined
+    item.mechanism !== undefined ||
+    item.materials !== undefined ||
+    item.mechanisms !== undefined
   );
+}
+
+/** Atgriež materiālu sarakstu ar atbalstu vecajam singular formātam. */
+export function resolveEffectiveMaterials(
+  item: EstimateLineItem,
+): LineItemCatalogRef[] {
+  if (item.materials !== undefined) {
+    return item.materials;
+  }
+  return item.material ? [item.material] : [];
+}
+
+/** Atgriež mehānismu sarakstu ar atbalstu vecajam singular formātam. */
+export function resolveEffectiveMechanisms(
+  item: EstimateLineItem,
+): LineItemCatalogRef[] {
+  if (item.mechanisms !== undefined) {
+    return item.mechanisms;
+  }
+  return item.mechanism ? [item.mechanism] : [];
 }
 
 export function resolveCatalogRefUnitPrice(
@@ -36,7 +58,7 @@ export function resolveCatalogRefUnitPrice(
   return resolvePositionCatalogUnitPrice(position ?? ({} as PositionPriceSummary)) ?? 0;
 }
 
-/** Atsvaidzina materiāla / mehānisma nosaukumu un mērvienību no kataloga (ja vēl pastāv). */
+/** Atsvaidzina viena materiāla / mehānisma nosaukumu un mērvienību no kataloga (ja vēl pastāv). */
 function refreshCatalogRef(
   ref: LineItemCatalogRef | null | undefined,
   catalogPositions: PositionPriceSummary[],
@@ -60,6 +82,16 @@ function refreshCatalogRef(
   };
 }
 
+/** Atsvaidzina masīva katru ierakstu; izmet neesošos. */
+function refreshCatalogRefs(
+  refs: LineItemCatalogRef[],
+  catalogPositions: PositionPriceSummary[],
+): LineItemCatalogRef[] {
+  return refs
+    .map((ref) => refreshCatalogRef(ref, catalogPositions))
+    .filter((ref): ref is LineItemCatalogRef => ref !== null);
+}
+
 export function deriveCompositeUnitPrice(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
@@ -69,14 +101,20 @@ export function deriveCompositeUnitPrice(
     ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
     : 0;
   const labor = roundToTwoDecimals(timeNorm * (defaultHourlyRate ?? 0));
+
   const materials = roundToTwoDecimals(
-    resolveCatalogRefUnitPrice(item.material, catalogPositions),
+    resolveEffectiveMaterials(item).reduce(
+      (sum, ref) => sum + resolveCatalogRefUnitPrice(ref, catalogPositions),
+      0,
+    ),
   );
-  const mechanismHourlyRate = resolveCatalogRefUnitPrice(
-    item.mechanism,
-    catalogPositions,
+
+  const mechanisms = roundToTwoDecimals(
+    resolveEffectiveMechanisms(item).reduce((sum, ref) => {
+      const rate = resolveCatalogRefUnitPrice(ref, catalogPositions);
+      return sum + roundToTwoDecimals(rate * timeNorm);
+    }, 0),
   );
-  const mechanisms = roundToTwoDecimals(mechanismHourlyRate * timeNorm);
 
   return { labor, materials, mechanisms };
 }
@@ -87,12 +125,19 @@ export function hydrateCompositeLineItem(
   defaultHourlyRate: number | null,
   options?: { forceCatalogPrices?: boolean },
 ): EstimateLineItem {
-  const material = refreshCatalogRef(item.material, catalogPositions);
-  const mechanism = refreshCatalogRef(item.mechanism, catalogPositions);
+  // Migrācija no veca singular formāta uz masīviem
+  const rawMaterials = item.materials ?? (item.material ? [item.material] : []);
+  const rawMechanisms = item.mechanisms ?? (item.mechanism ? [item.mechanism] : []);
+
+  const materials = refreshCatalogRefs(rawMaterials, catalogPositions);
+  const mechanisms = refreshCatalogRefs(rawMechanisms, catalogPositions);
+
   const next: EstimateLineItem = {
     ...item,
-    material,
-    mechanism,
+    materials,
+    mechanisms,
+    material: undefined,
+    mechanism: undefined,
   };
 
   if (options?.forceCatalogPrices) {
@@ -128,7 +173,7 @@ export function createCompositePosition(): EstimateLineItem {
     quantity: 1,
     unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
     laborTimeNorm: 0,
-    material: null,
-    mechanism: null,
+    materials: [],
+    mechanisms: [],
   };
 }

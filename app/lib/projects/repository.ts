@@ -27,6 +27,7 @@ import {
   isProjectEstimateLocked,
   isProjectVisibleInList,
   normalizeProjectStatus,
+  shouldShowStaleCatalogPriceWarnings,
   type ProjectStatus,
 } from "@/app/lib/projects/project-status";
 import type {
@@ -260,7 +261,7 @@ export async function listProjectIdsWithStaleCatalogPrices(
 
   for (const row of data) {
     const project = projectById.get(row.project_id as string);
-    if (!project || isProjectEstimateLocked(project.status)) {
+    if (!project || !shouldShowStaleCatalogPriceWarnings(project.status)) {
       continue;
     }
 
@@ -303,6 +304,11 @@ export async function listProjectIdsWithStaleCatalogPrices(
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
+  const projects = await listAllProjects();
+  return projects.filter((project) => isProjectVisibleInList(project.status));
+}
+
+export async function listAllProjects(): Promise<ProjectSummary[]> {
   if (!isSupabaseAdminConfigured()) {
     return SAMPLE_PROJECTS;
   }
@@ -314,9 +320,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     return [];
   }
 
-  return rows
-    .map(mapProject)
-    .filter((project) => isProjectVisibleInList(project.status));
+  return rows.map(mapProject);
 }
 
 export async function getProject(id: string): Promise<ProjectSummary | null> {
@@ -614,6 +618,14 @@ export async function updateProjectStatus(
 
   if (status === "rejected" && project.status === "rejected") {
     return { ok: false, error: "Projekts jau ir noraidīts." };
+  }
+
+  if (status === "completed" && project.status !== "approved") {
+    return { ok: false, error: "Projektu nevar atzīmēt kā pabeigtu šajā statusā." };
+  }
+
+  if (status === "completed" && project.status === "completed") {
+    return { ok: false, error: "Projekts jau ir pabeigts." };
   }
 
   const supabase = createAdminClient();

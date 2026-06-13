@@ -18,7 +18,6 @@ import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
-import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import {
   DEFAULT_CATALOG_POSITION_COST_TYPE,
   type CatalogPositionCostType,
@@ -50,7 +49,6 @@ const emptyForm: {
   name: string;
   unit: string;
   costType: CatalogPositionCostType;
-  variableQuantity: boolean;
 } = {
 
   name: "",
@@ -58,8 +56,6 @@ const emptyForm: {
   unit: "",
 
   costType: DEFAULT_CATALOG_POSITION_COST_TYPE,
-
-  variableQuantity: false,
 
 };
 
@@ -182,7 +178,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         costType: form.costType,
 
-        variableQuantity: form.variableQuantity,
+        variableQuantity: false,
 
       });
 
@@ -251,8 +247,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         dirty={
           Boolean(form.name.trim() || form.unit.trim()) ||
-          form.costType !== DEFAULT_CATALOG_POSITION_COST_TYPE ||
-          form.variableQuantity
+          form.costType !== DEFAULT_CATALOG_POSITION_COST_TYPE
         }
 
         panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
@@ -291,12 +286,6 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
             autoFocusName
 
-          />
-
-          <PositionVariableQuantityField
-            id="position-variable-quantity"
-            enabled={form.variableQuantity}
-            onChange={(value) => updateField("variableQuantity", value)}
           />
 
           {error ? (
