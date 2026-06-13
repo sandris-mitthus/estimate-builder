@@ -383,8 +383,8 @@ export async function createProject(
   }
 
   if (input.buildingModuleId) {
-    const module = await getBuildingModule(input.buildingModuleId);
-    if (!module) {
+    const mod = await getBuildingModule(input.buildingModuleId);
+    if (!mod) {
       return { ok: false, error: "Izvēlētais modulis vairs neeksistē." };
     }
   }
@@ -514,8 +514,8 @@ export async function updateProject(
   }
 
   if (input.buildingModuleId) {
-    const module = await getBuildingModule(input.buildingModuleId);
-    if (!module) {
+    const mod = await getBuildingModule(input.buildingModuleId);
+    if (!mod) {
       return { ok: false, error: "Izvēlētais modulis vairs neeksistē." };
     }
   }

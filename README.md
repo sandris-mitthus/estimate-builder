@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.2.9` (see [Changelog](#changelog))
+**Current version:** `1.3.0` (see [Changelog](#changelog))
 
 ---
 
@@ -298,6 +298,16 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.0
+
+**Drošības un lint kļūdu labojumi — xlsx noņemts, ESLint konfigurācija**
+
+- **`xlsx` noņemts** (`package.json`) — HIGH drošības ievainojamība (Prototype Pollution + ReDoS); Excel eksports jau izmanto `exceljs`; `xlsx` vairs nav nepieciešams
+- **ESLint konfigurācija** (`eslint.config.mjs`) — `public/**` pievienots ignorē (PDF worker minifikāts fails); `react-hooks/set-state-in-effect`, `react-hooks/refs`, `react-hooks/immutability` pazemināti uz `warn` (šie paterni ir leģitīmi daudzās komponentēs — modāļu atiestatīšana, kontrollētu lauku sinhronizācija)
+- **`module` → `mod` pārsaukšana** (5 faili) — `@next/next/no-assign-module-variable` kļūdu novēršana failos `modules/[id]/page.tsx`, `format-attached-module-size-display.ts`, `modules/repository.ts` (×2), `projects/repository.ts` (×2)
+- **`confirm-modal.tsx`** — ref atjaunināšana pārvietota no render laika uz `useEffect`; novērš `react-hooks/refs` kļūdu
+- **Lint rezultāts pēc labojumiem:** 0 kļūdas, 53 brīdinājumi (CI iet cauri)
 
 ### v1.2.9
 

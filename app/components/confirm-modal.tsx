@@ -47,8 +47,12 @@ export function ConfirmModal({
   const onConfirmRef = useRef(onConfirm);
   const blockingRef = useRef(blocking);
 
-  onConfirmRef.current = onConfirm;
-  blockingRef.current = blocking;
+  useEffect(() => {
+    onConfirmRef.current = onConfirm;
+  });
+  useEffect(() => {
+    blockingRef.current = blocking;
+  });
 
   const close = useCallback(() => {
     if (blockingRef.current) return;

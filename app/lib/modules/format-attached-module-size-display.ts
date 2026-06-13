@@ -16,19 +16,19 @@ function resolveAttachmentSections(
   attachment: LineItemModuleSizeAttachment,
   moduleSizeOptions: BuildingModuleSizeOption[],
 ): { sections: ModuleSizeSummarySection[] } | null {
-  const module = moduleSizeOptions.find(
+  const mod = moduleSizeOptions.find(
     (entry) => entry.id === attachment.moduleId,
   );
-  if (!module) return null;
+  if (!mod) return null;
 
   const adjustments = getLineItemModuleSizeAdjustments(attachment);
   const sections =
     Object.keys(adjustments).length > 0
       ? buildAdjustedModuleSizeSummarySections(
-          module.projectDescription,
+          mod.projectDescription,
           adjustments,
         )
-      : module.sections;
+      : mod.sections;
 
   return { sections };
 }

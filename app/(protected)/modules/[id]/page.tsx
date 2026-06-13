@@ -9,9 +9,9 @@ export default async function ModuleDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const module = await getBuildingModule(id);
+  const mod = await getBuildingModule(id);
 
-  if (!module) {
+  if (!mod) {
     notFound();
   }
 
@@ -25,7 +25,7 @@ export default async function ModuleDetailPage({
         Atpakaļ uz moduļiem
       </Link>
 
-      <ModuleDetailContent module={module} />
+      <ModuleDetailContent module={mod} />
     </main>
   );
 }

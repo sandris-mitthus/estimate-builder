@@ -294,8 +294,8 @@ export async function uploadBuildingModuleBlock(
     return uploadResult;
   }
 
-  const module = await getBuildingModule(moduleId);
-  if (!module) {
+  const mod = await getBuildingModule(moduleId);
+  if (!mod) {
     await deleteModuleBlockFiles([uploadResult.block.storagePath]);
     return { ok: false, error: "Modulis nav atrasts." };
   }
@@ -304,12 +304,12 @@ export async function uploadBuildingModuleBlock(
     id: moduleId,
     visualizationBlocks:
       kind === "visualization"
-        ? [...module.visualizationBlocks, uploadResult.block]
-        : module.visualizationBlocks,
+        ? [...mod.visualizationBlocks, uploadResult.block]
+        : mod.visualizationBlocks,
     projectBlocks:
       kind === "project"
-        ? [...module.projectBlocks, uploadResult.block]
-        : module.projectBlocks,
+        ? [...mod.projectBlocks, uploadResult.block]
+        : mod.projectBlocks,
   });
 
   if (!updateResult.ok) {
@@ -325,13 +325,13 @@ export async function removeBuildingModuleBlock(
   kind: ModuleBlockKind,
   blockId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const module = await getBuildingModule(moduleId);
-  if (!module) {
+  const mod = await getBuildingModule(moduleId);
+  if (!mod) {
     return { ok: false, error: "Modulis nav atrasts." };
   }
 
   const blocks =
-    kind === "visualization" ? module.visualizationBlocks : module.projectBlocks;
+    kind === "visualization" ? mod.visualizationBlocks : mod.projectBlocks;
   const block = blocks.find((entry) => entry.id === blockId);
 
   if (!block) {
@@ -342,12 +342,12 @@ export async function removeBuildingModuleBlock(
     id: moduleId,
     visualizationBlocks:
       kind === "visualization"
-        ? module.visualizationBlocks.filter((entry) => entry.id !== blockId)
-        : module.visualizationBlocks,
+        ? mod.visualizationBlocks.filter((entry) => entry.id !== blockId)
+        : mod.visualizationBlocks,
     projectBlocks:
       kind === "project"
-        ? module.projectBlocks.filter((entry) => entry.id !== blockId)
-        : module.projectBlocks,
+        ? mod.projectBlocks.filter((entry) => entry.id !== blockId)
+        : mod.projectBlocks,
   });
 
   if (!updateResult.ok) {
