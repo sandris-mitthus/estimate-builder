@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAuth } from "@/app/lib/auth/require-auth";
 import {
   createPositionPrice,
   deletePositionPrice,
@@ -16,11 +17,14 @@ import type {
 } from "@/app/lib/positions/types";
 
 function revalidatePositions() {
-  revalidatePath("/positions");
+  revalidatePath("/settings/positions");
   revalidatePath("/estimate");
 }
 
 export async function createPositionAction(input: CreatePositionInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await createPositionPrice(input);
 
   if (result.ok) {
@@ -35,6 +39,9 @@ export async function syncPositionFromEstimateLineItemAction(input: {
   name: string;
   unit: string;
 }) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updatePositionNameAndUnit({
     id: input.positionPriceId,
     name: input.name,
@@ -49,6 +56,9 @@ export async function syncPositionFromEstimateLineItemAction(input: {
 }
 
 export async function updatePositionAction(input: UpdatePositionInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updatePositionPrice(input);
 
   if (result.ok) {
@@ -61,6 +71,9 @@ export async function updatePositionAction(input: UpdatePositionInput) {
 export async function updatePositionUnitPriceAction(
   input: UpdatePositionUnitPriceInput,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updatePositionUnitPrice(input);
 
   if (result.ok) {
@@ -71,6 +84,9 @@ export async function updatePositionUnitPriceAction(
 }
 
 export async function deletePositionAction(id: string) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await deletePositionPrice(id);
 
   if (result.ok) {
@@ -81,5 +97,8 @@ export async function deletePositionAction(id: string) {
 }
 
 export async function getPositionPriceHistoryAction(positionId: string) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   return listPositionPriceHistory(positionId);
 }

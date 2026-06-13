@@ -8,6 +8,7 @@ import {
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
+import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
@@ -126,6 +127,14 @@ export function PositionModal({
     setMaterialAddKey((k) => k + 1);
   }
 
+  function updateMaterialConsumption(index: number, consumption: number) {
+    patch({
+      materials: (draft.materials ?? []).map((mat, i) =>
+        i === index ? { ...mat, consumption } : mat,
+      ),
+    });
+  }
+
   function removeMechanism(index: number) {
     patch({
       mechanisms: (draft.mechanisms ?? []).filter((_, i) => i !== index),
@@ -171,6 +180,11 @@ export function PositionModal({
 
   const draftMaterials = resolveEffectiveMaterials(draft);
   const draftMechanisms = resolveEffectiveMechanisms(draft);
+  // Pozīcijas mērvienība no piesaistītā moduļa apjoma (piem. m²). Tikai tad var ievadīt patēriņu.
+  const positionUnit = resolveLineItemDisplayUnitFromModuleSize(
+    draft,
+    moduleSizeOptions,
+  );
 
   return (
     <AppModal
@@ -213,25 +227,45 @@ export function PositionModal({
           <div>
             <span className={labelClassName}>Materiāli</span>
             <div className="space-y-1.5">
-              {draftMaterials.map((mat, index) => (
-                <div
-                  key={`${mat.positionPriceId}-${index}`}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate text-zinc-800">
-                    {mat.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-zinc-400">
-                    {mat.unit}
-                  </span>
-                  <IconActionButton
-                    label="Noņemt materiālu"
-                    icon="fas fa-times"
-                    variant="delete"
-                    onClick={() => removeMaterial(index)}
-                  />
-                </div>
-              ))}
+              {draftMaterials.map((mat, index) => {
+                const showConsumption =
+                  positionUnit != null &&
+                  mat.unit.trim() !== positionUnit;
+                return (
+                  <div
+                    key={`${mat.positionPriceId}-${index}`}
+                    className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-zinc-800">
+                      {mat.name}
+                    </span>
+                    {showConsumption ? (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <MaterialConsumptionInput
+                          value={mat.consumption ?? 1}
+                          onChange={(consumption) =>
+                            updateMaterialConsumption(index, consumption)
+                          }
+                          aria-label={`Patēriņš ${mat.unit} uz ${positionUnit}`}
+                        />
+                        <span className="text-xs text-zinc-400">
+                          {mat.unit}/{positionUnit}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="shrink-0 text-xs text-zinc-400">
+                        {mat.unit}
+                      </span>
+                    )}
+                    <IconActionButton
+                      label="Noņemt materiālu"
+                      icon="fas fa-times"
+                      variant="delete"
+                      onClick={() => removeMaterial(index)}
+                    />
+                  </div>
+                );
+              })}
               <CatalogHintField
                 key={materialAddKey}
                 value={null}

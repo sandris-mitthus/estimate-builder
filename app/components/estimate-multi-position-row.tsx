@@ -53,6 +53,7 @@ import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import {
   hasModuleSizeAttachment,
   resolveLineItemDisplayQuantityFromModuleSize,
+  resolveLineItemDisplayUnitFromModuleSize,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { hasDefinedLaborLineItem } from "@/app/lib/positions/has-defined-labor";
 import {
@@ -201,7 +202,11 @@ function MultiOptionSubRow({
   moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
-  const label = option.lineItem.name.trim() || "—";
+  const label =
+    option.lineItem.name.trim() ||
+    option.lineItem.materials?.[0]?.name ||
+    option.lineItem.mechanisms?.[0]?.name ||
+    "—";
   const showAttachModuleSize = hasDefinedLaborLineItem(
     option.lineItem,
     catalogPositions,
@@ -214,6 +219,15 @@ function MultiOptionSubRow({
   const missingTimeNorm =
     isCompositeLineItem(option.lineItem) &&
     !((option.lineItem.laborTimeNorm ?? 0) > 0);
+  const missingModuleSize =
+    moduleSizeOptions.length > 0 &&
+    !hasModuleSizeAttachment(option.lineItem) &&
+    !isVariableQuantityLineItem(option.lineItem, catalogPositions);
+  const moduleSizeUnit =
+    !isVariableQuantityLineItem(option.lineItem, catalogPositions)
+      ? resolveLineItemDisplayUnitFromModuleSize(option.lineItem, moduleSizeOptions)
+      : null;
+  const displayUnit = moduleSizeUnit ?? (option.lineItem.unit.trim() || "—");
   const displayPrices = resolveDisplayUnitPrice(
     option.lineItem,
     catalogPositions,
@@ -276,9 +290,11 @@ function MultiOptionSubRow({
 
   const rowBg = isLinkDropTarget
     ? "bg-violet-100/70 ring-1 ring-inset ring-violet-300"
-    : missingTimeNorm
-      ? "bg-amber-50/60"
-      : "bg-violet-50/20";
+    : missingModuleSize
+      ? "bg-red-50/60"
+      : missingTimeNorm
+        ? "bg-amber-50/60"
+        : "bg-violet-50/20";
 
   return (
     <tr
@@ -305,21 +321,33 @@ function MultiOptionSubRow({
               <div className="flex min-w-0 flex-1 flex-col gap-0 leading-snug">
                 <div
                   className={`text-sm ${
-                    missingTimeNorm
-                      ? "text-amber-700 font-medium"
-                      : showAttachModuleSize
-                        ? "font-semibold text-zinc-700"
-                        : "text-zinc-700"
+                    missingModuleSize
+                      ? "font-medium text-red-700"
+                      : missingTimeNorm
+                        ? "text-amber-700 font-medium"
+                        : showAttachModuleSize
+                          ? "font-semibold text-zinc-700"
+                          : "text-zinc-700"
                   }`}
                 >
                   {label}
-                  {missingTimeNorm ? (
+                  {missingModuleSize ? (
+                    <i
+                      className="fas fa-exclamation-triangle ml-1.5 text-xs text-red-500"
+                      aria-hidden="true"
+                    />
+                  ) : missingTimeNorm ? (
                     <i
                       className="fas fa-exclamation-triangle ml-1.5 text-xs text-amber-500"
                       aria-hidden="true"
                     />
                   ) : null}
                 </div>
+                {missingModuleSize ? (
+                  <span className="text-xs text-red-500">
+                    Nav pievienots moduļa apjoms
+                  </span>
+                ) : null}
                 {missingTimeNorm ? (
                   <span className="text-xs text-amber-600">
                     Nav ievadīta Laika norma
@@ -370,7 +398,7 @@ function MultiOptionSubRow({
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
         <span className={`${readOnlyNum} text-zinc-500`}>
-          {option.lineItem.unit.trim() || "—"}
+          {displayUnit}
         </span>
       </td>
       {showQuantityColumn ? (
@@ -462,6 +490,12 @@ export function EstimateMultiPositionRow({
   const showQuantityInput =
     selectedLineItem != null &&
     isVariableQuantityLineItem(selectedLineItem, catalogPositions);
+  const selectedModuleSizeUnit =
+    selectedLineItem != null && !showQuantityInput
+      ? resolveLineItemDisplayUnitFromModuleSize(selectedLineItem, moduleSizeOptions)
+      : null;
+  const selectedDisplayUnit =
+    selectedModuleSizeUnit ?? (selectedLineItem?.unit.trim() || "—");
   const attachedQuantity =
     selectedLineItem != null
       ? resolveLineItemDisplayQuantityFromModuleSize(
@@ -582,7 +616,7 @@ export function EstimateMultiPositionRow({
             </td>
             <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
               <span className={`${readOnlyNum} text-zinc-500`}>
-                {selectedLineItem?.unit.trim() || "—"}
+                {selectedDisplayUnit}
               </span>
             </td>
             {showQuantityColumn ? (

@@ -3,6 +3,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { EstimatePdfDocument } from "@/app/lib/exports/estimate-pdf";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getProjectEstimate } from "@/app/lib/projects/repository";
@@ -15,6 +16,10 @@ export async function GET(
   const user = await getCurrentUser();
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  if (!checkRateLimit(`pdf:${user.id}`, 20, 60_000)) {
+    return rateLimitResponse();
   }
 
   const { projectId } = await params;

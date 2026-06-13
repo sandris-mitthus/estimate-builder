@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Projekti" },
   { href: "/modules", label: "Ēku moduļi" },
   { href: "/estimate", label: "Sagatave" },
-  { href: "/positions", label: "Pozicijas" },
+  { href: "/settings/positions", label: "Pozīcijas" },
   { href: "/users", label: "Lietotāji" },
   { href: "/settings", label: "Uzstādījumi" },
 ] as const;

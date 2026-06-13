@@ -17,6 +17,11 @@ export type LineItemCatalogRef = {
   positionPriceId: string;
   name: string;
   unit: string;
+  /**
+   * Materiāla patēriņš uz vienu pozīcijas (moduļa apjoma) mērvienību, kad materiāla
+   * mērvienība atšķiras no pozīcijas mērvienības (piem. m uz vienu m²). Nav norādīts = 1.
+   */
+  consumption?: number;
 };
 
 export type EstimateLineItem = {

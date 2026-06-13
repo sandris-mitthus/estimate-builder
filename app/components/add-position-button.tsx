@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useState, useTransition } from "react";
 
-import { createPositionAction } from "@/app/(protected)/positions/actions";
+import { createPositionAction } from "@/app/(protected)/settings/positions/actions";
 
 import {
   AppModal,

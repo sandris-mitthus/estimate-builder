@@ -25,6 +25,12 @@ function purgeForeignSupabaseCookies(
   }
 }
 
+const PUBLIC_PATHS = ["/auth/", "/auth/auth-code-error"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
+
 export async function updateSession(request: NextRequest) {
   const env = getSupabasePublicEnv();
   if (!env) {
@@ -52,8 +58,20 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   purgeForeignSupabaseCookies(request, supabaseResponse, storageKey);
+
+  const { pathname } = request.nextUrl;
+
+  if (!user && !isPublicPath(pathname) && pathname !== "/") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/";
+    loginUrl.search = "";
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 }

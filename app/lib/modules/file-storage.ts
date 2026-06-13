@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
 
 export const MODULE_ASSETS_BUCKET = "module-assets";
@@ -100,6 +101,11 @@ export async function uploadScopedBlockFile(
     return validation;
   }
 
+  const magicCheck = await validateFileMagicBytes(file, file.type);
+  if (!magicCheck.ok) {
+    return magicCheck;
+  }
+
   const blockId = crypto.randomUUID();
   let storagePath: string;
   const root = storageRoot(scope, ownerId);
@@ -128,16 +134,14 @@ export async function uploadScopedBlockFile(
     return { ok: false, error: "Neizdevās augšupielādēt failu." };
   }
 
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(MODULE_ASSETS_BUCKET).getPublicUrl(storagePath);
+  const proxyUrl = `/api/modules/asset?path=${encodeURIComponent(storagePath)}`;
 
   return {
     ok: true,
     block: {
       id: blockId,
       title: sanitizeFileName(file.name),
-      fileUrl: publicUrl,
+      fileUrl: proxyUrl,
       mimeType: file.type,
       storagePath,
     },

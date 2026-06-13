@@ -325,7 +325,11 @@ export function getMultiPositionSelectionOptions(
     )
     .map((option) => ({
       id: option.id,
-      label: option.lineItem.name.trim() || "—",
+      label:
+        option.lineItem.name.trim() ||
+        option.lineItem.materials?.[0]?.name ||
+        option.lineItem.mechanisms?.[0]?.name ||
+        "—",
     }));
 
   return [
@@ -347,6 +351,16 @@ export function resolveSelectedMultiLineItem(
 
   const option = multi.options.find((entry) => entry.id === selectedId);
   return option?.lineItem ?? null;
+}
+
+/** Atgriež pozīcijas rādāmo nosaukumu: ievadīts nosaukums → pirmā materiāla nosaukums → pirmā mehānisma nosaukums → "—". */
+export function resolveLineItemDisplayName(item: EstimateLineItem): string {
+  return (
+    item.name.trim() ||
+    item.materials?.[0]?.name ||
+    item.mechanisms?.[0]?.name ||
+    "—"
+  );
 }
 
 export function collectRowLineItems(

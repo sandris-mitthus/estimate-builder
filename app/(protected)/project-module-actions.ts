@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAuth } from "@/app/lib/auth/require-auth";
 import type { ModuleBlockKind } from "@/app/lib/modules/types";
 import {
   removeProjectModuleBlock,
@@ -22,6 +23,9 @@ function revalidateProject(projectId: string) {
 export async function updateProjectModuleBlocksAction(
   input: UpdateProjectModuleBlocksInput,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateProjectModuleBlocks(input);
 
   if (result.ok) {
@@ -34,6 +38,9 @@ export async function updateProjectModuleBlocksAction(
 export async function updateProjectProjectDescriptionAction(
   input: UpdateProjectProjectDescriptionInput,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateProjectProjectDescription(input);
 
   if (result.ok) {
@@ -48,6 +55,9 @@ export async function uploadProjectModuleBlockAction(
   kind: ModuleBlockKind,
   formData: FormData,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const file = formData.get("file");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -68,6 +78,9 @@ export async function removeProjectModuleBlockAction(
   kind: ModuleBlockKind,
   blockId: string,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await removeProjectModuleBlock(projectId, kind, blockId);
 
   if (result.ok) {

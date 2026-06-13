@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { inviteUser } from "@/app/lib/users/repository";
+import { requireAuth } from "@/app/lib/auth/require-auth";
 
 export async function inviteUserAction(email: string) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const emailError = validateRequiredEmail(email);
   if (emailError) {
     return { ok: false as const, error: emailError };

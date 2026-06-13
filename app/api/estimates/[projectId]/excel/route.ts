@@ -1,6 +1,7 @@
 "use server";
 
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { buildEstimateExcel } from "@/app/lib/exports/estimate-excel";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getProjectEstimate } from "@/app/lib/projects/repository";
@@ -15,6 +16,10 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
 
+  if (!checkRateLimit(`excel:${user.id}`, 20, 60_000)) {
+    return rateLimitResponse();
+  }
+
   const { projectId } = await params;
   const [estimate, catalogPositions, companySettings] = await Promise.all([
     getProjectEstimate(projectId),
@@ -26,7 +31,7 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const buffer = buildEstimateExcel(
+  const buffer = await buildEstimateExcel(
     estimate.title,
     estimate.meta,
     estimate.categories,

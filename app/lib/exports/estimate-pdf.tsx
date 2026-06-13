@@ -8,7 +8,10 @@ import {
 } from "@react-pdf/renderer";
 import { addThousandSeparators, roundToTwoDecimals, sumBreakdown } from "@/app/lib/estimates/calculate-line";
 import { calculateEstimateTotals } from "@/app/lib/estimates/calculate-totals";
-import { collectRowLineItems } from "@/app/lib/estimates/multi-position";
+import {
+  collectRowLineItems,
+  resolveLineItemDisplayName,
+} from "@/app/lib/estimates/multi-position";
 import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
 import type { EstimateCategory, EstimateLineItem } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
@@ -165,7 +168,7 @@ export function EstimatePdfDocument({ title, meta, categories, catalogPositions,
                 return (
                   <View key={item.id} style={s.itemRow}>
                     <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                    <Text style={[s.cell, s.colName]}>{item.name || "—"}</Text>
+                    <Text style={[s.cell, s.colName]}>{resolveLineItemDisplayName(item)}</Text>
                     <Text style={[s.cell, s.colUnit]}>{item.unit || "—"}</Text>
                     <Text style={[s.cell, s.colQty]}>{fmtQty(item.quantity)}</Text>
                     <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
@@ -211,7 +214,7 @@ export function EstimatePdfDocument({ title, meta, categories, catalogPositions,
                       return (
                         <View key={item.id} style={s.itemRow}>
                           <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                          <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>{item.name || "—"}</Text>
+                          <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>{resolveLineItemDisplayName(item)}</Text>
                           <Text style={[s.cell, s.colUnit]}>{item.unit || "—"}</Text>
                           <Text style={[s.cell, s.colQty]}>{fmtQty(item.quantity)}</Text>
                           <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>

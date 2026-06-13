@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.2.7` (see [Changelog](#changelog))
+**Current version:** `1.2.9` (see [Changelog](#changelog))
 
 ---
 
@@ -25,7 +25,7 @@ English routes, Latvian labels:
 | Projekti | `/` |
 | Ēku moduļi | `/modules` |
 | Sagatave | `/estimate` |
-| Pozicijas | `/positions` |
+| Pozicijas | `/settings/positions` |
 | Lietotāji | `/users` |
 | Uzstādījumi | `/settings` |
 
@@ -90,7 +90,7 @@ English routes, Latvian labels:
 - **Tailwind CSS 4**
 - **@dnd-kit** — drag and drop
 - **@react-pdf/renderer** — server-side PDF generation (estimate proposal); `serverExternalPackages` in `next.config.ts`
-- **xlsx** — Excel workbook generation (estimate spreadsheet)
+- **exceljs** — Excel workbook generation (estimate spreadsheet) with merged headers and cell borders
 - **pdfjs-dist** — PDF first-page thumbnails in module detail (legacy build + `public/pdf.worker.min.mjs` via `postinstall`)
 - **Font Awesome** — icons
 
@@ -140,6 +140,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Address autocomplete | Places API (New) via `/api/places/autocomplete`; HTTP referrers must include site URL |
 | `GOOGLE_MAPS_API_KEY` | Optional | Server-only key override (defaults to public key on server) |
+| `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
 
 Google Maps key referrers (when restricted): `http://localhost:3100/*`, `http://127.0.0.1:3100/*`. Enable **Places API (New)** and **Maps Embed API** in Cloud Console.
 
@@ -158,9 +159,10 @@ npm run db:test
 5. Set redirect URLs: Authentication → URL Configuration  
    - Site URL: `http://localhost:3100`  
    - Redirect: `http://localhost:3100/auth/callback`
-6. Start the app — sign in, then `/` loads projects from `public.projects`
+6. *(Optional)* Disable public sign-ups in Authentication → Settings → User Signups (use invites only)
+7. Start the app — sign in, then `/` loads projects from `public.projects`
 
-**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` / `project_description` for individual projects, `status` `active` | `approved` | `rejected` | `completed` in `026` + `027`, `007` + `015` + `017` + `025`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`, `project_description` in `025`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets`, `module-assets` (module + project asset paths)
+**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` / `project_description` for individual projects, `status` `active` | `approved` | `rejected` | `completed` in `026` + `027`, `007` + `015` + `017` + `025`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`, `project_description` in `025`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets` (private, `028`), `module-assets` (private, `028`; module + project asset paths)
 
 ---
 
@@ -178,21 +180,22 @@ app/
 │   │   └── module-data/page.tsx   # Individual project module uploads
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads, project description)
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
-│   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
+│   ├── settings/positions/  # page + CRUD / price-update / history / catalog sync actions (was /positions)
 │   ├── users/          # page + inviteUserAction
 │   └── settings/
 ├── api/
 │   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
 │   ├── estimates/[projectId]/excel/  # Authenticated Excel download (Tāme)
-│   ├── geo/calling-code/   # IP → phone country code
+│   ├── company/logo/       # Authenticated company logo proxy (private bucket)
+│   ├── geo/calling-code/   # IP → phone country code (auth required)
 │   ├── modules/asset/      # Authenticated PDF/image proxy (modules + projects paths)
-│   └── places/autocomplete/ # Google Places (New) proxy
+│   └── places/autocomplete/ # Google Places (New) proxy (auth + rate limited)
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
 ├── components/         # UI (estimate-table, project-page-actions, project-archive-content, project-status-filter, estimate-position-table, …)
 ├── lib/
-│   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay
+│   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay, require-auth
 │   ├── client/         # cookie read/write helpers
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, project-estimate-base, default sagatave
 │   ├── estimates/      # calculate-totals, calculate-line (addThousandSeparators), format-money, multi-position, multi-position-links, composite-line-item, unit-price-columns, volume-price-columns, module-size-attachment, sync-module-size-quantities, resolve-estimate-meta, sample data, DnD reorder
@@ -207,12 +210,13 @@ app/
 │   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
 │   ├── users/          # Auth user list + invite (admin API)
 │   ├── validation/     # email, phone, formatDisplayPhone
-│   ├── security/       # safe redirect paths
-│   └── supabase/       # clients, update-session, storage-key cookie cleanup
-proxy.ts                # Supabase session refresh
+│   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
+│   └── supabase/       # clients, update-session (session refresh + auth redirect), storage-key cookie cleanup
+proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall from pdfjs-dist)
-supabase/migrations/
+supabase/migrations/    # 001–028 (028 = private storage buckets)
+.github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
 
@@ -243,6 +247,20 @@ supabase/migrations/
 - [x] Projekta statuss — **Apstiprināts** / **Noraidīts** / **Pabeigts** + **Arhīvs** ar statusa filtru
 - [ ] User management beyond read-only list and email invite
 - [ ] Use company settings + logo on estimate PDF/header
+
+---
+
+## CI / Security checks
+
+Three GitHub Actions workflows run on every push and pull request:
+
+| Workflow | File | What it checks |
+|----------|------|----------------|
+| **Secret scan** | `.github/workflows/secret-scan.yml` | gitleaks — API keys, tokens, passwords in git history |
+| **Security audit** | `.github/workflows/security-audit.yml` | `npm audit` — HIGH and CRITICAL dependency vulnerabilities |
+| **Security smoke** | `.github/workflows/security-smoke.yml` | TypeScript, lint, production build, `requireAuth` on all actions, no `eval()`, security headers |
+
+> `GITLEAKS_LICENSE` repo secret is required only for **private** repositories (free for public repos).
 
 ---
 
@@ -280,6 +298,37 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.2.9
+
+**Materiāla patēriņš, kompozītu kopsummu labojums, opciju nosaukumu fallback un UI kļūdu labojumi**
+
+- **Materiāla patēriņš** (`consumption`) — jauns neobligāts lauks `LineItemCatalogRef.consumption`; kad materiāla mērvienība atšķiras no pozīcijas moduļa mērvienības (piem. m pret m²), parādās `MaterialConsumptionInput` pozīcijas un multi-pozīcijas modāļos; `deriveCompositeUnitPrice` reizina katra materiāla cenu ar patēriņa koeficientu (noklusējums 1); `refreshCatalogRef` saglabā `consumption` vērtību pie kataloga atsvaidzināšanas
+- **Kompozītu kopsummu labojums** (`calculate-totals.ts`) — `calculateEstimateTotals` kompozītajiem elementiem tagad vienmēr izsauc `deriveCompositeUnitPrice` (aktuāla struktūra ar `consumption`), nevis izmanto iesaldēto `item.unitPrice`; pirms šī labojuma patēriņš netika atspoguļots kopsummās, ja tāme bija saglabāta pirms `consumption` pievienošanas
+- **Moduļa lieluma mērvienības sinhronizācija** (`sync-module-size-quantities.ts`) — `syncLineItemQuantityFromModuleSize` tagad sinhronizē arī `item.unit` no moduļa lieluma, ne tikai `quantity`; saglabājot projekta tāmi, mērvienība tiek atjaunināta automātiski, ja pozīcijai ir `moduleSizeAttachment`
+- **Multi-pozīciju opciju nosaukumi** (`multi-position.ts`) — `getMultiPositionSelectionOptions` (opciju select projekta tāmē) un jauna `resolveLineItemDisplayName` helper funkcija tagad izmanto materiāla/mehānisma nosaukumu kā fallback, ja opcija nav nosaukta; šī pati loģika pielietota **Excel** un **PDF** eksportā
+- **Google avatari** (`user-avatar.tsx`, `users/repository.ts`) — `UserAvatar` pārveidots par klienta komponentu ar `onError` apstrādi — bojāta Google attēla URL gadījumā tiek parādīti iniciāļi; `resolveAvatarUrl` tagad pārbauda arī `user.identities[].identity_data`, kur dažiem Google OAuth lietotājiem avatar URL tiek glabāts
+- **`/positions` novirzīšana** (`next.config.ts`) — pievienots pastāvīgs redirect `/positions` → `/settings/positions`; novērš konsoles kļūdu `invalid input syntax for type uuid: "positions"` no `[id]` dinamiskā maršruta
+
+### v1.2.8
+
+**Security hardening — auth guards, private storage, rate limiting, CI**
+
+- **`requireAuth()`** helper (`app/lib/auth/require-auth.ts`) — added to every server action (projects, estimates, positions, modules, settings, users); unauthenticated calls now return `{ ok: false, error: "Nav autorizācijas." }` instead of silently executing with service role
+- **Middleware redirect** (`update-session.ts`) — unauthenticated requests to non-`/auth/*` routes are now redirected to `/` (defense in depth on top of layout login gate)
+- **Private storage buckets** — migration `028_private_storage_buckets.sql` makes `module-assets` and `company-assets` private; files served only through authenticated proxies (`/api/modules/asset`, `/api/company/logo`)
+- **`/api/company/logo`** — new authenticated route to serve the company logo from private Supabase storage
+- **Google OAuth domain restriction** — optional `ALLOWED_EMAIL_DOMAIN` env var; if set, users whose email does not match the domain are signed out at callback
+- **X-Forwarded-Host validation** (`auth/callback`) — host validated against `NEXT_PUBLIC_SITE_URL` in production to prevent open-redirect via header injection
+- **Rate limiting** (`app/lib/security/rate-limit.ts`) — 60 req/min on Places API (per user), 20 req/min on PDF/Excel export
+- **Magic-byte validation** (`app/lib/security/magic-bytes.ts`) — file uploads (module images, project PDFs, company logo) validated against actual header bytes, not just `Content-Type`
+- **Production guard** — when Supabase is not configured in `NODE_ENV=production`, layout blocks access instead of showing the app in open demo mode
+- **Security headers** — added `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`; HSTS when `NEXT_PUBLIC_SITE_URL` starts with `https://`; `unsafe-eval` in CSP only in development (React debugger requirement)
+- **Error sanitization** — Supabase and Google API error messages no longer forwarded to clients
+- **`logoUrl` validation** — `saveCompanySettings` rejects any URL that is not a `/api/company/logo` path
+- **Auth on geo + Places endpoints** — `/api/geo/calling-code` and `/api/places/autocomplete` now require a valid session
+- **GitHub Actions** (`.github/workflows/`) — 3 new workflows on every push: `secret-scan` (gitleaks), `security-audit` (npm audit high+), `security-smoke` (typecheck + lint + build + static security checks)
+- **`security-check.md`** — full audit report with findings, fixes applied, score (4/10 → 8/10), and remaining TODO
 
 ### v1.2.7
 

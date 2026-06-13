@@ -23,6 +23,12 @@ export default async function ProtectedLayout({
     }
 
     currentUser = mapUserDisplay(user);
+  } else if (process.env.NODE_ENV === "production") {
+    return (
+      <FeedbackToastProvider>
+        <LoginGate />
+      </FeedbackToastProvider>
+    );
   }
 
   return (

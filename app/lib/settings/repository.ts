@@ -44,12 +44,19 @@ function mapSettings(settings: CompanySettings): Omit<CompanySettingsRow, "id"> 
     currency: isCurrencyCode(settings.currency)
       ? settings.currency
       : DEFAULT_CURRENCY,
-    logo_url: settings.logoUrl.trim(),
+    logo_url: sanitizeLogoUrl(settings.logoUrl),
     estimate_validity_days: normalizeEstimateValidityDays(
       settings.estimateValidityDays,
     ),
     default_hourly_rate: normalizeDefaultHourlyRate(settings.defaultHourlyRate),
   };
+}
+
+function sanitizeLogoUrl(url: string): string {
+  const trimmed = url.trim();
+  if (trimmed === "") return "";
+  if (trimmed.startsWith("/api/company/logo")) return trimmed;
+  return "";
 }
 
 export async function getCompanySettings(): Promise<CompanySettings> {
@@ -90,7 +97,7 @@ export async function saveCompanySettings(
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: "Neizdevās saglabāt iestatījumus." };
   }
 
   return { ok: true };

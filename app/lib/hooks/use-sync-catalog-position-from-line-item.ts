@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useTransition } from "react";
-import { syncPositionFromEstimateLineItemAction } from "@/app/(protected)/positions/actions";
+import { syncPositionFromEstimateLineItemAction } from "@/app/(protected)/settings/positions/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import type { EstimateLineItem } from "@/app/lib/estimates/types";
 import {

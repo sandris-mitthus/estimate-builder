@@ -14,7 +14,7 @@ import {
 
   updatePositionUnitPriceAction,
 
-} from "@/app/(protected)/positions/actions";
+} from "@/app/(protected)/settings/positions/actions";
 
 import { ConfirmModal } from "@/app/components/confirm-modal";
 

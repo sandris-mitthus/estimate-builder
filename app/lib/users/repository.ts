@@ -1,19 +1,33 @@
 import type { User } from "@supabase/supabase-js";
-import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
+import { mapUserDisplay, readAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { SAMPLE_USERS } from "@/app/lib/users/sample-users";
 import type { UserSummary } from "@/app/lib/users/types";
 
+function resolveAvatarUrl(user: User): string | null {
+  const { avatarUrl } = mapUserDisplay(user);
+  if (avatarUrl) return avatarUrl;
+
+  // Dažiem Google OAuth lietotājiem avatars ir tikai identities datos.
+  for (const identity of user.identities ?? []) {
+    const data = identity.identity_data ?? {};
+    const url = readAvatarUrl(data as Record<string, unknown>);
+    if (url) return url;
+  }
+
+  return null;
+}
+
 function mapAuthUser(user: User): UserSummary {
-  const { name, avatarUrl } = mapUserDisplay(user);
+  const { name } = mapUserDisplay(user);
 
   return {
     id: user.id,
     name,
     email: user.email ?? "—",
-    avatarUrl,
+    avatarUrl: resolveAvatarUrl(user),
   };
 }
 

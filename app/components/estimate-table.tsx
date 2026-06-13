@@ -102,6 +102,7 @@ import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import {
   hasModuleSizeAttachment,
   resolveLineItemDisplayQuantityFromModuleSize,
+  syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
   formatQuantityDisplay,
@@ -135,7 +136,6 @@ import {
 } from "@/app/lib/estimates/multi-position-links";
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import {
-  collectSelectedMultiOptionKeys,
   createMultiPosition,
   isEstimateMultiPosition,
   removeRowItemById,
@@ -579,10 +579,6 @@ function SortableMultiPositionRow({
     disabled: estimateLocked,
     animateLayoutChanges: () => false,
   });
-  const excludedSelectionKeys = useMemo(
-    () => collectSelectedMultiOptionKeys(allCategories, value.id),
-    [allCategories, value.id],
-  );
   return (
     <EstimateMultiPositionRow
       mode="offer"
@@ -599,7 +595,6 @@ function SortableMultiPositionRow({
       }
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
-      excludedSelectionKeys={excludedSelectionKeys}
       optionLinkActions={optionLinkActions}
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
@@ -1647,8 +1642,17 @@ export function EstimateTable({
     setIsSaving(true);
     clearFeedback();
 
+    const syncedCategories =
+      moduleSizeOptions.length > 0
+        ? syncCategoriesQuantitiesFromModuleSizes(
+            categories,
+            moduleSizeOptions[0].projectDescription,
+            catalogPositions,
+          )
+        : categories;
+
     const bakedCategories = bakeInCatalogPrices(
-      categories,
+      syncedCategories,
       catalogPositions,
       defaultHourlyRate,
     );

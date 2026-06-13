@@ -8,6 +8,7 @@ import {
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
+import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
@@ -147,6 +148,25 @@ export function MultiPositionModal({
   const dirty =
     snapshot({ name, attachment, options }) !== initialSnapshot;
 
+  // Pozīcijas mērvienība no vienotā moduļa apjoma (piem. m²). Tikai tad var ievadīt patēriņu.
+  const positionUnit = useMemo(
+    () =>
+      attachment
+        ? resolveLineItemDisplayUnitFromModuleSize(
+            {
+              id: "preview",
+              name: "",
+              unit: "gab.",
+              quantity: 1,
+              unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
+              moduleSizeAttachment: attachment,
+            },
+            moduleSizeOptions,
+          )
+        : null,
+    [attachment, moduleSizeOptions],
+  );
+
   function updateOption(optionId: string, updates: Partial<OptionDraft>) {
     setOptions((current) =>
       current.map((entry) =>
@@ -176,6 +196,25 @@ export function MultiPositionModal({
           ? {
               ...entry,
               materials: entry.materials.filter((_, i) => i !== index),
+            }
+          : entry,
+      ),
+    );
+  }
+
+  function updateMaterialConsumption(
+    optionId: string,
+    index: number,
+    consumption: number,
+  ) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              materials: entry.materials.map((mat, i) =>
+                i === index ? { ...mat, consumption } : mat,
+              ),
             }
           : entry,
       ),
@@ -242,11 +281,7 @@ export function MultiPositionModal({
     const finalOptions = meaningful.length > 0 ? meaningful : [options[0]];
 
     const builtOptions = finalOptions.map((option) => {
-      const label =
-        option.label.trim() ||
-        option.materials[0]?.name ||
-        option.mechanisms[0]?.name ||
-        "";
+      const label = option.label.trim();
       const partialItem: EstimateLineItem = {
         id: option.lineItemId,
         name: label,
@@ -408,27 +443,51 @@ export function MultiPositionModal({
                     <div>
                       <span className={subLabelClassName}>Materiāli</span>
                       <div className="space-y-1.5">
-                        {option.materials.map((mat, matIdx) => (
-                          <div
-                            key={`${mat.positionPriceId}-${matIdx}`}
-                            className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                          >
-                            <span className="min-w-0 flex-1 truncate text-zinc-800">
-                              {mat.name}
-                            </span>
-                            <span className="shrink-0 text-xs text-zinc-400">
-                              {mat.unit}
-                            </span>
-                            <IconActionButton
-                              label="Noņemt materiālu"
-                              icon="fas fa-times"
-                              variant="delete"
-                              onClick={() =>
-                                removeMaterial(option.optionId, matIdx)
-                              }
-                            />
-                          </div>
-                        ))}
+                        {option.materials.map((mat, matIdx) => {
+                          const showConsumption =
+                            positionUnit != null &&
+                            mat.unit.trim() !== positionUnit;
+                          return (
+                            <div
+                              key={`${mat.positionPriceId}-${matIdx}`}
+                              className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
+                            >
+                              <span className="min-w-0 flex-1 truncate text-zinc-800">
+                                {mat.name}
+                              </span>
+                              {showConsumption ? (
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <MaterialConsumptionInput
+                                    value={mat.consumption ?? 1}
+                                    onChange={(consumption) =>
+                                      updateMaterialConsumption(
+                                        option.optionId,
+                                        matIdx,
+                                        consumption,
+                                      )
+                                    }
+                                    aria-label={`Patēriņš ${mat.unit} uz ${positionUnit}`}
+                                  />
+                                  <span className="text-xs text-zinc-400">
+                                    {mat.unit}/{positionUnit}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="shrink-0 text-xs text-zinc-400">
+                                  {mat.unit}
+                                </span>
+                              )}
+                              <IconActionButton
+                                label="Noņemt materiālu"
+                                icon="fas fa-times"
+                                variant="delete"
+                                onClick={() =>
+                                  removeMaterial(option.optionId, matIdx)
+                                }
+                              />
+                            </div>
+                          );
+                        })}
                         <CatalogHintField
                           key={`${option.optionId}-mat-${option.materialAddKey}`}
                           value={null}

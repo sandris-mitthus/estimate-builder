@@ -3,8 +3,19 @@ import {
   fetchPlaceSuggestions,
 } from "@/app/lib/google-maps/places-api";
 import { isGoogleMapsConfigured } from "@/app/lib/google-maps/env";
+import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 
 export async function GET(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  if (!checkRateLimit(`places:${user.id}`, 60, 60_000)) {
+    return rateLimitResponse();
+  }
+
   if (!isGoogleMapsConfigured()) {
     return Response.json(
       { error: "Google Maps nav konfigurēts." },
@@ -35,11 +46,10 @@ export async function GET(request: Request) {
   try {
     const suggestions = await fetchPlaceSuggestions(input);
     return Response.json({ suggestions });
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Neizdevās ielādēt adreses ieteikumus.";
-    return Response.json({ error: message }, { status: 502 });
+  } catch {
+    return Response.json(
+      { error: "Neizdevās ielādēt adreses ieteikumus." },
+      { status: 502 },
+    );
   }
 }

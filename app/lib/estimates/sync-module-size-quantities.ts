@@ -91,24 +91,26 @@ export function buildProjectModuleSizeOptions(
   return options;
 }
 
+function resolveSummaryItemFromAttachment(
+  attachment: LineItemModuleSizeAttachment,
+  projectDescription: ProjectDescriptionFormState,
+) {
+  const adjustments = getLineItemModuleSizeAdjustments(attachment);
+  const sections =
+    Object.keys(adjustments).length > 0
+      ? buildAdjustedModuleSizeSummarySections(projectDescription, adjustments)
+      : buildModuleSizeSummarySections(projectDescription);
+  return findModuleSizeSummaryItem(sections, attachment.itemKey);
+}
+
 export function resolveQuantityFromModuleSizeAttachment(
   attachment: LineItemModuleSizeAttachment,
   projectDescription: ProjectDescriptionFormState,
 ): number | null {
-  const adjustments = getLineItemModuleSizeAdjustments(attachment);
-  const sections =
-    Object.keys(adjustments).length > 0
-      ? buildAdjustedModuleSizeSummarySections(
-          projectDescription,
-          adjustments,
-        )
-      : buildModuleSizeSummarySections(projectDescription);
-
-  const item = findModuleSizeSummaryItem(sections, attachment.itemKey);
+  const item = resolveSummaryItemFromAttachment(attachment, projectDescription);
   if (item?.numericValue == null || !Number.isFinite(item.numericValue)) {
     return null;
   }
-
   return roundQuantity(item.numericValue);
 }
 
@@ -177,16 +179,23 @@ export function syncLineItemQuantityFromModuleSize(
   }
 
   const normalizedItem = { ...item, moduleSizeAttachment: attachment };
-  const quantity = resolveQuantityFromModuleSizeAttachment(
-    attachment,
-    projectDescription,
-  );
+  const summaryItem = resolveSummaryItemFromAttachment(attachment, projectDescription);
 
-  if (quantity == null) {
+  if (summaryItem == null) {
     return normalizedItem;
   }
 
-  return { ...normalizedItem, quantity };
+  const quantity =
+    summaryItem.numericValue != null && Number.isFinite(summaryItem.numericValue)
+      ? roundQuantity(summaryItem.numericValue)
+      : null;
+  const unit = summaryItem.unit ?? null;
+
+  return {
+    ...normalizedItem,
+    ...(quantity != null ? { quantity } : {}),
+    ...(unit ? { unit } : {}),
+  };
 }
 
 function syncRowItemQuantityFromModuleSize(

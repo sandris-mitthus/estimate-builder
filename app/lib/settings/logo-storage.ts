@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
 
 export const COMPANY_LOGO_BUCKET = "company-assets";
 export const COMPANY_LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -73,6 +74,11 @@ export async function uploadCompanyLogo(
     return validation;
   }
 
+  const magicCheck = await validateFileMagicBytes(file, file.type);
+  if (!magicCheck.ok) {
+    return magicCheck;
+  }
+
   const extension = getLogoExtension(file.type);
   if (!extension) {
     return { ok: false, error: "Neatbalstīts attēla formāts." };
@@ -92,16 +98,12 @@ export async function uploadCompanyLogo(
     });
 
   if (uploadError) {
-    return { ok: false, error: uploadError.message };
+    return { ok: false, error: "Neizdevās augšupielādēt logotipu." };
   }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(COMPANY_LOGO_BUCKET).getPublicUrl(path);
 
   return {
     ok: true,
-    logoUrl: `${publicUrl}?v=${Date.now()}`,
+    logoUrl: `/api/company/logo?v=${Date.now()}`,
   };
 }
 

@@ -79,6 +79,7 @@ function refreshCatalogRef(
     positionPriceId: position.id,
     name: position.name,
     unit: position.unit,
+    ...(ref.consumption != null ? { consumption: ref.consumption } : {}),
   };
 }
 
@@ -103,10 +104,11 @@ export function deriveCompositeUnitPrice(
   const labor = roundToTwoDecimals(timeNorm * (defaultHourlyRate ?? 0));
 
   const materials = roundToTwoDecimals(
-    resolveEffectiveMaterials(item).reduce(
-      (sum, ref) => sum + resolveCatalogRefUnitPrice(ref, catalogPositions),
-      0,
-    ),
+    resolveEffectiveMaterials(item).reduce((sum, ref) => {
+      const price = resolveCatalogRefUnitPrice(ref, catalogPositions);
+      const consumption = ref.consumption ?? 1;
+      return sum + roundToTwoDecimals(price * consumption);
+    }, 0),
   );
 
   const mechanisms = roundToTwoDecimals(

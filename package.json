@@ -1,6 +1,6 @@
 {
   "name": "estimate-builder",
-  "version": "1.2.7",
+  "version": "1.2.9",
   "private": true,
   "scripts": {
     "dev": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next dev -p 3100",
@@ -20,6 +20,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
+    "exceljs": "^4.4.0",
     "next": "16.2.7",
     "pdfjs-dist": "^6.0.227",
     "react": "19.2.4",

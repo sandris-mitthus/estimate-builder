@@ -1,4 +1,8 @@
 import { multiplyBreakdown } from "@/app/lib/estimates/calculate-line";
+import {
+  deriveCompositeUnitPrice,
+  isCompositeLineItem,
+} from "@/app/lib/estimates/composite-line-item";
 import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
 import { collectRowLineItems } from "@/app/lib/estimates/multi-position";
 import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
@@ -35,9 +39,21 @@ export function collectEstimateLineItems(
 
 function resolveLineItemBreakdown(
   item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
   catalogById: Map<string, PositionPriceSummary>,
   defaultHourlyRate: number | null,
 ): PriceBreakdown {
+  const hasModuleSize =
+    !item.variableQuantity &&
+    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
+
+  if (isCompositeLineItem(item)) {
+    // Vienmēr rēķina no aktuālās struktūras (ietverot consumption), nevis iesaldētas cenas.
+    const unitPrice = deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
+    const shouldApply = (item.variableQuantity === true || hasModuleSize) && item.quantity > 0;
+    return shouldApply ? multiplyBreakdown(item.quantity, unitPrice) : unitPrice;
+  }
+
   const position = item.positionPriceId
     ? catalogById.get(item.positionPriceId)
     : undefined;
@@ -45,9 +61,6 @@ function resolveLineItemBreakdown(
     ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
     : item.unitPrice;
 
-  const hasModuleSize =
-    !item.variableQuantity &&
-    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
   const shouldApplyQuantity =
     (item.variableQuantity === true || position?.variableQuantity === true || hasModuleSize) &&
     item.quantity > 0;
@@ -77,6 +90,7 @@ export function calculateEstimateTotals(
   for (const item of collectEstimateLineItems(categories, { forTotals: true })) {
     const breakdown = resolveLineItemBreakdown(
       item,
+      catalogPositions,
       catalogById,
       defaultHourlyRate,
     );

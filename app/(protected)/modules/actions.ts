@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAuth } from "@/app/lib/auth/require-auth";
 import {
   createBuildingModule,
   deleteBuildingModule,
@@ -27,6 +28,9 @@ function revalidateModuleDetail(id: string) {
 }
 
 export async function createBuildingModuleAction(input: CreateBuildingModuleInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await createBuildingModule(input);
 
   if (result.ok) {
@@ -37,6 +41,9 @@ export async function createBuildingModuleAction(input: CreateBuildingModuleInpu
 }
 
 export async function updateBuildingModuleAction(input: UpdateBuildingModuleInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateBuildingModule(input);
 
   if (result.ok) {
@@ -47,6 +54,9 @@ export async function updateBuildingModuleAction(input: UpdateBuildingModuleInpu
 }
 
 export async function deleteBuildingModuleAction(id: string) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await deleteBuildingModule(id);
 
   if (result.ok) {
@@ -59,6 +69,9 @@ export async function deleteBuildingModuleAction(id: string) {
 export async function updateBuildingModuleBlocksAction(
   input: UpdateBuildingModuleBlocksInput,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateBuildingModuleBlocks(input);
 
   if (result.ok) {
@@ -72,6 +85,9 @@ export async function updateBuildingModuleBlocksAction(
 export async function updateBuildingModuleProjectDescriptionAction(
   input: UpdateBuildingModuleProjectDescriptionInput,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateBuildingModuleProjectDescription(input);
 
   if (result.ok) {
@@ -86,6 +102,9 @@ export async function uploadBuildingModuleBlockAction(
   kind: ModuleBlockKind,
   formData: FormData,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const file = formData.get("file");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -107,6 +126,9 @@ export async function removeBuildingModuleBlockAction(
   kind: ModuleBlockKind,
   blockId: string,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await removeBuildingModuleBlock(moduleId, kind, blockId);
 
   if (result.ok) {

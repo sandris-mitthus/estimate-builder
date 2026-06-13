@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 type UserAvatarProps = {
   avatarUrl: string | null;
   name: string;
@@ -21,10 +25,13 @@ export function UserAvatar({
   name,
   size = "md",
 }: UserAvatarProps) {
+  const [imgError, setImgError] = useState(false);
   const sizeClass = sizeClasses[size];
   const pixels = sizePixels[size];
 
-  if (avatarUrl) {
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
+
+  if (avatarUrl && !imgError) {
     return (
       <img
         src={avatarUrl}
@@ -32,11 +39,10 @@ export function UserAvatar({
         width={pixels}
         height={pixels}
         className={`${sizeClass} shrink-0 object-cover ring-1 ring-zinc-200`}
+        onError={() => setImgError(true)}
       />
     );
   }
-
-  const initial = name.trim().charAt(0).toUpperCase() || "?";
 
   return (
     <div

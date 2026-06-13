@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { requireAuth } from "@/app/lib/auth/require-auth";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
@@ -20,6 +21,9 @@ import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
 
 export async function createProjectAction(input: CreateProjectInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const contact = validateProjectContactFields({
     email: input.email,
     phone: input.phone,
@@ -50,6 +54,9 @@ export async function createProjectAction(input: CreateProjectInput) {
 }
 
 export async function updateProjectAction(input: UpdateProjectInput) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const contact = validateProjectContactFields({
     email: input.email,
     phone: input.phone,
@@ -78,6 +85,9 @@ export async function updateProjectEstimateDatesAction(
   projectId: string,
   dates: { date: string; deadline: string },
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateProjectEstimateDates(projectId, dates);
 
   if (result.ok) {
@@ -96,6 +106,9 @@ export async function saveProjectEstimateAction(
     multiOptionLinks: MultiOptionLinkGroup[];
   },
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await saveProjectEstimate(projectId, payload);
 
   if (result.ok) {
@@ -106,6 +119,9 @@ export async function saveProjectEstimateAction(
 }
 
 export async function deleteProjectAction(id: string) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await deleteProject(id);
 
   if (result.ok) {
@@ -119,6 +135,9 @@ export async function updateProjectStatusAction(
   projectId: string,
   status: ProjectStatus,
 ) {
+  const { denied } = await requireAuth();
+  if (denied) return denied;
+
   const result = await updateProjectStatus(projectId, status);
 
   if (result.ok) {
