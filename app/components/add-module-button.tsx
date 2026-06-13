@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createBuildingModuleAction } from "@/app/(protected)/modules/actions";
 import { AppModal } from "@/app/components/app-modal";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import {
@@ -13,6 +14,7 @@ import {
 
 export function AddModuleButton() {
   const router = useRouter();
+  const canManage = useActionPermission("modules.manage");
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -61,6 +63,10 @@ export function AddModuleButton() {
       showFeedback({ type: "success", text: "Modulis pievienots." });
       router.refresh();
     });
+  }
+
+  if (!canManage) {
+    return null;
   }
 
   return (

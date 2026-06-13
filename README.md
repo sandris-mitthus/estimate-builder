@@ -1,9 +1,9 @@
 # Estimate Builder
 
-Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, and drag-and-drop reordering. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, users, settings).
+Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.0` (see [Changelog](#changelog))
+**Current version:** `1.3.15` (see [Changelog](#changelog))
 
 ---
 
@@ -15,6 +15,18 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
+- **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
+
+### User groups and permissions
+
+- **4 noklusējuma grupas** (DB `user_groups`, migrācija `032`): **Administrators**, **Projektu vadītājs**, **Materiālu pasūtīšana**, **Skatītājs** — katrai savas navigācijas un darbību tiesības (`app/lib/auth/permissions.ts`)
+- **`/users`** — katram lietotājam grupas izvēle (`user-group-select.tsx`); **Uzaicināt** (ja `users.invite`); saite **Grupas un tiesības** (ja `groups.manage`)
+- **`/users/groups`** — matrica: ko grupa redz izvēlnē un ko drīkst darīt (`user-groups-permissions-form.tsx`); saglabāšana ar `updateUserGroupPermissionsAction`
+- **Jauns lietotājs** — reģistrācija/uzaicinājums **neuzstāda** grupu; **pirmajā piekļuvē** bez membership automātiski piešķirts **Skatītājs** (`ensureUserDefaultMembership`); administrators `/users` var paaugstināt grupu
+- **Eforcēšana** — `requireAction()` server actions; `assertNavAccess()` lapās; `AppNav` filtrēts pēc `permissions.nav`; PDF/Excel prasa `estimate.export`
+- **UI ↔ tiesības** — `ActionPermissionsProvider` + `useActionPermission()` (`action-permissions-context.tsx`); pogas/darbības slēptas pēc `permissions.actions` (projekti, tāme, sagatave, moduļi, pozīcijas, materiāli, settings)
+- **Administrators** — pilnas tiesības `getUserAccess()` (`createFullPermissions(true)`); nav `slug` apiešanas kodā; saglabāšanā admin grupai vienmēr pilns `permissions` JSON
+- **Migrācijas** — `032_user_groups.sql` (tabulas + RLS deny + sēkla); `033_repair_admin_group_memberships.sql` (admin tiesību atjaunošana + membership bez grupas → admin)
 
 ### Navigation
 
@@ -25,33 +37,37 @@ English routes, Latvian labels:
 | Projekti | `/` |
 | Ēku moduļi | `/modules` |
 | Sagatave | `/estimate` |
-| Pozicijas | `/settings/positions` |
-| Lietotāji | `/users` |
+| Pozicijas | `/positions` |
+| Neiekļautās pozīcijas | `/excluded-positions` |
+| Lietotāji | `/users` (apakšlapa **Grupas un tiesības**: `/users/groups`) |
 | Uzstādījumi | `/settings` |
 
-- **Projekti** — project cards (module name above client name, email, phone, address); galvenē **Jauns projekts** + **Arhīvs** (`fa-archive`, `/?archive=1`); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt** (vienmēr redzama), **Labot**, **Dzēst** (tikai `active`), **Apstiprināts**, **Noraidīts** (tikai `active`), **Pabeigts** (`fa-check-double`, tikai `approved`; `ConfirmModal`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos** tikai `active` projektiem ar novecojušām kataloga cenām; list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); sarakstā tikai `active` un `approved`; **Arhīvs** rāda visus statusus ar radio filtru (**Visi**, **Aktīvie**, **Procesā**, **Pabeigtie**, **Noraidītie**); **noraidītie** un **pabeigtie** paslēpti no galvenā saraksta, bet netiek dzēsti no DB
-- **Jauns projekts / Labot / Kopēt** — shared `ProjectFormModal` with **required Modulis** select (catalog modules + **Individuāls projekts** last); `building_module_id` on `projects`; client name, phone, email, address; phone country code from IP on create, parsed from stored number on edit; email/phone validation; **Google Places** autocomplete with map preview (including pre-filled address on edit); **Kopēt** (`fa-copy`) atver **Jauns projekts** modāli ar tukšiem kontaktu laukiem un avota moduli, bet izveides laikā tāme tiek klonēta no avota projekta (`copyEstimateFromProjectId`)
+- **Projekti** — project cards (module name above client name, email, phone, address); galvenē **Jauns projekts** + **Arhīvs** (`fa-archive`, `/?archive=1`); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt** (vienmēr redzama), **Labot**, **Dzēst** (tikai `active`), **Apstiprināts**, **Noraidīts** (tikai `active`), **Pabeigts** (`fa-check-double`, tikai `approved`; `ConfirmModal`); **`approved` kartes** — visa karte zaļā tonī (`bg-green-50`, `text-green-800`, `border-green-200`), bez atsevišķas statusa birkas; **`approved` ar nepasūtītiem materiāliem** — izteikts oranžs bloks kartē **Visi materiāli vēl nav pasūtīti!** (`listProjectIdsWithPendingMaterials`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos** tikai `active` projektiem ar novecojušām kataloga cenām; **dzeltena apmale** + **Sagatavē pievienotas jaunas pozīcijas** tikai `active` projektiem, kuru tāmē trūkst sagataves struktūras (izņemot **Kopēt** no cita projekta); list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); sarakstā tikai `active` un `approved`; **Arhīvs** rāda visus statusus ar radio filtru (**Visi**, **Aktīvie**, **Procesā**, **Pabeigtie**, **Noraidītie**); **noraidītie** un **pabeigtie** paslēpti no galvenā saraksta, bet netiek dzēsti no DB
+- **Jauns projekts / Labot / Kopēt** — shared `ProjectFormModal` with **required Modulis** select (catalog modules + **Individuāls projekts** last); `building_module_id` on `projects`; client name, phone, email, **free-text address**; phone country code from IP on create, parsed from stored number on edit; email/phone validation; **Kopēt** (`fa-copy`) atver **Jauns projekts** modāli ar tukšiem kontaktu laukiem un avota moduli, bet izveides laikā tāme tiek klonēta no avota projekta (`copyEstimateFromProjectId`)
 - **Ēku moduļi** (`/modules`, `/modules/[id]`) — module catalog in Supabase (`building_modules`); **Pievienot Moduli** (name only); cards with **Labot** / **Dzēst**; red **`fa-house-damage`** icon + tooltip **Nav ievadīti moduļu dati** when viz or project PDF missing; click name opens detail: left column **Vizualizācijas** (image upload grid, 2 per row, drag reorder) + **Projekts** (PDF only, same grid); right column **Projekta apraksts** (Pamats, L veida pamats, izgriezumi, Sienas ar **Frontoni** — augstums, skaits, pamata plakne; platums × augstums / 2 × skaits pieskaitīts ārsienu neto kvadratūrai; Logi, Durvis, Jumts — calculated fields, **Saglabāt** persists `project_description` JSON); **aptaksts** outline list below; empty states; toasts on file actions
-- **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāli · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `materials[]`, `mechanisms[]` (kataloga atsauces masīvi; vairāki materiāli summējas, vairāki mehānismi summējas × laika norma); Darbs = laika norma × stundas likme; **Laika norma** tieši rediģējama sarakstā (inline `LaborTimeNormInput` ar `−`/`+`, hover-only border/pogas); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāli/Mehānismi šūnās tooltip ar kataloga nosaukumu (ja vairāki — komatu atdalīti); rinda **sarkanā tonī** + `fa-exclamation-triangle` + teksts **Nav pievienots moduļa apjoms** pozīcijām bez `moduleSizeAttachment`, kad moduļu lielumi definēti; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; katras opcijas apakšā cenu kopsāvilkums (Darbs / Materiāli / Mehānismi / Vienības cena); **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder; **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
+- **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON) un **fa-stream** (dzeltens ieslēgts — paslēpt pozīciju cenas piedāvājumā; `hiddenPricesInOffer` JSON); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāli · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `materials[]`, `mechanisms[]` (kataloga atsauces masīvi; vairāki materiāli summējas, vairāki mehānismi summējas × laika norma); Darbs = laika norma × stundas likme; **Laika norma** tieši rediģējama sarakstā (inline `LaborTimeNormInput` ar `−`/`+`, hover-only border/pogas); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāli/Mehānismi šūnās tooltip ar kataloga nosaukumu (ja vairāki — komatu atdalīti); rinda **sarkanā tonī** + `fa-exclamation-triangle` + teksts **Nav pievienots moduļa apjoms** pozīcijām bez `moduleSizeAttachment`, kad moduļu lielumi definēti; pozīciju modālī slēdzis **Manuāli norādīta mērvienība** (`manualUnitEnabled` / `manualUnit`) ar select no tāmē jau lietotajām mērvienībām — materiāliem ar citu mērvienību rāda patēriņu uz izvēlēto; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; katras opcijas apakšā cenu kopsāvilkums (Darbs / Materiāli / Mehānismi / Vienības cena); **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder; **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
 - **Pozicijas** (`/positions`) — **materiālu un mehānismu** unit-price katalogs Supabase (`position_prices`; **Darbs** — no **Uzstādījumi** stundas likmes, ne šeit); searchable sortable table; kompakts **Veids** filtrs zem meklēšanas (**Visi** / **Materiāls** / **Mehānismi**); columns **Nosaukums**, **Veids**, **Cena** (`2.91 EUR / gab.` + update date; bez cenas `- EUR / gab.`), **Darbības**; **Pievienot pozīciju** / **Labot** modals (tikai Materiāls / Mehānismi — cost-type radio above name + unit with hints, 80/20; optional **mainīgs apjoms** toggle — enables editable **Apj.** cell in project estimates for linked rows); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); **Vēsture** row action opens extra-wide modal with price log (date, amount, “No …” delta, supplier on two lines with phone/email icons); row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`; **nosaukums / mērvienība** atjaunināti arī no sagataves vai projekta tāmes, ja rinda saistīta ar katalogu (`positionPriceId` vai unikāla nosaukuma atbilstība)
-- **Lietotāji** — Supabase Auth users (name, email, Google avatar); **Uzaicināt** modal sends email invite via admin API (client + server validation)
-- **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo)
+- **Neiekļautās pozīcijas** (`/excluded-positions`) — uzņēmuma līmeņa saraksts pozīcijām, kas **nav iekļautas piedāvājumā**; pievienošana pa vienai (nosaukums); drag-and-drop secība; labošana / dzēšana; glabājas `excluded_positions` (`031` migrācija)
+- **Lietotāji** — Supabase Auth users (name, email, Google avatar); grupas piešķiršana un uzaicinājumi — skat. **User groups and permissions** augstāk
+- **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo, piedāvājuma derīgums un piezīmes)
 
 ### Company settings (`/settings`)
 
-- Company name, address, registration number, optional VAT number (hidden in preview when empty)
+- Company name, address, registration number, optional **PVN numurs** (hidden in preview when empty; when set, PDF/Excel exports show VAT breakdown at the bottom — 21% on net total)
 - **Bank account first** — entering a Latvian IBAN auto-fills bank name and SWIFT on the next row (Swedbank, SEB, Citadele, Luminor, etc.)
 - Info phone and email
 - Currency select (EUR, USD, GBP, PLN, SEK, NOK, DKK)
 - **Tāmes derīguma termiņš** — integer days (suffix **dienas**); default **30**; used for new projects and estimate **Tāmes termiņš** calculation
 - **Darbinieka standarta stundas likme** — optional decimal; currency suffix from company settings (e.g. `EUR`)
+- **Piedāvājuma derīguma termiņš** — integer days (suffix **dienas**); default **30**; sadaļā **Piedāvājums**; PDF rāda treknrakstā **Piedāvājums spēkā X dienas** (pirms paraksta bloka)
+- **Papildus informācija piedāvājumam** — textarea sadaļā **Piedāvājums**; katra rinda = atsevišķs komentārs; priekšskatījumā un PDF piedāvājumā (pirms paraksta bloka); tukšas rindas netiek rādītas
 - **Logo upload** — drag-and-drop or file picker → Supabase Storage (`company-assets` bucket)
 - Live preview of company block on the right (wider sidebar column)
 - Persisted in `public.company_settings` (singleton row)
 
 ### Estimate editor (`/[id]`)
 
-- **Header above table** — **3 columns**: Google Maps embed (left, from **Objekts** address) · module **visualizations** (middle — from linked module or individual project uploads) · meta + actions (right)
+- **Header above table** — **2 columns**: module **visualizations** (left — from linked module or individual project uploads) · meta + actions (right)
 - Meta layout: bold module name + action icons; **Tāmes piedāvājums** title + **Kopā** total; client, full-width object address; **Sagatavotājs**, **Datums**, **Tāmes termiņš** in one row
 - **Datums** — defaults to project **created_at**; **Tāmes termiņš** — defaults to Datums + validity days from **Uzstādījumi**; both editable (changing Datums recalculates termiņš); **zem termiņa** — "X dienas līdz termiņam" / "Termiņš šodien" / "Termiņš beidzies" rādīts, kad tāme ir saglabāta
 - **Individuāls projekts** — **Moduļa dati** icon opens `/[id]/module-data` (same upload UI as module detail: viz images, project PDFs, **Projekta apraksts** with save); incomplete viz/PDF → amber icon + optional full-page **spotlight** (blur overlay, ESC or **X** to dismiss)
@@ -59,8 +75,10 @@ English routes, Latvian labels:
 - **Jauns projekts** — tāmes struktūra **klonēta no Sagataves** (`clone-sagatave-for-project.ts`); **Kopēt** no projekta kartes klonē esošas projekta tāmes pozīcijas un `multiOptionLinks` (jauni ID); tukšām esošām tāmēm fallback no sagataves; galvenē `{N} tāmes pozīcijas · {M} rindas` un **+ Tāmes pozīcija**
 - **Saglabāt tāmi** — poga zem tabulas; nospiežot, tāme (title, meta, categories ar **iesaldētām cenām**) tiek saglabāta `estimates` tabulā; "Nesaglabātas izmaiņas" / "Saglabāts: DD.MM.YY" indikators; cenu iesaldēšana: `positionPriceId` atsauces tiek nomainītas uz faktiskajām cenām — kataloga izmaiņas neieetekmē saglabātās tāmes; pēc saglabāšanas **saglabātās cenas** salīdzināmas ar katalogu — atšķirības **sarkanās šūnās** (materiāli/mehanismi, arī apjoma kolonnās)
 - **Jauni izcenojumi** — baneris **Pieejami jauni izcenojumi** un **Atjaunot cenas** tikai `active` projektiem (`shouldShowStaleCatalogPriceWarnings`); **Atjaunot cenas** atjaunina tabulas cenas no kataloga **tikai UI** (nesaglabā DB; **Saglabāt** paliek aktīvs)
-- **Apstiprināta tāme** — **Apstiprināts** (`status = approved`) bloķē labošanu (read-only meta, bez drag/dzēšanas/pozīciju pievienošanas); zaļš baneris **Tāme apstiprināta — izmaiņas vairs nav iespējamas**; bez brīdinājumiem par jauniem izcenojumiem; PDF/Excel joprojām pieejami; **Kopēt** vienmēr pieejama; **Labot/Dzēst** paslēpti; **Pabeigts** pārvieto uz `completed` (pazūd no saraksta, saglabāts DB, atverams caur `/{id}`)
-- **Eksports** (tikai kad saglabāts) — **PDF (piedāvājums)** via `@react-pdf/renderer` (A4, kategorijas, `hiddenInOffer` apakšsadaļas → vienā rindā, lapas numurs); **Excel (tāme)** via `xlsx` (pilna cenu detaļa: V.cena + Kopā pa Darbs/Materiāli/Mehānismi); lejupielāde no `/api/estimates/[id]/pdf` un `/api/estimates/[id]/excel`
+- **Jaunas sagataves pozīcijas** — dzeltenš baneris **Sagatavē pievienotas jaunas pozīcijas** ar pogu **Atjaunot pozicijas** (labajā pusē) tikai `active` projektiem; salīdzina struktūru ar `/estimate` (`sagatave-has-new-positions.ts`, `listProjectIdsWithNewSagatavePositions`); **Atjaunot pozicijas** pievieno trūkstošās kategorijas / subkategorijas / rindas **tikai UI**; jaunās rindas **zaļā izcelšanā** līdz lapas pārlādei; projekti no **Kopēt** (`meta.clonedFromProjectId`) izlaisti
+- **Apstiprināta tāme** — **Apstiprināts** (`status = approved`) bloķē labošanu (read-only meta, bez drag/dzēšanas/pozīciju pievienošanas); projektu sarakstā **zaļa karte** (skat. **Projekti**); tāmes skatā (`/{id}`) — zaļš baneris **Tāme apstiprināta — izmaiņas vairs nav iespējamas** (`ApprovedEstimateStatusLabel`); bez brīdinājumiem par jauniem izcenojumiem; PDF/Excel joprojām pieejami; **Kopēt** vienmēr pieejama; **Labot/Dzēst** paslēpti; **Pabeigts** pārvieto uz `completed` (pazūd no saraksta, saglabāts DB, atverams caur `/{id}`)
+- **Materiālu saraksts** (tikai apstiprināts / pabeigts) — tabula **virs tāmes** (aiz apstiprināšanas banera); blakus **Lietotāji** (2:1, `project-materials-delegation-panel.tsx`); **drag-and-drop** — velc lietotāju no saraksta uz materiālu; piešķirtais lietotājs zem materiāla nosaukuma; glabājas `meta.materialAssigneeUserIds` (`assignProjectMaterialUserAction`); viens materiāls = viena rinda (agregēts no tāmes, ieskaitot kompozītu patēriņu un izvēlētās multi opcijas); kolonnas **Apjoms**, **Budžeta cena** (iesaldēta), **Budžets**, **Darbības**; ja kataloga cena atšķiras — sarkanīga rinda + **Katalogā: …**; **Atjaunot cenu** (`fa-level-up-alt`) — vienmēr redzama, tas pats modālis kā **Pozicijas**; pēc saglabāšanas **ConfirmModal** **Vai pasūtīji materiālu?**; **Pasūtīts** (`fa-check`) vai apstiprinājums — rinda pazūd (`meta.orderedMaterialPositionIds`); piešķīrums tiek noņemts; **brīdinājums** — oranžs baneris **Visi materiāli vēl nav pasūtīti! Atlikuši X no Y.** virs tabulas un uz `approved` kartes sarakstā, kamēr nav visi pasūtīti (neatkarīgi no delegācijas)
+- **Eksports** (tikai kad saglabāts) — **PDF (piedāvājums)** un **Excel (tāme)** pogas ar **loading** (`fa-circle-notch fa-spin`) līdz lejupielādei; **PDF** — `@react-pdf/renderer` A4: uzņēmuma rekvizīti + logo (oriģinālās proporcijas, `objectFit: contain`), projekta info rindās (modulis · pasūtītājs; adrese; e-pasts · tālrunis ar `formatDisplayPhone`), vizualizācijas 2 kolonnās, vienkāršota tabula (Nr. · Nosaukums · Kopā €); subkategorijas ar `hiddenInOffer` vai `hiddenPricesInOffer` (karodziņi no **Sagataves**) → viena kopsummas rinda; apakšā **Summa bez PVN** · **PVN 21%** · **KOPĀ AR PVN**, ja **Uzstādījumos** ir PVN numurs (`vat-breakdown.ts`); sadaļa **Piedāvājumā neiekļautās pozīcijas** (globālais saraksts mīnus projekta noņemtās); **Papildus informācija piedāvājumam** no uzstādījumiem (rinda pa rindai) un treknrakstā **Piedāvājums spēkā X dienas** (`offerValidityDays`); piedāvājuma paraksta bloks kreisajā pusē (uzņēmuma nosaukums, info e-pasts, info tālrunis); Roboto fonts latviešu burtiem (`public/fonts/`); attēli no Supabase caur `pdf-image-fetch.ts`; **Excel** — `exceljs` pilna cenu detaļa (V.cena + Kopā pa Darbs/Materiāli/Mehānismi); tāmei tāds pats PVN sadalījums apakšā, ja ir PVN numurs; kategoriju un pozīciju summas caur kopīgu `resolveEstimateLineItemPrices()`; lejupielāde no `/api/estimates/[id]/pdf` un `/api/estimates/[id]/excel`
 - **Multi opciju saites** — sagatavē definētas pārus starp opcijām dažādos multi; projekta tāmē izvēle **divvirzienu** sinhronizē saistītās opcijas (session state; kopā ar pilnu tāmes persistenci roadmap)
 - **Moduļa lieluma apjomi** — rindām ar `moduleSizeAttachment` **Apj.** kolonnā rāda piesaistīto lielumu (ne zem nosaukuma); sinhronizēts no sagataves / moduļa `project_description` (`sync-module-size-quantities.ts`); read-only, ja ir piesaiste
 - **Multi piedāvājumā** — tikai opciju **select** (bez labošanas modāļa, dzēšanas, **+ Multi**); pilna multi rediģēšana tikai **Sagatave**
@@ -72,6 +90,7 @@ English routes, Latvian labels:
 - Drop indicator: thick horizontal line on hover (no slide animation)
 - Sticky table header, footer totals row
 - Editable estimate number in meta when set
+- **Neiekļautās pozīcijas** — bloks **zem tāmes tabulas**; rāda globālo sarakstu; **×** noņem pozīciju tikai no **šī projekta** piedāvājuma (`estimates.meta.excludedPositionIdsOmitted`); globālais `/excluded-positions` nemainās; **Kopēt** projektu kopē arī noņemšanas sarakstu; apstiprinātā tāmē — tikai lasāms
 
 ### Data
 
@@ -138,11 +157,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; OAuth redirect base |
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Address autocomplete | Places API (New) via `/api/places/autocomplete`; HTTP referrers must include site URL |
-| `GOOGLE_MAPS_API_KEY` | Optional | Server-only key override (defaults to public key on server) |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
-
-Google Maps key referrers (when restricted): `http://localhost:3100/*`, `http://127.0.0.1:3100/*`. Enable **Places API (New)** and **Maps Embed API** in Cloud Console.
 
 ### Supabase setup
 
@@ -162,7 +177,7 @@ npm run db:test
 6. *(Optional)* Disable public sign-ups in Authentication → Settings → User Signups (use invites only)
 7. Start the app — sign in, then `/` loads projects from `public.projects`
 
-**Schema:** `supabase/migrations/` — `projects` (phone, email, `building_module_id`, `visualization_blocks` / `project_blocks` / `project_description` for individual projects, `status` `active` | `approved` | `rejected` | `completed` in `026` + `027`, `007` + `015` + `017` + `025`), `estimates`, `estimate_positions` (`020`–`021`, JSON `sections` — masīvs vai `{ sections, multiOptionLinks }`), `position_prices` (`008`–`009`, `cost_type` in `019`, history in `022`, sample cost types in `023`, `variable_quantity` in `024`), `building_modules` (`010`–`014`, `project_description` in `025`), `company_settings` (incl. `estimate_validity_days` `016`, `default_hourly_rate` `018`), `schema_migrations`, Storage `company-assets` (private, `028`), `module-assets` (private, `028`; module + project asset paths)
+**Schema:** `supabase/migrations/` — `projects` (…), `estimates` (…), `estimate_positions` (…), `position_prices` (…), `excluded_positions` (`031`), `building_modules` (…), `company_settings` (…), **`user_groups` + `user_group_members`** (`032`–`033`, JSON `permissions`, RLS deny), `schema_migrations`, Storage `company-assets` / `module-assets` (private, `028`)
 
 ---
 
@@ -170,18 +185,20 @@ npm run db:test
 
 ```
 app/
+├── layout.tsx          # Root layout; FeedbackToastProvider (vienīgais — Turbopack konteksts)
 ├── (protected)/      # Auth-gated routes (nav + pages)
-│   ├── layout.tsx      # Login gate or AppNav + children
+│   ├── layout.tsx      # Login gate or AppNav + ActionPermissionsProvider + AssignedMaterialsBanner + children
 │   ├── page.tsx        # Project list (/) + archive (?archive=1)
-│   ├── actions.ts      # create/update/delete project; save estimate; updateProjectStatusAction; updateProjectEstimateDatesAction
+│   ├── actions.ts      # create/update/delete project; save estimate; omitProjectExcludedPositionAction; markProjectMaterialOrderedAction; assignProjectMaterialUserAction; updateProjectStatusAction; updateProjectEstimateDatesAction
 │   ├── project-module-actions.ts  # individual project viz/PDF blocks + project description
 │   ├── [id]/           # Estimate editor + module-data/
 │   │   ├── page.tsx
 │   │   └── module-data/page.tsx   # Individual project module uploads
+│   ├── excluded-positions/  # page + CRUD / reorder actions (global excluded-offer list)
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads, project description)
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
-│   ├── settings/positions/  # page + CRUD / price-update / history / catalog sync actions (was /positions)
-│   ├── users/          # page + inviteUserAction
+│   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
+│   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, updateUserGroupPermissionsAction
 │   └── settings/
 ├── api/
 │   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
@@ -189,33 +206,32 @@ app/
 │   ├── company/logo/       # Authenticated company logo proxy (private bucket)
 │   ├── geo/calling-code/   # IP → phone country code (auth required)
 │   ├── modules/asset/      # Authenticated PDF/image proxy (modules + projects paths)
-│   └── places/autocomplete/ # Google Places (New) proxy (auth + rate limited)
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate-table, project-page-actions, project-archive-content, project-status-filter, estimate-position-table, …)
+├── components/         # UI (estimate-table, action-permissions-context, project-materials-table, project-materials-delegation-panel, assigned-materials-banner, feedback-toast-provider, …)
 ├── lib/
-│   ├── auth/           # getCurrentUser, signInWithGoogle, signOut, mapUserDisplay, require-auth
+│   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
 │   ├── client/         # cookie read/write helpers
-│   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, project-estimate-base, default sagatave
-│   ├── estimates/      # calculate-totals, calculate-line (addThousandSeparators), format-money, multi-position, multi-position-links, composite-line-item, unit-price-columns, volume-price-columns, module-size-attachment, sync-module-size-quantities, resolve-estimate-meta, sample data, DnD reorder
-│   ├── exports/        # estimate-pdf.tsx (React PDF document), estimate-excel.ts (xlsx workbook)
-│   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-collapsed-estimate-sections
+│   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, sagatave-has-new-positions, project-estimate-base, sync-subcategory-offer-visibility, default sagatave
+│   ├── excluded-positions/  # repository, resolve-project-excluded-positions (global list + per-project omissions)
+│   ├── estimates/      # calculate-totals (resolveEstimateLineItemPrices), aggregate-project-materials, collect-estimate-document-units, calculate-line (addThousandSeparators), format-money, multi-position, composite-line-item, sync-module-size-quantities, …
+│   ├── exports/        # estimate-pdf.tsx, estimate-excel.ts (exceljs), pdf-image-fetch.ts
+│   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-collapsed-estimate-sections, use-assigned-materials-banner-expanded
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
-│   ├── google-maps/    # Places API, build-embed-url
 │   ├── modules/        # repository, outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (module-assets)
 │   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, has-defined-labor, variable-quantity, stale-catalog-price, filter-positions (catalog filter + search)
-│   ├── projects/       # repository, project-status, filter-projects, project-module-data, sample fallback
-│   ├── settings/       # company settings, logo storage, IBAN bank resolve, currencies
-│   ├── users/          # Auth user list + invite (admin API)
+│   ├── projects/       # repository, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
+│   ├── settings/       # company settings, vat-breakdown, offer-additional-info, logo storage, IBAN bank resolve, currencies
+│   ├── users/          # Auth user list, invite, groups-repository (membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone
 │   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
 │   └── supabase/       # clients, update-session (session refresh + auth redirect), storage-key cookie cleanup
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
-public/                 # pdf.worker.min.mjs (postinstall from pdfjs-dist)
-supabase/migrations/    # 001–028 (028 = private storage buckets)
+public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
+supabase/migrations/    # 001–033 (032 = user_groups; 033 = admin repair)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -236,17 +252,24 @@ supabase/migrations/    # 001–028 (028 = private storage buckets)
 - [x] Pozicijas **mainīgs apjoms** — optional quantity column in project estimates (`024`)
 - [x] Multi **opciju saites** — drag link starp opcijām dažādos multi, divvirzienu izvēle, saglabāšana sagatavē
 - [x] Projekta tāme no sagataves — jauns projekts klonē sagataves struktūru; **Apj.** kolonna; **Apjoma cena**; read-only kataloga nosaukums/mērv./vienības cena; multi piedāvājumā viena rinda ar select
-- [x] Sagatave — moduļa lieluma piesaiste darba pozīcijām (`moduleSizeAttachment`); subkategorijas piedāvājuma redzamība (`hiddenInOffer`)
+- [x] Sagatave — moduļa lieluma piesaiste darba pozīcijām (`moduleSizeAttachment`); subkategorijas piedāvājuma redzamība (`hiddenInOffer`, `hiddenPricesInOffer`)
 - [x] Piedāvājumā (`/[id]`) — `moduleSizeAttachment` apjomi **Apj.** kolonnā; multi tikai select; materiālu/mehānismu nosaukumi labajā pusē
 - [x] Projekta apraksts — **Frontoni** sadaļā Sienas (pamata plakne, skaits, formula; pieskaitīts ārsienu neto)
 - [x] Pozicijas — **Veids** filtrs (Visi / Materiāls / Mehānismi); bez cenas `- VALŪTA / mērv.`
 - [x] Kompozīts pozīciju modelis — laika norma, Darbs = norma × likme, Materiāli/Mehānismi no kataloga (masīvi, cenas summējas); inline rediģēšana; multi-pozīcijām arī; moduļa apjoma brīdinājums; opciju kopsāvilkums multi modālī
-- [x] Piedāvājumā `hiddenInOffer` — PDF eksportā apakšsadaļas ar `hiddenInOffer: true` rāda kā vienu kopsummas rindu
-- [x] Export estimate — **PDF (piedāvājums)** un **Excel (tāme)**
+- [x] Piedāvājumā `hiddenInOffer` / `hiddenPricesInOffer` — PDF subkategorijas kopsummas rinda (karodziņi no sagataves)
+- [x] Export estimate — **PDF (piedāvājums)** un **Excel (tāme)**; PDF ar rekvizītiem, logo, vizualizācijām; eksporta loading
+- [x] Excel/PDF kopsummas — kopīga `resolveEstimateLineItemPrices()` (kompozītas pozīcijas, mainīgs apjoms)
 - [x] Saglabātas tāmes — novecojušu kataloga cenu indikators (saraksts + projekta lapa + sarkanās šūnas); **Atjaunot cenas** (UI)
+- [x] Sagataves jaunas pozīcijas — brīdinājums projektu sarakstā un projekta lapā; **Atjaunot pozicijas** ar zaļu izcelšanu (session)
 - [x] Projekta statuss — **Apstiprināts** / **Noraidīts** / **Pabeigts** + **Arhīvs** ar statusa filtru
-- [ ] User management beyond read-only list and email invite
-- [ ] Use company settings + logo on estimate PDF/header
+- [x] User management — lietotāju grupas, navigācijas/darbību tiesības (`/users`, `/users/groups`, `032` + `033`)
+- [x] Company settings + logo on estimate PDF
+- [x] Neiekļautās pozīcijas — globālais saraksts (`/excluded-positions`); projekta lapā bloks zem tāmes ar projekta līmeņa noņemšanu; PDF sadaļa
+- [x] Materiālu saraksts — apstiprinātiem projektiem **virs tāmes**; agregēts apjoms un budžets; **Pasūtīts** + **Atjaunot cenu**; brīdinājums sarakstā un projekta lapā, kamēr nav visi pasūtīti
+- [x] Materiālu delegācija — drag lietotāju uz materiālu (`materialAssigneeUserIds`); globālais baneris zem nav ar animāciju un cookie
+- [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
+- [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm audit` 0)
 
 ---
 
@@ -257,10 +280,12 @@ Three GitHub Actions workflows run on every push and pull request:
 | Workflow | File | What it checks |
 |----------|------|----------------|
 | **Secret scan** | `.github/workflows/secret-scan.yml` | gitleaks — API keys, tokens, passwords in git history |
-| **Security audit** | `.github/workflows/security-audit.yml` | `npm audit` — HIGH and CRITICAL dependency vulnerabilities |
+| **Security audit** | `.github/workflows/security-audit.yml` | `npm audit` — HIGH and CRITICAL dependency vulnerabilities (`uuid` override `^11.1.1` caur `package.json`) |
 | **Security smoke** | `.github/workflows/security-smoke.yml` | TypeScript, lint, production build, `requireAuth` on all actions, no `eval()`, security headers |
 
 > `GITLEAKS_LICENSE` repo secret is required only for **private** repositories (free for public repos).
+
+Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.5 / 10**).
 
 ---
 
@@ -288,16 +313,159 @@ Cursor rules:
 - `.cursor/rules/github-version-commit.mdc` — commit message format; run `typecheck` + `build` before commit/push
 - `.cursor/rules/db-migrate-after-sql.mdc` — run `npm run db:migrate` after new SQL; fix and retry on failure
 - `.cursor/rules/supabase-migration-security.mdc` — RLS deny policies, no `using (true)`, `search_path`, storage rules
-- `.cursor/rules/modal-confirm-exit.mdc` — `AppModal` backdrop confirm only when `dirty={true}`; Enter submit; fixed overlay (not `showModal`) for Places dropdown z-index
+- `.cursor/rules/modal-confirm-exit.mdc` — `AppModal` backdrop confirm only when `dirty={true}`; Enter submit; fixed overlay (not `showModal`) for portaled dropdown z-index
 - `.cursor/rules/tooltip-buttons.mdc` — icon buttons use `Tooltip`, not `title`
 - `.cursor/rules/button-cursor-pointer.mdc` — all buttons use `cursor: pointer` (base styles in `globals.css`)
-- `.cursor/rules/feedback-toast.mdc` — save feedback via toast provider (`app/layout.tsx` + `app/(protected)/layout.tsx`)
+- `.cursor/rules/feedback-toast.mdc` — save feedback via toast provider (`app/layout.tsx`; konteksts `feedback-toast-context.ts`)
 
 Skip version bump only for typo/docs-only changes when you explicitly say no release.
 
 ---
 
 ## Changelog
+
+### v1.3.15
+
+**UI tiesības, drošība 9.5, toast un npm**
+
+- **UI ↔ tiesības (L23)** — `action-permissions-context.tsx`; `ActionPermissionsProvider` `(protected)/layout.tsx`; pogas slēptas pēc `permissions.actions`
+- **M22** — jauni lietotāji bez membership → **Skatītājs** (`ensureUserDefaultMembership`); `/users` noklusējuma grupa Skatītājs
+- **M23** — noņemts admin `slug` bypass; admin tiesības tikai `getUserAccess()` → `createFullPermissions(true)`; saglabāšanā admin grupai vienmēr pilns JSON
+- **L24** — `getPositionPriceHistoryAction` → `requireAction("positions.manage")`
+- **npm** — `package.json` `overrides.uuid` `^11.1.1`; `npm audit` 0 moderate+
+- **Toast** — `FeedbackToastProvider` tikai `app/layout.tsx` (novērš Turbopack `useFeedbackToast` kļūdu materiālu banerī)
+- **`security-check.md`** — atkārtota pārbaude **9.5 / 10**
+
+### v1.3.14
+
+**Lietotāju grupas — admin labojumi un dokumentācija**
+
+- **Admin redzamība** — `groups-repository.ts`: membership bez join kļūdas; `033` repair migrācija
+- **DB** — `033_repair_admin_group_memberships.sql`: atjauno admin `permissions` JSON; piešķir admin lietotājiem bez membership
+- **README** — User groups sadaļa, shēma, struktūra; `security-check.md` M14 ✅
+
+### v1.3.13
+
+**Google Maps noņemts; adrese brīvā tekstā**
+
+- **Projekta forma** — adrese parasts teksta lauks (`ProjectFormModal`); bez Places autocomplete un kartes priekšskatījuma
+- **Tāmes galvene** — noņemts `AddressMapEmbed`; **2 kolonnas**: moduļa vizualizācijas · meta + darbības
+- **Dzēsti** — `app/lib/google-maps/`, `/api/places/autocomplete`, `address-autocomplete-field.tsx`, `address-map-embed.tsx`, `@types/google.maps`
+- **CSP** (`next.config.ts`) — noņemti Maps/Places domēni no `script-src`, `connect-src`, `frame-src`
+- **UI/CSS** — `.pac-container` stili no `globals.css`; `AppModal` vairs neignorē `.pac-container` backdrop klikšķī
+- **Env** — vairs nav nepieciešams `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` / `GOOGLE_MAPS_API_KEY` (`.env.example` atjaunināts)
+- **Drošība** — `028_private_storage_buckets.sql` apstiprināts piemērots (`npm run db:migrate`); `security-check.md` atjaunināts (M17 noņemts)
+
+### v1.3.12
+
+**Lietotāju grupas un tiesības (M14)**
+
+- **DB** — `032_user_groups.sql`: `user_groups`, `user_group_members`; RLS deny; 4 sistēmas grupas; esošie lietotāji → Administrators
+- **`/users`** — grupas izvēle katram lietotājam (`user-group-select.tsx`); saite **Grupas un tiesības**
+- **`/users/groups`** — matrica: navigācija + darbības (`user-groups-permissions-form.tsx`)
+- **Eforcēšana** — `requireAction()` visos server actions; `assertNavAccess()` lapās; filtrēta `AppNav`; PDF/Excel ar `estimate.export`
+
+### v1.3.11
+
+**Materiālu delegācija un globālais baneris**
+
+- **Projekta tāme** (`/{id}`) — materiālu tabula + **Lietotāji** bloks (2:1); drag-and-drop piešķir materiālu lietotājam; piešķirtais zem nosaukuma; `meta.materialAssigneeUserIds`; `assignProjectMaterialUserAction` / `assignProjectMaterialUser()`
+- **Globālais baneris** — zem top izvēlnes ielogotajam lietotājam ar nepasūtītiem piešķirtajiem materiāliem (`list-user-assigned-materials.ts`, `assigned-materials-banner.tsx`); vairāki projekti — pārslēgšana; **sakļaujams** ar animāciju; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`; atpazīst saistītos kontus pēc normalizēta vārda (`resolve-related-user-ids.ts`)
+- **Moduļu vizualizācijas** — autentificēts attēlu ielāde projektos un `/modules/[id]` (`module-visualization-image.tsx`, `resolve-block-asset.ts`)
+- **Toast** — `FeedbackToastProvider` arī `(protected)/layout.tsx` (novērš kļūdu materiālu tabulā)
+
+### v1.3.10
+
+**Materiālu pasūtīšanas plūsma un brīdinājumi**
+
+- **Materiālu saraksts** — pārvietots **virs tāmes** tabulas (`estimate-table.tsx`)
+- **Atjaunot cenu** — poga **vienmēr** redzama; pēc saglabāšanas **ConfirmModal** **Vai pasūtīji materiālu?** — apstiprinot, materiāls pazūd no saraksta
+- **Brīdinājums** — **Visi materiāli vēl nav pasūtīti!** uz `approved` projekta kartes (izteikts oranžs bloks) un baneris projekta lapā ar **Atlikuši X no Y** (`listProjectIdsWithPendingMaterials`, `pending-project-materials.ts`, `pending-project-materials-banner.tsx`)
+- **Darbības** — `markProjectMaterialOrderedAction`; `project-material-row-actions.tsx`
+
+### v1.3.9
+
+**Apstiprinātu projektu kartes, manuālā mērvienība sagatavē un toast labojums**
+
+- **Projektu saraksts** — `approved` kartes visa virsma zaļā tonī (`approvedEstimateSurfaceClassName`); bez atsevišķas birkas sarakstā; tāmes skatā baneris paliek (`approved-estimate-status-label.tsx`)
+- **Sagatave (`/estimate`)** — pozīciju modālī slēdzis **Manuāli norādīta mērvienība** + select (`manualUnitEnabled`, `manualUnit` JSON); mērvienību saraksts no tāmes (`collect-estimate-document-units.ts`); materiālu patēriņš, ja mērvienības nesakrīt
+- **Toast** — `FeedbackToastProvider` tikai `app/layout.tsx`; konteksts `feedback-toast-context.ts` (novērš `useFeedbackToast must be used within FeedbackToastProvider` Turbopack)
+- **Maršruts `/`** — atjaunots `app/(protected)/page.tsx` (projektu saraksts; novērš 404)
+
+### v1.3.8
+
+**Materiālu saraksts apstiprinātiem projektiem**
+
+- **Projekta tāme** (`/{id}`) — jauna tabula **Materiālu saraksts** zem tāmes, tikai `approved` / `completed`; agregē materiālus no tāmes (kompozīts × patēriņš, multi — izvēlētā opcija)
+- **Kolonnas** — Nosaukums, Mērv., Apjoms, Budžeta cena (iesaldēta), Budžets, Darbības
+- **Pasūtīts** — materiāls pazūd no saraksta; glabājas `estimates.meta.orderedMaterialPositionIds` (bez jaunas migrācijas)
+- **Atjaunot cenu** — redzama, ja kataloga cena ≠ budžeta cena; `UpdatePositionPriceModal` kā `/positions`; atjaunina `position_prices` un vēsturi
+- **UI** — sarkanīga rinda un **Katalogā: …**, kad cenas atšķiras
+- **Jaunie faili** — `aggregate-project-materials.ts`, `project-materials-table.tsx`, `project-material-row-actions.tsx`
+
+### v1.3.7
+
+**Neiekļautās pozīcijas — globālais saraksts un projekta pielāgojumi**
+
+- **Nav** — jauns punkts **Neiekļautās pozīcijas** (`/excluded-positions`); CRUD, drag-and-drop secība
+- **Projekta tāme** (`/{id}`) — bloks **zem tāmes tabulas** ar globālo sarakstu; **×** noņem pozīciju tikai no šī projekta piedāvājuma (`meta.excludedPositionIdsOmitted`); **Kopēt** projektu kopē arī noņemšanas sarakstu
+- **PDF piedāvājums** — sadaļa **Piedāvājumā neiekļautās pozīcijas** (projekta efektīvais saraksts)
+- **Supabase** — `031_excluded_positions.sql` (`excluded_positions`); obligāts `npm run db:migrate`
+- **Jaunie faili** — `app/lib/excluded-positions/`, `app/(protected)/excluded-positions/`, `project-excluded-positions-panel.tsx`, `resolve-project-excluded-positions.ts`
+- **Tooltip** — `align` (`center` / `start` / `end`) labajā malā esošām pogām
+
+### v1.3.6
+
+**Piedāvājuma derīgums PDF un uzstādījumos**
+
+- **`/settings`** — sadaļā **Piedāvājums** jauns lauks **Piedāvājuma derīguma termiņš** (dienas, noklusējums 30); priekšskatījumā treknrakstā **Piedāvājums spēkā X dienas**
+- **PDF piedāvājums** — pēc papildu informācijas rindām, pirms paraksta bloka, treknrakstā **Piedāvājums spēkā X dienas**
+- **Supabase** — `030_company_settings_offer_validity_days.sql` (`company_settings.offer_validity_days`)
+
+### v1.3.5
+
+**Uzstādījumi — papildus informācija piedāvājumam**
+
+- **`/settings`** — jauna sadaļa **Piedāvājums** ar textarea **Papildus informācija piedāvājumam**; katra rinda = atsevišķs komentārs; priekšskatījumā sadaļa **Piedāvājuma piezīmes**
+- **PDF piedāvājums** — komentāri rādīti pēc kopsummas/PVN, pirms paraksta bloka
+- **Supabase** — `029_company_settings_offer_additional_info.sql` (`company_settings.offer_additional_info`)
+- **Jauns fails** — `app/lib/settings/offer-additional-info.ts` (`parseOfferAdditionalInfoLines`)
+
+### v1.3.4
+
+**Sagataves jaunas pozīcijas — brīdinājums un sinhronizācija**
+
+- **Projektu saraksts** — dzeltena kartes apmale + **Sagatavē pievienotas jaunas pozīcijas** (`listProjectIdsWithNewSagatavePositions`); tikai `active`; izlaisti projekti ar `meta.clonedFromProjectId` (**Kopēt**)
+- **Projekta lapa** — dzeltenš baneris ar pogu **Atjaunot pozicijas** labajā pusē; pievieno trūkstošo struktūru no sagataves **tikai UI** (`mergeNewSagatavePositionsIntoProject`)
+- **Zaļa izcelšana** — jaunās kategorijas / subkategorijas / rindas zaļā tonī līdz lapas pārlādei vai atkārtotai ieeja projektā
+- **Sagataves saglabāšana** — `revalidatePath("/")` pēc `/estimate` saglabāšanas, lai projektu saraksts atjaunojas
+- **Jaunie faili / loģika** — `sagatave-has-new-positions.ts`; `EstimateMeta.clonedFromProjectId` pie **Kopēt** izveides
+
+### v1.3.3
+
+**Eksporta PVN sadalījums un piedāvājuma paraksts**
+
+- **PVN sadalījums** — ja **Uzstādījumos** ir aizpildīts PVN numurs, PDF (piedāvājums) un Excel (tāme) apakšā rāda **Summa bez PVN**, **PVN 21%** un **KOPĀ AR PVN**; bez PVN numura paliek tikai **PAVISAM KOPĀ**
+- **Piedāvājuma paraksts** — PDF apakšā kreisajā pusē: uzņēmuma nosaukums, info e-pasts, info tālrunis (tukši lauki netiek rādīti)
+- **Jauns fails** — `app/lib/settings/vat-breakdown.ts` (kopīgs PVN aprēķins eksportiem)
+
+### v1.3.2
+
+**Piedāvājuma PDF — logo un kontaktu izkārtojums**
+
+- **Logo** — vairs netiek izstiepts; `maxHeight` + `objectFit: contain` saglabā oriģinālās proporcijas
+- **Projekta info** — tālrunis blakus e-pastam vienā rindā; numurs ar `formatDisplayPhone()` (`+371 987654321`); info bloks strukturēts pa rindām (projekts/pasūtītājs · adrese · e-pasts/tālrunis · datums/termiņš)
+
+### v1.3.1
+
+**Piedāvājuma PDF, sagataves subkategoriju redzamība un tāmes kopsummu labojums**
+
+- **Piedāvājuma PDF** — jauns izkārtojums: rekvizīti (kreisā puse) + logo (labā), projekta dati (modulis, pasūtītājs, adrese, tālrunis, e-pasts), vizualizācijas 2 kolonnās, vienkāršota tabula (Nr. · Nosaukums · Kopā €); Roboto TTF latviešu burtiem (`public/fonts/`); attēlu ielāde serverī (`pdf-image-fetch.ts`)
+- **Sagatave — subkategoriju cenu slēpšana** — `fa-stream` poga blakus acij; `hiddenPricesInOffer` JSON; PDF subkategorijai rāda kopsummu, ja ieslēgts `hiddenInOffer` vai `hiddenPricesInOffer`
+- **PDF subkategoriju karodziņi no sagataves** — `sync-subcategory-offer-visibility.ts` pirms PDF ģenerēšanas sinhronizē `hiddenInOffer` / `hiddenPricesInOffer` no sagataves uz projekta tāmi (pēc indeksa / nosaukuma)
+- **Eksporta pogas** — PDF un Excel lejupielāde ar `fetch` + loading spinner (`fa-circle-notch fa-spin`), bloķē dubultklikšķi; kļūda → `FeedbackToast`
+- **Kopsummu labojums** — jauna kopīga `resolveEstimateLineItemPrices()` (`calculate-totals.ts`); Excel un PDF pozīciju rindas izmanto to pašu loģiku kā kategoriju kopsummas (kompozītas pozīcijas, `variableQuantity`, moduļa lielums)
+- **Jaunie faili** — `subcategory-price-visibility-toggle.tsx`, `sync-subcategory-offer-visibility.ts`, `pdf-image-fetch.ts`, `public/fonts/Roboto-Regular.ttf`, `public/fonts/Roboto-Bold.ttf`
 
 ### v1.3.0
 
@@ -338,7 +506,7 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 - **`logoUrl` validation** — `saveCompanySettings` rejects any URL that is not a `/api/company/logo` path
 - **Auth on geo + Places endpoints** — `/api/geo/calling-code` and `/api/places/autocomplete` now require a valid session
 - **GitHub Actions** (`.github/workflows/`) — 3 new workflows on every push: `secret-scan` (gitleaks), `security-audit` (npm audit high+), `security-smoke` (typecheck + lint + build + static security checks)
-- **`security-check.md`** — full audit report with findings, fixes applied, score (4/10 → 8/10), and remaining TODO
+- **`security-check.md`** — full audit report with findings, fixes applied, score (4/10 → **9.5/10**), and remaining TODO
 
 ### v1.2.7
 

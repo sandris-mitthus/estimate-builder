@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { getPositionPriceHistoryAction } from "@/app/(protected)/settings/positions/actions";
+import { getPositionPriceHistoryAction } from "@/app/(protected)/positions/actions";
 import {
   AppModal,
   appModalExtraWidePanelMaxWidthClassName,

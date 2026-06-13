@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Modāļi — apstiprinājums pirms aizvēršanas
 
-Visiem jaunajiem modāliem izmanto **`AppModal`** (`app/components/app-modal.tsx`). Neveido atsevišķus modāļus bez apstiprinājuma. **`AppModal` izmanto `fixed` overlay (ne `<dialog showModal>`)** — lai Google Places `.pac-container` (z-index virs modāla) darbotos pareizi.
+Visiem jaunajiem modāliem izmanto **`AppModal`** (`app/components/app-modal.tsx`). Neveido atsevišķus modāļus bez apstiprinājuma. **`AppModal` izmanto `fixed` overlay (ne `<dialog showModal>`)** — lai portāla dropdown (hinti u.c.) darbotos pareizi virs modāla.
 
 ## Uzvedība
 

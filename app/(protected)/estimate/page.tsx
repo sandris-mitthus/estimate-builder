@@ -1,4 +1,5 @@
 import { EstimatePositionTable } from "@/app/components/estimate-position-table";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 
@@ -11,6 +12,7 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 
 
 export default async function SagatavePage() {
+  await assertNavAccess("estimate");
 
   const [sagatave, catalogPositions, companySettings, moduleSizeOptions] =
     await Promise.all([

@@ -45,6 +45,10 @@ export type EstimateLineItem = {
   mechanisms?: LineItemCatalogRef[];
   /** Ja `true` — apjoms nav saistīts ar moduļa lielumu; katrā projektā ierakstāms manuāli. */
   variableQuantity?: boolean;
+  /** Ja `true` — mērvienību norāda manuāli (ne tikai no moduļa apjoma). */
+  manualUnitEnabled?: boolean;
+  /** Manuāli norādītā mērvienība, kad `manualUnitEnabled`. */
+  manualUnit?: string;
 };
 
 export type EstimateMultiPositionOption = {
@@ -76,6 +80,8 @@ export type EstimateSubcategory = {
   items: EstimateRowItem[];
   /** `true` — subkategorijas pozīcijas paslēptas piedāvājumā. */
   hiddenInOffer?: boolean;
+  /** `true` — subkategorijas pozīciju cenas paslēptas piedāvājumā. */
+  hiddenPricesInOffer?: boolean;
 };
 
 export type EstimateCategory = {

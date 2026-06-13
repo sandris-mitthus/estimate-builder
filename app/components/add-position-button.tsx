@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useState, useTransition } from "react";
 
-import { createPositionAction } from "@/app/(protected)/settings/positions/actions";
+import { createPositionAction } from "@/app/(protected)/positions/actions";
 
 import {
   AppModal,
@@ -14,6 +14,7 @@ import {
 } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
@@ -64,6 +65,7 @@ const emptyForm: {
 export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
   const router = useRouter();
+  const canManage = useActionPermission("positions.manage");
 
   const { showFeedback, clearFeedback } = useFeedbackToast();
 
@@ -210,6 +212,10 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
   }
 
 
+
+  if (!canManage) {
+    return null;
+  }
 
   return (
 

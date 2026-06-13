@@ -9,6 +9,7 @@ type IconActionButtonProps = {
   variant?: "edit" | "delete" | "approve" | "reject" | "moduleData" | "history" | "copy" | "complete";
   highlighted?: boolean;
   spotlight?: boolean;
+  tooltipAlign?: "center" | "start" | "end";
   className?: string;
 };
 
@@ -35,6 +36,7 @@ export function IconActionButton({
   variant = "edit",
   highlighted = false,
   spotlight = false,
+  tooltipAlign = "center",
   className = "",
 }: IconActionButtonProps) {
   const toneClassName =
@@ -47,7 +49,7 @@ export function IconActionButton({
     : "";
 
   return (
-    <Tooltip label={label} elevated={spotlight}>
+    <Tooltip label={label} align={tooltipAlign} elevated={spotlight}>
       <button
         type="button"
         onClick={onClick}

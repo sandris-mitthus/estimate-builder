@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import { deleteBuildingModuleAction } from "@/app/(protected)/modules/actions";
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ModuleFormModal } from "@/app/components/module-form-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
 export function ModuleCardActions({ module }: { module: BuildingModuleSummary }) {
   const router = useRouter();
+  const canManage = useActionPermission("modules.manage");
   const { showFeedback } = useFeedbackToast();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -39,6 +41,10 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
       showFeedback({ type: "success", text: "Modulis dzēsts." });
       router.refresh();
     });
+  }
+
+  if (!canManage) {
+    return null;
   }
 
   return (

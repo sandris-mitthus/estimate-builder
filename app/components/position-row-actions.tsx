@@ -14,13 +14,15 @@ import {
 
   updatePositionUnitPriceAction,
 
-} from "@/app/(protected)/settings/positions/actions";
+} from "@/app/(protected)/positions/actions";
 
 import { ConfirmModal } from "@/app/components/confirm-modal";
 
 import { EditPositionModal } from "@/app/components/edit-position-modal";
 
 import { IconActionButton } from "@/app/components/icon-action-button";
+
+import { useActionPermission } from "@/app/components/action-permissions-context";
 
 import { UpdatePositionPriceModal } from "@/app/components/update-position-price-modal";
 
@@ -62,6 +64,7 @@ export function PositionRowActions({
 }: PositionRowActionsProps) {
 
   const router = useRouter();
+  const canManage = useActionPermission("positions.manage");
 
   const { showFeedback } = useFeedbackToast();
 
@@ -197,6 +200,10 @@ export function PositionRowActions({
   }
 
 
+
+  if (!canManage) {
+    return null;
+  }
 
   return (
 

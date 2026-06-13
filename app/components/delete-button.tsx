@@ -6,11 +6,12 @@ type DeleteButtonProps = {
   label: string;
   onClick: () => void;
   className?: string;
+  tooltipAlign?: "center" | "start" | "end";
 };
 
-export function DeleteButton({ label, onClick, className = "" }: DeleteButtonProps) {
+export function DeleteButton({ label, onClick, className = "", tooltipAlign = "end" }: DeleteButtonProps) {
   return (
-    <Tooltip label={label}>
+    <Tooltip label={label} align={tooltipAlign}>
       <button
         type="button"
         onClick={onClick}

@@ -7,12 +7,16 @@ type ProjectListProps = {
   projects: ProjectSummary[];
   modules: BuildingModuleSummary[];
   staleCatalogPriceProjectIds?: ReadonlySet<string>;
+  newSagatavePositionProjectIds?: ReadonlySet<string>;
+  pendingMaterialsProjectIds?: ReadonlySet<string>;
 };
 
 export function ProjectList({
   projects,
   modules,
   staleCatalogPriceProjectIds = new Set(),
+  newSagatavePositionProjectIds = new Set(),
+  pendingMaterialsProjectIds = new Set(),
 }: ProjectListProps) {
   return (
     <ListEntryGrid>
@@ -22,6 +26,8 @@ export function ProjectList({
           project={project}
           modules={modules}
           hasStaleCatalogPrices={staleCatalogPriceProjectIds.has(project.id)}
+          hasNewSagatavePositions={newSagatavePositionProjectIds.has(project.id)}
+          hasPendingMaterials={pendingMaterialsProjectIds.has(project.id)}
         />
       ))}
     </ListEntryGrid>

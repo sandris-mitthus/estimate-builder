@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProjectModuleDataContent } from "@/app/components/project-module-data-content";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { getProject } from "@/app/lib/projects/repository";
 
 export default async function ProjectModuleDataPage({
@@ -8,6 +9,8 @@ export default async function ProjectModuleDataPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await assertNavAccess("projects");
+
   const { id } = await params;
   const project = await getProject(id);
 

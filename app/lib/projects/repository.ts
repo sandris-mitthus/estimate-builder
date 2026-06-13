@@ -8,6 +8,8 @@ import {
 } from "@/app/lib/estimate-positions/serialize-document";
 import { cloneSagataveDocumentForProject } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
+import { sagataveHasNewPositionsForProject } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
+import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import {
   estimateHasStaleCatalogPrices,
@@ -15,6 +17,10 @@ import {
 } from "@/app/lib/positions/stale-catalog-price";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import { getBuildingModule } from "@/app/lib/modules/repository";
+import {
+  buildPendingMaterialsModuleSizeOptions,
+  hasPendingProjectMaterials,
+} from "@/app/lib/projects/pending-project-materials";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
@@ -303,6 +309,144 @@ export async function listProjectIdsWithStaleCatalogPrices(
   return staleProjectIds;
 }
 
+export async function listProjectIdsWithNewSagatavePositions(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  if (!isSupabaseAdminConfigured() || projects.length === 0) {
+    return new Set();
+  }
+
+  const sagatave = await ensureDefaultEstimatePosition();
+  if (sagatave.sections.length === 0) {
+    return new Set();
+  }
+
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("project_id, meta, categories")
+    .in(
+      "project_id",
+      projects.map((project) => project.id),
+    );
+
+  if (error || !data) {
+    return new Set();
+  }
+
+  const projectIdsWithNewSagatavePositions = new Set<string>();
+
+  for (const row of data) {
+    const project = projectById.get(row.project_id as string);
+    if (!project || !shouldShowStaleCatalogPriceWarnings(project.status)) {
+      continue;
+    }
+
+    const meta = (row.meta ?? {}) as EstimateMeta;
+    if (meta.clonedFromProjectId) {
+      continue;
+    }
+
+    const parsed = parseEstimatePositionDocumentPayload(
+      row.categories as EstimateCategory[],
+    );
+
+    if (
+      sagataveHasNewPositionsForProject(sagatave.sections, parsed.sections)
+    ) {
+      projectIdsWithNewSagatavePositions.add(project.id);
+    }
+  }
+
+  return projectIdsWithNewSagatavePositions;
+}
+
+export async function listProjectIdsWithPendingMaterials(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  const approvedProjects = projects.filter(
+    (project) => project.status === "approved",
+  );
+
+  if (!isSupabaseAdminConfigured() || approvedProjects.length === 0) {
+    return new Set();
+  }
+
+  const catalogPositions = await listPositionPrices();
+  const projectById = new Map(
+    approvedProjects.map((project) => [project.id, project]),
+  );
+  const moduleCache = new Map<
+    string,
+    Awaited<ReturnType<typeof getBuildingModule>>
+  >();
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("project_id, meta, categories")
+    .in(
+      "project_id",
+      approvedProjects.map((project) => project.id),
+    );
+
+  if (error || !data) {
+    return new Set();
+  }
+
+  const pendingProjectIds = new Set<string>();
+
+  for (const row of data) {
+    const project = projectById.get(row.project_id as string);
+    if (!project) {
+      continue;
+    }
+
+    const parsed = parseEstimatePositionDocumentPayload(
+      row.categories as EstimateCategory[],
+    );
+    if (parsed.sections.length === 0) {
+      continue;
+    }
+
+    const meta = (row.meta ?? {}) as EstimateMeta;
+    const orderedIds = meta.orderedMaterialPositionIds ?? [];
+
+    let buildingModule: Awaited<ReturnType<typeof getBuildingModule>> = null;
+    if (project.buildingModuleId) {
+      if (!moduleCache.has(project.buildingModuleId)) {
+        moduleCache.set(
+          project.buildingModuleId,
+          await getBuildingModule(project.buildingModuleId),
+        );
+      }
+      buildingModule = moduleCache.get(project.buildingModuleId) ?? null;
+    }
+
+    const moduleName = buildingModule?.name ?? "Individuāls projekts";
+    const moduleSizeOptions = buildPendingMaterialsModuleSizeOptions(
+      project,
+      buildingModule,
+      moduleName,
+      parsed.sections,
+    );
+
+    if (
+      hasPendingProjectMaterials(
+        parsed.sections,
+        catalogPositions,
+        moduleSizeOptions,
+        orderedIds,
+      )
+    ) {
+      pendingProjectIds.add(project.id);
+    }
+  }
+
+  return pendingProjectIds;
+}
+
 export async function listProjects(): Promise<ProjectSummary[]> {
   const projects = await listAllProjects();
   return projects.filter((project) => isProjectVisibleInList(project.status));
@@ -469,6 +613,12 @@ export async function createProject(
     );
     estimateCategories = cloned.categories;
     estimateMultiOptionLinks = cloned.multiOptionLinks;
+    meta.clonedFromProjectId = input.copyEstimateFromProjectId;
+    if (sourceEstimate.meta.excludedPositionIdsOmitted?.length) {
+      meta.excludedPositionIdsOmitted = [
+        ...sourceEstimate.meta.excludedPositionIdsOmitted,
+      ];
+    }
   } else {
     const estimateBase = await getProjectEstimateBaseFromSagatave();
     estimateCategories = estimateBase.categories;
@@ -528,6 +678,11 @@ export async function updateProject(
 
   if (contact.error) {
     return { ok: false, error: contact.error };
+  }
+
+  const editable = await assertProjectEstimateEditable(input.id);
+  if (!editable.ok) {
+    return editable;
   }
 
   if (!isSupabaseAdminConfigured()) {
@@ -688,6 +843,196 @@ export async function updateProjectEstimateDates(
   }
 
   return { ok: true };
+}
+
+export async function omitProjectExcludedPosition(
+  projectId: string,
+  excludedPositionId: string,
+): Promise<{ ok: true; omittedIds: string[] } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const trimmedId = excludedPositionId.trim();
+  if (!trimmedId) {
+    return { ok: false, error: "Pozīcija nav norādīta." };
+  }
+
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const currentMeta = (data.meta ?? {}) as EstimateMeta;
+  const omittedIds = Array.from(
+    new Set([...(currentMeta.excludedPositionIdsOmitted ?? []), trimmedId]),
+  );
+
+  const meta: EstimateMeta = {
+    ...currentMeta,
+    excludedPositionIdsOmitted: omittedIds,
+  };
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās noņemt pozīciju no projekta." };
+  }
+
+  return { ok: true, omittedIds };
+}
+
+export async function markProjectMaterialOrdered(
+  projectId: string,
+  positionPriceId: string,
+): Promise<
+  { ok: true; orderedIds: string[] } | { ok: false; error: string }
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const trimmedId = positionPriceId.trim();
+  if (!trimmedId) {
+    return { ok: false, error: "Materiāls nav norādīts." };
+  }
+
+  const project = await getProject(projectId);
+  if (!project) {
+    return { ok: false, error: "Projekts nav atrasts." };
+  }
+
+  if (!isProjectEstimateLocked(project.status)) {
+    return {
+      ok: false,
+      error: "Materiālu pasūtīšanu var atzīmēt tikai apstiprinātam projektam.",
+    };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const currentMeta = (data.meta ?? {}) as EstimateMeta;
+  const orderedIds = Array.from(
+    new Set([...(currentMeta.orderedMaterialPositionIds ?? []), trimmedId]),
+  );
+
+  const meta: EstimateMeta = {
+    ...currentMeta,
+    orderedMaterialPositionIds: orderedIds,
+  };
+
+  if (currentMeta.materialAssigneeUserIds?.[trimmedId]) {
+    const { [trimmedId]: _removed, ...remainingAssignees } =
+      currentMeta.materialAssigneeUserIds;
+    if (Object.keys(remainingAssignees).length > 0) {
+      meta.materialAssigneeUserIds = remainingAssignees;
+    } else {
+      delete meta.materialAssigneeUserIds;
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās atzīmēt materiālu kā pasūtītu." };
+  }
+
+  return { ok: true, orderedIds };
+}
+
+export async function assignProjectMaterialUser(
+  projectId: string,
+  positionPriceId: string,
+  userId: string,
+): Promise<
+  | { ok: true; materialAssigneeUserIds: Record<string, string> }
+  | { ok: false; error: string }
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const trimmedMaterialId = positionPriceId.trim();
+  const trimmedUserId = userId.trim();
+
+  if (!trimmedMaterialId) {
+    return { ok: false, error: "Materiāls nav norādīts." };
+  }
+
+  if (!trimmedUserId) {
+    return { ok: false, error: "Lietotājs nav norādīts." };
+  }
+
+  const project = await getProject(projectId);
+  if (!project) {
+    return { ok: false, error: "Projekts nav atrasts." };
+  }
+
+  if (!isProjectEstimateLocked(project.status)) {
+    return {
+      ok: false,
+      error: "Lietotāju var piešķirt tikai apstiprinātam projektam.",
+    };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const currentMeta = (data.meta ?? {}) as EstimateMeta;
+  const materialAssigneeUserIds: Record<string, string> = {
+    ...(currentMeta.materialAssigneeUserIds ?? {}),
+    [trimmedMaterialId]: trimmedUserId,
+  };
+
+  const meta: EstimateMeta = {
+    ...currentMeta,
+    materialAssigneeUserIds,
+  };
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās piešķirt materiālu lietotājam." };
+  }
+
+  return { ok: true, materialAssigneeUserIds };
 }
 
 export async function saveProjectEstimate(

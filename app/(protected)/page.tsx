@@ -2,9 +2,12 @@ import { ProjectArchiveContent } from "@/app/components/project-archive-content"
 import { ProjectList } from "@/app/components/project-list";
 import { ProjectPageActions } from "@/app/components/project-page-actions";
 import { SectionPage } from "@/app/components/section-page";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { listBuildingModules } from "@/app/lib/modules/repository";
 import {
   listAllProjects,
+  listProjectIdsWithNewSagatavePositions,
+  listProjectIdsWithPendingMaterials,
   listProjectIdsWithStaleCatalogPrices,
   listProjects,
 } from "@/app/lib/projects/repository";
@@ -26,6 +29,8 @@ export default async function ProjectsPage({
 }: {
   searchParams: Promise<{ archive?: string | string[] }>;
 }) {
+  await assertNavAccess("projects");
+
   const { archive } = await searchParams;
   const showArchive = isArchiveView(archive);
 
@@ -33,8 +38,12 @@ export default async function ProjectsPage({
     showArchive ? listAllProjects() : listProjects(),
     listBuildingModules(),
   ]);
-  const staleCatalogPriceProjectIds =
-    await listProjectIdsWithStaleCatalogPrices(projects);
+  const [staleCatalogPriceProjectIds, newSagatavePositionProjectIds, pendingMaterialsProjectIds] =
+    await Promise.all([
+      listProjectIdsWithStaleCatalogPrices(projects),
+      listProjectIdsWithNewSagatavePositions(projects),
+      listProjectIdsWithPendingMaterials(projects),
+    ]);
 
   const subtitle = showArchive
     ? `${projects.length} projekti arhīvā`
@@ -51,12 +60,16 @@ export default async function ProjectsPage({
           projects={projects}
           modules={modules}
           staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+          newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+          pendingMaterialsProjectIds={pendingMaterialsProjectIds}
         />
       ) : (
         <ProjectList
           projects={projects}
           modules={modules}
           staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+          newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+          pendingMaterialsProjectIds={pendingMaterialsProjectIds}
         />
       )}
     </SectionPage>

@@ -1,9 +1,47 @@
 # Security Audit - estimate-builder
 
-**Datums:** 2026-06-13  
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Auditors:** AI drošības analīze (claude-sonnet-4.6)
+**Pēdējā pilnā pārbaude:** 2026-06-13 (**v1.3.14**) — **9.5 / 10**  
+**Iepriekšējā pilnā pārbaude:** 2026-06-13 (v1.3.14) — 9.0 / 10
+
+---
+
+## Ātrā pārbaude v1.3.14 (atkārtota, 2026-06-13)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` | ✅ 8 faili, 41+ action; `security-smoke.yml` validē |
+| Lomu sistēma (M14) | ✅ `032`–`033`; `assertNavAccess()` 10 lapās + `assertUserGroupsPageAccess()` |
+| UI ↔ tiesības (L23) | ✅ `ActionPermissionsProvider` + `useActionPermission()` 18 komponentēs |
+| Admin grupa (M23) | ✅ Nav `slug` apiešanas; `getUserAccess()` vienmēr `createFullPermissions(true)` admin |
+| PDF/Excel eksports | ✅ Auth + `estimate.export` + rate limit 20/min |
+| API maršruti (`app/api/**`) | ✅ 5 maršruti; visi ar `getCurrentUser()` |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
+| npm audit (moderate+) | ✅ **0 vulnerabilities** (`uuid` override `^11.1.1` caur `package.json`) |
+| Storage / proxy | ✅ Privātie bucketi (`028`); auth proxy `logo`, `asset`; path regex |
+| RLS deny (DB tabulas) | ✅ `006` + jaunās tabulas (`020`, `022`, `031`, `032`) |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options, Referrer-Policy, Permissions-Policy |
+| Magic-byte upload validācija | ✅ `file-storage.ts`, `logo-storage.ts` |
+| OAuth / redirect | ✅ `ALLOWED_EMAIL_DOMAIN` opcija; `getSafeRedirectPath()`; X-Forwarded-Host validācija |
+| Estimate lock (M13) | ✅ `assertProjectEstimateEditable()` repository slānī |
+
+### Izmaiņas kopš 9.0 → 9.5
+
+| # | Statuss | Apraksts |
+|---|---------|----------|
+| L24 | ✅ LABOTS | `getPositionPriceHistoryAction` → `requireAction("positions.manage")` |
+| M23 | ✅ LABOTS | Noņemta `slug === "admin"` apiešana `requireAction` / `assertNavAccess` / layout; admin tiesības tikai `getUserAccess()` + saglabāšanā |
+| npm | ✅ LABOTS | `package.json` `overrides.uuid` → `^11.1.1`; `npm audit` 0 |
+
+### Atlikušās piezīmes (nebloķējošas)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | `ALLOWED_EMAIL_DOMAIN` un Supabase invite-only — atkarīgs no production ENV |
+| L26 | ℹ️ SCALE | In-process rate limiter — pietiek **1 instance**; Upstash tikai multi-instance |
+
+**Atzīme:** **9.5 / 10** — koda un atkarību audits tīrs; atlikušais galvenokārt production konfigurācija.
 
 ---
 
@@ -33,118 +71,130 @@
 
 | # | Statuss | Fails | Problēma | Labojums |
 |---|---------|-------|----------|----------|
-| H1 | ✅ LABOTS | `app/(protected)/**/actions.ts` (visi) | Server actions bez autentifikācijas | `requireAuth()` pievienots visiem actions |
-| H2 | ✅ LABOTS | `app/(protected)/users/actions.ts` | `inviteUserAction` bez auth pārbaudes | `requireAuth()` pirms invite loģikas |
+| H1 | ✅ LABOTS | `app/(protected)/**/actions.ts` (visi) | Server actions bez autentifikācijas | `requireAuth()` / `requireAction()` visiem actions |
+| H2 | ✅ LABOTS | `app/(protected)/users/actions.ts` | `inviteUserAction` bez auth pārbaudes | `requireAction("users.invite")` |
 | H3 | ✅ LABOTS | `app/lib/supabase/update-session.ts` | Middleware tikai atsvaidzināja sesiju, neredirect | Pievienots redirect uz `/` neautenticētiem |
 | H4 | ✅ LABOTS | `app/auth/callback/route.ts` | Atvērta Google OAuth - jebkurš Google konts | `ALLOWED_EMAIL_DOMAIN` env var pārbaude |
-| H5 | ✅ LABOTS | `app/api/estimates/[projectId]/pdf/route.ts` | IDOR - jebkurš auth lietotājs var eksportēt | Auth pārbaude jau bija; rate limit pievienots |
-| H6 | ✅ LABOTS | `app/api/modules/asset/route.ts` | IDOR - failu proxy bez ownership | Auth bija; storage privatizēts (H7) |
+| H5 | ✅ LABOTS | `app/api/estimates/[projectId]/pdf/route.ts` | IDOR - jebkurš auth lietotājs var eksportēt | Auth + `estimate.export` + rate limit |
+| H6 | ✅ LABOTS | `app/api/modules/asset/route.ts` | IDOR - failu proxy bez ownership | Auth + path regex + privāts bucket |
 | H7 | ✅ LABOTS | `supabase/migrations/028_*.sql` + kods | Publiski storage bucketi (PDF, logotipi) | Bucketi privatizēti; autenticēts proxy |
 
 ### MEDIUM - Nozīmīgi
 
 | # | Statuss | Fails | Problēma | Labojums |
 |---|---------|-------|----------|----------|
-| M8 | ✅ LABOTS | `app/api/places/autocomplete/route.ts` | Google Places API bez autentifikācijas | `getCurrentUser()` pārbaude pievienota |
-| M9 | ✅ LABOTS | Places, PDF, Excel API routes | Nav rate limiting | 60 req/min Places; 20 req/min PDF/Excel |
+| M8 | ✅ NOŅEMTS | — | Google Places API | Integrācija noņemta (v1.3.13) |
+| M9 | ✅ LABOTS | PDF, Excel API routes | Nav rate limiting | 20 req/min PDF/Excel |
 | M10 | ✅ LABOTS | `app/auth/callback/route.ts` | `X-Forwarded-Host` nav validēts | Validācija pret `NEXT_PUBLIC_SITE_URL` |
-| M11 | ℹ️ ARHITEKTŪRA | Visi `repository.ts` | Service role visur - RLS apzināti apiet | Pieņemams single-tenant rīkam; doc. |
-| M12 | ✅ LABOTS | `file-storage.ts`, `logo-storage.ts` | File upload validē tikai `Content-Type` | Magic-byte validācija pievienota |
-| M13 | ⚠️ PALIEK | `projects/repository.ts` | `updateProject` apiet estimate lock | Jāpievieno `assertProjectEstimateEditable` |
-| M14 | ⚠️ PALIEK | Nav lomu sistēmas | Visi lietotāji redz/var darīt visu | Pieņemams iekšējam rīkam; plāno lomu sistēmu |
-| M15 | ✅ LABOTS | `app/(protected)/layout.tsx` | Dev mode = atvērta app bez auth produktionā | Pievienots production guard - bloķē bez Supabase |
-| M16 | ✅ LABOTS | `next.config.ts` | CSP `unsafe-eval`, trūkst HSTS, X-Frame-Options | HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy |
-| M17 | ℹ️ VIDE | `app/lib/google-maps/env.ts` | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` client-side | Nepieciešams - Google Maps SDK prasīts; jāierobežo referrers |
+| M11 | ℹ️ ARHITEKTŪRA | Visi `repository.ts` | Service role visur - RLS apzināti apiet | Pieņemams single-tenant rīkam |
+| M12 | ✅ LABOTS | `file-storage.ts`, `logo-storage.ts` | File upload validē tikai `Content-Type` | Magic-byte validācija |
+| M13 | ✅ LABOTS | `projects/repository.ts` | `updateProject` apiet estimate lock | `assertProjectEstimateEditable()` |
+| M14 | ✅ LABOTS | `032`–`033`, permissions | Nav lomu sistēmas | Grupas, `requireAction()`, `assertNavAccess()`, filtrēta nav |
+| M15 | ✅ LABOTS | `app/(protected)/layout.tsx` | Dev mode = atvērta app produktionā | Production guard bez Supabase |
+| M16 | ✅ LABOTS | `next.config.ts` | CSP, HSTS, X-Frame-Options | Uzlabotas HTTP galvenes |
+| M17 | ✅ NOŅEMTS | — | Google Maps client-side API atslēga | Integrācija noņemta |
+| M22 | ✅ LABOTS | `groups-repository.ts` | Jauns OAuth/invite lietotājs → auto **Skatītājs** | `ensureUserDefaultMembership()`; admin tikai manuāli `/users` |
+| M23 | ✅ LABOTS | `require-permission.ts`, `assert-nav-access.ts`, layout | Admin `slug` apiet pārbaudes | Admin tiesības `getUserAccess()`; pārbaudes vienmēr caur `canPerformAction` / `canAccessNav` |
 
 ### LOW - Nelieli
 
 | # | Statuss | Fails | Problēma | Labojums |
 |---|---------|-------|----------|----------|
-| L18 | ✅ LABOTS | `app/api/geo/calling-code/route.ts` | Neautenticēts geo endpoint | `getCurrentUser()` pievienots |
-| L19 | ✅ LABOTS | `app/lib/settings/repository.ts` | `logoUrl` akceptē jebkuru URL | Validācija - tikai `/api/company/logo` vai tukšs |
-| L20 | ℹ️ ZEMS RISKS | GET API routes | CSRF read/export uzbrukumi | Pieņemams - GET nav mutācijas; CORS ierobežo |
-| L21 | ✅ LABOTS | `logo-storage.ts`, `places/route.ts` | Kļūdu ziņojumi atklāj infrastruktūru | Vispārīgi kļūdu teksti |
+| L18 | ✅ LABOTS | `app/api/geo/calling-code/route.ts` | Neautenticēts geo endpoint | `getCurrentUser()` |
+| L19 | ✅ LABOTS | `app/lib/settings/repository.ts` | `logoUrl` akceptē jebkuru URL | Validācija - tikai `/api/company/logo` |
+| L20 | ✅ LABOTS | GET API routes | Cross-site GET ar sesiju | Auth + `SameSite=Lax` + rate limit eksportam |
+| L21 | ✅ LABOTS | `logo-storage.ts` | Kļūdu ziņojumi atklāj infrastruktūru | Vispārīgi kļūdu teksti |
+| L22 | ✅ LABOTS | `.github/workflows/security-smoke.yml` | Smoke meklēja tikai `requireAuth` | Pārbauda `requireAuth` vai `requireAction` |
+| L23 | ✅ LABOTS | Frontend komponentes | Pogas redzamas bez tiesībām | `useActionPermission()` + layout provider |
+| L24 | ✅ LABOTS | `positions/actions.ts` | Cenu vēsture tikai ar `requireAuth()` | `requireAction("positions.manage")` |
+| L25 | ℹ️ DEPLOY | Supabase Auth / ENV | OAuth nav ierobežots bez ENV | `ALLOWED_EMAIL_DOMAIN` + atspējot publisko signup |
+| L26 | ℹ️ SCALE | `rate-limit.ts` | In-process limiter | Pietiek 1 instance; Upstash tikai multi-instance |
 
 ---
 
-## Ko tika izveidots / mainīts
+## Ko tika izveidots / mainīts (kopsavilkums)
 
-### Jauni faili
+### v1.3.14 drošības labojumi (šī sesija)
 | Fails | Mērķis |
 |-------|--------|
-| `app/lib/auth/require-auth.ts` | Centralizēts auth guards server actions |
+| `package.json` | `overrides.uuid` → `^11.1.1` (exceljs transitīvais) |
+| `app/(protected)/positions/actions.ts` | Cenu vēsture ar `positions.manage` |
+| `app/lib/auth/require-permission.ts` | Noņemts admin `slug` bypass |
+| `app/lib/auth/assert-nav-access.ts` | Noņemts admin `slug` bypass |
+| `app/(protected)/layout.tsx` | Nav filtrēts tikai pēc `permissions.nav` (bez admin izņēmuma) |
+| `app/lib/users/groups-repository.ts` | Admin `getUserAccess()` → vienmēr pilnas tiesības; saglabāšanā admin → `createFullPermissions(true)` |
+
+### UI tiesības (L23)
+| Fails | Mērķis |
+|-------|--------|
+| `app/components/action-permissions-context.tsx` | `ActionPermissionsProvider`, `useActionPermission()` |
+| `app/(protected)/layout.tsx` | Nodod `permissions.actions` no sesijas |
+
+### Autentifikācija un lomas (v1.3.12–v1.3.14)
+| Fails | Mērķis |
+|-------|--------|
+| `app/lib/auth/permissions.ts` | Nav/darbību atslēgas, noklusējuma grupas |
+| `app/lib/auth/require-permission.ts` | `requireAction()`, `getCurrentUserAccess()` |
+| `app/lib/auth/assert-nav-access.ts` | Lapu piekļuves guards |
+| `app/lib/users/groups-repository.ts` | Grupas, membership, `getUserAccess()` |
+| `supabase/migrations/032_user_groups.sql` | Tabulas + RLS deny + sēkla |
+| `supabase/migrations/033_repair_admin_group_memberships.sql` | Admin tiesību repair |
+
+### Agrākie drošības labojumi
+| Fails | Mērķis |
+|-------|--------|
+| `app/lib/auth/require-auth.ts` | Centralizēts auth guard |
 | `app/lib/security/rate-limit.ts` | In-process rate limiter |
 | `app/lib/security/magic-bytes.ts` | Failu magic-byte validācija |
 | `app/api/company/logo/route.ts` | Autenticēts logotipa proxy |
 | `supabase/migrations/028_private_storage_buckets.sql` | Privatizē storage bucketus |
 
-### Mainīti faili
-| Fails | Izmaiņa |
-|-------|---------|
-| `app/(protected)/actions.ts` | `requireAuth()` visiem actions |
-| `app/(protected)/estimate/actions.ts` | `requireAuth()` |
-| `app/(protected)/positions/actions.ts` | `requireAuth()` |
-| `app/(protected)/modules/actions.ts` | `requireAuth()` |
-| `app/(protected)/project-module-actions.ts` | `requireAuth()` |
-| `app/(protected)/settings/actions.ts` | `requireAuth()` |
-| `app/(protected)/users/actions.ts` | `requireAuth()` |
-| `app/(protected)/layout.tsx` | Production guard bez Supabase |
-| `app/lib/supabase/update-session.ts` | Redirect neautenticētiem lietotājiem |
-| `app/auth/callback/route.ts` | X-Forwarded-Host validācija + email domain |
-| `app/api/places/autocomplete/route.ts` | Auth + rate limiting |
-| `app/api/geo/calling-code/route.ts` | Auth pārbaude |
-| `app/api/estimates/[projectId]/pdf/route.ts` | Rate limiting |
-| `app/api/estimates/[projectId]/excel/route.ts` | Rate limiting |
-| `app/lib/modules/file-storage.ts` | Magic bytes + proxy URL |
-| `app/lib/settings/logo-storage.ts` | Magic bytes + proxy URL + kļūdu sanitizācija |
-| `app/lib/settings/repository.ts` | logoUrl validācija + kļūdu sanitizācija |
-| `next.config.ts` | HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy |
-
 ---
 
-## Vēl darāmais (nav labots šajā sesijā)
+## Vēl darāmais
 
-### Obligāti pirms production
+### Obligāti pirms production (ieteicams)
 
-- [ ] **`028_private_storage_buckets.sql`** - Palaist migrāciju Supabase (`npm run db:migrate`)
-- [ ] **Google Maps API atslēga** - Ierobežot ar HTTP referrer Google Cloud Console
-- [ ] **`ALLOWED_EMAIL_DOMAIN`** (neobligāts) - Iestatīt `.env.local` / Vercel env, ja vajag ierobežot piekļuvi pēc domēna
-- [ ] **GitHub Actions** - Iestatīt `GITLEAKS_LICENSE` repo secret (bezmaksas public repo, nav vajadzīgs private)
+- [x] **`028`–`033` migrācijas** — palaist `npm run db:migrate`
+- [ ] **`ALLOWED_EMAIL_DOMAIN`** — iestatīt, ja vajag ierobežot OAuth pēc domēna
+- [ ] **Supabase Auth** — atspējot publisko signup (invite-only)
+- [x] **M22** — jaunie lietotāji → **Skatītājs**, ne Administrators
 
 ### CI/CD pārbaudes (automātiski uz katru push)
 
 | Workflow | Fails | Ko pārbauda |
 |----------|-------|-------------|
-| Secret scan | `.github/workflows/secret-scan.yml` | gitleaks - atslēgas, paroles kodā |
-| Security audit | `.github/workflows/security-audit.yml` | npm audit - vulnerablities |
-| Security smoke | `.github/workflows/security-smoke.yml` | typecheck, lint, build, requireAuth, eval(), headers |
+| Secret scan | `.github/workflows/secret-scan.yml` | gitleaks |
+| Security audit | `.github/workflows/security-audit.yml` | npm audit |
+| Security smoke | `.github/workflows/security-smoke.yml` | typecheck, lint, build, auth guards, eval(), headers |
 
 ### Ieteicams nākotnē
 
-- [ ] **Lomu sistēma** - Pievienot `admin` / `member` lomas; ierobežot `/users` un `/settings` tikai adminiem
-- [ ] **`updateProject` lock** - Pievienot `assertProjectEstimateEditable` pirms `updateProject` approved/completed projektiem
-- [ ] **Distributed rate limiting** - Aizstāt in-process limiter ar Redis/Upstash multi-instance deployment gadījumā
-- [ ] **Supabase Auth** - Atspējot publisko signup Supabase dashboard (Authentication > Settings > User Signups)
-- [ ] **Invite-only flow** - Pārbaudīt ka jauns OAuth lietotājs atbilst invite listei
+- [x] **UI atbilstība tiesībām** — slēpt pogas pēc `permissions` (L23)
+- [ ] **Distributed rate limiting** — Redis/Upstash **tikai** ja deploy uz vairākām instance
+- [ ] **Invite-only plūsma** — OAuth tikai uzaicinātajiem (Supabase dashboard + ENV)
 
 ---
 
-## Atzīme pēc labojumiem: 8/10
+## Atzīme: 9.5 / 10 (v1.3.14)
 
 ### Pamatojums
 
-**Uzlabojumi:**
-- Visas mutācijas tagad aizsargātas ar `requireAuth()` (iepriekš nav bijis)
-- Storage bucketi privāti - konfidenciāli faili vairs nav publiski pieejami
-- Middleware redirect neautenticētiem lietotājiem
-- Rate limiting sensitīviem endpointiem
-- Magic-byte validācija failiem
-- Uzlabotas HTTP drošības galvenes (HSTS, X-Frame, Referrer-Policy)
-- Kļūdu ziņojumu sanitizācija
+**Stipri (+):**
+- Visas mutācijas aizsargātas ar `requireAction()` pēc konkrētām tiesībām
+- Lomu sistēma ar navigācijas un darbību eforcēšanu (M14) + UI saskaņa (L23)
+- Admin grupa bez koda apiešanas — vienots avots `getUserAccess()` (M23)
+- Privāti storage bucketi + auth proxy
+- Rate limiting PDF/Excel eksportiem (pietiek vienai instance)
+- `npm audit` 0 moderate+; typecheck + build OK
+- Magic-byte validācija, sanitizētas kļūdas, drošības galvenes, CI smoke
 
-**Atlikušās nepilnības (-2 punkti):**
-- Nav lomu sistēmas (visi auth lietotāji redz visu)
-- In-process rate limiter nav pietiekams distributed deployment gadījumā
-- Google Maps API atslēga joprojām client-side (nepieciešams, bet jāierobežo)
-- `updateProject` neievēro estimate lock
-- Storage migrācija jāpalaiž manuāli
+**Vājāk (-0.5 kopā):**
+- **-0.5** — production OAuth vēl nav stingri ierobežots (ENV + Supabase signup atkarībā no deploy)
+
+**Pieņemams single-tenant iekšējam rīkam:** service role repository slānī, visi auth lietotāji redz vienus projektus (nav row-level tenancy), `resolve-related-user-ids` banerim, asset proxy bez per-projekta ownership.
+
+### Kad atzīme būtu 10/10
+
+1. Production: `ALLOWED_EMAIL_DOMAIN` + invite-only Supabase Auth
+2. (Ja vajag) Upstash rate limit multi-instance deploy

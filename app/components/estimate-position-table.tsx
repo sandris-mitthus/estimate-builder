@@ -30,6 +30,7 @@ import {
 } from "react";
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
 import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guard";
 import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
@@ -74,6 +75,7 @@ import type {
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
+import { SubcategoryPriceVisibilityToggle } from "@/app/components/subcategory-price-visibility-toggle";
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
@@ -88,7 +90,8 @@ import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
-import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
+import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import {
   UNIT_PRICE_COLUMN_COUNT,
@@ -154,7 +157,8 @@ function LineItemRow({
   const missingModuleSize =
     moduleSizeOptions.length > 0 &&
     !item.moduleSizeAttachment &&
-    !item.variableQuantity;
+    !item.variableQuantity &&
+    !item.manualUnitEnabled;
   const missingTimeNorm =
     isCompositeLineItem(item) && !((item.laborTimeNorm ?? 0) > 0);
 
@@ -230,8 +234,8 @@ function LineItemRow({
       </td>
       <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
         <span className={`${readOnlyNum} text-zinc-500`}>
-          {(isCompositeLineItem(item) && !item.variableQuantity
-            ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions)
+          {(isCompositeLineItem(item)
+            ? resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions)
             : item.unit.trim()) || "—"}
         </span>
       </td>
@@ -594,12 +598,20 @@ function SubcategoryBlock({
         collapsedSummary={collapsedSummary}
         onToggleCollapse={onToggleCollapse}
         nameTrailing={
-          <SubcategoryOfferVisibilityToggle
-            hiddenInOffer={subcategory.hiddenInOffer}
-            onChange={(hiddenInOffer) =>
-              onChange({ ...subcategory, hiddenInOffer })
-            }
-          />
+          <>
+            <SubcategoryPriceVisibilityToggle
+              hiddenPricesInOffer={subcategory.hiddenPricesInOffer}
+              onChange={(hiddenPricesInOffer) =>
+                onChange({ ...subcategory, hiddenPricesInOffer })
+              }
+            />
+            <SubcategoryOfferVisibilityToggle
+              hiddenInOffer={subcategory.hiddenInOffer}
+              onChange={(hiddenInOffer) =>
+                onChange({ ...subcategory, hiddenInOffer })
+              }
+            />
+          </>
         }
         actions={
           <RowActions
@@ -1038,6 +1050,8 @@ export function EstimatePositionTable({
   moduleSizeOptions = [],
 }: EstimatePositionTableProps) {
   const router = useRouter();
+  const canSaveSagatave = useActionPermission("sagatave.save");
+  const readOnly = !canSaveSagatave;
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [isSaving, startSaveTransition] = useTransition();
   const mountedRef = useRef(false);
@@ -1075,6 +1089,10 @@ export function EstimatePositionTable({
   );
 
   const lineItemCount = collectSectionLineItems(sections).length;
+  const estimateUnits = useMemo(
+    () => collectEstimateDocumentUnits(sections, moduleSizeOptions),
+    [sections, moduleSizeOptions],
+  );
   const {
     collapsedSectionIds,
     toggleSectionCollapsed,
@@ -1151,16 +1169,23 @@ export function EstimatePositionTable({
     <div className="max-w-full space-y-4">
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
-          <input
-            type="text"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
-            aria-label="Bibliotēkas ieraksta nosaukums"
-          />
+          {readOnly ? (
+            <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
+              {title}
+            </p>
+          ) : (
+            <input
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
+              aria-label="Bibliotēkas ieraksta nosaukums"
+            />
+          )}
           <p className="text-xs text-zinc-500">
             {sections.length} tāmes pozīcijas · {lineItemCount} rindas
           </p>
+          {!readOnly ? (
           <button
             type="button"
             onClick={() =>
@@ -1170,9 +1195,14 @@ export function EstimatePositionTable({
           >
             + Tāmes pozīcija
           </button>
+          ) : null}
         </div>
 
-        <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
+        <div
+          className={`max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto${
+            readOnly ? " pointer-events-none opacity-80" : ""
+          }`}
+        >
           <PositionModalProvider openPositionModal={openPositionModal}>
             <DropIndicatorProvider>
               <EstimatePositionDndTable
@@ -1207,9 +1237,11 @@ export function EstimatePositionTable({
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
           moduleSizeOptions={moduleSizeOptions}
+          estimateUnits={estimateUnits}
         />
       ) : null}
 
+      {!readOnly ? (
       <div className="flex justify-end">
         <button
           type="button"
@@ -1220,6 +1252,7 @@ export function EstimatePositionTable({
           {isSaving ? "Saglabā…" : "Saglabāt"}
         </button>
       </div>
+      ) : null}
 
       <UnsavedChangesConfirmModal
         open={confirmOpen}

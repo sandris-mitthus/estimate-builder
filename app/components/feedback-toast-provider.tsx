@@ -1,33 +1,19 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   FeedbackToast,
   type FeedbackMessage,
-  type FeedbackType,
 } from "@/app/components/feedback-toast";
+import { FeedbackToastContext } from "@/app/components/feedback-toast-context";
 
-type FeedbackToastContextValue = {
-  showFeedback: (message: { type: FeedbackType; text: string }) => void;
-  clearFeedback: () => void;
-};
-
-const FeedbackToastContext = createContext<FeedbackToastContextValue | null>(
-  null,
-);
+export { useFeedbackToast } from "@/app/components/feedback-toast-context";
 
 export function FeedbackToastProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<FeedbackMessage | null>(null);
 
   const showFeedback = useCallback(
-    (nextMessage: { type: FeedbackType; text: string }) => {
+    (nextMessage: { type: FeedbackMessage["type"]; text: string }) => {
       setMessage(nextMessage);
     },
     [],
@@ -48,14 +34,4 @@ export function FeedbackToastProvider({ children }: { children: ReactNode }) {
       <FeedbackToast message={message} onDismiss={clearFeedback} />
     </FeedbackToastContext.Provider>
   );
-}
-
-export function useFeedbackToast() {
-  const context = useContext(FeedbackToastContext);
-
-  if (!context) {
-    throw new Error("useFeedbackToast must be used within FeedbackToastProvider");
-  }
-
-  return context;
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/app/lib/auth/require-auth";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import type { ModuleBlockKind } from "@/app/lib/modules/types";
 import {
   removeProjectModuleBlock,
@@ -23,7 +23,7 @@ function revalidateProject(projectId: string) {
 export async function updateProjectModuleBlocksAction(
   input: UpdateProjectModuleBlocksInput,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project_module.manage");
   if (denied) return denied;
 
   const result = await updateProjectModuleBlocks(input);
@@ -38,7 +38,7 @@ export async function updateProjectModuleBlocksAction(
 export async function updateProjectProjectDescriptionAction(
   input: UpdateProjectProjectDescriptionInput,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project_module.manage");
   if (denied) return denied;
 
   const result = await updateProjectProjectDescription(input);
@@ -55,7 +55,7 @@ export async function uploadProjectModuleBlockAction(
   kind: ModuleBlockKind,
   formData: FormData,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project_module.manage");
   if (denied) return denied;
 
   const file = formData.get("file");
@@ -78,7 +78,7 @@ export async function removeProjectModuleBlockAction(
   kind: ModuleBlockKind,
   blockId: string,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project_module.manage");
   if (denied) return denied;
 
   const result = await removeProjectModuleBlock(projectId, kind, blockId);

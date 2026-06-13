@@ -1,6 +1,7 @@
 "use server";
 
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { buildEstimateExcel } from "@/app/lib/exports/estimate-excel";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -14,6 +15,11 @@ export async function GET(
   const user = await getCurrentUser();
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  const access = await getUserAccess(user.id);
+  if (!canPerformAction(access, "estimate.export")) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   if (!checkRateLimit(`excel:${user.id}`, 20, 60_000)) {
@@ -37,6 +43,7 @@ export async function GET(
     estimate.categories,
     catalogPositions,
     companySettings.defaultHourlyRate,
+    companySettings.vatNumber,
   );
 
   const filename = `tame-${projectId.slice(0, 8)}.xlsx`;

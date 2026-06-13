@@ -12,6 +12,8 @@ export type CompanySettings = {
   logoUrl: string;
   estimateValidityDays: number;
   defaultHourlyRate: number | null;
+  offerAdditionalInfo: string;
+  offerValidityDays: number;
 };
 
 export type CompanySettingsRow = {
@@ -29,4 +31,6 @@ export type CompanySettingsRow = {
   logo_url: string;
   estimate_validity_days?: number;
   default_hourly_rate?: number | null;
+  offer_additional_info?: string;
+  offer_validity_days?: number;
 };

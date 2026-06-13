@@ -1,27 +1,45 @@
+import path from "path";
 import {
   Document,
   Font,
+  Image,
   Page,
   StyleSheet,
   Text,
   View,
 } from "@react-pdf/renderer";
 import { addThousandSeparators, roundToTwoDecimals, sumBreakdown } from "@/app/lib/estimates/calculate-line";
-import { calculateEstimateTotals } from "@/app/lib/estimates/calculate-totals";
+import {
+  calculateEstimateTotals,
+  resolveEstimateLineItemPrices,
+} from "@/app/lib/estimates/calculate-totals";
 import {
   collectRowLineItems,
   resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
-import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
-import type { EstimateCategory, EstimateLineItem } from "@/app/lib/estimates/types";
+import type { EstimateCategory } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
-import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
+import { formatDisplayPhone } from "@/app/lib/validation/contact-fields";
+import type { CompanySettings } from "@/app/lib/settings/types";
+import { formatCompanyDisplayLines } from "@/app/lib/settings/format-company-lines";
+import { parseOfferAdditionalInfoLines } from "@/app/lib/settings/offer-additional-info";
+import {
+  calculateVatBreakdown,
+  hasCompanyVatNumber,
+} from "@/app/lib/settings/vat-breakdown";
+import type { PdfImageAsset } from "@/app/lib/exports/pdf-image-fetch";
+import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
+
+const fontsDir = path.join(process.cwd(), "public", "fonts");
 
 Font.register({
-  family: "Helvetica",
-  fonts: [{ src: "Helvetica" }, { src: "Helvetica-Bold", fontWeight: "bold" }],
+  family: "Roboto",
+  fonts: [
+    { src: path.join(fontsDir, "Roboto-Regular.ttf"), fontWeight: "normal" },
+    { src: path.join(fontsDir, "Roboto-Bold.ttf"), fontWeight: "bold" },
+  ],
 });
 
 const c = {
@@ -29,21 +47,37 @@ const c = {
   gray: "#71717a",
   grayLight: "#f4f4f5",
   white: "#ffffff",
-  accent: "#18181b",
   border: "#e4e4e7",
 };
 
+// A4 usable width: 595.28 - 2*32 = 531.28pt
+// 2-column images: (531 - 8) / 2 = 261pt per column
+const IMG_COL_WIDTH = 261;
+const IMG_HEIGHT = 155;
+
 const s = StyleSheet.create({
-  page: { fontFamily: "Helvetica", fontSize: 9, color: c.black, padding: "28pt 32pt" },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  title: { fontSize: 16, fontWeight: "bold", letterSpacing: 0.5 },
-  subtitle: { fontSize: 9, color: c.gray, marginTop: 2 },
-  metaGrid: { flexDirection: "row", gap: 24, marginBottom: 16, flexWrap: "wrap" },
-  metaBlock: { minWidth: 120 },
-  metaLabel: { fontSize: 7, color: c.gray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
-  metaValue: { fontSize: 9, color: c.black },
+  page: { fontFamily: "Roboto", fontSize: 9, color: c.black, padding: "28pt 32pt" },
+
+  reqRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  reqLines: { flex: 1, paddingRight: 16 },
+  reqCompanyName: { fontSize: 11, fontWeight: "bold", marginBottom: 3 },
+  reqLine: { fontSize: 8, color: c.gray, marginBottom: 2 },
+  logo: { maxHeight: 56, objectFit: "contain" },
+
   divider: { height: 1, backgroundColor: c.border, marginBottom: 14 },
-  tableHeader: { flexDirection: "row", backgroundColor: c.black, padding: "5pt 4pt", marginBottom: 0 },
+
+  offerTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
+  infoGrid: { marginBottom: 14 },
+  infoRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 8 },
+  infoBlock: { minWidth: 140 },
+  infoLabel: { fontSize: 7, color: c.gray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
+  infoValue: { fontSize: 9, color: c.black },
+
+  imgSectionTitle: { fontSize: 8, fontWeight: "bold", color: c.gray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
+  imgRow: { flexDirection: "row", marginBottom: 8 },
+  imgItem: { width: IMG_COL_WIDTH, height: IMG_HEIGHT },
+
+  tableHeader: { flexDirection: "row", backgroundColor: c.black, padding: "5pt 4pt" },
   tableHeaderCell: { color: c.white, fontSize: 7, fontWeight: "bold" },
   catRow: { flexDirection: "row", backgroundColor: c.grayLight, padding: "5pt 4pt", marginTop: 4 },
   catText: { fontSize: 8, fontWeight: "bold", color: c.black, flex: 1 },
@@ -53,45 +87,53 @@ const s = StyleSheet.create({
   totalRow: { flexDirection: "row", padding: "6pt 4pt", borderTopWidth: 1.5, borderTopColor: c.black, marginTop: 8 },
   totalLabel: { fontSize: 9, fontWeight: "bold", flex: 1 },
   totalValue: { fontSize: 10, fontWeight: "bold", width: 72, textAlign: "right" },
+  vatRow: { flexDirection: "row", padding: "3pt 4pt" },
+  vatLabel: { fontSize: 8, flex: 1 },
+  vatValue: { fontSize: 8, width: 72, textAlign: "right" },
+  grossRow: { flexDirection: "row", padding: "5pt 4pt", borderTopWidth: 0.5, borderTopColor: c.border, marginTop: 2 },
+  grossLabel: { fontSize: 9, fontWeight: "bold", flex: 1 },
+  grossValue: { fontSize: 10, fontWeight: "bold", width: 72, textAlign: "right" },
+
+  signatureBlock: { marginTop: 28, alignSelf: "flex-start" },
+  signatureLine: { fontSize: 9, marginBottom: 4 },
+
+  offerNotesBlock: { marginTop: 20 },
+  offerNoteLine: { fontSize: 8, color: c.gray, marginBottom: 4 },
+  offerValidityLine: { fontSize: 9, fontWeight: "bold", marginTop: 4 },
+
+  excludedBlock: { marginTop: 18 },
+  excludedTitle: { fontSize: 8, fontWeight: "bold", color: c.gray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+  excludedLine: { fontSize: 8, color: c.black, marginBottom: 3, paddingLeft: 4 },
+
   footer: { position: "absolute", bottom: 20, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between" },
   footerText: { fontSize: 7, color: c.gray },
+
   colNr: { width: 22 },
   colName: { flex: 1 },
-  colUnit: { width: 38, textAlign: "right" },
-  colQty: { width: 44, textAlign: "right" },
   colTotal: { width: 72, textAlign: "right" },
 });
 
 function fmtMoney(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return "—";
-  return `€ ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
-}
-
-function fmtQty(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "—";
-  return addThousandSeparators(roundToTwoDecimals(value).toFixed(2)).replace(".", ",");
+  if (!Number.isFinite(value) || value === 0) return "\u2014";
+  return `\u20AC ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
 }
 
 function resolveItemGrand(
-  item: EstimateLineItem,
-  catalogById: Map<string, PositionPriceSummary>,
+  item: Parameters<typeof resolveEstimateLineItemPrices>[0],
+  catalogPositions: PositionPriceSummary[],
   hourlyRate: number | null,
 ): number {
-  const position = item.positionPriceId ? catalogById.get(item.positionPriceId) : undefined;
-  const unitPrice = position
-    ? buildUnitPriceForCatalogPosition(position, hourlyRate)
-    : item.unitPrice;
-  const hasModuleSize = normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
-  const applyQty = (position?.variableQuantity === true || hasModuleSize) && item.quantity > 0;
-  const breakdown = applyQty
-    ? {
-        labor: roundToTwoDecimals(item.quantity * unitPrice.labor),
-        materials: roundToTwoDecimals(item.quantity * unitPrice.materials),
-        mechanisms: roundToTwoDecimals(item.quantity * unitPrice.mechanisms),
-      }
-    : unitPrice;
-  return roundToTwoDecimals(sumBreakdown(breakdown));
+  const { lineTotal } = resolveEstimateLineItemPrices(item, catalogPositions, hourlyRate);
+  return roundToTwoDecimals(sumBreakdown(lineTotal));
 }
+
+export type OfferProjectInfo = {
+  moduleName: string;
+  clientName: string;
+  address: string;
+  phone: string;
+  email: string;
+};
 
 type Props = {
   title: string;
@@ -99,124 +141,214 @@ type Props = {
   categories: EstimateCategory[];
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  company: CompanySettings;
+  logo: PdfImageAsset | null;
+  projectInfo: OfferProjectInfo;
+  visualizationImages: PdfImageAsset[];
+  excludedPositions: ExcludedPosition[];
 };
 
-export function EstimatePdfDocument({ title, meta, categories, catalogPositions, defaultHourlyRate }: Props) {
-  const catalogById = new Map(catalogPositions.map((p) => [p.id, p]));
+function pairImages(images: PdfImageAsset[]): Array<[PdfImageAsset, PdfImageAsset | null]> {
+  const pairs: Array<[PdfImageAsset, PdfImageAsset | null]> = [];
+  for (let i = 0; i < images.length; i += 2) {
+    pairs.push([images[i], images[i + 1] ?? null]);
+  }
+  return pairs;
+}
+
+export function EstimatePdfDocument({
+  title,
+  meta,
+  categories,
+  catalogPositions,
+  defaultHourlyRate,
+  company,
+  logo,
+  projectInfo,
+  visualizationImages,
+  excludedPositions,
+}: Props) {
   const totals = calculateEstimateTotals(categories, catalogPositions, defaultHourlyRate);
+  const companyLines = formatCompanyDisplayLines(company);
+  const imagePairs = pairImages(visualizationImages);
+  const showVat = hasCompanyVatNumber(company.vatNumber);
+  const vatBreakdown = showVat ? calculateVatBreakdown(totals.grand) : null;
+  const signatureLines = [
+    company.companyName.trim(),
+    company.email.trim(),
+    company.phone.trim() ? formatDisplayPhone(company.phone) : "",
+  ].filter(Boolean);
+  const offerNoteLines = parseOfferAdditionalInfoLines(company.offerAdditionalInfo);
+  const showOfferNotes =
+    offerNoteLines.length > 0 || company.offerValidityDays > 0;
 
   let rowNr = 0;
 
   return (
-    <Document title={title} author={meta.author} subject="Tāmes piedāvājums">
+    <Document title={title} author={meta.author} subject="Piedavajums">
       <Page size="A4" style={s.page}>
-        {/* Header */}
-        <View style={s.headerRow}>
-          <View>
-            <Text style={s.title}>{title}</Text>
-            <Text style={s.subtitle}>Tāmes piedāvājums</Text>
+
+        {/* Rekviziti + logo */}
+        <View style={s.reqRow}>
+          <View style={s.reqLines}>
+            {companyLines.map((line, i) =>
+              i === 0 ? (
+                <Text key={i} style={s.reqCompanyName}>{line.value}</Text>
+              ) : (
+                <Text key={i} style={s.reqLine}>
+                  {line.label ? `${line.label}: ` : ""}{line.value}
+                </Text>
+              )
+            )}
           </View>
-          <View style={{ alignItems: "flex-end" }}>
-            {meta.number ? <Text style={{ fontSize: 8, color: c.gray }}>Nr. {meta.number}</Text> : null}
-            <Text style={{ fontSize: 8, color: c.gray }}>Datums: {formatDisplayDateDdMmYy(meta.date)}</Text>
-            {meta.deadline ? (
-              <Text style={{ fontSize: 8, color: c.gray }}>Termiņš: {formatDisplayDateDdMmYy(meta.deadline)}</Text>
-            ) : null}
-          </View>
+          {logo ? <Image src={logo.dataUrl} style={s.logo} /> : null}
         </View>
 
-        {/* Meta */}
-        <View style={s.metaGrid}>
-          <View style={s.metaBlock}>
-            <Text style={s.metaLabel}>Pasūtītājs</Text>
-            <Text style={s.metaValue}>{meta.client || "—"}</Text>
+        <View style={s.divider} />
+
+        {/* Virsraksts + projekta info */}
+        <Text style={s.offerTitle}>{"Pied\u0101v\u0101jums"}</Text>
+        <View style={s.infoGrid}>
+          <View style={s.infoRow}>
+            <View style={s.infoBlock}>
+              <Text style={s.infoLabel}>Projekts</Text>
+              <Text style={s.infoValue}>{projectInfo.moduleName}</Text>
+            </View>
+            <View style={s.infoBlock}>
+              <Text style={s.infoLabel}>{"Pas\u016bt\u012bt\u0101js"}</Text>
+              <Text style={s.infoValue}>{projectInfo.clientName || "\u2014"}</Text>
+            </View>
           </View>
-          <View style={[s.metaBlock, { flex: 1 }]}>
-            <Text style={s.metaLabel}>Objekts</Text>
-            <Text style={s.metaValue}>{meta.project || "—"}</Text>
+          <View style={s.infoRow}>
+            <View style={[s.infoBlock, { minWidth: 280, flex: 1 }]}>
+              <Text style={s.infoLabel}>Adrese</Text>
+              <Text style={s.infoValue}>{projectInfo.address || "\u2014"}</Text>
+            </View>
+          </View>
+          {(projectInfo.email || projectInfo.phone) ? (
+            <View style={s.infoRow}>
+              {projectInfo.email ? (
+                <View style={s.infoBlock}>
+                  <Text style={s.infoLabel}>E-pasts</Text>
+                  <Text style={s.infoValue}>{projectInfo.email}</Text>
+                </View>
+              ) : null}
+              {projectInfo.phone ? (
+                <View style={s.infoBlock}>
+                  <Text style={s.infoLabel}>{"T\u0101lrunis"}</Text>
+                  <Text style={s.infoValue}>{formatDisplayPhone(projectInfo.phone)}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          <View style={s.infoRow}>
+            {meta.number ? (
+              <View style={s.infoBlock}>
+                <Text style={s.infoLabel}>Numurs</Text>
+                <Text style={s.infoValue}>{meta.number}</Text>
+              </View>
+            ) : null}
+            <View style={s.infoBlock}>
+              <Text style={s.infoLabel}>Datums</Text>
+              <Text style={s.infoValue}>{formatDisplayDateDdMmYy(meta.date)}</Text>
+            </View>
+            {meta.deadline ? (
+              <View style={s.infoBlock}>
+                <Text style={s.infoLabel}>{"Der\u012bguma termi\u0146\u0161"}</Text>
+                <Text style={s.infoValue}>{formatDisplayDateDdMmYy(meta.deadline)}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
         <View style={s.divider} />
 
-        {/* Table header */}
+        {/* Vizualizacijas — 2 kolonnas ar eksplicitem platumu */}
+        {imagePairs.length > 0 ? (
+          <View>
+            <Text style={s.imgSectionTitle}>{"Vizualiz\u0101cija"}</Text>
+            {imagePairs.map(([left, right], i) => (
+              <View key={i} style={s.imgRow} wrap={false}>
+                <Image src={left.dataUrl} style={[s.imgItem, right ? { marginRight: 8 } : {}]} />
+                {right ? <Image src={right.dataUrl} style={s.imgItem} /> : null}
+              </View>
+            ))}
+            <View style={[s.divider, { marginTop: 6 }]} />
+          </View>
+        ) : null}
+
+        {/* Tabulas galvene */}
         <View style={s.tableHeader}>
           <Text style={[s.tableHeaderCell, s.colNr]}>Nr.</Text>
           <Text style={[s.tableHeaderCell, s.colName]}>Nosaukums</Text>
-          <Text style={[s.tableHeaderCell, s.colUnit]}>Vien.</Text>
-          <Text style={[s.tableHeaderCell, s.colQty]}>Daudzums</Text>
-          <Text style={[s.tableHeaderCell, s.colTotal]}>Kopā €</Text>
+          <Text style={[s.tableHeaderCell, s.colTotal]}>{"Kop\u0101 \u20AC"}</Text>
         </View>
 
-        {/* Rows */}
+        {/* Tabulas rindas */}
         {categories.map((cat) => {
           const catTotals = calculateEstimateTotals([cat], catalogPositions, defaultHourlyRate);
           const directItems = collectRowLineItems(cat.items, { forTotals: true });
 
           return (
-            <View key={cat.id} wrap={false}>
-              {/* Category header */}
+            <View key={cat.id}>
               <View style={s.catRow}>
                 <Text style={s.catText}>{cat.title || "Bez nosaukuma"}</Text>
                 <Text style={s.catTotal}>{fmtMoney(catTotals.grand)}</Text>
               </View>
 
-              {/* Direct items */}
               {directItems.map((item) => {
                 rowNr += 1;
-                const grand = resolveItemGrand(item, catalogById, defaultHourlyRate);
+                const grand = resolveItemGrand(item, catalogPositions, defaultHourlyRate);
                 return (
                   <View key={item.id} style={s.itemRow}>
                     <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
                     <Text style={[s.cell, s.colName]}>{resolveLineItemDisplayName(item)}</Text>
-                    <Text style={[s.cell, s.colUnit]}>{item.unit || "—"}</Text>
-                    <Text style={[s.cell, s.colQty]}>{fmtQty(item.quantity)}</Text>
                     <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
                   </View>
                 );
               })}
 
-              {/* Subcategories */}
               {cat.subcategories.map((sub) => {
                 const subItems = collectRowLineItems(sub.items, { forTotals: true });
                 if (subItems.length === 0) return null;
 
-                if (sub.hiddenInOffer) {
-                  const subTotals = calculateEstimateTotals(
-                    [{ ...cat, subcategories: [sub], items: [] }],
-                    catalogPositions,
-                    defaultHourlyRate,
-                  );
+                const subTotals = calculateEstimateTotals(
+                  [{ ...cat, subcategories: [sub], items: [] }],
+                  catalogPositions,
+                  defaultHourlyRate,
+                );
+
+                // Paslēptas pozīcijas vai cenas — subkategorijas kopsummas rinda
+                if (sub.hiddenInOffer || sub.hiddenPricesInOffer) {
                   rowNr += 1;
                   return (
-                    <View key={sub.id} style={s.itemRow}>
+                    <View key={sub.id} style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
                       <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                      <Text style={[s.cell, s.colName]}>{sub.title || "Bez nosaukuma"}</Text>
-                      <Text style={[s.cell, s.colUnit]}>—</Text>
-                      <Text style={[s.cell, s.colQty]}>—</Text>
-                      <Text style={[s.cell, s.colTotal]}>{fmtMoney(subTotals.grand)}</Text>
+                      <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>
+                        {sub.title || "Bez nosaukuma"}
+                      </Text>
+                      <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
+                        {fmtMoney(subTotals.grand)}
+                      </Text>
                     </View>
                   );
                 }
 
+                // Noklusejums: subkategorijas virsraksts + visas pozicijas ar cenu
                 return (
                   <View key={sub.id}>
                     <View style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
                       <Text style={[s.cell, s.colNr]} />
                       <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>{sub.title}</Text>
-                      <Text style={[s.cell, s.colUnit]} />
-                      <Text style={[s.cell, s.colQty]} />
                       <Text style={[s.cell, s.colTotal]} />
                     </View>
                     {subItems.map((item) => {
                       rowNr += 1;
-                      const grand = resolveItemGrand(item, catalogById, defaultHourlyRate);
+                      const grand = resolveItemGrand(item, catalogPositions, defaultHourlyRate);
                       return (
                         <View key={item.id} style={s.itemRow}>
                           <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
                           <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>{resolveLineItemDisplayName(item)}</Text>
-                          <Text style={[s.cell, s.colUnit]}>{item.unit || "—"}</Text>
-                          <Text style={[s.cell, s.colQty]}>{fmtQty(item.quantity)}</Text>
                           <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
                         </View>
                       );
@@ -228,15 +360,70 @@ export function EstimatePdfDocument({ title, meta, categories, catalogPositions,
           );
         })}
 
-        {/* Grand total */}
+        {/* Pavisam kopa */}
         <View style={s.totalRow}>
-          <Text style={s.totalLabel}>PAVISAM KOPĀ</Text>
+          <Text style={s.totalLabel}>
+            {showVat ? "Summa bez PVN" : "PAVISAM KOP\u0100"}
+          </Text>
           <Text style={s.totalValue}>{fmtMoney(totals.grand)}</Text>
         </View>
 
-        {/* Footer */}
+        {vatBreakdown ? (
+          <>
+            <View style={s.vatRow}>
+              <Text style={s.vatLabel}>
+                {`PVN ${vatBreakdown.ratePercent}%`}
+              </Text>
+              <Text style={s.vatValue}>{fmtMoney(vatBreakdown.vatAmount)}</Text>
+            </View>
+            <View style={s.grossRow}>
+              <Text style={s.grossLabel}>{"KOP\u0100 AR PVN"}</Text>
+              <Text style={s.grossValue}>{fmtMoney(vatBreakdown.gross)}</Text>
+            </View>
+          </>
+        ) : null}
+
+        {excludedPositions.length > 0 ? (
+          <View style={s.excludedBlock}>
+            <Text style={s.excludedTitle}>
+              {"Pied\u0101v\u0101jum\u0101 neiek\u013caut\u0101s poz\u012bcijas"}
+            </Text>
+            {excludedPositions.map((position, index) => (
+              <Text key={position.id} style={s.excludedLine}>
+                {`${index + 1}. ${position.name}`}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {showOfferNotes ? (
+          <View style={s.offerNotesBlock}>
+            {offerNoteLines.map((line, index) => (
+              <Text key={index} style={s.offerNoteLine}>
+                {line}
+              </Text>
+            ))}
+            {company.offerValidityDays > 0 ? (
+              <Text style={s.offerValidityLine}>
+                {`Pied\u0101v\u0101jums sp\u0113k\u0101 ${company.offerValidityDays} dienas`}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {signatureLines.length > 0 ? (
+          <View style={s.signatureBlock}>
+            {signatureLines.map((line, index) => (
+              <Text key={index} style={s.signatureLine}>
+                {line}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Kajene */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>{meta.client} · {meta.project}</Text>
+          <Text style={s.footerText}>{projectInfo.clientName}{" \u00B7 "}{projectInfo.address}</Text>
           <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>

@@ -20,6 +20,61 @@ export type EstimateTotals = {
   grand: number;
 };
 
+export type EstimateLineItemPrices = {
+  unitPrice: PriceBreakdown;
+  lineTotal: PriceBreakdown;
+};
+
+export function resolveEstimateLineItemPrices(
+  item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+): EstimateLineItemPrices {
+  const catalogById = new Map(
+    catalogPositions.map((position) => [position.id, position]),
+  );
+  const hasModuleSize =
+    !item.variableQuantity &&
+    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
+
+  if (isCompositeLineItem(item)) {
+    const unitPrice = deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
+    const shouldApply = (item.variableQuantity === true || hasModuleSize) && item.quantity > 0;
+    const lineTotal = shouldApply
+      ? multiplyBreakdown(item.quantity, unitPrice)
+      : unitPrice;
+    return { unitPrice, lineTotal };
+  }
+
+  const position = item.positionPriceId
+    ? catalogById.get(item.positionPriceId)
+    : undefined;
+  const unitPrice = position
+    ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
+    : item.unitPrice;
+
+  const shouldApplyQuantity =
+    (item.variableQuantity === true ||
+      position?.variableQuantity === true ||
+      hasModuleSize) &&
+    item.quantity > 0;
+
+  const lineTotal = shouldApplyQuantity
+    ? multiplyBreakdown(item.quantity, unitPrice)
+    : unitPrice;
+
+  return { unitPrice, lineTotal };
+}
+
+function resolveLineItemBreakdown(
+  item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+): PriceBreakdown {
+  return resolveEstimateLineItemPrices(item, catalogPositions, defaultHourlyRate)
+    .lineTotal;
+}
+
 export function collectEstimateLineItems(
   categories: EstimateCategory[],
   options?: { forTotals?: boolean },
@@ -37,49 +92,11 @@ export function collectEstimateLineItems(
   return items;
 }
 
-function resolveLineItemBreakdown(
-  item: EstimateLineItem,
-  catalogPositions: PositionPriceSummary[],
-  catalogById: Map<string, PositionPriceSummary>,
-  defaultHourlyRate: number | null,
-): PriceBreakdown {
-  const hasModuleSize =
-    !item.variableQuantity &&
-    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
-
-  if (isCompositeLineItem(item)) {
-    // Vienmēr rēķina no aktuālās struktūras (ietverot consumption), nevis iesaldētas cenas.
-    const unitPrice = deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
-    const shouldApply = (item.variableQuantity === true || hasModuleSize) && item.quantity > 0;
-    return shouldApply ? multiplyBreakdown(item.quantity, unitPrice) : unitPrice;
-  }
-
-  const position = item.positionPriceId
-    ? catalogById.get(item.positionPriceId)
-    : undefined;
-  const unitPrice = position
-    ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
-    : item.unitPrice;
-
-  const shouldApplyQuantity =
-    (item.variableQuantity === true || position?.variableQuantity === true || hasModuleSize) &&
-    item.quantity > 0;
-
-  if (shouldApplyQuantity) {
-    return multiplyBreakdown(item.quantity, unitPrice);
-  }
-
-  return unitPrice;
-}
-
 export function calculateEstimateTotals(
   categories: EstimateCategory[],
   catalogPositions: PositionPriceSummary[] = [],
   defaultHourlyRate: number | null = null,
 ): EstimateTotals {
-  const catalogById = new Map(
-    catalogPositions.map((position) => [position.id, position]),
-  );
   const totals: EstimateTotals = {
     labor: 0,
     materials: 0,
@@ -91,7 +108,6 @@ export function calculateEstimateTotals(
     const breakdown = resolveLineItemBreakdown(
       item,
       catalogPositions,
-      catalogById,
       defaultHourlyRate,
     );
     totals.labor += breakdown.labor;
@@ -102,4 +118,3 @@ export function calculateEstimateTotals(
   totals.grand = totals.labor + totals.materials + totals.mechanisms;
   return totals;
 }
-

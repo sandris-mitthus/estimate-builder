@@ -1,32 +1,47 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import {
   buildProjectModuleSizeOptions,
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
+import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
+import { listUsers } from "@/app/lib/users/repository";
 
 export default async function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await assertNavAccess("projects");
+
   const { id } = await params;
-  const [project, estimate, modules, companySettings, catalogPositions, sagatave] =
-    await Promise.all([
-      getProject(id),
-      getProjectEstimate(id),
-      listBuildingModules(),
-      getCompanySettings(),
-      listPositionPrices(),
-      ensureDefaultEstimatePosition(),
-    ]);
+  const [
+    project,
+    estimate,
+    modules,
+    companySettings,
+    catalogPositions,
+    sagatave,
+    globalExcludedPositions,
+    users,
+  ] = await Promise.all([
+    getProject(id),
+    getProjectEstimate(id),
+    listBuildingModules(),
+    getCompanySettings(),
+    listPositionPrices(),
+    ensureDefaultEstimatePosition(),
+    listExcludedPositions(),
+    listUsers(),
+  ]);
 
   if (!project || !estimate) {
     notFound();
@@ -84,6 +99,10 @@ export default async function ProjectDetailPage({
         catalogPositions={catalogPositions}
         defaultHourlyRate={companySettings.defaultHourlyRate}
         currency={companySettings.currency}
+        sagataveSections={sagatave.sections}
+        sagataveMultiOptionLinks={sagatave.multiOptionLinks}
+        globalExcludedPositions={globalExcludedPositions}
+        users={users}
       />
     </main>
   );

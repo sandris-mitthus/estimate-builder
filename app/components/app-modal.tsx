@@ -26,20 +26,14 @@ const panelBaseClassName =
 
 const defaultPanelMaxWidthClassName = "max-w-md";
 
-/** Portaled dropdowns (unit hints, Google Places, …) must not count as backdrop clicks. */
+/** Portaled dropdowns (unit hints, …) must not count as backdrop clicks. */
 function isBackdropDismissTarget(target: Node, panel: HTMLElement | null): boolean {
   if (panel?.contains(target)) {
     return false;
   }
 
-  if (target instanceof Element) {
-    if (target.closest("[data-app-modal-ignore-backdrop]")) {
-      return false;
-    }
-
-    if (target.closest(".pac-container")) {
-      return false;
-    }
+  if (target instanceof Element && target.closest("[data-app-modal-ignore-backdrop]")) {
+    return false;
   }
 
   return true;

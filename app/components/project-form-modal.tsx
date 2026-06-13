@@ -6,7 +6,6 @@ import {
   createProjectAction,
   updateProjectAction,
 } from "@/app/(protected)/actions";
-import { AddressAutocompleteField } from "@/app/components/address-autocomplete-field";
 import { AppModal } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PhoneField } from "@/app/components/phone-field";
@@ -387,7 +386,7 @@ export function ProjectFormModal({
           onChange={(value) => updateField("email", value)}
           error={fieldErrors.email}
         />
-        <AddressAutocompleteField
+        <FormField
           label="Adrese"
           id="address"
           value={form.address}

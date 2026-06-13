@@ -12,7 +12,7 @@ Visas **server action** un saglabāšanas atbildes (veiksme, kļūda) rādi ar *
 
 | Kas | Kur |
 |-----|-----|
-| Provider | `FeedbackToastProvider` — `app/layout.tsx` un `app/(protected)/layout.tsx` |
+| Provider | `FeedbackToastProvider` — tikai `app/layout.tsx` (nav dublēt `(protected)/layout.tsx` — Turbopack konteksta kļūda) |
 | Hook | `useFeedbackToast()` → `showFeedback`, `clearFeedback` |
 | UI | `FeedbackToast` — `app/components/feedback-toast.tsx` |
 

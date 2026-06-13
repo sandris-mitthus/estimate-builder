@@ -4,7 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAuth } from "@/app/lib/auth/require-auth";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import { collectSectionLineItems } from "@/app/lib/estimate-positions/collect-section-items";
 import { saveEstimatePositionDocument } from "@/app/lib/estimate-positions/repository";
 import type { SaveEstimatePositionDocumentInput } from "@/app/lib/estimate-positions/types";
@@ -19,7 +19,8 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 
 function revalidateSagatave() {
   revalidatePath("/estimate");
-  revalidatePath("/settings/positions");
+  revalidatePath("/positions");
+  revalidatePath("/");
 }
 
 
@@ -29,7 +30,7 @@ export async function saveEstimatePositionDocumentAction(
   input: SaveEstimatePositionDocumentInput,
 
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("sagatave.save");
   if (denied) return denied;
 
   const [catalogPositions, companySettings] = await Promise.all([

@@ -22,6 +22,10 @@ import { DragHandle } from "@/app/components/drag-handle";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { ModulePdfThumbnail } from "@/app/components/module-pdf-thumbnail";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { ModuleVisualizationImage } from "@/app/components/module-visualization-image";
+import {
+  resolveModuleBlockAssetUrl,
+} from "@/app/lib/modules/resolve-block-asset";
 import {
   validateModuleImageFile,
   validateModuleProjectFile,
@@ -59,7 +63,7 @@ function SortableModuleTile({
   return (
     <div ref={setNodeRef} style={style} className={tileClassName}>
       <a
-        href={block.fileUrl}
+        href={resolveModuleBlockAssetUrl(block)}
         target="_blank"
         rel="noopener noreferrer"
         className="block size-full"
@@ -68,11 +72,7 @@ function SortableModuleTile({
         {isPdf ? (
           <ModulePdfThumbnail storagePath={block.storagePath} />
         ) : (
-          <img
-            src={block.fileUrl}
-            alt=""
-            className="size-full object-cover transition group-hover:opacity-95"
-          />
+          <ModuleVisualizationImage block={block} />
         )}
       </a>
 

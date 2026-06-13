@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/app/lib/auth/require-auth";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import {
   createBuildingModule,
   deleteBuildingModule,
@@ -28,7 +28,7 @@ function revalidateModuleDetail(id: string) {
 }
 
 export async function createBuildingModuleAction(input: CreateBuildingModuleInput) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await createBuildingModule(input);
@@ -41,7 +41,7 @@ export async function createBuildingModuleAction(input: CreateBuildingModuleInpu
 }
 
 export async function updateBuildingModuleAction(input: UpdateBuildingModuleInput) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await updateBuildingModule(input);
@@ -54,7 +54,7 @@ export async function updateBuildingModuleAction(input: UpdateBuildingModuleInpu
 }
 
 export async function deleteBuildingModuleAction(id: string) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await deleteBuildingModule(id);
@@ -69,7 +69,7 @@ export async function deleteBuildingModuleAction(id: string) {
 export async function updateBuildingModuleBlocksAction(
   input: UpdateBuildingModuleBlocksInput,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await updateBuildingModuleBlocks(input);
@@ -85,7 +85,7 @@ export async function updateBuildingModuleBlocksAction(
 export async function updateBuildingModuleProjectDescriptionAction(
   input: UpdateBuildingModuleProjectDescriptionInput,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await updateBuildingModuleProjectDescription(input);
@@ -102,7 +102,7 @@ export async function uploadBuildingModuleBlockAction(
   kind: ModuleBlockKind,
   formData: FormData,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const file = formData.get("file");
@@ -126,7 +126,7 @@ export async function removeBuildingModuleBlockAction(
   kind: ModuleBlockKind,
   blockId: string,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("modules.manage");
   if (denied) return denied;
 
   const result = await removeBuildingModuleBlock(moduleId, kind, blockId);

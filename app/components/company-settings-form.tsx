@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { saveCompanySettingsAction } from "@/app/(protected)/settings/actions";
 import { CompanyLogoDropzone } from "@/app/components/company-logo-dropzone";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { formatAmount } from "@/app/lib/estimates/calculate-line";
 import { CURRENCY_OPTIONS } from "@/app/lib/settings/currencies";
@@ -12,6 +13,7 @@ import {
   parseEstimateValidityDaysInput,
 } from "@/app/lib/settings/estimate-validity-days";
 import { formatCompanyDisplayLines } from "@/app/lib/settings/format-company-lines";
+import { parseOfferAdditionalInfoLines } from "@/app/lib/settings/offer-additional-info";
 import { resolveBankFromAccountNumber } from "@/app/lib/settings/resolve-bank-from-account";
 import type { CompanySettings } from "@/app/lib/settings/types";
 
@@ -129,6 +131,26 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
           PVN numurs netiks rādīts, kamēr lauks ir tukšs.
         </p>
       ) : null}
+      {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).length > 0 ||
+      settings.offerValidityDays > 0 ? (
+        <div className="mt-5 border-t border-zinc-200/80 pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+            Piedāvājuma piezīmes
+          </p>
+          <ul className="mt-2 space-y-1.5 text-sm text-zinc-600">
+            {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).map(
+              (line, index) => (
+                <li key={`${index}-${line.slice(0, 24)}`}>{line}</li>
+              ),
+            )}
+          </ul>
+          {settings.offerValidityDays > 0 ? (
+            <p className="mt-3 text-sm font-semibold text-zinc-800">
+              Piedāvājums spēkā {settings.offerValidityDays} dienas
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -145,6 +167,7 @@ export function CompanySettingsForm({
       : "",
   );
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const canSave = useActionPermission("settings.save");
   const [isPending, startTransition] = useTransition();
 
   function updateField<K extends keyof CompanySettings>(
@@ -180,6 +203,14 @@ export function CompanySettingsForm({
       return;
     }
 
+    if (settings.offerValidityDays < 1) {
+      showFeedback({
+        type: "error",
+        text: "Ievadi piedāvājuma derīguma termiņu dienās.",
+      });
+      return;
+    }
+
     const parsedHourlyRate = parseDefaultHourlyRateInput(hourlyRateInput);
     if (hourlyRateInput.trim() && parsedHourlyRate === null) {
       showFeedback({
@@ -210,6 +241,7 @@ export function CompanySettingsForm({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_386px] lg:items-start">
       <form onSubmit={handleSubmit} className="space-y-8">
+        <fieldset disabled={!canSave} className="space-y-8 disabled:opacity-80">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title="Uzņēmums">
             <CompanyLogoDropzone
@@ -339,6 +371,63 @@ export function CompanySettingsForm({
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
+          <SettingsSection title="Piedāvājums">
+            <label htmlFor="offerValidityDays" className="block">
+              <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Piedāvājuma derīguma termiņš
+              </span>
+              <span className="mb-2 block text-xs text-zinc-500">
+                PDF rāda treknrakstā: „Piedāvājums spēkā X dienas”.
+              </span>
+              <InputWithSuffix
+                id="offerValidityDays"
+                name="offerValidityDays"
+                suffix="dienas"
+                inputMode="numeric"
+                autoComplete="off"
+                value={
+                  settings.offerValidityDays > 0
+                    ? String(settings.offerValidityDays)
+                    : ""
+                }
+                onChange={(event) => {
+                  const digits = parseEstimateValidityDaysInput(
+                    event.target.value,
+                  );
+                  updateField(
+                    "offerValidityDays",
+                    digits === "" ? 0 : Number.parseInt(digits, 10),
+                  );
+                }}
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <label htmlFor="offerAdditionalInfo" className="block">
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                  Papildus informācija piedāvājumam
+                </span>
+                <span className="mb-2 block text-xs text-zinc-500">
+                  Katra rinda tiek rādīta kā atsevišķs komentārs piedāvājuma PDF.
+                </span>
+                <textarea
+                  id="offerAdditionalInfo"
+                  name="offerAdditionalInfo"
+                  rows={5}
+                  value={settings.offerAdditionalInfo}
+                  placeholder={
+                    "Pozīcijas, kas nav minētas piedāvājumā – nav iekļautas.\nPrecizējot un mainot pozīcijas cenas piedāvājums var tikt precizēts."
+                  }
+                  onChange={(event) =>
+                    updateField("offerAdditionalInfo", event.target.value)
+                  }
+                  className={`${inputClassName} resize-y min-h-[7.5rem]`}
+                />
+              </label>
+            </div>
+          </SettingsSection>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title="Kontakti un valūta">
             <FormField
               label="Info telefons"
@@ -380,6 +469,7 @@ export function CompanySettingsForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {canSave ? (
           <button
             type="submit"
             disabled={isPending}
@@ -387,7 +477,9 @@ export function CompanySettingsForm({
           >
             {isPending ? "Saglabā…" : "Saglabāt"}
           </button>
+          ) : null}
         </div>
+        </fieldset>
       </form>
 
       <div className="lg:sticky lg:top-[4.5rem]">

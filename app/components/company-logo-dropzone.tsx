@@ -5,6 +5,7 @@ import {
   removeCompanyLogoAction,
   uploadCompanyLogoAction,
 } from "@/app/(protected)/settings/actions";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { validateCompanyLogoFile } from "@/app/lib/settings/logo-storage";
 
 type CompanyLogoDropzoneProps = {
@@ -18,6 +19,7 @@ export function CompanyLogoDropzone({
   onLogoChange,
   onError,
 }: CompanyLogoDropzoneProps) {
+  const canSave = useActionPermission("settings.save");
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -65,6 +67,25 @@ export function CompanyLogoDropzone({
 
       onLogoChange("");
     });
+  }
+
+  if (!canSave) {
+    return (
+      <div className="sm:col-span-2">
+        <p className="mb-1.5 text-sm font-medium text-zinc-700">Uzņēmuma logotips</p>
+        <div className="flex size-24 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Uzņēmuma logotips"
+              className="max-h-full max-w-full object-contain p-2"
+            />
+          ) : (
+            <i className="fas fa-image text-2xl text-zinc-300" aria-hidden="true" />
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (

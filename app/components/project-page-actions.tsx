@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
@@ -15,18 +16,21 @@ export function ProjectPageActions({
   archive = false,
 }: ProjectPageActionsProps) {
   const [createOpen, setCreateOpen] = useState(false);
+  const canCreate = useActionPermission("project.create");
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
-        >
-          <i className="fas fa-plus text-xs" aria-hidden="true" />
-          Jauns projekts
-        </button>
+        {canCreate ? (
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
+          >
+            <i className="fas fa-plus text-xs" aria-hidden="true" />
+            Jauns projekts
+          </button>
+        ) : null}
 
         <Link
           href={archive ? "/" : "/?archive=1"}

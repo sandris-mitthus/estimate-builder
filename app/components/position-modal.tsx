@@ -11,6 +11,7 @@ import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
+import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import {
@@ -23,7 +24,11 @@ import {
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
 } from "@/app/lib/estimates/composite-line-item";
-import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import { buildManualUnitSelectOptions } from "@/app/lib/estimates/collect-estimate-document-units";
+import {
+  resolveCompositeLineItemDisplayUnit,
+  resolveLineItemDisplayUnitFromModuleSize,
+} from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
   EstimateLineItem,
   LineItemCatalogRef,
@@ -40,6 +45,7 @@ type PositionModalProps = {
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
+  estimateUnits?: string[];
 };
 
 const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
@@ -65,6 +71,8 @@ function snapshot(item: EstimateLineItem): string {
     mechanisms: item.mechanisms ?? [],
     moduleSizeAttachment: item.moduleSizeAttachment ?? null,
     variableQuantity: item.variableQuantity ?? false,
+    manualUnitEnabled: item.manualUnitEnabled ?? false,
+    manualUnit: item.manualUnit ?? "",
   });
 }
 
@@ -76,6 +84,7 @@ export function PositionModal({
   catalogPositions,
   defaultHourlyRate,
   moduleSizeOptions,
+  estimateUnits = [],
 }: PositionModalProps) {
   const [draft, setDraft] = useState<EstimateLineItem>(() => prepareDraft(value));
   const [initialSnapshot, setInitialSnapshot] = useState(() =>
@@ -161,7 +170,10 @@ export function PositionModal({
       name: draft.name.trim(),
       unit: draft.variableQuantity
         ? resolvedVariableUnit
-        : (resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ?? "gab."),
+        : draft.manualUnitEnabled && draft.manualUnit?.trim()
+          ? draft.manualUnit.trim()
+          : (resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ??
+            "gab."),
       laborTimeNorm: roundToTwoDecimals(draft.laborTimeNorm ?? 0),
       materials: draft.materials ?? [],
       mechanisms: draft.mechanisms ?? [],
@@ -180,11 +192,29 @@ export function PositionModal({
 
   const draftMaterials = resolveEffectiveMaterials(draft);
   const draftMechanisms = resolveEffectiveMechanisms(draft);
-  // Pozīcijas mērvienība no piesaistītā moduļa apjoma (piem. m²). Tikai tad var ievadīt patēriņu.
-  const positionUnit = resolveLineItemDisplayUnitFromModuleSize(
-    draft,
-    moduleSizeOptions,
+  const positionUnit = resolveCompositeLineItemDisplayUnit(draft, moduleSizeOptions);
+  const manualUnitOptions = useMemo(
+    () => buildManualUnitSelectOptions(estimateUnits, draft.manualUnit ?? ""),
+    [estimateUnits, draft.manualUnit],
   );
+
+  function handleManualUnitEnabledChange(manualUnitEnabled: boolean) {
+    if (!manualUnitEnabled) {
+      patch({ manualUnitEnabled });
+      return;
+    }
+
+    const nextUnit =
+      draft.manualUnit?.trim() ||
+      resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ||
+      manualUnitOptions[0] ||
+      "gab.";
+
+    patch({
+      manualUnitEnabled,
+      manualUnit: nextUnit,
+    });
+  }
 
   return (
     <AppModal
@@ -349,6 +379,15 @@ export function PositionModal({
               ...(variableQuantity ? { moduleSizeAttachment: undefined } : {}),
             })
           }
+        />
+
+        <PositionManualUnitField
+          id={`position-manual-unit-${draft.id}`}
+          enabled={draft.manualUnitEnabled ?? false}
+          unit={draft.manualUnit ?? ""}
+          unitOptions={manualUnitOptions}
+          onEnabledChange={handleManualUnitEnabledChange}
+          onUnitChange={(manualUnit) => patch({ manualUnit })}
         />
 
         <div>

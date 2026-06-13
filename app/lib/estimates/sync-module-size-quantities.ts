@@ -120,6 +120,23 @@ export function hasModuleSizeAttachment(item: EstimateLineItem): boolean {
   );
 }
 
+/** Kompozītās pozīcijas efektīvā mērvienība tabulā un patēriņa aprēķinam. */
+export function resolveCompositeLineItemDisplayUnit(
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): string | null {
+  if (item.manualUnitEnabled && item.manualUnit?.trim()) {
+    return item.manualUnit.trim();
+  }
+
+  if (item.variableQuantity) {
+    const unit = item.unit.trim();
+    return unit || null;
+  }
+
+  return resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions);
+}
+
 /** Mērvienība no piesaistītā moduļa lieluma pozīcijas (piem. "m²", "m"). */
 export function resolveLineItemDisplayUnitFromModuleSize(
   item: EstimateLineItem,

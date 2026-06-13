@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/app/lib/auth/require-auth";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import {
   deleteCompanyLogoFromStorage,
   uploadCompanyLogo,
@@ -13,7 +13,7 @@ import {
 import type { CompanySettings } from "@/app/lib/settings/types";
 
 export async function saveCompanySettingsAction(settings: CompanySettings) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("settings.save");
   if (denied) return denied;
 
   const result = await saveCompanySettings(settings);
@@ -27,7 +27,7 @@ export async function saveCompanySettingsAction(settings: CompanySettings) {
 }
 
 export async function uploadCompanyLogoAction(formData: FormData) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("settings.save");
   if (denied) return denied;
 
   const file = formData.get("logo");
@@ -56,7 +56,7 @@ export async function uploadCompanyLogoAction(formData: FormData) {
 }
 
 export async function removeCompanyLogoAction() {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("settings.save");
   if (denied) return denied;
 
   await deleteCompanyLogoFromStorage();

@@ -7,8 +7,6 @@ const scriptSrc = [
   "'self'",
   "'unsafe-inline'",
   isDev ? "'unsafe-eval'" : null,
-  "https://maps.googleapis.com",
-  "https://maps.gstatic.com",
 ]
   .filter(Boolean)
   .join(" ");
@@ -20,8 +18,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https: blob:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com",
-  "frame-src 'self' https://www.google.com https://maps.google.com https://www.google.com/maps/",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src 'self'",
   `frame-ancestors 'none'`,
 ].join("; ");
 
@@ -30,8 +28,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/positions",
-        destination: "/settings/positions",
+        source: "/settings/positions",
+        destination: "/positions",
         permanent: true,
       },
     ];

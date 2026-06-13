@@ -4,6 +4,39 @@ import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
 
 export const COMPANY_LOGO_BUCKET = "company-assets";
 export const COMPANY_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const COMPANY_LOGO_EXTENSIONS = ["png", "jpg", "webp", "svg"] as const;
+
+export function resolveCompanyLogoDisplayUrl(storedUrl: string): string {
+  const trimmed = storedUrl.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("/api/company/logo")) return trimmed;
+  return "/api/company/logo";
+}
+
+export async function downloadCompanyLogoFile(
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<{ data: Blob; mimeType: string } | null> {
+  for (const extension of COMPANY_LOGO_EXTENSIONS) {
+    const path = `company/logo.${extension}`;
+    const { data, error } = await supabase.storage
+      .from(COMPANY_LOGO_BUCKET)
+      .download(path);
+
+    if (!error && data) {
+      const mimeType =
+        data.type ||
+        (extension === "jpg"
+          ? "image/jpeg"
+          : extension === "svg"
+            ? "image/svg+xml"
+            : `image/${extension}`);
+
+      return { data, mimeType };
+    }
+  }
+
+  return null;
+}
 
 const ALLOWED_LOGO_TYPES = new Set([
   "image/png",

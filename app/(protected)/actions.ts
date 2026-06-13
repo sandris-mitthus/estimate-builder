@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { requireAuth } from "@/app/lib/auth/require-auth";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   createProject,
   deleteProject,
+  omitProjectExcludedPosition,
+  markProjectMaterialOrdered,
+  assignProjectMaterialUser,
   saveProjectEstimate,
   updateProject,
   updateProjectEstimateDates,
@@ -20,8 +23,21 @@ import type { EstimateCategory } from "@/app/lib/estimates/types";
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
 
+function statusActionPermission(status: ProjectStatus) {
+  switch (status) {
+    case "approved":
+      return "project.approve" as const;
+    case "rejected":
+      return "project.reject" as const;
+    case "completed":
+      return "project.complete" as const;
+    default:
+      return "project.edit" as const;
+  }
+}
+
 export async function createProjectAction(input: CreateProjectInput) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project.create");
   if (denied) return denied;
 
   const contact = validateProjectContactFields({
@@ -54,7 +70,7 @@ export async function createProjectAction(input: CreateProjectInput) {
 }
 
 export async function updateProjectAction(input: UpdateProjectInput) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project.edit");
   if (denied) return denied;
 
   const contact = validateProjectContactFields({
@@ -85,7 +101,7 @@ export async function updateProjectEstimateDatesAction(
   projectId: string,
   dates: { date: string; deadline: string },
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("estimate.dates");
   if (denied) return denied;
 
   const result = await updateProjectEstimateDates(projectId, dates);
@@ -106,7 +122,7 @@ export async function saveProjectEstimateAction(
     multiOptionLinks: MultiOptionLinkGroup[];
   },
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("estimate.save");
   if (denied) return denied;
 
   const result = await saveProjectEstimate(projectId, payload);
@@ -118,8 +134,66 @@ export async function saveProjectEstimateAction(
   return result;
 }
 
+export async function omitProjectExcludedPositionAction(
+  projectId: string,
+  excludedPositionId: string,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await omitProjectExcludedPosition(projectId, excludedPositionId);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
+export async function markProjectMaterialOrderedAction(
+  projectId: string,
+  positionPriceId: string,
+) {
+  const { denied } = await requireAction("materials.order");
+  if (denied) return denied;
+
+  const result = await markProjectMaterialOrdered(projectId, positionPriceId);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath("/positions");
+    revalidatePath("/", "layout");
+    revalidatePath("/");
+  }
+
+  return result;
+}
+
+export async function assignProjectMaterialUserAction(
+  projectId: string,
+  positionPriceId: string,
+  userId: string,
+) {
+  const { denied } = await requireAction("materials.assign");
+  if (denied) return denied;
+
+  const result = await assignProjectMaterialUser(
+    projectId,
+    positionPriceId,
+    userId,
+  );
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath("/", "layout");
+    revalidatePath("/");
+  }
+
+  return result;
+}
+
 export async function deleteProjectAction(id: string) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction("project.delete");
   if (denied) return denied;
 
   const result = await deleteProject(id);
@@ -135,7 +209,7 @@ export async function updateProjectStatusAction(
   projectId: string,
   status: ProjectStatus,
 ) {
-  const { denied } = await requireAuth();
+  const { denied } = await requireAction(statusActionPermission(status));
   if (denied) return denied;
 
   const result = await updateProjectStatus(projectId, status);

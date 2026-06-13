@@ -54,6 +54,7 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
       try {
         const response = await fetch(
           `/api/modules/asset?path=${encodeURIComponent(storagePath)}`,
+          { credentials: "include" },
         );
 
         if (!response.ok) {
@@ -114,6 +115,7 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
         try {
           const response = await fetch(
             `/api/modules/asset?path=${encodeURIComponent(storagePath)}`,
+            { credentials: "include" },
           );
 
           if (!response.ok) {

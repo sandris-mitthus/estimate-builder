@@ -38,6 +38,7 @@ export function UserAvatar({
         alt=""
         width={pixels}
         height={pixels}
+        referrerPolicy="no-referrer"
         className={`${sizeClass} shrink-0 object-cover ring-1 ring-zinc-200`}
         onError={() => setImgError(true)}
       />

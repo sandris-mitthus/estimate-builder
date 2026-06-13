@@ -8,6 +8,7 @@ import {
 } from "@/app/(protected)/actions";
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
@@ -40,6 +41,13 @@ export function ProjectCardActions({
   const canApprove = project.status === "active";
   const canReject = project.status === "active";
   const canComplete = project.status === "approved";
+  const canCreate = useActionPermission("project.create");
+  const canEdit = useActionPermission("project.edit");
+  const canDelete = useActionPermission("project.delete");
+  const canApproveAction = useActionPermission("project.approve");
+  const canRejectAction = useActionPermission("project.reject");
+  const canCompleteAction = useActionPermission("project.complete");
+  const canManageModuleData = useActionPermission("project_module.manage");
 
   function handleDeleteOpenChange(open: boolean) {
     if (!open && !isPending) {
@@ -128,7 +136,7 @@ export function ProjectCardActions({
   return (
     <>
       <div className="flex shrink-0 items-center gap-0.5">
-        {isIndividualProject ? (
+        {isIndividualProject && canManageModuleData ? (
           <IconActionButton
             label={
               moduleDataComplete
@@ -142,13 +150,15 @@ export function ProjectCardActions({
             onClick={() => router.push(`/${project.id}/module-data`)}
           />
         ) : null}
-        <IconActionButton
-          label="Kopēt"
-          icon="fas fa-copy"
-          variant="copy"
-          onClick={() => setCopyOpen(true)}
-        />
-        {canEditOrDelete ? (
+        {canCreate ? (
+          <IconActionButton
+            label="Kopēt"
+            icon="fas fa-copy"
+            variant="copy"
+            onClick={() => setCopyOpen(true)}
+          />
+        ) : null}
+        {canEditOrDelete && canEdit ? (
           <>
             <IconActionButton
               label="Labot"
@@ -156,15 +166,17 @@ export function ProjectCardActions({
               variant="edit"
               onClick={() => setEditOpen(true)}
             />
-            <IconActionButton
-              label="Dzēst"
-              icon="fas fa-trash"
-              variant="delete"
-              onClick={() => setDeleteOpen(true)}
-            />
           </>
         ) : null}
-        {canApprove ? (
+        {canEditOrDelete && canDelete ? (
+          <IconActionButton
+            label="Dzēst"
+            icon="fas fa-trash"
+            variant="delete"
+            onClick={() => setDeleteOpen(true)}
+          />
+        ) : null}
+        {canApprove && canApproveAction ? (
           <IconActionButton
             label="Apstiprināts"
             icon="fas fa-check"
@@ -172,7 +184,7 @@ export function ProjectCardActions({
             onClick={() => setApproveOpen(true)}
           />
         ) : null}
-        {canComplete ? (
+        {canComplete && canCompleteAction ? (
           <IconActionButton
             label="Pabeigts"
             icon="fas fa-check-double"
@@ -180,7 +192,7 @@ export function ProjectCardActions({
             onClick={() => setCompleteOpen(true)}
           />
         ) : null}
-        {canReject ? (
+        {canReject && canRejectAction ? (
           <IconActionButton
             label="Noraidīts"
             icon="fas fa-times"

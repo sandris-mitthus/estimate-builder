@@ -1,26 +1,12 @@
 import type { ModuleContentBlock } from "@/app/lib/modules/types";
-
-function isModuleContentBlock(value: unknown): value is ModuleContentBlock {
-  if (!value || typeof value !== "object") return false;
-
-  const row = value as Record<string, unknown>;
-  return (
-    typeof row.id === "string" &&
-    typeof row.title === "string" &&
-    typeof row.fileUrl === "string" &&
-    typeof row.mimeType === "string" &&
-    typeof row.storagePath === "string"
-  );
-}
+import { normalizeModuleContentBlock } from "@/app/lib/modules/resolve-block-asset";
 
 export function parseModuleContentBlocks(value: unknown): ModuleContentBlock[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
-  return value.filter(isModuleContentBlock).map((block) => ({
-    id: block.id,
-    title: block.title,
-    fileUrl: block.fileUrl,
-    mimeType: block.mimeType,
-    storagePath: block.storagePath,
-  }));
+  return value
+    .map((entry) => normalizeModuleContentBlock(entry))
+    .filter((block): block is ModuleContentBlock => block !== null);
 }

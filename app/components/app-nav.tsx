@@ -4,19 +4,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { UserAvatar } from "@/app/components/user-avatar";
+import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 import type { UserDisplay } from "@/app/lib/auth/map-user-display";
 import { signOut } from "@/app/lib/auth/sign-out";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Projekti" },
-  { href: "/modules", label: "Ēku moduļi" },
-  { href: "/estimate", label: "Sagatave" },
-  { href: "/settings/positions", label: "Pozīcijas" },
-  { href: "/users", label: "Lietotāji" },
-  { href: "/settings", label: "Uzstādījumi" },
-] as const;
+type NavItem = {
+  key: NavPermissionKey;
+  href: string;
+  label: string;
+};
 
-const OTHER_NAV_PREFIXES = NAV_ITEMS.map((item) => item.href).filter(
+const ALL_NAV_ITEMS: NavItem[] = [
+  { key: "projects", href: "/", label: "Projekti" },
+  { key: "modules", href: "/modules", label: "Ēku moduļi" },
+  { key: "estimate", href: "/estimate", label: "Sagatave" },
+  { key: "positions", href: "/positions", label: "Pozīcijas" },
+  { key: "excluded_positions", href: "/excluded-positions", label: "Neiekļautās pozīcijas" },
+  { key: "users", href: "/users", label: "Lietotāji" },
+  { key: "settings", href: "/settings", label: "Uzstādījumi" },
+];
+
+const OTHER_NAV_PREFIXES = ALL_NAV_ITEMS.map((item) => item.href).filter(
   (href) => href !== "/",
 );
 
@@ -66,16 +74,24 @@ function NavUserSection({ user }: { user: UserDisplay }) {
 
 type AppNavProps = {
   currentUser?: UserDisplay | null;
+  allowedNavKeys?: NavPermissionKey[] | null;
 };
 
-export function AppNav({ currentUser = null }: AppNavProps) {
+export function AppNav({
+  currentUser = null,
+  allowedNavKeys = null,
+}: AppNavProps) {
   const pathname = usePathname();
+  const navItems =
+    allowedNavKeys === null
+      ? ALL_NAV_ITEMS
+      : ALL_NAV_ITEMS.filter((item) => allowedNavKeys.includes(item.key));
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white">
       <div className="mx-auto flex h-[52px] max-w-[1480px] items-stretch justify-between gap-4 px-4 md:px-6">
         <nav className="flex min-w-0 flex-1 items-stretch overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const isActive =
                 item.href === "/"
                   ? isProjectsNavActive(pathname)

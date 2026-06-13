@@ -3,13 +3,14 @@ import {
   roundToTwoDecimals,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
-import { calculateEstimateTotals } from "@/app/lib/estimates/calculate-totals";
-import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
+import {
+  calculateEstimateTotals,
+  resolveEstimateLineItemPrices,
+} from "@/app/lib/estimates/calculate-totals";
 import {
   collectRowLineItems,
   resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
-import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import type {
   EstimateCategory,
   EstimateLineItem,
@@ -17,6 +18,10 @@ import type {
 } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import {
+  calculateVatBreakdown,
+  hasCompanyVatNumber,
+} from "@/app/lib/settings/vat-breakdown";
 
 function fmtNum(v: number): number | string {
   if (!Number.isFinite(v) || v === 0) return "";
@@ -26,32 +31,6 @@ function fmtNum(v: number): number | string {
 function fmtQty(v: number): number | string {
   if (!Number.isFinite(v) || v <= 0) return "";
   return roundToTwoDecimals(v);
-}
-
-function resolveItemBreakdown(
-  item: EstimateLineItem,
-  catalogById: Map<string, PositionPriceSummary>,
-  hourlyRate: number | null,
-): { unitPrice: PriceBreakdown; lineTotal: PriceBreakdown } {
-  const position = item.positionPriceId
-    ? catalogById.get(item.positionPriceId)
-    : undefined;
-  const unitPrice = position
-    ? buildUnitPriceForCatalogPosition(position, hourlyRate)
-    : item.unitPrice;
-  const hasModuleSize =
-    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
-  const applyQty =
-    (position?.variableQuantity === true || hasModuleSize) &&
-    item.quantity > 0;
-  const lineTotal: PriceBreakdown = applyQty
-    ? {
-        labor: roundToTwoDecimals(item.quantity * unitPrice.labor),
-        materials: roundToTwoDecimals(item.quantity * unitPrice.materials),
-        mechanisms: roundToTwoDecimals(item.quantity * unitPrice.mechanisms),
-      }
-    : { ...unitPrice };
-  return { unitPrice, lineTotal };
 }
 
 const THIN: ExcelJS.Border = { style: "thin", color: { argb: "FF000000" } };
@@ -123,8 +102,8 @@ export async function buildEstimateExcel(
   categories: EstimateCategory[],
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  vatNumber: string = "",
 ): Promise<Buffer> {
-  const catalogById = new Map(catalogPositions.map((p) => [p.id, p]));
   const totals = calculateEstimateTotals(
     categories,
     catalogPositions,
@@ -267,9 +246,9 @@ export async function buildEstimateExcel(
     // Direct items under category
     for (const item of collectRowLineItems(cat.items, { forTotals: true })) {
       nr += 1;
-      const { unitPrice, lineTotal } = resolveItemBreakdown(
+      const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
         item,
-        catalogById,
+        catalogPositions,
         defaultHourlyRate,
       );
       addDataRow(ws, nr, item, unitPrice, lineTotal, "");
@@ -289,9 +268,9 @@ export async function buildEstimateExcel(
 
       for (const item of subItems) {
         nr += 1;
-        const { unitPrice, lineTotal } = resolveItemBreakdown(
+        const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
           item,
-          catalogById,
+          catalogPositions,
           defaultHourlyRate,
         );
         addDataRow(ws, nr, item, unitPrice, lineTotal, "    ");
@@ -301,9 +280,12 @@ export async function buildEstimateExcel(
 
   // ── Grand total row ──────────────────────────────────────────────────
   ws.addRow([]); // spacer
+  const showVat = hasCompanyVatNumber(vatNumber);
+  const vatBreakdown = showVat ? calculateVatBreakdown(totals.grand) : null;
+
   const totalRow = ws.addRow([
     "",
-    "PAVISAM KOPĀ",
+    showVat ? "Summa bez PVN" : "PAVISAM KOPĀ",
     "",
     "",
     fmtNum(totals.labor),
@@ -319,6 +301,44 @@ export async function buildEstimateExcel(
   for (let c = 5; c <= 11; c++) {
     totalRow.getCell(c).alignment = { horizontal: "right", vertical: "middle" };
     totalRow.getCell(c).numFmt = "0.00";
+  }
+
+  if (vatBreakdown) {
+    const vatRow = ws.addRow([
+      "",
+      `PVN ${vatBreakdown.ratePercent}%`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      fmtNum(vatBreakdown.vatAmount),
+    ]);
+    vatRow.height = 18;
+    styleRowCells(vatRow, 11, { fontSize: 10, border: true });
+    vatRow.getCell(11).alignment = { horizontal: "right", vertical: "middle" };
+    vatRow.getCell(11).numFmt = "0.00";
+
+    const grossRow = ws.addRow([
+      "",
+      "KOPĀ AR PVN",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      fmtNum(vatBreakdown.gross),
+    ]);
+    grossRow.height = 20;
+    styleRowCells(grossRow, 11, { bold: true, fontSize: 10, bgColor: BG_TOTAL, border: true });
+    grossRow.getCell(11).alignment = { horizontal: "right", vertical: "middle" };
+    grossRow.getCell(11).numFmt = "0.00";
   }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();

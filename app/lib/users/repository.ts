@@ -1,33 +1,31 @@
 import type { User } from "@supabase/supabase-js";
-import { mapUserDisplay, readAvatarUrl } from "@/app/lib/auth/map-user-display";
+import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { SAMPLE_USERS } from "@/app/lib/users/sample-users";
 import type { UserSummary } from "@/app/lib/users/types";
 
-function resolveAvatarUrl(user: User): string | null {
-  const { avatarUrl } = mapUserDisplay(user);
-  if (avatarUrl) return avatarUrl;
-
-  // Dažiem Google OAuth lietotājiem avatars ir tikai identities datos.
-  for (const identity of user.identities ?? []) {
-    const data = identity.identity_data ?? {};
-    const url = readAvatarUrl(data as Record<string, unknown>);
-    if (url) return url;
-  }
-
-  return null;
-}
-
-function mapAuthUser(user: User): UserSummary {
+async function mapAuthUser(
+  user: User,
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<UserSummary> {
   const { name } = mapUserDisplay(user);
+  let avatarUrl = resolveAvatarUrl(user);
+
+  // listUsers bieži neatgriež pilnu identity_data — ielādē lietotāju atsevišķi.
+  if (!avatarUrl) {
+    const { data } = await supabase.auth.admin.getUserById(user.id);
+    if (data.user) {
+      avatarUrl = resolveAvatarUrl(data.user);
+    }
+  }
 
   return {
     id: user.id,
     name,
     email: user.email ?? "—",
-    avatarUrl: resolveAvatarUrl(user),
+    avatarUrl,
   };
 }
 
@@ -50,9 +48,11 @@ export async function listUsers(): Promise<UserSummary[]> {
     return [];
   }
 
-  return data.users
-    .map(mapAuthUser)
-    .sort((a, b) => a.name.localeCompare(b.name, "lv"));
+  const users = await Promise.all(
+    data.users.map((user) => mapAuthUser(user, supabase)),
+  );
+
+  return users.sort((a, b) => a.name.localeCompare(b.name, "lv"));
 }
 
 function inviteRedirectUrl(): string {

@@ -1,0 +1,317 @@
+export const NAV_PERMISSION_KEYS = [
+  "projects",
+  "modules",
+  "estimate",
+  "positions",
+  "excluded_positions",
+  "users",
+  "user_groups",
+  "settings",
+] as const;
+
+export type NavPermissionKey = (typeof NAV_PERMISSION_KEYS)[number];
+
+export const ACTION_PERMISSION_KEYS = [
+  "project.create",
+  "project.edit",
+  "project.delete",
+  "project.approve",
+  "project.reject",
+  "project.complete",
+  "estimate.save",
+  "estimate.export",
+  "estimate.dates",
+  "sagatave.save",
+  "modules.manage",
+  "positions.manage",
+  "excluded_positions.manage",
+  "project_module.manage",
+  "users.invite",
+  "users.assign_group",
+  "groups.manage",
+  "settings.save",
+  "materials.assign",
+  "materials.order",
+] as const;
+
+export type ActionPermissionKey = (typeof ACTION_PERMISSION_KEYS)[number];
+
+export type PermissionSet = {
+  nav: Record<NavPermissionKey, boolean>;
+  actions: Record<ActionPermissionKey, boolean>;
+};
+
+export type UserGroupSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  isSystem: boolean;
+  permissions: PermissionSet;
+};
+
+export const NAV_PERMISSION_LABELS: Record<NavPermissionKey, string> = {
+  projects: "Projekti",
+  modules: "Ēku moduļi",
+  estimate: "Sagatave",
+  positions: "Pozīcijas",
+  excluded_positions: "Neiekļautās pozīcijas",
+  users: "Lietotāji",
+  user_groups: "Grupas un tiesības",
+  settings: "Uzstādījumi",
+};
+
+export const NAV_PERMISSION_HREFS: Record<NavPermissionKey, string> = {
+  projects: "/",
+  modules: "/modules",
+  estimate: "/estimate",
+  positions: "/positions",
+  excluded_positions: "/excluded-positions",
+  users: "/users",
+  user_groups: "/users/groups",
+  settings: "/settings",
+};
+
+export const ACTION_PERMISSION_GROUPS: {
+  title: string;
+  keys: ActionPermissionKey[];
+}[] = [
+  {
+    title: "Projekti",
+    keys: [
+      "project.create",
+      "project.edit",
+      "project.delete",
+      "project.approve",
+      "project.reject",
+      "project.complete",
+      "estimate.save",
+      "estimate.export",
+      "estimate.dates",
+      "project_module.manage",
+    ],
+  },
+  {
+    title: "Sagatave",
+    keys: ["sagatave.save"],
+  },
+  {
+    title: "Moduļi un katalogs",
+    keys: [
+      "modules.manage",
+      "positions.manage",
+      "excluded_positions.manage",
+    ],
+  },
+  {
+    title: "Materiāli",
+    keys: ["materials.assign", "materials.order"],
+  },
+  {
+    title: "Lietotāji un grupas",
+    keys: ["users.invite", "users.assign_group", "groups.manage"],
+  },
+  {
+    title: "Uzstādījumi",
+    keys: ["settings.save"],
+  },
+];
+
+export const ACTION_PERMISSION_LABELS: Record<ActionPermissionKey, string> = {
+  "project.create": "Veidot projektus",
+  "project.edit": "Labot projektus",
+  "project.delete": "Dzēst projektus",
+  "project.approve": "Apstiprināt projektus",
+  "project.reject": "Noraidīt projektus",
+  "project.complete": "Atzīmēt kā pabeigtus",
+  "estimate.save": "Saglabāt tāmi",
+  "estimate.export": "Eksportēt PDF/Excel",
+  "estimate.dates": "Labot tāmes datumus",
+  "sagatave.save": "Saglabāt sagatavi",
+  "modules.manage": "Pārvaldīt ēku moduļus",
+  "positions.manage": "Pārvaldīt pozīcijas",
+  "excluded_positions.manage": "Pārvaldīt neiekļautās pozīcijas",
+  "project_module.manage": "Labot projekta moduļa datus",
+  "users.invite": "Uzaicināt lietotājus",
+  "users.assign_group": "Piešķirt lietotāju grupas",
+  "groups.manage": "Konfigurēt grupu tiesības",
+  "settings.save": "Saglabāt uzstādījumus",
+  "materials.assign": "Piešķirt materiālus lietotājiem",
+  "materials.order": "Atzīmēt materiālus kā pasūtītus",
+};
+
+export function createFullPermissions(enabled = true): PermissionSet {
+  return {
+    nav: Object.fromEntries(
+      NAV_PERMISSION_KEYS.map((key) => [key, enabled]),
+    ) as Record<NavPermissionKey, boolean>,
+    actions: Object.fromEntries(
+      ACTION_PERMISSION_KEYS.map((key) => [key, enabled]),
+    ) as Record<ActionPermissionKey, boolean>,
+  };
+}
+
+export function normalizePermissionSet(value: unknown): PermissionSet {
+  const full = createFullPermissions(false);
+  if (!value || typeof value !== "object") {
+    return full;
+  }
+
+  const record = value as {
+    nav?: Record<string, boolean>;
+    actions?: Record<string, boolean>;
+  };
+
+  for (const key of NAV_PERMISSION_KEYS) {
+    if (typeof record.nav?.[key] === "boolean") {
+      full.nav[key] = record.nav[key];
+    }
+  }
+
+  for (const key of ACTION_PERMISSION_KEYS) {
+    if (typeof record.actions?.[key] === "boolean") {
+      full.actions[key] = record.actions[key];
+    }
+  }
+
+  return full;
+}
+
+export function hasNavPermission(
+  permissions: PermissionSet,
+  key: NavPermissionKey,
+): boolean {
+  return permissions.nav[key] === true;
+}
+
+export function hasActionPermission(
+  permissions: PermissionSet,
+  key: ActionPermissionKey,
+): boolean {
+  return permissions.actions[key] === true;
+}
+
+export const DEFAULT_GROUP_DEFINITIONS: {
+  slug: string;
+  name: string;
+  permissions: PermissionSet;
+}[] = [
+  {
+    slug: "admin",
+    name: "Administrators",
+    permissions: createFullPermissions(true),
+  },
+  {
+    slug: "manager",
+    name: "Projektu vadītājs",
+    permissions: {
+      nav: {
+        projects: true,
+        modules: true,
+        estimate: true,
+        positions: true,
+        excluded_positions: true,
+        users: true,
+        user_groups: false,
+        settings: false,
+      },
+      actions: {
+        "project.create": true,
+        "project.edit": true,
+        "project.delete": true,
+        "project.approve": true,
+        "project.reject": true,
+        "project.complete": true,
+        "estimate.save": true,
+        "estimate.export": true,
+        "estimate.dates": true,
+        "sagatave.save": false,
+        "modules.manage": true,
+        "positions.manage": true,
+        "excluded_positions.manage": true,
+        "project_module.manage": true,
+        "users.invite": false,
+        "users.assign_group": false,
+        "groups.manage": false,
+        "settings.save": false,
+        "materials.assign": true,
+        "materials.order": true,
+      },
+    },
+  },
+  {
+    slug: "materials",
+    name: "Materiālu pasūtīšana",
+    permissions: {
+      nav: {
+        projects: true,
+        modules: false,
+        estimate: false,
+        positions: false,
+        excluded_positions: false,
+        users: false,
+        user_groups: false,
+        settings: false,
+      },
+      actions: {
+        "project.create": false,
+        "project.edit": false,
+        "project.delete": false,
+        "project.approve": false,
+        "project.reject": false,
+        "project.complete": false,
+        "estimate.save": false,
+        "estimate.export": true,
+        "estimate.dates": false,
+        "sagatave.save": false,
+        "modules.manage": false,
+        "positions.manage": false,
+        "excluded_positions.manage": false,
+        "project_module.manage": false,
+        "users.invite": false,
+        "users.assign_group": false,
+        "groups.manage": false,
+        "settings.save": false,
+        "materials.assign": false,
+        "materials.order": true,
+      },
+    },
+  },
+  {
+    slug: "viewer",
+    name: "Skatītājs",
+    permissions: {
+      nav: {
+        projects: true,
+        modules: true,
+        estimate: true,
+        positions: true,
+        excluded_positions: true,
+        users: false,
+        user_groups: false,
+        settings: false,
+      },
+      actions: {
+        "project.create": false,
+        "project.edit": false,
+        "project.delete": false,
+        "project.approve": false,
+        "project.reject": false,
+        "project.complete": false,
+        "estimate.save": false,
+        "estimate.export": true,
+        "estimate.dates": false,
+        "sagatave.save": false,
+        "modules.manage": false,
+        "positions.manage": false,
+        "excluded_positions.manage": false,
+        "project_module.manage": false,
+        "users.invite": false,
+        "users.assign_group": false,
+        "groups.manage": false,
+        "settings.save": false,
+        "materials.assign": false,
+        "materials.order": false,
+      },
+    },
+  },
+];

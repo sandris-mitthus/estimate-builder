@@ -1,4 +1,5 @@
 import { DEFAULT_COMPANY_SETTINGS } from "@/app/lib/settings/defaults";
+import { resolveCompanyLogoDisplayUrl } from "@/app/lib/settings/logo-storage";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "@/app/lib/settings/currencies";
 import { normalizeDefaultHourlyRate } from "@/app/lib/settings/default-hourly-rate";
 import {
@@ -24,9 +25,11 @@ function mapRow(row: CompanySettingsRow): CompanySettings {
     phone: row.phone,
     email: row.email,
     currency: isCurrencyCode(row.currency) ? row.currency : DEFAULT_CURRENCY,
-    logoUrl: row.logo_url,
+    logoUrl: resolveCompanyLogoDisplayUrl(row.logo_url),
     estimateValidityDays: normalizeEstimateValidityDays(row.estimate_validity_days),
     defaultHourlyRate: normalizeDefaultHourlyRate(row.default_hourly_rate),
+    offerAdditionalInfo: row.offer_additional_info ?? "",
+    offerValidityDays: normalizeEstimateValidityDays(row.offer_validity_days),
   };
 }
 
@@ -49,6 +52,8 @@ function mapSettings(settings: CompanySettings): Omit<CompanySettingsRow, "id"> 
       settings.estimateValidityDays,
     ),
     default_hourly_rate: normalizeDefaultHourlyRate(settings.defaultHourlyRate),
+    offer_additional_info: settings.offerAdditionalInfo.trim(),
+    offer_validity_days: normalizeEstimateValidityDays(settings.offerValidityDays),
   };
 }
 
@@ -68,7 +73,7 @@ export async function getCompanySettings(): Promise<CompanySettings> {
   const { data, error } = await supabase
     .from("company_settings")
     .select(
-      "id, company_name, address, registration_number, vat_number, bank_name, swift, bank_account_number, phone, email, currency, logo_url, estimate_validity_days, default_hourly_rate",
+      "id, company_name, address, registration_number, vat_number, bank_name, swift, bank_account_number, phone, email, currency, logo_url, estimate_validity_days, default_hourly_rate, offer_additional_info, offer_validity_days",
     )
     .eq("id", 1)
     .maybeSingle();

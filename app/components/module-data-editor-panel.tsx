@@ -15,6 +15,7 @@ import {
   uploadProjectModuleBlockAction,
 } from "@/app/(protected)/project-module-actions";
 import { ModuleDataEditor } from "@/app/components/module-data-editor";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import type {
   ModuleBlockKind,
@@ -51,6 +52,10 @@ export function ModuleDataEditorPanel({
   outline,
 }: ModuleDataEditorPanelProps) {
   const router = useRouter();
+  const canManage =
+    useActionPermission(
+      scope.kind === "module" ? "modules.manage" : "project_module.manage",
+    );
   const { showFeedback } = useFeedbackToast();
   const [visualizationBlocks, setVisualizationBlocks] = useState(
     initialVisualizationBlocks,
@@ -141,7 +146,8 @@ export function ModuleDataEditorPanel({
   }
 
   return (
-    <ModuleDataEditor
+    <div className={canManage ? undefined : "pointer-events-none opacity-70"}>
+      <ModuleDataEditor
       uploadBlockAction={uploadBlock}
       removeBlockAction={removeBlock}
       visualizationBlocks={visualizationBlocks}
@@ -155,5 +161,6 @@ export function ModuleDataEditorPanel({
       initialProjectDescription={initialProjectDescription}
       onSaveProjectDescription={saveProjectDescription}
     />
+    </div>
   );
 }

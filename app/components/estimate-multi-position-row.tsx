@@ -106,6 +106,7 @@ type EstimateMultiPositionRowProps = {
   showQuantityColumn?: boolean;
   readOnlyPrices?: boolean;
   highlightStaleCatalogPrices?: boolean;
+  highlightMergedSagatave?: boolean;
   optionLinkActions?: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 };
@@ -449,6 +450,7 @@ export function EstimateMultiPositionRow({
   showQuantityColumn = false,
   readOnlyPrices = true,
   highlightStaleCatalogPrices = false,
+  highlightMergedSagatave = false,
   optionLinkActions,
   moduleSizeOptions = [],
 }: EstimateMultiPositionRowProps) {
@@ -547,7 +549,13 @@ export function EstimateMultiPositionRow({
         className={`group/multi align-middle ${showDropLine ? dropLineClass : ""}`}
       >
         {mode === "offer" ? (
-          <tr className={`align-middle ${showQuantityInput && selectedLineItem && selectedLineItem.quantity <= 0 ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-violet-50/30"}`}>
+          <tr className={`align-middle ${
+            highlightMergedSagatave
+              ? "bg-emerald-50/80 hover:bg-emerald-50"
+              : showQuantityInput && selectedLineItem && selectedLineItem.quantity <= 0
+                ? "bg-red-50/60 hover:bg-red-50"
+                : "hover:bg-violet-50/30"
+          }`}>
             <td className="border-b border-zinc-100 py-1 pr-2 align-top">
               <div
                 className={`flex items-start gap-1 py-1 pl-3 ${indentName ? subcategoryItemNameIndent : ""}`}

@@ -62,6 +62,14 @@ export type EstimateMeta = {
   savedAt?: string;
   /** Saglabāta tāme ar iesaldētām kataloga cenām (kopā ar savedAt). */
   pricesFrozen?: boolean;
+  /** Projekts izveidots, klonējot citas projekta tāmi (ne no sagataves). */
+  clonedFromProjectId?: string;
+  /** Globālo neiekļauto pozīciju ID, kas šim projektam netiek rādītas piedāvājumā. */
+  excludedPositionIdsOmitted?: string[];
+  /** Kataloga materiālu ID, kas atzīmēti kā pasūtīti (pazūd no materiālu saraksta). */
+  orderedMaterialPositionIds?: string[];
+  /** Kataloga materiālu ID → piešķirtā lietotāja ID (pasūtīšanas atbildība). */
+  materialAssigneeUserIds?: Record<string, string>;
 };
 
 export type ProjectEstimate = {

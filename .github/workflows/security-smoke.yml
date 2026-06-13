@@ -38,20 +38,21 @@ jobs:
 
       - name: Security - requireAuth on all server actions
         run: |
-          echo "Checking that all server actions have requireAuth..."
+          echo "Checking that all server actions have requireAuth or requireAction..."
           ACTIONS=$(find app -name "actions.ts" -path "*/(protected)/*")
+          ACTIONS="$ACTIONS app/(protected)/project-module-actions.ts"
           MISSING=0
           for file in $ACTIONS; do
-            if ! grep -q "requireAuth" "$file"; then
-              echo "FAIL: Missing requireAuth in $file"
+            if ! grep -qE "requireAuth|requireAction" "$file"; then
+              echo "FAIL: Missing requireAuth/requireAction in $file"
               MISSING=$((MISSING + 1))
             fi
           done
           if [ $MISSING -gt 0 ]; then
-            echo "$MISSING file(s) missing requireAuth"
+            echo "$MISSING file(s) missing auth guard"
             exit 1
           fi
-          echo "OK: All action files have requireAuth"
+          echo "OK: All action files have requireAuth or requireAction"
 
       - name: Security - no hardcoded secrets
         run: |

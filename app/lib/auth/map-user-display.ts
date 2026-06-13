@@ -13,6 +13,18 @@ export function readAvatarUrl(metadata: Record<string, unknown>): string | null 
   return avatar || null;
 }
 
+export function resolveAvatarUrl(user: User): string | null {
+  const fromMetadata = readAvatarUrl(user.user_metadata ?? {});
+  if (fromMetadata) return fromMetadata;
+
+  for (const identity of user.identities ?? []) {
+    const url = readAvatarUrl((identity.identity_data ?? {}) as Record<string, unknown>);
+    if (url) return url;
+  }
+
+  return null;
+}
+
 export function mapUserDisplay(user: User): UserDisplay {
   const metadata = user.user_metadata ?? {};
   const name =
@@ -23,6 +35,6 @@ export function mapUserDisplay(user: User): UserDisplay {
 
   return {
     name,
-    avatarUrl: readAvatarUrl(metadata),
+    avatarUrl: resolveAvatarUrl(user),
   };
 }

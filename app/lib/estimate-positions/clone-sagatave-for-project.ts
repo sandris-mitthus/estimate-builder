@@ -46,7 +46,7 @@ function remapSelectedOptionId(
   return optionIdMap.get(selectedOptionId) ?? null;
 }
 
-function cloneRowItem(
+export function cloneRowItem(
   row: EstimateRowItem,
   optionIdMap: Map<string, string>,
 ): EstimateRowItem {
@@ -65,7 +65,7 @@ function cloneRowItem(
   };
 }
 
-function cloneSubcategory(
+export function cloneSubcategory(
   subcategory: EstimateSubcategory,
   optionIdMap: Map<string, string>,
 ): EstimateSubcategory {
@@ -76,7 +76,7 @@ function cloneSubcategory(
   };
 }
 
-function cloneCategory(
+export function cloneCategory(
   category: EstimateCategory,
   optionIdMap: Map<string, string>,
 ): EstimateCategory {
@@ -90,7 +90,7 @@ function cloneCategory(
   };
 }
 
-function remapMultiOptionLinks(
+export function remapMultiOptionLinks(
   links: MultiOptionLinkGroup[],
   optionIdMap: Map<string, string>,
 ): MultiOptionLinkGroup[] {

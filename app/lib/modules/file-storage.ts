@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
+import { moduleAssetProxyUrl } from "@/app/lib/modules/resolve-block-asset";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
 
 export const MODULE_ASSETS_BUCKET = "module-assets";
@@ -134,7 +135,7 @@ export async function uploadScopedBlockFile(
     return { ok: false, error: "Neizdevās augšupielādēt failu." };
   }
 
-  const proxyUrl = `/api/modules/asset?path=${encodeURIComponent(storagePath)}`;
+  const proxyUrl = moduleAssetProxyUrl(storagePath);
 
   return {
     ok: true,

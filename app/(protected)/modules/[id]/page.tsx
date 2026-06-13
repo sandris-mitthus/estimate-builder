@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ModuleDetailContent } from "@/app/components/module-detail-content";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 
 export default async function ModuleDetailPage({
@@ -8,6 +9,8 @@ export default async function ModuleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await assertNavAccess("modules");
+
   const { id } = await params;
   const mod = await getBuildingModule(id);
 

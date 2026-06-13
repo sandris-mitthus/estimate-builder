@@ -1,9 +1,12 @@
 import { AddModuleButton } from "@/app/components/add-module-button";
 import { ModuleList } from "@/app/components/module-list";
 import { SectionPage } from "@/app/components/section-page";
+import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { listBuildingModules } from "@/app/lib/modules/repository";
 
 export default async function ModulesPage() {
+  await assertNavAccess("modules");
+
   const modules = await listBuildingModules();
 
   return (

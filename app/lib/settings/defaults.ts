@@ -16,4 +16,6 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   logoUrl: "",
   estimateValidityDays: DEFAULT_ESTIMATE_VALIDITY_DAYS,
   defaultHourlyRate: null,
+  offerAdditionalInfo: "",
+  offerValidityDays: DEFAULT_ESTIMATE_VALIDITY_DAYS,
 };
