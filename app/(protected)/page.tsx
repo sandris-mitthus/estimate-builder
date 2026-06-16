@@ -1,6 +1,7 @@
 import { ProjectArchiveContent } from "@/app/components/project-archive-content";
 import { ProjectList } from "@/app/components/project-list";
 import { ProjectPageActions } from "@/app/components/project-page-actions";
+import { NavigationLoadingProvider } from "@/app/components/navigation-loading-context";
 import { ProjectsPageCreateProvider } from "@/app/components/projects-page-create-context";
 import { SectionPage } from "@/app/components/section-page";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
@@ -51,8 +52,9 @@ export default async function ProjectsPage({
     : `${projects.length} aktīvi projekti`;
 
   return (
-    <ProjectsPageCreateProvider>
-      <SectionPage
+    <NavigationLoadingProvider>
+      <ProjectsPageCreateProvider>
+        <SectionPage
         title={showArchive ? "Arhīvs" : "Projekti"}
         subtitle={subtitle}
         actions={<ProjectPageActions modules={modules} archive={showArchive} />}
@@ -75,6 +77,7 @@ export default async function ProjectsPage({
           />
         )}
       </SectionPage>
-    </ProjectsPageCreateProvider>
+      </ProjectsPageCreateProvider>
+    </NavigationLoadingProvider>
   );
 }

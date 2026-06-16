@@ -74,6 +74,7 @@ import type {
 } from "@/app/lib/estimates/types";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
+import { LineItemPriceVisibilityToggle } from "@/app/components/line-item-price-visibility-toggle";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
 import { SubcategoryPriceVisibilityToggle } from "@/app/components/subcategory-price-visibility-toggle";
 import { DeleteButton } from "@/app/components/delete-button";
@@ -85,11 +86,14 @@ import {
   usePositionModal,
 } from "@/app/components/position-modal-context";
 import { resolveLiveDisplayUnitPrice } from "@/app/lib/positions/stale-catalog-price";
-import { createCompositePosition } from "@/app/lib/estimates/composite-line-item";
+import {
+  createCompositePosition,
+  isCompositeLineItem,
+  patchLineItemLaborTimeNorm,
+} from "@/app/lib/estimates/composite-line-item";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
-import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
@@ -136,6 +140,7 @@ function LineItemRow({
   rowRef,
   rowStyle,
   indentName,
+  showOfferPriceToggle = false,
   showDropLine,
   catalogPositions,
   defaultHourlyRate,
@@ -148,6 +153,7 @@ function LineItemRow({
   rowRef?: (element: HTMLTableSectionElement | null) => void;
   rowStyle?: CSSProperties;
   indentName?: boolean;
+  showOfferPriceToggle?: boolean;
   showDropLine?: boolean;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
@@ -167,6 +173,11 @@ function LineItemRow({
     : missingTimeNorm
       ? "bg-amber-50/60 hover:bg-amber-50"
       : "hover:bg-sky-50/40";
+  const hiddenPriceInOffer = item.hiddenPriceInOffer === true;
+  const hoverOnlyActionClass = "opacity-0 group-hover:opacity-100";
+  const priceToggleClass = hiddenPriceInOffer
+    ? "opacity-100"
+    : hoverOnlyActionClass;
 
   return (
     <tbody
@@ -247,21 +258,39 @@ function LineItemRow({
           catalogPositions,
           defaultHourlyRate,
         )}
-        onTimeNormChange={(laborTimeNorm) => onChange({ ...item, laborTimeNorm })}
+        onTimeNormChange={(laborTimeNorm) =>
+          onChange(
+            patchLineItemLaborTimeNorm(
+              item,
+              laborTimeNorm,
+              catalogPositions,
+              defaultHourlyRate,
+            ),
+          )
+        }
       />
       <td className={rowActionCell}>
         <div className="flex items-center justify-center gap-0.5">
+          {showOfferPriceToggle ? (
+            <LineItemPriceVisibilityToggle
+              hiddenPriceInOffer={item.hiddenPriceInOffer}
+              onChange={(nextHidden) =>
+                onChange({ ...item, hiddenPriceInOffer: nextHidden })
+              }
+              className={priceToggleClass}
+            />
+          ) : null}
           <IconActionButton
             label="Labot pozīciju"
             icon="fas fa-pen"
             variant="edit"
             onClick={() => openPositionModal(item, onChange)}
-            className="opacity-0 group-hover:opacity-100"
+            className={hoverOnlyActionClass}
           />
           <DeleteButton
             label="Dzēst pozīciju"
             onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100"
+            className={hoverOnlyActionClass}
           />
         </div>
       </td>
@@ -295,6 +324,7 @@ function SortableLineItemRow({
     <LineItemRow
       {...props}
       indentName={subcategoryId != null}
+      showOfferPriceToggle={subcategoryId == null}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}

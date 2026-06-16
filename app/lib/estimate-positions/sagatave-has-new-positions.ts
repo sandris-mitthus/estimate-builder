@@ -78,6 +78,105 @@ function sagataveRowsMissingInProject(
   );
 }
 
+function isMissingRowSelected(
+  sagataveRow: EstimateRowItem,
+  projectItems: EstimateRowItem[],
+  rowIndex: number,
+  selectedSagataveRowIds?: ReadonlySet<string>,
+): boolean {
+  if (findProjectRowItem(projectItems, sagataveRow, rowIndex)) {
+    return false;
+  }
+
+  if (selectedSagataveRowIds && !selectedSagataveRowIds.has(sagataveRow.id)) {
+    return false;
+  }
+
+  return true;
+}
+
+export type MissingSagatavePositionEntry = {
+  sagataveRowId: string;
+  name: string;
+};
+
+export type MissingSagatavePositionGroup = {
+  categoryTitle: string;
+  subcategoryTitle?: string;
+  positions: MissingSagatavePositionEntry[];
+};
+
+/**
+ * Saraksts ar sagataves pozīcijām / multi, kuru nav projekta tāmē.
+ */
+export function listMissingSagatavePositions(
+  sagataveSections: EstimateCategory[],
+  projectCategories: EstimateCategory[],
+): MissingSagatavePositionGroup[] {
+  const groups: MissingSagatavePositionGroup[] = [];
+
+  for (const [categoryIndex, sagataveCategory] of sagataveSections.entries()) {
+    const projectCategory = findProjectCategory(
+      projectCategories,
+      sagataveCategory,
+      categoryIndex,
+    );
+
+    const missingCategoryItems: MissingSagatavePositionEntry[] = [];
+    for (const [rowIndex, row] of sagataveCategory.items.entries()) {
+      if (
+        !projectCategory ||
+        !findProjectRowItem(projectCategory.items, row, rowIndex)
+      ) {
+        missingCategoryItems.push({
+          sagataveRowId: row.id,
+          name: rowItemLabel(row),
+        });
+      }
+    }
+
+    if (missingCategoryItems.length > 0) {
+      groups.push({
+        categoryTitle: sagataveCategory.title,
+        positions: missingCategoryItems,
+      });
+    }
+
+    for (const [subcategoryIndex, sagataveSubcategory] of sagataveCategory.subcategories.entries()) {
+      const projectSubcategory = projectCategory
+        ? findProjectSubcategory(
+            projectCategory.subcategories,
+            sagataveSubcategory,
+            subcategoryIndex,
+          )
+        : undefined;
+
+      const missingSubcategoryItems: MissingSagatavePositionEntry[] = [];
+      for (const [rowIndex, row] of sagataveSubcategory.items.entries()) {
+        if (
+          !projectSubcategory ||
+          !findProjectRowItem(projectSubcategory.items, row, rowIndex)
+        ) {
+          missingSubcategoryItems.push({
+            sagataveRowId: row.id,
+            name: rowItemLabel(row),
+          });
+        }
+      }
+
+      if (missingSubcategoryItems.length > 0) {
+        groups.push({
+          categoryTitle: sagataveCategory.title,
+          subcategoryTitle: sagataveSubcategory.title,
+          positions: missingSubcategoryItems,
+        });
+      }
+    }
+  }
+
+  return groups;
+}
+
 /**
  * `true`, ja sagatavē ir kategorija, subkategorija vai rinda (pozīcija / multi),
  * kuras nav projekta tāmē (pēc indeksa vai nosaukuma).
@@ -185,6 +284,7 @@ export function mergeNewSagatavePositionsIntoProject(
   projectMultiOptionLinks: MultiOptionLinkGroup[],
   sagataveSections: EstimateCategory[],
   sagataveMultiOptionLinks: MultiOptionLinkGroup[] = [],
+  selectedSagataveRowIds?: ReadonlySet<string>,
 ): {
   categories: EstimateCategory[];
   multiOptionLinks: MultiOptionLinkGroup[];
@@ -202,7 +302,37 @@ export function mergeNewSagatavePositionsIntoProject(
     );
 
     if (!projectCategory) {
-      const clonedCategory = cloneCategory(sagataveCategory, optionIdMap);
+      const partialSubcategories: EstimateSubcategory[] = [];
+
+      for (const sagataveSubcategory of sagataveCategory.subcategories) {
+        const selectedItems = sagataveSubcategory.items.filter((row, rowIndex) =>
+          isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+        );
+
+        if (selectedItems.length > 0) {
+          partialSubcategories.push({
+            ...sagataveSubcategory,
+            items: selectedItems,
+          });
+        }
+      }
+
+      const selectedCategoryItems = sagataveCategory.items.filter((row, rowIndex) =>
+        isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+      );
+
+      if (partialSubcategories.length === 0 && selectedCategoryItems.length === 0) {
+        continue;
+      }
+
+      const clonedCategory = cloneCategory(
+        {
+          ...sagataveCategory,
+          subcategories: partialSubcategories,
+          items: selectedCategoryItems,
+        },
+        optionIdMap,
+      );
       categories.push(clonedCategory);
       addedNodeIds.push(...collectCategoryNodeIds(clonedCategory));
       continue;
@@ -216,8 +346,19 @@ export function mergeNewSagatavePositionsIntoProject(
       );
 
       if (!projectSubcategory) {
+        const selectedItems = sagataveSubcategory.items.filter((row, rowIndex) =>
+          isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+        );
+
+        if (selectedItems.length === 0) {
+          continue;
+        }
+
         const clonedSubcategory = cloneSubcategory(
-          sagataveSubcategory,
+          {
+            ...sagataveSubcategory,
+            items: selectedItems,
+          },
           optionIdMap,
         );
         projectCategory.subcategories.push(clonedSubcategory);
@@ -226,7 +367,14 @@ export function mergeNewSagatavePositionsIntoProject(
       }
 
       for (const [rowIndex, sagataveRow] of sagataveSubcategory.items.entries()) {
-        if (!findProjectRowItem(projectSubcategory.items, sagataveRow, rowIndex)) {
+        if (
+          isMissingRowSelected(
+            sagataveRow,
+            projectSubcategory.items,
+            rowIndex,
+            selectedSagataveRowIds,
+          )
+        ) {
           const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
           projectSubcategory.items.push(clonedRow);
           addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
@@ -235,7 +383,14 @@ export function mergeNewSagatavePositionsIntoProject(
     }
 
     for (const [rowIndex, sagataveRow] of sagataveCategory.items.entries()) {
-      if (!findProjectRowItem(projectCategory.items, sagataveRow, rowIndex)) {
+      if (
+        isMissingRowSelected(
+          sagataveRow,
+          projectCategory.items,
+          rowIndex,
+          selectedSagataveRowIds,
+        )
+      ) {
         const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
         projectCategory.items.push(clonedRow);
         addedNodeIds.push(...collectRowItemNodeIds(clonedRow));

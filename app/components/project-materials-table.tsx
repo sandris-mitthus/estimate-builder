@@ -21,6 +21,7 @@ type ProjectMaterialsTableProps = {
   materialAssigneeUserIds?: Record<string, string>;
   users?: UserSummary[];
   delegationEnabled?: boolean;
+  assigningMaterialId?: string | null;
   visibleMaterialIds?: string[];
   hideHeader?: boolean;
   headingId?: string;
@@ -33,6 +34,7 @@ type DroppableMaterialRowProps = {
   positionPriceId: string;
   delegationEnabled: boolean;
   hasPriceChange: boolean;
+  isAssigning: boolean;
   children: ReactNode;
 };
 
@@ -40,12 +42,13 @@ function DroppableMaterialRow({
   positionPriceId,
   delegationEnabled,
   hasPriceChange,
+  isAssigning,
   children,
 }: DroppableMaterialRowProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `delegation-material:${positionPriceId}`,
     data: { type: "delegation-material", positionPriceId },
-    disabled: !delegationEnabled,
+    disabled: !delegationEnabled || isAssigning,
   });
 
   return (
@@ -53,7 +56,9 @@ function DroppableMaterialRow({
       ref={setNodeRef}
       className={`border-b border-zinc-100 last:border-b-0 ${
         hasPriceChange ? "bg-red-50/40" : ""
-      } ${isOver ? "bg-emerald-50/80 ring-1 ring-inset ring-emerald-300" : ""}`}
+      } ${isAssigning ? "pointer-events-none opacity-45" : ""} ${
+        isOver ? "bg-emerald-50/80 ring-1 ring-inset ring-emerald-300" : ""
+      }`}
     >
       {children}
     </tr>
@@ -69,6 +74,7 @@ export function ProjectMaterialsTable({
   materialAssigneeUserIds = {},
   users = [],
   delegationEnabled = false,
+  assigningMaterialId = null,
   visibleMaterialIds,
   hideHeader = false,
   headingId = "project-materials-heading",
@@ -173,6 +179,7 @@ export function ProjectMaterialsTable({
           <tbody>
             {materials.map((row) => {
               const assigneeName = resolveAssigneeName(row);
+              const isAssigning = assigningMaterialId === row.positionPriceId;
 
               return (
                 <DroppableMaterialRow
@@ -180,14 +187,25 @@ export function ProjectMaterialsTable({
                   positionPriceId={row.positionPriceId}
                   delegationEnabled={delegationEnabled}
                   hasPriceChange={row.hasPriceChange}
+                  isAssigning={isAssigning}
                 >
                   <td className="px-4 py-2.5 text-zinc-900">
-                    <p>{row.name}</p>
-                    {assigneeName ? (
-                      <p className="mt-0.5 text-xs text-zinc-500">
-                        {assigneeName}
-                      </p>
-                    ) : null}
+                    <div className="flex items-start gap-2">
+                      {isAssigning ? (
+                        <i
+                          className="fas fa-spinner mt-0.5 animate-spin text-xs text-zinc-400"
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <p>{row.name}</p>
+                        {assigneeName ? (
+                          <p className="mt-0.5 text-xs text-zinc-500">
+                            {assigneeName}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-zinc-600">{row.unit}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-zinc-900">
@@ -220,6 +238,7 @@ export function ProjectMaterialsTable({
                       catalogPosition={catalogById.get(row.positionPriceId)}
                       currency={currency}
                       onOrdered={onMaterialOrdered}
+                      disabled={isAssigning}
                     />
                   </td>
                 </DroppableMaterialRow>

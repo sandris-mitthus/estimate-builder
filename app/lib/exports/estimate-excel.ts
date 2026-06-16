@@ -22,6 +22,7 @@ import {
   calculateVatBreakdown,
   hasCompanyVatNumber,
 } from "@/app/lib/settings/vat-breakdown";
+import { formatDisplayDateDdMmYyyy } from "@/app/lib/format-display-date";
 
 function fmtNum(v: number): number | string {
   if (!Number.isFinite(v) || v === 0) return "";
@@ -140,7 +141,19 @@ export async function buildEstimateExcel(
 
   ws.addRow(["Pasūtītājs:", meta.client]);
   ws.addRow(["Objekts:", meta.project]);
-  ws.addRow(["Datums:", meta.date, "", "", "", "", "", "", "", "Termiņš:", meta.deadline]);
+  ws.addRow([
+    "Datums:",
+    formatDisplayDateDdMmYyyy(meta.date),
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "Termiņš:",
+    formatDisplayDateDdMmYyyy(meta.deadline),
+  ]);
   ws.addRow([]); // empty spacer
 
   // ── Two-row merged column header ─────────────────────────────────────
@@ -293,12 +306,12 @@ export async function buildEstimateExcel(
     showVat ? "Summa bez PVN" : "PAVISAM KOPĀ",
     "",
     "",
+    "",
+    "",
+    "",
     fmtNum(totals.labor),
     fmtNum(totals.materials),
     fmtNum(totals.mechanisms),
-    "",
-    "",
-    "",
     fmtNum(totals.grand),
   ]);
   totalRow.height = 20;

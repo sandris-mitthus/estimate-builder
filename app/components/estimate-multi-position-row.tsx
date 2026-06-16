@@ -41,6 +41,7 @@ import {
 import {
   deriveCompositeUnitPrice,
   isCompositeLineItem,
+  patchLineItemLaborTimeNorm,
 } from "@/app/lib/estimates/composite-line-item";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { useEstimatePlannedProfitPercent } from "@/app/components/estimate-planned-profit-context";
@@ -111,6 +112,7 @@ type EstimateMultiPositionRowProps = {
   highlightMergedSagatave?: boolean;
   optionLinkActions?: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  allowOfferMultiEdit?: boolean;
 };
 
 function resolveDisplayUnitPrice(
@@ -463,6 +465,7 @@ export function EstimateMultiPositionRow({
   highlightMergedSagatave = false,
   optionLinkActions,
   moduleSizeOptions = [],
+  allowOfferMultiEdit = false,
 }: EstimateMultiPositionRowProps) {
   const [editOpen, setEditOpen] = useState(false);
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
@@ -552,6 +555,7 @@ export function EstimateMultiPositionRow({
     selectedOption && optionLinkActions
       ? optionLinkActions.getLinkedOptions(selectedOption.id)
       : [];
+  const canEditTimeNorm = mode === "template" || allowOfferMultiEdit;
 
   return (
     <>
@@ -630,6 +634,15 @@ export function EstimateMultiPositionRow({
                         </ul>
                       ) : null}
                     </div>
+                    {allowOfferMultiEdit ? (
+                      <IconActionButton
+                        label="Labot multi-pozīciju"
+                        icon="fas fa-pen"
+                        variant="edit"
+                        onClick={() => setEditOpen(true)}
+                        className="opacity-0 group-hover/multi:opacity-100"
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -669,6 +682,23 @@ export function EstimateMultiPositionRow({
               defaultHourlyRate={defaultHourlyRate}
               values={displayPrices}
               staleCatalogPriceHints={selectedStaleCatalogPriceHints}
+              onTimeNormChange={
+                canEditTimeNorm && selectedLineItem && selectedOption
+                  ? (laborTimeNorm) =>
+                      onChange(
+                        updateMultiOptionLineItem(
+                          value,
+                          selectedOption.id,
+                          patchLineItemLaborTimeNorm(
+                            selectedLineItem,
+                            laborTimeNorm,
+                            catalogPositions,
+                            defaultHourlyRate,
+                          ),
+                        ),
+                      )
+                  : undefined
+              }
             />
             {showQuantityColumn ? (
               <VolumeSumCells
@@ -760,18 +790,26 @@ export function EstimateMultiPositionRow({
                         optionLinkActions.onUnlink(option.id, targetId)
                     : undefined
                 }
-                onTimeNormChange={(laborTimeNorm) =>
-                  onChange({
-                    ...value,
-                    options: value.options.map((o) =>
-                      o.id === option.id
-                        ? {
-                            ...o,
-                            lineItem: { ...o.lineItem, laborTimeNorm },
-                          }
-                        : o,
-                    ),
-                  })
+                onTimeNormChange={
+                  canEditTimeNorm
+                    ? (laborTimeNorm) =>
+                        onChange({
+                          ...value,
+                          options: value.options.map((o) =>
+                            o.id === option.id
+                              ? {
+                                  ...o,
+                                  lineItem: patchLineItemLaborTimeNorm(
+                                    o.lineItem,
+                                    laborTimeNorm,
+                                    catalogPositions,
+                                    defaultHourlyRate,
+                                  ),
+                                }
+                              : o,
+                          ),
+                        })
+                    : undefined
                 }
                 moduleSizeOptions={moduleSizeOptions}
               />
@@ -780,7 +818,7 @@ export function EstimateMultiPositionRow({
         )}
       </tbody>
 
-      {mode === "template" && editOpen ? (
+      {(mode === "template" || allowOfferMultiEdit) && editOpen ? (
         <MultiPositionModal
           open={editOpen}
           onOpenChange={setEditOpen}

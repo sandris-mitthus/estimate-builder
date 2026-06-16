@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { approvedEstimateSurfaceClassName } from "@/app/components/approved-estimate-status-label";
 import { PendingProjectMaterialsCardHint } from "@/app/components/pending-project-materials-banner";
 import { ProjectCardActions } from "@/app/components/project-card-actions";
+import { useOptionalProjectsPageCreate } from "@/app/components/projects-page-create-context";
+import { isPlainPrimaryNavigationClick } from "@/app/components/navigation-loading-context";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
@@ -69,6 +73,8 @@ export function ProjectCard({
   hasPendingMaterials?: boolean;
   isCreating?: boolean;
 }) {
+  const pageCreate = useOptionalProjectsPageCreate();
+  const projectHref = `/${project.id}`;
   const hasEmail = Boolean(project.email.trim());
   const hasPhone = Boolean(project.phone.trim());
   const isApproved = project.status === "approved";
@@ -134,7 +140,7 @@ export function ProjectCard({
       {hasNewSagatavePositions ? (
         <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-700">
           <i className="fas fa-layer-group text-[11px]" aria-hidden="true" />
-          Sagatavē pievienotas jaunas pozīcijas
+          Sagatavē ir pozīcijas, kuras nav šajā tāmē
         </p>
       ) : null}
     </>
@@ -157,7 +163,17 @@ export function ProjectCard({
         {isCreating ? (
           <div className="min-w-0 flex-1">{cardBody}</div>
         ) : (
-          <Link href={`/${project.id}`} className="group min-w-0 flex-1">
+          <Link
+            href={projectHref}
+            className="group min-w-0 flex-1"
+            onClick={(event) => {
+              if (!isPlainPrimaryNavigationClick(event)) {
+                return;
+              }
+
+              pageCreate?.beginProjectNavigation(projectHref);
+            }}
+          >
             {cardBody}
           </Link>
         )}

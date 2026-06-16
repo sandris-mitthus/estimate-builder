@@ -43,7 +43,8 @@ export function ProjectMaterialRowActions({
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [updatePriceOpen, setUpdatePriceOpen] = useState(false);
   const [orderedConfirmOpen, setOrderedConfirmOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isOrdering, startOrderTransition] = useTransition();
+  const [isPricePending, startPriceTransition] = useTransition();
 
   const resolvedCurrency: CurrencyCode =
     currency && isCurrencyCode(currency) ? currency : DEFAULT_CURRENCY;
@@ -60,10 +61,10 @@ export function ProjectMaterialRowActions({
     } satisfies PositionPriceSummary);
 
   function handleMarkOrdered() {
-    if (disabled || isPending) return;
+    if (disabled || isOrdering || isPricePending) return;
 
     clearFeedback();
-    startTransition(async () => {
+    startOrderTransition(async () => {
       const result = await markProjectMaterialOrderedAction(
         projectId,
         material.positionPriceId,
@@ -80,7 +81,7 @@ export function ProjectMaterialRowActions({
   }
 
   function handlePriceSave(input: Omit<UpdatePositionUnitPriceInput, "id">) {
-    startTransition(async () => {
+    startPriceTransition(async () => {
       const result = await updatePositionUnitPriceAction({
         id: material.positionPriceId,
         ...input,
@@ -99,10 +100,10 @@ export function ProjectMaterialRowActions({
   }
 
   function handleConfirmOrderedAfterPriceUpdate() {
-    if (disabled || isPending) return;
+    if (disabled || isOrdering || isPricePending) return;
 
     clearFeedback();
-    startTransition(async () => {
+    startOrderTransition(async () => {
       const result = await markProjectMaterialOrderedAction(
         projectId,
         material.positionPriceId,
@@ -138,7 +139,7 @@ export function ProjectMaterialRowActions({
             tooltipAlign="end"
             onClick={() => setUpdatePriceOpen(true)}
             className={
-              disabled || isPending
+              disabled || isOrdering || isPricePending
                 ? "pointer-events-none opacity-50"
                 : material.hasPriceChange
                   ? "text-red-500 hover:bg-red-50 hover:text-red-700"
@@ -147,14 +148,29 @@ export function ProjectMaterialRowActions({
           />
         ) : null}
         {canOrder ? (
-          <IconActionButton
-            label="Pasūtīts"
-            icon="fas fa-check"
-            variant="complete"
-            tooltipAlign="end"
-            onClick={handleMarkOrdered}
-            className={disabled || isPending ? "pointer-events-none opacity-50" : ""}
-          />
+          isOrdering ? (
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center"
+              role="status"
+              aria-label="Saglabā"
+            >
+              <i
+                className="fas fa-spinner animate-spin text-sm text-zinc-400"
+                aria-hidden="true"
+              />
+            </span>
+          ) : (
+            <IconActionButton
+              label="Pasūtīts"
+              icon="fas fa-check"
+              variant="complete"
+              tooltipAlign="end"
+              onClick={handleMarkOrdered}
+              className={
+                disabled || isPricePending ? "pointer-events-none opacity-50" : ""
+              }
+            />
+          )
         ) : null}
       </div>
 
@@ -165,7 +181,7 @@ export function ProjectMaterialRowActions({
           position={position}
           currency={resolvedCurrency}
           onSave={handlePriceSave}
-          blocking={isPending}
+          blocking={isPricePending}
         />
       ) : null}
 
@@ -181,10 +197,10 @@ export function ProjectMaterialRowActions({
             ja pasūtījums ir veikts, apstiprini, lai noņemtu to no saraksta.
           </p>
         }
-        confirmLabel={isPending ? "Saglabā…" : "Jā, pasūtīts"}
+        confirmLabel={isOrdering ? "Saglabā…" : "Jā, pasūtīts"}
         cancelLabel="Nē"
         onConfirm={handleConfirmOrderedAfterPriceUpdate}
-        blocking={isPending}
+        blocking={isOrdering}
       />
       ) : null}
     </>

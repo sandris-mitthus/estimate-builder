@@ -243,6 +243,8 @@ export function PositionModal({
             <LaborTimeNormInput
               value={draft.laborTimeNorm ?? 0}
               onChange={(laborTimeNorm) => patch({ laborTimeNorm })}
+              withStepper
+              stepperButtonsAlwaysVisible
             />
             {defaultHourlyRate != null ? (
               <span className="mt-1 block text-xs text-zinc-500">

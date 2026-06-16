@@ -120,7 +120,17 @@ export function PositionPriceHistoryModal({
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
     >
       {loading ? (
-        <p className="py-6 text-center text-sm text-zinc-500">Ielādē vēsturi…</p>
+        <div
+          className="flex items-center justify-center gap-2 py-6 text-sm text-zinc-500"
+          role="status"
+          aria-live="polite"
+        >
+          <i
+            className="fas fa-spinner animate-spin text-zinc-400"
+            aria-hidden="true"
+          />
+          <span>Ielādē vēsturi…</span>
+        </div>
       ) : entries.length === 0 ? (
         <p className="py-6 text-center text-sm text-zinc-500">
           Nav saglabātu cenu izmaiņu.

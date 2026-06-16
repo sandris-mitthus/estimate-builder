@@ -148,6 +148,8 @@ export async function saveProjectEstimateAction(
   const result = await saveProjectEstimate(projectId, payload);
 
   if (result.ok) {
+    revalidatePath("/");
+    revalidatePath("/estimate");
     revalidatePath(`/${projectId}`);
   }
 

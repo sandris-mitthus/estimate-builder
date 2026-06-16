@@ -179,3 +179,29 @@ export function createCompositePosition(): EstimateLineItem {
     mechanisms: [],
   };
 }
+
+/** Atjaunina laika normu un pārrēķina kompozīta vienības cenu (tabula / modālis). */
+export function patchLineItemLaborTimeNorm(
+  item: EstimateLineItem,
+  laborTimeNorm: number,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+): EstimateLineItem {
+  const nextItem = {
+    ...item,
+    laborTimeNorm: roundToTwoDecimals(laborTimeNorm),
+  };
+
+  if (!isCompositeLineItem(nextItem)) {
+    return nextItem;
+  }
+
+  return {
+    ...nextItem,
+    unitPrice: deriveCompositeUnitPrice(
+      nextItem,
+      catalogPositions,
+      defaultHourlyRate,
+    ),
+  };
+}

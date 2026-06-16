@@ -73,6 +73,7 @@ export function EstimateUnitPriceCells({
               <LaborTimeNormInput
                 value={item?.laborTimeNorm ?? 0}
                 onChange={onTimeNormChange}
+                className={cellNum}
                 aria-label="Laika norma (c/h)"
               />
             ) : (

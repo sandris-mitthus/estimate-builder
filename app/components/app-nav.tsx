@@ -24,15 +24,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { key: "settings", href: "/settings", label: "Uzstādījumi" },
 ];
 
-const OTHER_NAV_PREFIXES = ALL_NAV_ITEMS.map((item) => item.href).filter(
-  (href) => href !== "/",
-);
-
 function isProjectsNavActive(pathname: string) {
-  if (pathname === "/") return true;
-  return !OTHER_NAV_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  return pathname === "/";
 }
 
 function NavUserSection({ user }: { user: UserDisplay }) {

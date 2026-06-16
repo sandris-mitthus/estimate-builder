@@ -6,6 +6,7 @@ import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repo
 import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
 import { parseEstimatePositionDocumentPayload } from "@/app/lib/estimate-positions/serialize-document";
 import { normalizeUserId } from "@/app/lib/auth/normalize-person-name";
+import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -16,6 +17,7 @@ import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import type { UserSummary } from "@/app/lib/users/types";
 
 export type UserAssignedMaterialsProjectGroup = {
   projectId: string;
@@ -37,6 +39,7 @@ type EstimateAssignmentRow = {
 
 type ListUserAssignedMaterialGroupsOptions = {
   relatedUserIds?: string[];
+  allUsers?: UserSummary[];
 };
 
 function resolveMatchingUserIds(
@@ -159,9 +162,20 @@ export async function listUserAssignedMaterialGroups(
     return [];
   }
 
+  const relatedUserIds =
+    options.relatedUserIds ??
+    (options.allUsers
+      ? resolveRelatedUserIds(
+          trimmedUserId,
+          options.allUsers.find((user) => user.id === trimmedUserId)?.name ??
+            "",
+          options.allUsers,
+        )
+      : undefined);
+
   const matchingUserIds = resolveMatchingUserIds(
     trimmedUserId,
-    options.relatedUserIds,
+    relatedUserIds,
   );
 
   const [projects, catalogPositions, sagatave] = await Promise.all([

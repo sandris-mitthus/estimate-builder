@@ -55,13 +55,16 @@ export default async function ProtectedLayout({
       listPositionPrices(),
       getCompanySettings(),
     ]);
-    const relatedUserIds = resolveRelatedUserIds(
-      user.id,
-      currentUserDisplay.name,
-      allUsers,
+    const currentUserFromList = allUsers.find(
+      (listedUser) => listedUser.id === user.id,
     );
     const groups = await listUserAssignedMaterialGroups(user.id, {
-      relatedUserIds,
+      relatedUserIds: resolveRelatedUserIds(
+        user.id,
+        currentUserFromList?.name ?? currentUserDisplay.name,
+        allUsers,
+      ),
+      allUsers,
     });
 
     assignedMaterialGroups = groups;

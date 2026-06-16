@@ -2,8 +2,51 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-06-13 (**v1.3.14**) — **9.5 / 10**  
-**Iepriekšējā pilnā pārbaude:** 2026-06-13 (v1.3.14) — 9.0 / 10
+**Pēdējā pilnā pārbaude:** 2026-06-17 (**v1.3.25**) — **9.5 / 10**  
+**Iepriekšējā pilnā pārbaude:** 2026-06-13 (v1.3.14) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.3.25 (2026-06-17)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` | ✅ 9 faili (`actions.ts` × 8 + `project-module-actions.ts`); 38 exportētas actions; `security-smoke.yml` validē |
+| Lomu sistēma (M14) | ✅ `032`–`033`; `assertNavAccess()` 11 lapās + `assertUserGroupsPageAccess()` |
+| UI ↔ tiesības (L23) | ✅ `ActionPermissionsProvider` + `useActionPermission()` 17 komponentēs |
+| Admin grupa (M23) | ✅ Nav `slug` apiešanas `require-permission` / `assert-nav-access`; admin tikai `getUserAccess()` |
+| PDF/Excel eksports | ✅ Auth + `estimate.export` + rate limit 20/min |
+| API maršruti (`app/api/**`) | ✅ 5 maršruti; visi ar `getCurrentUser()` |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
+| npm audit (moderate+) | ✅ **0 vulnerabilities** (`uuid` override `^11.1.1`) |
+| Storage / proxy | ✅ Privātie bucketi (`028`); auth proxy `logo`, `asset`; path regex |
+| RLS deny (DB tabulas) | ✅ `006` + jaunās tabulas (`020`, `022`, `031`, `032`); jaunu migrāciju pēc `033` nav |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options, Referrer-Policy, Permissions-Policy |
+| Magic-byte upload validācija | ✅ `file-storage.ts`, `logo-storage.ts` |
+| OAuth / redirect | ✅ `ALLOWED_EMAIL_DOMAIN` opcija; `getSafeRedirectPath()`; X-Forwarded-Host validācija |
+| Estimate lock (M13) | ✅ `assertProjectEstimateEditable()` repository slānī |
+| typecheck + build | ✅ `npm run typecheck` un `npm run build` OK (v1.3.25) |
+
+### Izmaiņas kopš v1.3.14 → v1.3.25 (pārskatīts, bez regresijas)
+
+| Apgabals | Versijas | Drošības secinājums |
+|----------|----------|---------------------|
+| Laika normu sinhronizācija | v1.3.22 | ✅ Tikai `saveProjectEstimate` ar `estimate.save`; `approved`/`completed` izlaisti |
+| PDF `hiddenPricesInOffer` / `hiddenPriceInOffer` | v1.3.22–v1.3.24 | ✅ Eksporta loģika; auth + `estimate.export` nemainīts |
+| Materiālu delegācija / pasūtīšana | v1.3.23 | ✅ `materials.order`, `materials.assign`; UI loading stāvokļi bez jauniem API |
+| Sagataves trūkstošās pozīcijas — modālis | v1.3.25 | ✅ Tikai klienta UI (`restore-sagatave-positions-modal.tsx`); persist caur `saveProjectEstimateAction`; poga bloķēta ar `editorLocked` |
+| `listMissingSagatavePositions` / selektīva merge | v1.3.25 | ✅ Servera actions nav; nav jaunu maršrutu |
+| OAuth redirect (Vercel) | v1.3.17 | ✅ Jau iekļauts iepriekšējā auditā |
+
+### Atlikušās piezīmes (nebloķējošas)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | `ALLOWED_EMAIL_DOMAIN` un Supabase invite-only — atkarīgs no production ENV |
+| L26 | ℹ️ SCALE | In-process rate limiter — pietiek **1 instance**; Upstash tikai multi-instance |
+| L27 | ℹ️ ARHITEKTŪRA | `labor-time-norm-sync` saglabāšanas laikā maina arī Sagatavi un citus `active` projektus — apzināta single-tenant loģika aiz `estimate.save` |
+
+**Atzīme:** **9.5 / 10** — koda un atkarību audits tīrs; jaunu drošības trūkumu nav; atlikušais galvenokārt production konfigurācija.
 
 ---
 
@@ -109,12 +152,20 @@
 | L24 | ✅ LABOTS | `positions/actions.ts` | Cenu vēsture tikai ar `requireAuth()` | `requireAction("positions.manage")` |
 | L25 | ℹ️ DEPLOY | Supabase Auth / ENV | OAuth nav ierobežots bez ENV | `ALLOWED_EMAIL_DOMAIN` + atspējot publisko signup |
 | L26 | ℹ️ SCALE | `rate-limit.ts` | In-process limiter | Pietiek 1 instance; Upstash tikai multi-instance |
+| L27 | ℹ️ ARHITEKTŪRA | `labor-time-norm-sync.ts` | Saglabāšana sinhronizē Sagatavi + citus `active` projektus | Pieņemams single-tenant; aiz `estimate.save` |
 
 ---
 
 ## Ko tika izveidots / mainīts (kopsavilkums)
 
-### v1.3.14 drošības labojumi (šī sesija)
+### v1.3.25 drošības pārbaude (šī sesija)
+| Konteksts | Secinājums |
+|-----------|------------|
+| `restore-sagatave-positions-modal.tsx` | Klienta modālis; nav jaunu server actions / API |
+| `sagatave-has-new-positions.ts` | `listMissingSagatavePositions`, selektīva merge — tikai UI līdz **Saglabāt** |
+| v1.3.15–v1.3.24 funkcionalitāte | Nav jaunu migrāciju, API maršrutu vai auth regresijas |
+
+### v1.3.14 drošības labojumi
 | Fails | Mērķis |
 |-------|--------|
 | `package.json` | `overrides.uuid` → `^11.1.1` (exceljs transitīvais) |
@@ -176,7 +227,7 @@
 
 ---
 
-## Atzīme: 9.5 / 10 (v1.3.14)
+## Atzīme: 9.5 / 10 (v1.3.25)
 
 ### Pamatojums
 
@@ -192,7 +243,7 @@
 **Vājāk (-0.5 kopā):**
 - **-0.5** — production OAuth vēl nav stingri ierobežots (ENV + Supabase signup atkarībā no deploy)
 
-**Pieņemams single-tenant iekšējam rīkam:** service role repository slānī, visi auth lietotāji redz vienus projektus (nav row-level tenancy), `resolve-related-user-ids` banerim, asset proxy bez per-projekta ownership.
+**Pieņemams single-tenant iekšējam rīkam:** service role repository slānī, visi auth lietotāji redz vienus projektus (nav row-level tenancy), `resolve-related-user-ids` banerim, asset proxy bez per-projekta ownership, laika normu sinhronizācija starp projektiem saglabāšanas laikā.
 
 ### Kad atzīme būtu 10/10
 

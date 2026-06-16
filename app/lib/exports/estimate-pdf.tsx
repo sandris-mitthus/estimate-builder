@@ -15,9 +15,11 @@ import {
 } from "@/app/lib/estimates/calculate-totals";
 import {
   collectRowLineItems,
+  isEstimateLineItem,
   resolveLineItemDisplayName,
+  resolveSelectedMultiLineItem,
 } from "@/app/lib/estimates/multi-position";
-import type { EstimateCategory } from "@/app/lib/estimates/types";
+import type { EstimateCategory, EstimateLineItem, EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
@@ -31,6 +33,7 @@ import {
 } from "@/app/lib/settings/vat-breakdown";
 import type { PdfImageAsset } from "@/app/lib/exports/pdf-image-fetch";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
+import type { ReactNode } from "react";
 
 const fontsDir = path.join(process.cwd(), "public", "fonts");
 
@@ -81,18 +84,18 @@ const s = StyleSheet.create({
   tableHeaderCell: { color: c.white, fontSize: 7, fontWeight: "bold" },
   catRow: { flexDirection: "row", backgroundColor: c.grayLight, padding: "5pt 4pt", marginTop: 4 },
   catText: { fontSize: 8, fontWeight: "bold", color: c.black, flex: 1 },
-  catTotal: { fontSize: 8, fontWeight: "bold", color: c.black, width: 72, textAlign: "right" },
+  catTotal: { fontSize: 8, fontWeight: "bold", color: c.black, width: 72, flexShrink: 0, textAlign: "right" },
   itemRow: { flexDirection: "row", padding: "3pt 4pt", borderBottomWidth: 0.5, borderBottomColor: c.border },
   cell: { fontSize: 8, color: c.black },
   totalRow: { flexDirection: "row", padding: "6pt 4pt", borderTopWidth: 1.5, borderTopColor: c.black, marginTop: 8 },
   totalLabel: { fontSize: 9, fontWeight: "bold", flex: 1 },
-  totalValue: { fontSize: 10, fontWeight: "bold", width: 72, textAlign: "right" },
+  totalValue: { fontSize: 10, fontWeight: "bold", width: 72, flexShrink: 0, textAlign: "right" },
   vatRow: { flexDirection: "row", padding: "3pt 4pt" },
   vatLabel: { fontSize: 8, flex: 1 },
-  vatValue: { fontSize: 8, width: 72, textAlign: "right" },
+  vatValue: { fontSize: 8, width: 72, flexShrink: 0, textAlign: "right" },
   grossRow: { flexDirection: "row", padding: "5pt 4pt", borderTopWidth: 0.5, borderTopColor: c.border, marginTop: 2 },
   grossLabel: { fontSize: 9, fontWeight: "bold", flex: 1 },
-  grossValue: { fontSize: 10, fontWeight: "bold", width: 72, textAlign: "right" },
+  grossValue: { fontSize: 10, fontWeight: "bold", width: 72, flexShrink: 0, textAlign: "right" },
 
   signatureBlock: { marginTop: 28, alignSelf: "flex-start" },
   signatureLine: { fontSize: 9, marginBottom: 4 },
@@ -108,9 +111,9 @@ const s = StyleSheet.create({
   footer: { position: "absolute", bottom: 20, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between" },
   footerText: { fontSize: 7, color: c.gray },
 
-  colNr: { width: 22 },
+  colNr: { width: 22, flexShrink: 0 },
   colName: { flex: 1 },
-  colTotal: { width: 72, textAlign: "right" },
+  colTotal: { width: 72, flexShrink: 0, textAlign: "right" },
 });
 
 function fmtMoney(value: number): string {
@@ -131,6 +134,142 @@ function resolveItemGrand(
     plannedProfitPercent,
   );
   return roundToTwoDecimals(sumBreakdown(lineTotal));
+}
+
+/** PDF rindām — tās pašas pozīcijas, ko izmanto kopsummu aprēķinam. */
+function collectSubcategoryOfferLineItems(
+  sub: EstimateSubcategory,
+): EstimateLineItem[] {
+  return collectRowLineItems(sub.items, { forTotals: true });
+}
+
+function sumLineItemsGrand(
+  items: EstimateLineItem[],
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+  plannedProfitPercent: number,
+): number {
+  return roundToTwoDecimals(
+    items.reduce(
+      (sum, item) =>
+        sum +
+        resolveItemGrand(
+          item,
+          catalogPositions,
+          defaultHourlyRate,
+          plannedProfitPercent,
+        ),
+      0,
+    ),
+  );
+}
+
+type SubcategoryPdfRowsResult = {
+  rows: ReactNode[];
+  nextRowNr: number;
+};
+
+function buildSubcategoryOfferRows(
+  sub: EstimateSubcategory,
+  startRowNr: number,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+  plannedProfitPercent: number,
+): SubcategoryPdfRowsResult {
+  const displayItems = collectSubcategoryOfferLineItems(sub);
+  if (displayItems.length === 0) {
+    return { rows: [], nextRowNr: startRowNr };
+  }
+
+  const subGrand = sumLineItemsGrand(
+    displayItems,
+    catalogPositions,
+    defaultHourlyRate,
+    plannedProfitPercent,
+  );
+  const subTitle = sub.title || "Bez nosaukuma";
+  let rowNr = startRowNr;
+  const rows: ReactNode[] = [];
+
+  // Cenu slēpšana — kopsummas rinda, tad pozīcijas bez cenām.
+  if (sub.hiddenPricesInOffer === true) {
+    rowNr += 1;
+    rows.push(
+      <View key={`${sub.id}-summary`} style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
+        <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
+        <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>
+          {subTitle}
+        </Text>
+        <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
+          {fmtMoney(subGrand)}
+        </Text>
+      </View>,
+    );
+
+    for (const item of displayItems) {
+      rowNr += 1;
+      rows.push(
+        <View key={item.id} style={s.itemRow}>
+          <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
+          <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
+            {resolveLineItemDisplayName(item)}
+          </Text>
+          <Text style={[s.cell, s.colTotal]} />
+        </View>,
+      );
+    }
+
+    return { rows, nextRowNr: rowNr };
+  }
+
+  // Pozīciju slēpšana — viena kopsummas rinda.
+  if (sub.hiddenInOffer === true) {
+    rowNr += 1;
+    rows.push(
+      <View key={sub.id} style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
+        <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
+        <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>
+          {subTitle}
+        </Text>
+        <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
+          {fmtMoney(subGrand)}
+        </Text>
+      </View>,
+    );
+    return { rows, nextRowNr: rowNr };
+  }
+
+  // Noklusējums — subkategorijas virsraksts + pozīcijas ar cenām.
+  rows.push(
+    <View key={`${sub.id}-hdr`} style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
+      <Text style={[s.cell, s.colNr]} />
+      <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>
+        {subTitle}
+      </Text>
+      <Text style={[s.cell, s.colTotal]} />
+    </View>,
+  );
+
+  for (const item of displayItems) {
+    rowNr += 1;
+    const grand = resolveItemGrand(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+      plannedProfitPercent,
+    );
+    rows.push(
+      <View key={item.id} style={s.itemRow}>
+        <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
+        <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
+          {resolveLineItemDisplayName(item)}
+        </Text>
+        <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
+      </View>,
+    );
+  }
+
+  return { rows, nextRowNr: rowNr };
 }
 
 export type OfferProjectInfo = {
@@ -304,8 +443,6 @@ export function EstimatePdfDocument({
             defaultHourlyRate,
             plannedProfitPercent,
           );
-          const directItems = collectRowLineItems(cat.items, { forTotals: true });
-
           return (
             <View key={cat.id}>
               <View style={s.catRow}>
@@ -313,77 +450,50 @@ export function EstimatePdfDocument({
                 <Text style={s.catTotal}>{fmtMoney(catTotals.grand)}</Text>
               </View>
 
-              {directItems.map((item) => {
+              {cat.items.map((row) => {
+                const lineItem = isEstimateLineItem(row)
+                  ? row
+                  : resolveSelectedMultiLineItem(row);
+                if (!lineItem) return null;
+
                 rowNr += 1;
                 const grand = resolveItemGrand(
-                  item,
+                  lineItem,
                   catalogPositions,
                   defaultHourlyRate,
                   plannedProfitPercent,
                 );
+                const hidePrice = lineItem.hiddenPriceInOffer === true;
+
                 return (
-                  <View key={item.id} style={s.itemRow}>
+                  <View key={row.id} style={s.itemRow}>
                     <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                    <Text style={[s.cell, s.colName]}>{resolveLineItemDisplayName(item)}</Text>
-                    <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
+                    <Text style={[s.cell, s.colName]}>
+                      {resolveLineItemDisplayName(lineItem)}
+                    </Text>
+                    <Text style={[s.cell, s.colTotal]}>
+                      {hidePrice ? "" : fmtMoney(grand)}
+                    </Text>
                   </View>
                 );
               })}
 
-              {cat.subcategories.map((sub) => {
-                const subItems = collectRowLineItems(sub.items, { forTotals: true });
-                if (subItems.length === 0) return null;
-
-                const subTotals = calculateEstimateTotals(
-                  [{ ...cat, subcategories: [sub], items: [] }],
-                  catalogPositions,
-                  defaultHourlyRate,
-                  plannedProfitPercent,
-                );
-
-                // Paslēptas pozīcijas vai cenas — subkategorijas kopsummas rinda
-                if (sub.hiddenInOffer || sub.hiddenPricesInOffer) {
-                  rowNr += 1;
-                  return (
-                    <View key={sub.id} style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
-                      <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                      <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>
-                        {sub.title || "Bez nosaukuma"}
-                      </Text>
-                      <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
-                        {fmtMoney(subTotals.grand)}
-                      </Text>
-                    </View>
+              {(() => {
+                let subRowNr = rowNr;
+                const subcategoryRows = cat.subcategories.flatMap((sub) => {
+                  const result = buildSubcategoryOfferRows(
+                    sub,
+                    subRowNr,
+                    catalogPositions,
+                    defaultHourlyRate,
+                    plannedProfitPercent,
                   );
-                }
-
-                // Noklusejums: subkategorijas virsraksts + visas pozicijas ar cenu
-                return (
-                  <View key={sub.id}>
-                    <View style={[s.itemRow, { backgroundColor: "#fafafa" }]}>
-                      <Text style={[s.cell, s.colNr]} />
-                      <Text style={[s.cell, s.colName, { fontWeight: "bold", paddingLeft: 8 }]}>{sub.title}</Text>
-                      <Text style={[s.cell, s.colTotal]} />
-                    </View>
-                    {subItems.map((item) => {
-                      rowNr += 1;
-                      const grand = resolveItemGrand(
-                        item,
-                        catalogPositions,
-                        defaultHourlyRate,
-                        plannedProfitPercent,
-                      );
-                      return (
-                        <View key={item.id} style={s.itemRow}>
-                          <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                          <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>{resolveLineItemDisplayName(item)}</Text>
-                          <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
+                  subRowNr = result.nextRowNr;
+                  return result.rows;
+                });
+                rowNr = subRowNr;
+                return subcategoryRows;
+              })()}
             </View>
           );
         })}

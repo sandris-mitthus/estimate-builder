@@ -434,6 +434,8 @@ export function MultiPositionModal({
                         onChange={(timeNorm) =>
                           updateOption(option.optionId, { timeNorm })
                         }
+                        withStepper
+                        stepperButtonsAlwaysVisible
                       />
                     </label>
                   </div>

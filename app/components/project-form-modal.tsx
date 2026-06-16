@@ -293,11 +293,13 @@ export function ProjectFormModal({
       }
 
       if (useOptimisticCreate) {
+        pageCreate!.beginProjectNavigation(`/${result.id}`);
         router.push(`/${result.id}`);
         return;
       }
 
       handleOpenChange(false);
+      pageCreate?.beginProjectNavigation(`/${result.id}`);
       router.push(`/${result.id}`);
       router.refresh();
     });

@@ -8,7 +8,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { assignProjectMaterialUserAction } from "@/app/(protected)/actions";
 import { ProjectMaterialsTable } from "@/app/components/project-materials-table";
 import { ProjectUsersPanel } from "@/app/components/project-users-panel";
@@ -53,6 +53,9 @@ export function ProjectMaterialsDelegationPanel({
   const router = useRouter();
   const canAssignMaterials = useActionPermission("materials.assign");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const [assigningMaterialId, setAssigningMaterialId] = useState<string | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
 
   const sensors = useSensors(
@@ -92,24 +95,29 @@ export function ProjectMaterialsDelegationPanel({
     }
 
     clearFeedback();
+    setAssigningMaterialId(positionPriceId);
     startTransition(async () => {
-      const result = await assignProjectMaterialUserAction(
-        projectId,
-        positionPriceId,
-        userId,
-      );
+      try {
+        const result = await assignProjectMaterialUserAction(
+          projectId,
+          positionPriceId,
+          userId,
+        );
 
-      if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
-        return;
+        if (!result.ok) {
+          showFeedback({ type: "error", text: result.error });
+          return;
+        }
+
+        onMaterialAssigneeChange(result.materialAssigneeUserIds);
+        router.refresh();
+        showFeedback({
+          type: "success",
+          text: "Materiāls piešķirts lietotājam.",
+        });
+      } finally {
+        setAssigningMaterialId(null);
       }
-
-      onMaterialAssigneeChange(result.materialAssigneeUserIds);
-      router.refresh();
-      showFeedback({
-        type: "success",
-        text: "Materiāls piešķirts lietotājam.",
-      });
     });
   }
 
@@ -124,9 +132,7 @@ export function ProjectMaterialsDelegationPanel({
       onDragEnd={handleDragEnd}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div
-          className={`lg:col-span-2 ${isPending ? "pointer-events-none opacity-90" : ""}`}
-        >
+        <div className="lg:col-span-2">
           <ProjectMaterialsTable
             projectId={projectId}
             categories={categories}
@@ -135,7 +141,8 @@ export function ProjectMaterialsDelegationPanel({
             orderedMaterialPositionIds={orderedMaterialPositionIds}
             materialAssigneeUserIds={materialAssigneeUserIds}
             users={users}
-            delegationEnabled={canAssignMaterials}
+            delegationEnabled={canAssignMaterials && !isPending}
+            assigningMaterialId={assigningMaterialId}
             currency={currency}
             useFrozenPrices={useFrozenPrices}
             onMaterialOrdered={onMaterialOrdered}
@@ -143,7 +150,10 @@ export function ProjectMaterialsDelegationPanel({
         </div>
         {users.length > 0 ? (
           <div className="lg:col-span-1">
-            <ProjectUsersPanel users={users} dragEnabled={canAssignMaterials} />
+            <ProjectUsersPanel
+              users={users}
+              dragEnabled={canAssignMaterials && !isPending}
+            />
           </div>
         ) : null}
       </div>

@@ -16,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -63,6 +64,7 @@ import {
   SAMPLE_TITLE,
 } from "@/app/lib/estimates/sample-data";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
+import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
 import {
@@ -83,6 +85,7 @@ import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cel
 import {
   deriveCompositeUnitPrice,
   isCompositeLineItem,
+  patchLineItemLaborTimeNorm,
 } from "@/app/lib/estimates/composite-line-item";
 import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
@@ -91,6 +94,9 @@ import {
 } from "@/app/lib/estimates/unit-price-columns";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
+import { IconActionButton } from "@/app/components/icon-action-button";
+import { PositionModal } from "@/app/components/position-modal";
+import { PositionModalProvider, usePositionModal } from "@/app/components/position-modal-context";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { Tooltip } from "@/app/components/tooltip";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
@@ -171,9 +177,11 @@ import type {
 } from "@/app/lib/modules/types";
 import { isProjectEstimateLocked, shouldShowStaleCatalogPriceWarnings } from "@/app/lib/projects/project-status";
 import {
+  listMissingSagatavePositions,
   mergeNewSagatavePositionsIntoProject,
   sagataveHasNewPositionsForProject,
 } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
+import { RestoreSagatavePositionsModal } from "@/app/components/restore-sagatave-positions-modal";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import type { UserSummary } from "@/app/lib/users/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
@@ -298,6 +306,7 @@ function LineItemRow({
   highlightStaleCatalogPrices = false,
   highlightMergedSagatave = false,
   estimateLocked = false,
+  allowCompositeEdit = false,
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
@@ -317,7 +326,9 @@ function LineItemRow({
   highlightStaleCatalogPrices?: boolean;
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
+  allowCompositeEdit?: boolean;
 }) {
+  const { openPositionModal } = usePositionModal();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
   const isCatalogLinked = catalogPosition != null;
@@ -391,6 +402,25 @@ function LineItemRow({
           <span className={dragHandleColumn}>{dragHandle}</span>
           <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
             <span className="min-w-0 flex-1">
+              {allowCompositeEdit && isComposite ? (
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => openPositionModal(item, onChange)}
+                    className={`block w-full text-left text-sm transition hover:underline ${nameInput} ${indentName ? subcategoryItemNameIndent : ""} ${
+                      displayName.trim()
+                        ? "font-medium text-zinc-900 hover:text-sky-700"
+                        : "italic text-zinc-400"
+                    }`}
+                  >
+                    {displayName.trim() || "Nenosaukta pozīcija"}
+                  </button>
+                  <AttachedModuleSizeLabel
+                    attachment={item.moduleSizeAttachment}
+                    moduleSizeOptions={moduleSizeOptions ?? []}
+                  />
+                </div>
+              ) : (
               <EstimateLineItemNameField
                 value={displayName}
                 readOnly={estimateLocked || isCatalogLinked}
@@ -444,6 +474,7 @@ function LineItemRow({
                   )
                 }
               />
+              )}
             </span>
             {showQuantityColumn && !estimateLocked && item.variableQuantity ? (
               <Tooltip label="Noņemt individuālo apjomu">
@@ -461,6 +492,15 @@ function LineItemRow({
             ) : (
               <PositionVariableQuantityIcon enabled={showQuantityInput} />
             )}
+            {allowCompositeEdit && isComposite ? (
+              <IconActionButton
+                label="Labot pozīciju"
+                icon="fas fa-pen"
+                variant="edit"
+                onClick={() => openPositionModal(item, onChange)}
+                className="relative top-[5px] shrink-0 opacity-0 group-hover:opacity-100"
+              />
+            ) : null}
           </span>
         </div>
       </td>
@@ -516,6 +556,19 @@ function LineItemRow({
         defaultHourlyRate={defaultHourlyRate}
         values={displayUnitPrice}
         staleCatalogPriceHints={staleCatalogPriceHints}
+        onTimeNormChange={
+          isComposite && !estimateLocked
+            ? (laborTimeNorm) =>
+                onChange(
+                  patchLineItemLaborTimeNorm(
+                    item,
+                    laborTimeNorm,
+                    catalogPositions,
+                    defaultHourlyRate,
+                  ),
+                )
+            : undefined
+        }
       />
       {showQuantityColumn ? (
         <VolumeSumCells
@@ -638,6 +691,7 @@ function SortableMultiPositionRow({
       showQuantityColumn={showQuantityColumn}
       moduleSizeOptions={moduleSizeOptions}
       readOnlyPrices={true}
+      allowOfferMultiEdit={!estimateLocked}
       highlightStaleCatalogPrices={highlightStaleCatalogPrices}
       highlightMergedSagatave={highlightMergedSagatave}
       rowRef={setNodeRef}
@@ -688,6 +742,7 @@ function SortableLineItemRow({
   return (
     <LineItemRow
       {...props}
+      allowCompositeEdit={props.showQuantityColumn && !props.estimateLocked}
       highlightStaleCatalogPrices={props.highlightStaleCatalogPrices}
       highlightMergedSagatave={props.highlightMergedSagatave}
       estimateLocked={props.estimateLocked}
@@ -1577,13 +1632,13 @@ function MetaField({
       </span>
       {suffix ? (
         <div
-          className={`flex items-center border-b border-zinc-200 transition ${
+          className={`flex min-w-0 items-center overflow-hidden border-b border-zinc-200 transition ${
             disabled ? "" : "focus-within:border-zinc-400"
           }`}
         >
           <div className="min-w-0 flex-1">{inputElement}</div>
           <span
-            className={`shrink-0 border-l border-zinc-200 pl-2 text-sm ${
+            className={`shrink-0 border-l border-zinc-200 pl-2 pr-0.5 text-sm ${
               disabled ? "text-zinc-400" : "text-zinc-500"
             }`}
           >
@@ -1660,6 +1715,7 @@ export function EstimateTable({
   const [mergedSagataveHighlightIds, setMergedSagataveHighlightIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
+  const [restoreSagataveModalOpen, setRestoreSagataveModalOpen] = useState(false);
   const [, startSaveDatesTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
@@ -1670,6 +1726,10 @@ export function EstimateTable({
   const [savedAt, setSavedAt] = useState<string | undefined>(
     initialMeta.savedAt,
   );
+  const [positionModalState, setPositionModalState] = useState<{
+    item: EstimateLineItem;
+    onSave: (next: EstimateLineItem) => void;
+  } | null>(null);
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const canSaveEstimate = useActionPermission("estimate.save");
   const canExportEstimate = useActionPermission("estimate.export");
@@ -1681,6 +1741,16 @@ export function EstimateTable({
   const datesReadOnly = estimateStatusLocked || !canEditEstimateDates;
   const plannedProfitPercent = normalizePlannedProfitPercent(
     meta.plannedProfitPercent ?? 0,
+  );
+  const openPositionModal = useCallback(
+    (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
+      setPositionModalState({ item, onSave });
+    },
+    [],
+  );
+  const estimateUnits = useMemo(
+    () => collectEstimateDocumentUnits(categories, moduleSizeOptions),
+    [categories, moduleSizeOptions],
   );
 
   useEffect(() => {
@@ -1731,7 +1801,7 @@ export function EstimateTable({
     setCategories(refreshed);
   }
 
-  function handleMergeNewSagatavePositions() {
+  function handleMergeNewSagatavePositions(selectedSagataveRowIds: Set<string>) {
     if (!highlightNewSagatavePositions || editorLocked) return;
 
     const merged = mergeNewSagatavePositionsIntoProject(
@@ -1739,6 +1809,7 @@ export function EstimateTable({
       multiOptionLinks,
       sagataveSections,
       sagataveMultiOptionLinks,
+      selectedSagataveRowIds,
     );
     let nextCategories = merged.categories;
 
@@ -1885,6 +1956,14 @@ export function EstimateTable({
     [highlightNewSagatavePositions, sagataveSections, categories],
   );
 
+  const missingSagatavePositionGroups = useMemo(
+    () =>
+      highlightNewSagatavePositions
+        ? listMissingSagatavePositions(sagataveSections, categories)
+        : [],
+    [highlightNewSagatavePositions, sagataveSections, categories],
+  );
+
   const totals = useMemo(
     () =>
       calculateEstimateTotals(
@@ -1965,31 +2044,56 @@ export function EstimateTable({
 
       <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
         <EstimatePlannedProfitProvider percent={plannedProfitPercent}>
-          <EstimateDndTable
-            categories={categories}
-            allDragIds={allDragIds}
-            setCategories={setCategories}
-            multiOptionLinks={multiOptionLinks}
-            setMultiOptionLinks={setMultiOptionLinks}
-            totals={totals}
-            onSyncCatalogPosition={flushSyncFromLineItem}
-            onScheduleCatalogSync={scheduleSyncFromLineItem}
-            catalogPositions={catalogPositions}
-            defaultHourlyRate={defaultHourlyRate}
-            currency={currency}
-            showQuantityColumn={showQuantityColumn}
-            moduleSizeOptions={moduleSizeOptions}
-            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
-            mergedSagataveHighlightIds={mergedSagataveHighlightIds}
-            estimateLocked={editorLocked}
-          />
+          <PositionModalProvider openPositionModal={openPositionModal}>
+            <EstimateDndTable
+              categories={categories}
+              allDragIds={allDragIds}
+              setCategories={setCategories}
+              multiOptionLinks={multiOptionLinks}
+              setMultiOptionLinks={setMultiOptionLinks}
+              totals={totals}
+              onSyncCatalogPosition={flushSyncFromLineItem}
+              onScheduleCatalogSync={scheduleSyncFromLineItem}
+              catalogPositions={catalogPositions}
+              defaultHourlyRate={defaultHourlyRate}
+              currency={currency}
+              showQuantityColumn={showQuantityColumn}
+              moduleSizeOptions={moduleSizeOptions}
+              highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+              mergedSagataveHighlightIds={mergedSagataveHighlightIds}
+              estimateLocked={editorLocked}
+            />
+          </PositionModalProvider>
         </EstimatePlannedProfitProvider>
       </div>
     </div>
   );
 
   if (variant === "tableOnly") {
-    return <div className="max-w-full space-y-4">{tablePanel}</div>;
+    return (
+      <div className="max-w-full space-y-4">
+        {tablePanel}
+        {positionModalState ? (
+          <PositionModal
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setPositionModalState(null);
+              }
+            }}
+            value={positionModalState.item}
+            onSave={(next) => {
+              positionModalState.onSave(next);
+              setPositionModalState(null);
+            }}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            moduleSizeOptions={moduleSizeOptions}
+            estimateUnits={estimateUnits}
+          />
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -2068,36 +2172,42 @@ export function EstimateTable({
             onChange={(project) => setMeta({ ...meta, project })}
             fullWidth
           />
-          {project ? (
-            <MetaField
-              label="Plānotā peļņa"
-              value={
-                meta.plannedProfitPercent != null
-                  ? String(meta.plannedProfitPercent)
-                  : estimateStatusLocked
-                    ? "0"
-                    : ""
-              }
-              type="number"
-              suffix="%"
-              disabled={estimateStatusLocked}
-              readOnly={!estimateStatusLocked && editorLocked}
-              onChange={(raw) => {
-                const parsed = parsePlannedProfitInput(raw);
-                setMeta({
-                  ...meta,
-                  plannedProfitPercent: parsed > 0 ? parsed : undefined,
-                });
-              }}
-            />
-          ) : null}
           <div
             className={
               estimateStatusLocked
-                ? "grid grid-cols-1 gap-y-4"
-                : "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2"
+                ? project
+                  ? "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)]"
+                  : "grid grid-cols-1 gap-y-4"
+                : project
+                  ? "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)_minmax(0,1fr)]"
+                  : "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2"
             }
           >
+            {project ? (
+              <div className="w-full max-w-[8.5rem] shrink-0">
+                <MetaField
+                  label="Plānotā peļņa"
+                  value={
+                    meta.plannedProfitPercent != null
+                      ? String(meta.plannedProfitPercent)
+                      : estimateStatusLocked
+                        ? "0"
+                        : ""
+                  }
+                  type="number"
+                  suffix="%"
+                  disabled={estimateStatusLocked}
+                  readOnly={!estimateStatusLocked && editorLocked}
+                  onChange={(raw) => {
+                    const parsed = parsePlannedProfitInput(raw);
+                    setMeta({
+                      ...meta,
+                      plannedProfitPercent: parsed > 0 ? parsed : undefined,
+                    });
+                  }}
+                />
+              </div>
+            ) : null}
             <MetaField
               label="Datums"
               type="date"
@@ -2181,17 +2291,27 @@ export function EstimateTable({
         >
           <div className="flex items-center gap-2">
             <i className="fas fa-layer-group text-xs" aria-hidden="true" />
-            Sagatavē pievienotas jaunas pozīcijas
+            Sagatavē ir pozīcijas, kuras nav šajā tāmē
           </div>
           <button
             type="button"
-            onClick={handleMergeNewSagatavePositions}
+            onClick={() => setRestoreSagataveModalOpen(true)}
             disabled={isSaving || editorLocked}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Atjaunot pozicijas
+            Atjaunot pozīcijas
           </button>
         </div>
+      ) : null}
+
+      {project && hasNewSagatavePositions ? (
+        <RestoreSagatavePositionsModal
+          open={restoreSagataveModalOpen}
+          onOpenChange={setRestoreSagataveModalOpen}
+          groups={missingSagatavePositionGroups}
+          disabled={isSaving || editorLocked}
+          onConfirm={handleMergeNewSagatavePositions}
+        />
       ) : null}
 
       {tablePanel}
@@ -2291,6 +2411,25 @@ export function EstimateTable({
         </div>
       ) : null}
     </div>
+      {positionModalState ? (
+        <PositionModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setPositionModalState(null);
+            }
+          }}
+          value={positionModalState.item}
+          onSave={(next) => {
+            positionModalState.onSave(next);
+            setPositionModalState(null);
+          }}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          moduleSizeOptions={moduleSizeOptions}
+          estimateUnits={estimateUnits}
+        />
+      ) : null}
     </>
   );
 }

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import { useNavigationLoading } from "@/app/components/navigation-loading-context";
 import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
@@ -16,6 +23,7 @@ type ProjectsPageCreateContextValue = {
   optimisticProject: ProjectSummary | null;
   beginOptimisticCreate: (input: OptimisticCreateInput) => void;
   clearOptimisticCreate: () => void;
+  beginProjectNavigation: (href: string) => void;
 };
 
 const ProjectsPageCreateContext =
@@ -41,11 +49,12 @@ function buildOptimisticProject(input: OptimisticCreateInput): ProjectSummary {
   };
 }
 
-export function ProjectsPageCreateProvider({
+function ProjectsPageCreateProviderInner({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { beginNavigation } = useNavigationLoading();
   const [optimisticProject, setOptimisticProject] = useState<ProjectSummary | null>(
     null,
   );
@@ -58,19 +67,42 @@ export function ProjectsPageCreateProvider({
     setOptimisticProject(null);
   }, []);
 
+  const beginProjectNavigation = useCallback(
+    (href: string) => {
+      beginNavigation(href, "Ielādē projektu…");
+    },
+    [beginNavigation],
+  );
+
   const value = useMemo(
     () => ({
       optimisticProject,
       beginOptimisticCreate,
       clearOptimisticCreate,
+      beginProjectNavigation,
     }),
-    [optimisticProject, beginOptimisticCreate, clearOptimisticCreate],
+    [
+      optimisticProject,
+      beginOptimisticCreate,
+      clearOptimisticCreate,
+      beginProjectNavigation,
+    ],
   );
 
   return (
     <ProjectsPageCreateContext.Provider value={value}>
       {children}
     </ProjectsPageCreateContext.Provider>
+  );
+}
+
+export function ProjectsPageCreateProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ProjectsPageCreateProviderInner>{children}</ProjectsPageCreateProviderInner>
   );
 }
 

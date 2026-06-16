@@ -10,6 +10,7 @@ import { cloneSagataveDocumentForProject } from "@/app/lib/estimate-positions/cl
 import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
 import { sagataveHasNewPositionsForProject } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
+import { propagateLaborTimeNormsFromProject } from "@/app/lib/estimate-positions/labor-time-norm-sync";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import {
   estimateHasStaleCatalogPrices,
@@ -1111,6 +1112,14 @@ export async function saveProjectEstimate(
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt tāmi." };
+  }
+
+  const syncResult = await propagateLaborTimeNormsFromProject(
+    projectId,
+    payload.categories,
+  );
+  if (!syncResult.ok) {
+    return syncResult;
   }
 
   return { ok: true };

@@ -49,6 +49,8 @@ export type EstimateLineItem = {
   manualUnitEnabled?: boolean;
   /** Manuāli norādītā mērvienība, kad `manualUnitEnabled`. */
   manualUnit?: string;
+  /** `true` — pozīcijas cena paslēpta piedāvājumā (tikai kategorijas līmeņa pozīcijām). */
+  hiddenPriceInOffer?: boolean;
 };
 
 export type EstimateMultiPositionOption = {
