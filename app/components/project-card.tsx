@@ -150,12 +150,12 @@ export function ProjectCard({
               Sagatavē pievienotas jaunas pozīcijas
             </p>
           ) : null}
-
-          {hasPendingMaterials ? <PendingProjectMaterialsCardHint /> : null}
         </Link>
 
         <ProjectCardActions project={project} modules={modules} />
       </div>
+
+      {hasPendingMaterials ? <PendingProjectMaterialsCardHint /> : null}
     </div>
   );
 }

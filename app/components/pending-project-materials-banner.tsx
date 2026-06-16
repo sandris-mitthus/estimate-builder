@@ -33,7 +33,7 @@ export function PendingProjectMaterialsCardHint() {
   return (
     <p
       role="status"
-      className="mt-4 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm font-semibold text-orange-900"
+      className="-mx-5 -mb-5 mt-4 flex w-full items-center gap-2 rounded-b-2xl border-x-0 border-b-0 border-t border-orange-200 bg-orange-50 px-5 py-2.5 text-sm font-semibold text-orange-900"
     >
       <i className="fas fa-box-open text-sm" aria-hidden="true" />
       Visi materiāli vēl nav pasūtīti!
