@@ -9,6 +9,7 @@ import {
 import { AppModal } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PhoneField } from "@/app/components/phone-field";
+import { useOptionalProjectsPageCreate } from "@/app/components/projects-page-create-context";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   formInputClassName,
@@ -140,6 +141,7 @@ export function ProjectFormModal({
   copyFromProject,
 }: ProjectFormModalProps) {
   const router = useRouter();
+  const pageCreate = useOptionalProjectsPageCreate();
   const isEdit = mode === "edit";
   const isCopyCreate = !isEdit && Boolean(copyFromProject);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -182,14 +184,16 @@ export function ProjectFormModal({
     setFieldErrors((current) => ({ ...current, [key]: undefined }));
   }
 
-  function handleOpenChange(nextOpen: boolean) {
+  function handleOpenChange(nextOpen: boolean, preserveForm = false) {
     if (!nextOpen && !isPending) {
-      setForm(emptyForm);
-      setModuleSelection("");
-      setModuleError(undefined);
-      setFieldErrors({});
-      setError(null);
-      setPhoneCallingCode(DEFAULT_CALLING_CODE);
+      if (!preserveForm) {
+        setForm(emptyForm);
+        setModuleSelection("");
+        setModuleError(undefined);
+        setFieldErrors({});
+        setError(null);
+        setPhoneCallingCode(DEFAULT_CALLING_CODE);
+      }
     }
     onOpenChange(nextOpen);
   }
@@ -258,15 +262,38 @@ export function ProjectFormModal({
         return;
       }
 
+      const buildingModuleId = resolveBuildingModuleId() ?? null;
+      const useOptimisticCreate = Boolean(pageCreate);
+
+      if (useOptimisticCreate) {
+        pageCreate!.beginOptimisticCreate({
+          clientName: form.clientName,
+          phone: form.phone,
+          email: form.email,
+          address: form.address,
+          buildingModuleId,
+        });
+        handleOpenChange(false, true);
+      }
+
       const result = await createProjectAction({
         ...form,
         phoneCallingCode,
-        buildingModuleId: resolveBuildingModuleId() ?? null,
+        buildingModuleId,
         copyEstimateFromProjectId: copyFromProject?.id,
       });
 
       if (!result.ok) {
+        if (useOptimisticCreate) {
+          pageCreate!.clearOptimisticCreate();
+          handleOpenChange(true, true);
+        }
         setError(result.error);
+        return;
+      }
+
+      if (useOptimisticCreate) {
+        router.push(`/${result.id}`);
         return;
       }
 
@@ -407,15 +434,18 @@ export function ProjectFormModal({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending
-              ? isEdit
-                ? "Saglabā…"
-                : "Izveido…"
-              : isEdit
-                ? "Saglabāt"
-                : "Izveidot projektu"}
+            {isPending ? (
+              <>
+                <i className="fas fa-spinner animate-spin text-xs" aria-hidden="true" />
+                {isEdit ? "Saglabā…" : "Izveido…"}
+              </>
+            ) : isEdit ? (
+              "Saglabāt"
+            ) : (
+              "Izveidot projektu"
+            )}
           </button>
         </ModalFormActions>
       </form>

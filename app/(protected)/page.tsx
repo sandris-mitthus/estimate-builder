@@ -1,6 +1,7 @@
 import { ProjectArchiveContent } from "@/app/components/project-archive-content";
 import { ProjectList } from "@/app/components/project-list";
 import { ProjectPageActions } from "@/app/components/project-page-actions";
+import { ProjectsPageCreateProvider } from "@/app/components/projects-page-create-context";
 import { SectionPage } from "@/app/components/section-page";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { listBuildingModules } from "@/app/lib/modules/repository";
@@ -50,28 +51,30 @@ export default async function ProjectsPage({
     : `${projects.length} aktīvi projekti`;
 
   return (
-    <SectionPage
-      title={showArchive ? "Arhīvs" : "Projekti"}
-      subtitle={subtitle}
-      actions={<ProjectPageActions modules={modules} archive={showArchive} />}
-    >
-      {showArchive ? (
-        <ProjectArchiveContent
-          projects={projects}
-          modules={modules}
-          staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
-          newSagatavePositionProjectIds={newSagatavePositionProjectIds}
-          pendingMaterialsProjectIds={pendingMaterialsProjectIds}
-        />
-      ) : (
-        <ProjectList
-          projects={projects}
-          modules={modules}
-          staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
-          newSagatavePositionProjectIds={newSagatavePositionProjectIds}
-          pendingMaterialsProjectIds={pendingMaterialsProjectIds}
-        />
-      )}
-    </SectionPage>
+    <ProjectsPageCreateProvider>
+      <SectionPage
+        title={showArchive ? "Arhīvs" : "Projekti"}
+        subtitle={subtitle}
+        actions={<ProjectPageActions modules={modules} archive={showArchive} />}
+      >
+        {showArchive ? (
+          <ProjectArchiveContent
+            projects={projects}
+            modules={modules}
+            staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+            newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+            pendingMaterialsProjectIds={pendingMaterialsProjectIds}
+          />
+        ) : (
+          <ProjectList
+            projects={projects}
+            modules={modules}
+            staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+            newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+            pendingMaterialsProjectIds={pendingMaterialsProjectIds}
+          />
+        )}
+      </SectionPage>
+    </ProjectsPageCreateProvider>
   );
 }

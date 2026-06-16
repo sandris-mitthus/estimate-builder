@@ -174,7 +174,9 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
             }`}
           />
           {status === "loading" ? (
-            <div className="absolute inset-0 animate-pulse bg-zinc-100" aria-hidden="true" />
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-100 text-zinc-500">
+              <i className="fas fa-spinner animate-spin text-lg" aria-hidden="true" />
+            </div>
           ) : null}
         </>
       ) : null}

@@ -122,8 +122,14 @@ function resolveItemGrand(
   item: Parameters<typeof resolveEstimateLineItemPrices>[0],
   catalogPositions: PositionPriceSummary[],
   hourlyRate: number | null,
+  plannedProfitPercent: number,
 ): number {
-  const { lineTotal } = resolveEstimateLineItemPrices(item, catalogPositions, hourlyRate);
+  const { lineTotal } = resolveEstimateLineItemPrices(
+    item,
+    catalogPositions,
+    hourlyRate,
+    plannedProfitPercent,
+  );
   return roundToTwoDecimals(sumBreakdown(lineTotal));
 }
 
@@ -168,7 +174,13 @@ export function EstimatePdfDocument({
   visualizationImages,
   excludedPositions,
 }: Props) {
-  const totals = calculateEstimateTotals(categories, catalogPositions, defaultHourlyRate);
+  const plannedProfitPercent = meta.plannedProfitPercent ?? 0;
+  const totals = calculateEstimateTotals(
+    categories,
+    catalogPositions,
+    defaultHourlyRate,
+    plannedProfitPercent,
+  );
   const companyLines = formatCompanyDisplayLines(company);
   const imagePairs = pairImages(visualizationImages);
   const showVat = hasCompanyVatNumber(company.vatNumber);
@@ -286,7 +298,12 @@ export function EstimatePdfDocument({
 
         {/* Tabulas rindas */}
         {categories.map((cat) => {
-          const catTotals = calculateEstimateTotals([cat], catalogPositions, defaultHourlyRate);
+          const catTotals = calculateEstimateTotals(
+            [cat],
+            catalogPositions,
+            defaultHourlyRate,
+            plannedProfitPercent,
+          );
           const directItems = collectRowLineItems(cat.items, { forTotals: true });
 
           return (
@@ -298,7 +315,12 @@ export function EstimatePdfDocument({
 
               {directItems.map((item) => {
                 rowNr += 1;
-                const grand = resolveItemGrand(item, catalogPositions, defaultHourlyRate);
+                const grand = resolveItemGrand(
+                  item,
+                  catalogPositions,
+                  defaultHourlyRate,
+                  plannedProfitPercent,
+                );
                 return (
                   <View key={item.id} style={s.itemRow}>
                     <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
@@ -316,6 +338,7 @@ export function EstimatePdfDocument({
                   [{ ...cat, subcategories: [sub], items: [] }],
                   catalogPositions,
                   defaultHourlyRate,
+                  plannedProfitPercent,
                 );
 
                 // Paslēptas pozīcijas vai cenas — subkategorijas kopsummas rinda
@@ -344,7 +367,12 @@ export function EstimatePdfDocument({
                     </View>
                     {subItems.map((item) => {
                       rowNr += 1;
-                      const grand = resolveItemGrand(item, catalogPositions, defaultHourlyRate);
+                      const grand = resolveItemGrand(
+                        item,
+                        catalogPositions,
+                        defaultHourlyRate,
+                        plannedProfitPercent,
+                      );
                       return (
                         <View key={item.id} style={s.itemRow}>
                           <Text style={[s.cell, s.colNr]}>{rowNr}</Text>

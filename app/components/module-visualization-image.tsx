@@ -60,7 +60,11 @@ export function ModuleVisualizationImage({ block }: ModuleVisualizationImageProp
   }
 
   if (!src) {
-    return <div className="size-full animate-pulse bg-zinc-100" aria-hidden="true" />;
+    return (
+      <div className="flex size-full items-center justify-center bg-zinc-100 text-zinc-400">
+        <i className="fas fa-spinner animate-spin text-lg" aria-hidden="true" />
+      </div>
+    );
   }
 
   return (

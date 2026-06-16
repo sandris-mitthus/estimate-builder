@@ -1,5 +1,9 @@
 import { multiplyBreakdown } from "@/app/lib/estimates/calculate-line";
 import {
+  applyPlannedProfitPercent,
+  normalizePlannedProfitPercent,
+} from "@/app/lib/estimates/planned-profit";
+import {
   deriveCompositeUnitPrice,
   isCompositeLineItem,
 } from "@/app/lib/estimates/composite-line-item";
@@ -29,6 +33,7 @@ export function resolveEstimateLineItemPrices(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  plannedProfitPercent = 0,
 ): EstimateLineItemPrices {
   const catalogById = new Map(
     catalogPositions.map((position) => [position.id, position]),
@@ -38,7 +43,10 @@ export function resolveEstimateLineItemPrices(
     normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
 
   if (isCompositeLineItem(item)) {
-    const unitPrice = deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
+    const unitPrice = applyPlannedProfitPercent(
+      deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate),
+      plannedProfitPercent,
+    );
     const shouldApply = (item.variableQuantity === true || hasModuleSize) && item.quantity > 0;
     const lineTotal = shouldApply
       ? multiplyBreakdown(item.quantity, unitPrice)
@@ -49,9 +57,12 @@ export function resolveEstimateLineItemPrices(
   const position = item.positionPriceId
     ? catalogById.get(item.positionPriceId)
     : undefined;
-  const unitPrice = position
-    ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
-    : item.unitPrice;
+  const unitPrice = applyPlannedProfitPercent(
+    position
+      ? buildUnitPriceForCatalogPosition(position, defaultHourlyRate)
+      : item.unitPrice,
+    plannedProfitPercent,
+  );
 
   const shouldApplyQuantity =
     (item.variableQuantity === true ||
@@ -70,9 +81,14 @@ function resolveLineItemBreakdown(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  plannedProfitPercent = 0,
 ): PriceBreakdown {
-  return resolveEstimateLineItemPrices(item, catalogPositions, defaultHourlyRate)
-    .lineTotal;
+  return resolveEstimateLineItemPrices(
+    item,
+    catalogPositions,
+    defaultHourlyRate,
+    plannedProfitPercent,
+  ).lineTotal;
 }
 
 export function collectEstimateLineItems(
@@ -96,7 +112,9 @@ export function calculateEstimateTotals(
   categories: EstimateCategory[],
   catalogPositions: PositionPriceSummary[] = [],
   defaultHourlyRate: number | null = null,
+  plannedProfitPercent = 0,
 ): EstimateTotals {
+  const profitPercent = normalizePlannedProfitPercent(plannedProfitPercent);
   const totals: EstimateTotals = {
     labor: 0,
     materials: 0,
@@ -109,6 +127,7 @@ export function calculateEstimateTotals(
       item,
       catalogPositions,
       defaultHourlyRate,
+      profitPercent,
     );
     totals.labor += breakdown.labor;
     totals.materials += breakdown.materials;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserAvatar } from "@/app/components/user-avatar";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 import type { UserDisplay } from "@/app/lib/auth/map-user-display";
@@ -82,10 +82,15 @@ export function AppNav({
   allowedNavKeys = null,
 }: AppNavProps) {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const navItems =
     allowedNavKeys === null
       ? ALL_NAV_ITEMS
       : ALL_NAV_ITEMS.filter((item) => allowedNavKeys.includes(item.key));
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white">
@@ -97,18 +102,44 @@ export function AppNav({
                   ? isProjectsNavActive(pathname)
                   : pathname === item.href ||
                     pathname.startsWith(`${item.href}/`);
+              const isPending = pendingHref === item.href;
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative flex shrink-0 items-center whitespace-nowrap px-3 text-[13px] transition-colors md:px-3.5 ${
+                  onClick={(event) => {
+                    if (
+                      event.button !== 0 ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    ) {
+                      return;
+                    }
+
+                    if (isActive || isPending) {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    setPendingHref(item.href);
+                  }}
+                  aria-disabled={isPending}
+                  className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors md:px-3.5 ${
                     isActive
                       ? "font-medium text-zinc-900"
                       : "text-zinc-500 hover:text-zinc-800"
-                  }`}
+                  } ${isPending ? "pointer-events-none opacity-70" : ""}`}
                 >
                   {item.label}
+                  {isPending ? (
+                    <i
+                      className="fas fa-spinner animate-spin text-[11px]"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   {isActive ? (
                     <span
                       aria-hidden="true"

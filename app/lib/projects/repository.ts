@@ -845,6 +845,51 @@ export async function updateProjectEstimateDates(
   return { ok: true };
 }
 
+export async function updateProjectEstimatePlannedProfit(
+  projectId: string,
+  plannedProfitPercent: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const currentMeta = (data.meta ?? {}) as EstimateMeta;
+  const meta: EstimateMeta = { ...currentMeta };
+
+  if (plannedProfitPercent > 0) {
+    meta.plannedProfitPercent = plannedProfitPercent;
+  } else {
+    delete meta.plannedProfitPercent;
+  }
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās saglabāt plānoto peļņu." };
+  }
+
+  return { ok: true };
+}
+
 export async function omitProjectExcludedPosition(
   projectId: string,
   excludedPositionId: string,

@@ -43,6 +43,8 @@ import {
   isCompositeLineItem,
 } from "@/app/lib/estimates/composite-line-item";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
+import { useEstimatePlannedProfitPercent } from "@/app/components/estimate-planned-profit-context";
+import { applyPlannedProfitPercent } from "@/app/lib/estimates/planned-profit";
 import {
   EmptyVolumePriceCells,
   VolumeSumCells,
@@ -117,32 +119,38 @@ function resolveDisplayUnitPrice(
   defaultHourlyRate: number | null,
   readOnlyPrices: boolean,
   highlightStaleCatalogPrices: boolean,
+  plannedProfitPercent: number,
 ): PriceBreakdown {
   if (!item) {
     return { labor: 0, materials: 0, mechanisms: 0 };
   }
 
+  let baseUnitPrice: PriceBreakdown;
+
   if (highlightStaleCatalogPrices) {
-    return resolveFrozenEstimateDisplayUnitPrice(
+    baseUnitPrice = resolveFrozenEstimateDisplayUnitPrice(
       item,
       catalogPositions,
       defaultHourlyRate,
     );
-  }
-
-  if (readOnlyPrices) {
-    return resolveLiveDisplayUnitPrice(
+  } else if (readOnlyPrices) {
+    baseUnitPrice = resolveLiveDisplayUnitPrice(
       item,
       catalogPositions,
       defaultHourlyRate,
     );
+  } else if (isCompositeLineItem(item)) {
+    baseUnitPrice = deriveCompositeUnitPrice(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+    );
+  } else {
+    baseUnitPrice = item.unitPrice;
   }
 
-  if (isCompositeLineItem(item)) {
-    return deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
-  }
-
-  return item.unitPrice;
+  // Apply planned profit coefficient to all unit price components.
+  return applyPlannedProfitPercent(baseUnitPrice, plannedProfitPercent);
 }
 
 function EmptyHeaderMetricCells({
@@ -202,6 +210,7 @@ function MultiOptionSubRow({
   onTimeNormChange?: (value: number) => void;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
+  const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
   const label =
     option.lineItem.name.trim() ||
@@ -235,6 +244,7 @@ function MultiOptionSubRow({
     defaultHourlyRate,
     readOnlyPrices,
     highlightStaleCatalogPrices,
+    plannedProfitPercent,
   );
   const staleCatalogPriceHints = highlightStaleCatalogPrices
     ? resolveStaleCatalogPriceHints(
@@ -455,6 +465,7 @@ export function EstimateMultiPositionRow({
   moduleSizeOptions = [],
 }: EstimateMultiPositionRowProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const selectionOptions = getMultiPositionSelectionOptions(
     value,
     excludedSelectionKeys,
@@ -488,6 +499,7 @@ export function EstimateMultiPositionRow({
     defaultHourlyRate,
     readOnlyPrices,
     highlightStaleCatalogPrices,
+    plannedProfitPercent,
   );
   const showQuantityInput =
     selectedLineItem != null &&

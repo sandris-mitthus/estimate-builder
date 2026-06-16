@@ -70,6 +70,8 @@ export type EstimateMeta = {
   orderedMaterialPositionIds?: string[];
   /** Kataloga materiālu ID → piešķirtā lietotāja ID (pasūtīšanas atbildība). */
   materialAssigneeUserIds?: Record<string, string>;
+  /** Plānotā peļņa procentos — piemērota vienības cenām (darbs, materiāli, mehānismi). */
+  plannedProfitPercent?: number;
 };
 
 export type ProjectEstimate = {

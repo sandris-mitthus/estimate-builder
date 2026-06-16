@@ -28,6 +28,7 @@ import {
 import {
   saveProjectEstimateAction,
   updateProjectEstimateDatesAction,
+  updateProjectEstimatePlannedProfitAction,
 } from "@/app/(protected)/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useActionPermission } from "@/app/components/action-permissions-context";
@@ -43,6 +44,11 @@ import {
   VOLUME_PRICE_SUBHEADER_LABELS,
 } from "@/app/lib/estimates/volume-price-columns";
 import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
+import {
+  normalizePlannedProfitPercent,
+  parsePlannedProfitInput,
+  applyPlannedProfitPercent,
+} from "@/app/lib/estimates/planned-profit";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
   createLineItem,
@@ -59,6 +65,10 @@ import {
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
+import {
+  EstimatePlannedProfitProvider,
+  useEstimatePlannedProfitPercent,
+} from "@/app/components/estimate-planned-profit-context";
 import { IndividualProjectModuleDataSpotlight } from "@/app/components/individual-project-module-data-spotlight";
 import { ModuleVisualizationGallery } from "@/app/components/module-visualization-gallery";
 import { ApprovedEstimateStatusLabel } from "@/app/components/approved-estimate-status-label";
@@ -308,6 +318,7 @@ function LineItemRow({
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
 }) {
+  const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
@@ -331,13 +342,16 @@ function LineItemRow({
   const hasAttachedQuantity =
     !item.variableQuantity && hasModuleSizeAttachment(item) && attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? item.quantity;
-  const displayUnitPrice = highlightStaleCatalogPrices
-    ? resolveFrozenEstimateDisplayUnitPrice(
-        item,
-        catalogPositions,
-        defaultHourlyRate,
-      )
-    : resolveLiveDisplayUnitPrice(item, catalogPositions, defaultHourlyRate);
+  const displayUnitPrice = applyPlannedProfitPercent(
+    highlightStaleCatalogPrices
+      ? resolveFrozenEstimateDisplayUnitPrice(
+          item,
+          catalogPositions,
+          defaultHourlyRate,
+        )
+      : resolveLiveDisplayUnitPrice(item, catalogPositions, defaultHourlyRate),
+    plannedProfitPercent,
+  );
   const staleCatalogPriceHints = highlightStaleCatalogPrices
     ? resolveStaleCatalogPriceHints(
         item,
@@ -1511,6 +1525,7 @@ function MetaField({
   fullWidth = false,
   suffix,
   readOnly = false,
+  disabled = false,
 }: {
   label: string;
   value: string;
@@ -1519,9 +1534,12 @@ function MetaField({
   fullWidth?: boolean;
   suffix?: string;
   readOnly?: boolean;
+  disabled?: boolean;
 }) {
-  const fieldClassName =
-    "w-full border-0 bg-transparent pb-1.5 text-sm text-zinc-800 transition focus:outline-none";
+  const isInactive = readOnly || disabled;
+  const fieldClassName = `w-full border-0 bg-transparent pb-1.5 text-sm transition focus:outline-none ${
+    disabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-800"
+  }`;
 
   const inputElement =
     fullWidth && type === "text" ? (
@@ -1529,8 +1547,9 @@ function MetaField({
         rows={2}
         value={value}
         readOnly={readOnly}
+        disabled={disabled}
         onChange={
-          readOnly || !onChange
+          isInactive || !onChange
             ? undefined
             : (event) => onChange(event.target.value)
         }
@@ -1541,8 +1560,9 @@ function MetaField({
         type={type}
         value={value}
         readOnly={readOnly}
+        disabled={disabled}
         onChange={
-          readOnly || !onChange
+          isInactive || !onChange
             ? undefined
             : (event) => onChange(event.target.value)
         }
@@ -1551,19 +1571,31 @@ function MetaField({
     );
 
   return (
-    <label className="block w-full">
+    <label className={`block w-full ${disabled ? "cursor-not-allowed" : ""}`}>
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-400">
         {label}
       </span>
       {suffix ? (
-        <div className="flex items-center border-b border-zinc-200 transition focus-within:border-zinc-400">
+        <div
+          className={`flex items-center border-b border-zinc-200 transition ${
+            disabled ? "" : "focus-within:border-zinc-400"
+          }`}
+        >
           <div className="min-w-0 flex-1">{inputElement}</div>
-          <span className="shrink-0 border-l border-zinc-200 pl-2 text-sm text-zinc-500">
+          <span
+            className={`shrink-0 border-l border-zinc-200 pl-2 text-sm ${
+              disabled ? "text-zinc-400" : "text-zinc-500"
+            }`}
+          >
             {suffix}
           </span>
         </div>
       ) : (
-        <div className="border-b border-zinc-200 transition focus-within:border-zinc-400">
+        <div
+          className={`border-b border-zinc-200 transition ${
+            disabled ? "" : "focus-within:border-zinc-400"
+          }`}
+        >
           {inputElement}
         </div>
       )}
@@ -1647,6 +1679,9 @@ export function EstimateTable({
     : false;
   const editorLocked = estimateStatusLocked || !canSaveEstimate;
   const datesReadOnly = estimateStatusLocked || !canEditEstimateDates;
+  const plannedProfitPercent = normalizePlannedProfitPercent(
+    meta.plannedProfitPercent ?? 0,
+  );
 
   useEffect(() => {
     setMeta(initialMeta);
@@ -1856,8 +1891,9 @@ export function EstimateTable({
         categories,
         catalogPositions,
         defaultHourlyRate,
+        plannedProfitPercent,
       ),
-    [categories, catalogPositions, defaultHourlyRate],
+    [categories, catalogPositions, defaultHourlyRate, plannedProfitPercent],
   );
 
   const pendingMaterialsSummary = useMemo(
@@ -1928,24 +1964,26 @@ export function EstimateTable({
       </div>
 
       <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
-        <EstimateDndTable
-          categories={categories}
-          allDragIds={allDragIds}
-          setCategories={setCategories}
-          multiOptionLinks={multiOptionLinks}
-          setMultiOptionLinks={setMultiOptionLinks}
-          totals={totals}
-          onSyncCatalogPosition={flushSyncFromLineItem}
-          onScheduleCatalogSync={scheduleSyncFromLineItem}
-          catalogPositions={catalogPositions}
-          defaultHourlyRate={defaultHourlyRate}
-          currency={currency}
-          showQuantityColumn={showQuantityColumn}
-          moduleSizeOptions={moduleSizeOptions}
-          highlightStaleCatalogPrices={highlightStaleCatalogPrices}
-          mergedSagataveHighlightIds={mergedSagataveHighlightIds}
-          estimateLocked={editorLocked}
-        />
+        <EstimatePlannedProfitProvider percent={plannedProfitPercent}>
+          <EstimateDndTable
+            categories={categories}
+            allDragIds={allDragIds}
+            setCategories={setCategories}
+            multiOptionLinks={multiOptionLinks}
+            setMultiOptionLinks={setMultiOptionLinks}
+            totals={totals}
+            onSyncCatalogPosition={flushSyncFromLineItem}
+            onScheduleCatalogSync={scheduleSyncFromLineItem}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            showQuantityColumn={showQuantityColumn}
+            moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            mergedSagataveHighlightIds={mergedSagataveHighlightIds}
+            estimateLocked={editorLocked}
+          />
+        </EstimatePlannedProfitProvider>
       </div>
     </div>
   );
@@ -2030,6 +2068,29 @@ export function EstimateTable({
             onChange={(project) => setMeta({ ...meta, project })}
             fullWidth
           />
+          {project ? (
+            <MetaField
+              label="Plānotā peļņa"
+              value={
+                meta.plannedProfitPercent != null
+                  ? String(meta.plannedProfitPercent)
+                  : estimateStatusLocked
+                    ? "0"
+                    : ""
+              }
+              type="number"
+              suffix="%"
+              disabled={estimateStatusLocked}
+              readOnly={!estimateStatusLocked && editorLocked}
+              onChange={(raw) => {
+                const parsed = parsePlannedProfitInput(raw);
+                setMeta({
+                  ...meta,
+                  plannedProfitPercent: parsed > 0 ? parsed : undefined,
+                });
+              }}
+            />
+          ) : null}
           <div
             className={
               estimateStatusLocked

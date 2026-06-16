@@ -14,6 +14,7 @@ import {
   saveProjectEstimate,
   updateProject,
   updateProjectEstimateDates,
+  updateProjectEstimatePlannedProfit,
   updateProjectStatus,
 } from "@/app/lib/projects/repository";
 import type { ProjectStatus } from "@/app/lib/projects/project-status";
@@ -105,6 +106,25 @@ export async function updateProjectEstimateDatesAction(
   if (denied) return denied;
 
   const result = await updateProjectEstimateDates(projectId, dates);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
+export async function updateProjectEstimatePlannedProfitAction(
+  projectId: string,
+  plannedProfitPercent: number,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await updateProjectEstimatePlannedProfit(
+    projectId,
+    plannedProfitPercent,
+  );
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);

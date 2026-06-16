@@ -104,10 +104,12 @@ export async function buildEstimateExcel(
   defaultHourlyRate: number | null,
   vatNumber: string = "",
 ): Promise<Buffer> {
+  const plannedProfitPercent = meta.plannedProfitPercent ?? 0;
   const totals = calculateEstimateTotals(
     categories,
     catalogPositions,
     defaultHourlyRate,
+    plannedProfitPercent,
   );
 
   const workbook = new ExcelJS.Workbook();
@@ -222,6 +224,7 @@ export async function buildEstimateExcel(
       [cat],
       catalogPositions,
       defaultHourlyRate,
+      plannedProfitPercent,
     );
 
     // Category header row
@@ -250,6 +253,7 @@ export async function buildEstimateExcel(
         item,
         catalogPositions,
         defaultHourlyRate,
+        plannedProfitPercent,
       );
       addDataRow(ws, nr, item, unitPrice, lineTotal, "");
     }
@@ -272,6 +276,7 @@ export async function buildEstimateExcel(
           item,
           catalogPositions,
           defaultHourlyRate,
+          plannedProfitPercent,
         );
         addDataRow(ws, nr, item, unitPrice, lineTotal, "    ");
       }

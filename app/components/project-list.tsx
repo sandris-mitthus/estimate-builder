@@ -1,5 +1,11 @@
+"use client";
+
 import { ListEntryGrid } from "@/app/components/list-entry-card";
 import { ProjectCard } from "@/app/components/project-card";
+import {
+  isOptimisticProjectId,
+  useOptionalProjectsPageCreate,
+} from "@/app/components/projects-page-create-context";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
@@ -18,16 +24,33 @@ export function ProjectList({
   newSagatavePositionProjectIds = new Set(),
   pendingMaterialsProjectIds = new Set(),
 }: ProjectListProps) {
+  const pageCreate = useOptionalProjectsPageCreate();
+  const optimisticProject = pageCreate?.optimisticProject ?? null;
+
+  const displayProjects: ProjectSummary[] = optimisticProject
+    ? [optimisticProject, ...projects]
+    : projects;
+
   return (
     <ListEntryGrid>
-      {projects.map((project) => (
+      {displayProjects.map((project) => (
         <ProjectCard
           key={project.id}
           project={project}
           modules={modules}
-          hasStaleCatalogPrices={staleCatalogPriceProjectIds.has(project.id)}
-          hasNewSagatavePositions={newSagatavePositionProjectIds.has(project.id)}
-          hasPendingMaterials={pendingMaterialsProjectIds.has(project.id)}
+          isCreating={isOptimisticProjectId(project.id)}
+          hasStaleCatalogPrices={
+            !isOptimisticProjectId(project.id) &&
+            staleCatalogPriceProjectIds.has(project.id)
+          }
+          hasNewSagatavePositions={
+            !isOptimisticProjectId(project.id) &&
+            newSagatavePositionProjectIds.has(project.id)
+          }
+          hasPendingMaterials={
+            !isOptimisticProjectId(project.id) &&
+            pendingMaterialsProjectIds.has(project.id)
+          }
         />
       ))}
     </ListEntryGrid>
