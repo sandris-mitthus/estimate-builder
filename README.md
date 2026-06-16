@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.16` (see [Changelog](#changelog))
+**Current version:** `1.3.17` (see [Changelog](#changelog))
 
 ---
 
@@ -12,6 +12,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 ### Authentication
 
 - **Google OAuth** via Supabase — when not signed in, only a centered “Pierakstīties ar Google” button is shown (no nav or app content)
+- OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
@@ -154,7 +155,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `NEXT_PUBLIC_SUPABASE_URL` | DB + Auth | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | DB + Auth | Public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | DB + users list + settings + logo upload | Server only |
-| `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; OAuth redirect base |
+| `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; on Vercel set to `https://your-app.vercel.app` (server invites, CSP/HSTS); browser OAuth uses `window.location.origin` |
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
@@ -170,12 +171,31 @@ npm run db:migrate
 npm run db:test
 ```
 
-4. Enable **Google** provider: Authentication → Providers → Google
-5. Set redirect URLs: Authentication → URL Configuration  
-   - Site URL: `http://localhost:3100`  
-   - Redirect: `http://localhost:3100/auth/callback`
+4. Enable **Google** provider: Authentication → Providers → Google  
+   - **Callback URL (for OAuth)** in the Google provider screen is the Supabase URL (`https://<project-ref>.supabase.co/auth/v1/callback`) — register the same URI in Google Cloud → Authorized redirect URIs
+5. **Authentication → URL Configuration** (separate from the Google provider screen):  
+   - **Site URL:** production app URL (e.g. `https://your-app.vercel.app`); default `http://localhost:3000` causes post-login redirect to localhost with `?code=` on `/`  
+   - **Redirect URLs:** add every app callback you use, e.g.  
+     - `http://localhost:3100/auth/callback` (local dev)  
+     - `https://your-app.vercel.app/auth/callback` (production)
 6. *(Optional)* Disable public sign-ups in Authentication → Settings → User Signups (use invites only)
 7. Start the app — sign in, then `/` loads projects from `public.projects`
+
+### Vercel deployment
+
+1. Import the repo in [Vercel](https://vercel.com) (Framework Preset: **Next.js**)
+2. Add environment variables (same as `.env.example`; DB password only for local `npm run db:migrate`):
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key |
+| `NEXT_PUBLIC_SITE_URL` | `https://your-app.vercel.app` |
+
+3. **Redeploy** after changing any `NEXT_PUBLIC_*` variable (values are embedded at build time)
+4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
+5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
 **Schema:** `supabase/migrations/` — `projects` (…), `estimates` (…), `estimate_positions` (…), `position_prices` (…), `excluded_positions` (`031`), `building_modules` (…), `company_settings` (…), **`user_groups` + `user_group_members`** (`032`–`033`, JSON `permissions`, RLS deny), `schema_migrations`, Storage `company-assets` / `module-assets` (private, `028`)
 
@@ -323,6 +343,13 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.17
+
+**Vercel OAuth**
+
+- **`sign-in-with-google.ts`** — OAuth callback uses `window.location.origin` in the browser (fixes login redirect to localhost when `NEXT_PUBLIC_SITE_URL` is wrong at build time)
+- **README** — Vercel deployment and Supabase URL Configuration (Site URL + Redirect URLs vs Google provider callback)
 
 ### v1.3.16
 
