@@ -113,7 +113,7 @@ export function ProjectMaterialsDelegationPanel({
     });
   }
 
-  if (!showMaterialsColumn && users.length === 0) {
+  if (!showMaterialsColumn) {
     return null;
   }
 
@@ -123,34 +123,26 @@ export function ProjectMaterialsDelegationPanel({
       sensors={sensors}
       onDragEnd={handleDragEnd}
     >
-      <div
-        className={
-          showMaterialsColumn
-            ? "grid grid-cols-1 gap-6 lg:grid-cols-3"
-            : "grid grid-cols-1 gap-6"
-        }
-      >
-        {showMaterialsColumn ? (
-          <div
-            className={`lg:col-span-2 ${isPending ? "pointer-events-none opacity-90" : ""}`}
-          >
-            <ProjectMaterialsTable
-              projectId={projectId}
-              categories={categories}
-              catalogPositions={catalogPositions}
-              moduleSizeOptions={moduleSizeOptions}
-              orderedMaterialPositionIds={orderedMaterialPositionIds}
-              materialAssigneeUserIds={materialAssigneeUserIds}
-              users={users}
-              delegationEnabled={canAssignMaterials}
-              currency={currency}
-              useFrozenPrices={useFrozenPrices}
-              onMaterialOrdered={onMaterialOrdered}
-            />
-          </div>
-        ) : null}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div
+          className={`lg:col-span-2 ${isPending ? "pointer-events-none opacity-90" : ""}`}
+        >
+          <ProjectMaterialsTable
+            projectId={projectId}
+            categories={categories}
+            catalogPositions={catalogPositions}
+            moduleSizeOptions={moduleSizeOptions}
+            orderedMaterialPositionIds={orderedMaterialPositionIds}
+            materialAssigneeUserIds={materialAssigneeUserIds}
+            users={users}
+            delegationEnabled={canAssignMaterials}
+            currency={currency}
+            useFrozenPrices={useFrozenPrices}
+            onMaterialOrdered={onMaterialOrdered}
+          />
+        </div>
         {users.length > 0 ? (
-          <div className={showMaterialsColumn ? "lg:col-span-1" : ""}>
+          <div className="lg:col-span-1">
             <ProjectUsersPanel users={users} dragEnabled={canAssignMaterials} />
           </div>
         ) : null}

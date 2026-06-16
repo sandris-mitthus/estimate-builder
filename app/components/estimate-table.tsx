@@ -2030,7 +2030,13 @@ export function EstimateTable({
             onChange={(project) => setMeta({ ...meta, project })}
             fullWidth
           />
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          <div
+            className={
+              estimateStatusLocked
+                ? "grid grid-cols-1 gap-y-4"
+                : "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2"
+            }
+          >
             <MetaField
               label="Datums"
               type="date"
@@ -2038,25 +2044,27 @@ export function EstimateTable({
               readOnly={datesReadOnly}
               onChange={handleEstimateDateChange}
             />
-            <div>
-              <MetaField
-                label="Tāmes termiņš"
-                type="date"
-                value={meta.deadline}
-                readOnly={datesReadOnly}
-                onChange={handleEstimateDeadlineChange}
-              />
-              {!isDirty && isEstimateSaved && savedAt && meta.deadline ? (() => {
-                const days = daysUntilDeadline(meta.deadline);
-                if (days === null) return null;
-                const isExpired = days < 0;
-                return (
-                  <p className={`mt-1 text-[11px] font-medium ${isExpired ? "text-red-500" : "text-zinc-400"}`}>
-                    {formatDeadlineDays(days)}
-                  </p>
-                );
-              })() : null}
-            </div>
+            {!estimateStatusLocked ? (
+              <div>
+                <MetaField
+                  label="Tāmes termiņš"
+                  type="date"
+                  value={meta.deadline}
+                  readOnly={datesReadOnly}
+                  onChange={handleEstimateDeadlineChange}
+                />
+                {!isDirty && isEstimateSaved && savedAt && meta.deadline ? (() => {
+                  const days = daysUntilDeadline(meta.deadline);
+                  if (days === null) return null;
+                  const isExpired = days < 0;
+                  return (
+                    <p className={`mt-1 text-[11px] font-medium ${isExpired ? "text-red-500" : "text-zinc-400"}`}>
+                      {formatDeadlineDays(days)}
+                    </p>
+                  );
+                })() : null}
+              </div>
+            ) : null}
           </div>
         </div>
         </div>
