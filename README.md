@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.27` (see [Changelog](#changelog))
+**Current version:** `1.3.28` (see [Changelog](#changelog))
 
 ---
 
@@ -18,7 +18,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
-- **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers` vārds layoutā); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
+- **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas atsevišķā `Suspense` slotā, lai menu/lapas pārslēgšana negaida smagos materiālu vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers` vārds layoutā); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
 
 ### User groups and permissions
 
@@ -212,7 +212,7 @@ npm run db:test
 app/
 ├── layout.tsx          # Root layout; FeedbackToastProvider (vienīgais — Turbopack konteksts)
 ├── (protected)/      # Auth-gated routes (nav + pages)
-│   ├── layout.tsx      # Login gate or AppNav + ActionPermissionsProvider + AssignedMaterialsBanner + children
+│   ├── layout.tsx      # Login gate or AppNav + ActionPermissionsProvider + async AssignedMaterialsBanner + children
 │   ├── page.tsx        # Project list (/) + archive (?archive=1)
 │   ├── actions.ts      # create/update/delete project; save estimate; updateProjectEstimatePlannedProfitAction; omitProjectExcludedPositionAction; markProjectMaterialOrderedAction; assignProjectMaterialUserAction; updateProjectStatusAction; updateProjectEstimateDatesAction
 │   ├── project-module-actions.ts  # individual project viz/PDF blocks + project description
@@ -348,6 +348,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.28
+
+**Navigation performance**
+
+- **Protected layout** — global assigned-materials banner now loads in a separate `Suspense` slot, so page/menu transitions are no longer blocked by the banner's users, catalog, settings, project and estimate queries
+- **Auth request cache** — `getCurrentUser()` and `getCurrentUserAccess()` use React request caching to avoid duplicate Supabase auth/access lookups during one server render
+- **Assigned materials data** — `listUserAssignedMaterialGroups()` can reuse an already loaded catalog, avoiding an extra `listPositionPrices()` call from the layout banner path
 
 ### v1.3.27
 

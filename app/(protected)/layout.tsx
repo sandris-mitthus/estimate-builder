@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ActionPermissionsProvider } from "@/app/components/action-permissions-context";
 import { AppNav } from "@/app/components/app-nav";
 import { AssignedMaterialsBanner } from "@/app/components/assigned-materials-banner";
@@ -13,8 +14,53 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { listUsers } from "@/app/lib/users/repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
+import type { UserDisplay } from "@/app/lib/auth/map-user-display";
 
 export const dynamic = "force-dynamic";
+
+async function AssignedMaterialsBannerSlot({
+  currentUser,
+  currentUserId,
+}: {
+  currentUser: UserDisplay;
+  currentUserId: string;
+}) {
+  const [allUsers, catalogPositions, companySettings] = await Promise.all([
+    listUsers(),
+    listPositionPrices(),
+    getCompanySettings(),
+  ]);
+  const currentUserFromList = allUsers.find(
+    (listedUser) => listedUser.id === currentUserId,
+  );
+  const groups = await listUserAssignedMaterialGroups(currentUserId, {
+    relatedUserIds: resolveRelatedUserIds(
+      currentUserId,
+      currentUserFromList?.name ?? currentUser.name,
+      allUsers,
+    ),
+    allUsers,
+    catalogPositions,
+  });
+
+  if (groups.length === 0) {
+    return null;
+  }
+
+  return (
+    <AssignedMaterialsBanner
+      groups={groups}
+      catalogPositions={catalogPositions}
+      currency={companySettings.currency}
+      currentUser={{
+        id: currentUserId,
+        name: currentUser.name,
+        email: "",
+        avatarUrl: currentUser.avatarUrl,
+      }}
+    />
+  );
+}
 
 export default async function ProtectedLayout({
   children,
@@ -24,11 +70,6 @@ export default async function ProtectedLayout({
   let currentUser = null;
   let currentUserId: string | null = null;
   let allowedNavKeys: NavPermissionKey[] | null = null;
-  let assignedMaterialGroups: Awaited<
-    ReturnType<typeof listUserAssignedMaterialGroups>
-  > = [];
-  let catalogPositions: Awaited<ReturnType<typeof listPositionPrices>> = [];
-  let currency: string | null = null;
   let actionPermissions = createFullPermissions(true).actions;
 
   if (isSupabaseConfigured()) {
@@ -49,27 +90,6 @@ export default async function ProtectedLayout({
         .map(([key]) => key as NavPermissionKey);
       allowedNavKeys = navKeys.length > 0 ? navKeys : null;
     }
-
-    const [allUsers, positions, companySettings] = await Promise.all([
-      listUsers(),
-      listPositionPrices(),
-      getCompanySettings(),
-    ]);
-    const currentUserFromList = allUsers.find(
-      (listedUser) => listedUser.id === user.id,
-    );
-    const groups = await listUserAssignedMaterialGroups(user.id, {
-      relatedUserIds: resolveRelatedUserIds(
-        user.id,
-        currentUserFromList?.name ?? currentUserDisplay.name,
-        allUsers,
-      ),
-      allUsers,
-    });
-
-    assignedMaterialGroups = groups;
-    catalogPositions = positions;
-    currency = companySettings.currency;
   } else if (process.env.NODE_ENV === "production") {
     return <LoginGate />;
   }
@@ -77,18 +97,13 @@ export default async function ProtectedLayout({
   return (
     <ActionPermissionsProvider actions={actionPermissions}>
       <AppNav currentUser={currentUser} allowedNavKeys={allowedNavKeys} />
-      {currentUser && currentUserId && assignedMaterialGroups.length > 0 ? (
-        <AssignedMaterialsBanner
-          groups={assignedMaterialGroups}
-          catalogPositions={catalogPositions}
-          currency={currency}
-          currentUser={{
-            id: currentUserId,
-            name: currentUser.name,
-            email: "",
-            avatarUrl: currentUser.avatarUrl,
-          }}
-        />
+      {currentUser && currentUserId ? (
+        <Suspense fallback={null}>
+          <AssignedMaterialsBannerSlot
+            currentUser={currentUser}
+            currentUserId={currentUserId}
+          />
+        </Suspense>
       ) : null}
       {children}
     </ActionPermissionsProvider>

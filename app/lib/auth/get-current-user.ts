@@ -1,7 +1,8 @@
+import { cache } from "react";
 import { createClient } from "@/app/lib/supabase/server";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async function getCurrentUser() {
   if (!isSupabaseConfigured()) {
     return null;
   }
@@ -12,4 +13,4 @@ export async function getCurrentUser() {
   } = await supabase.auth.getUser();
 
   return user;
-}
+});

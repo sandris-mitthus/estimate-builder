@@ -40,6 +40,7 @@ type EstimateAssignmentRow = {
 type ListUserAssignedMaterialGroupsOptions = {
   relatedUserIds?: string[];
   allUsers?: UserSummary[];
+  catalogPositions?: PositionPriceSummary[];
 };
 
 function resolveMatchingUserIds(
@@ -180,7 +181,9 @@ export async function listUserAssignedMaterialGroups(
 
   const [projects, catalogPositions, sagatave] = await Promise.all([
     listAllProjects(),
-    listPositionPrices(),
+    options.catalogPositions
+      ? Promise.resolve(options.catalogPositions)
+      : listPositionPrices(),
     ensureDefaultEstimatePosition(),
   ]);
 

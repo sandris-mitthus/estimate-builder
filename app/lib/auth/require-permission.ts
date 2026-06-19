@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import {
   type ActionPermissionKey,
@@ -30,7 +31,7 @@ export async function requireAction(permission: ActionPermissionKey) {
   return result;
 }
 
-export async function getCurrentUserAccess(): Promise<{
+export const getCurrentUserAccess = cache(async function getCurrentUserAccess(): Promise<{
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   access: UserAccess;
 } | null> {
@@ -45,7 +46,7 @@ export async function getCurrentUserAccess(): Promise<{
   }
 
   return { user, access };
-}
+});
 
 export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
   const hrefs: string[] = [];
