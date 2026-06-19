@@ -1,11 +1,10 @@
-import { parseModuleContentBlocks } from "@/app/lib/modules/parse-blocks";
 import {
   deleteModuleBlockFiles,
   uploadProjectBlockFile,
 } from "@/app/lib/modules/file-storage";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
-import { parseProjectDescriptionFormState } from "@/app/lib/modules/parse-project-description";
-import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { parseProjectModuleBlocks } from "@/app/lib/projects/project-module-utils";
 import type { UpdateProjectModuleBlocksInput, UpdateProjectProjectDescriptionInput } from "@/app/lib/projects/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
@@ -18,11 +17,17 @@ async function getProjectModuleBlocks(projectId: string): Promise<{
     return { visualizationBlocks: [], projectBlocks: [] };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return null;
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("projects")
     .select("visualization_blocks, project_blocks")
     .eq("id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -39,6 +44,11 @@ export async function updateProjectModuleBlocks(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("projects")
@@ -46,7 +56,8 @@ export async function updateProjectModuleBlocks(
       visualization_blocks: input.visualizationBlocks,
       project_blocks: input.projectBlocks,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt bloku secību." };
@@ -62,11 +73,17 @@ export async function updateProjectProjectDescription(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("projects")
     .update({ project_description: input.projectDescription })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt projekta aprakstu." };
@@ -151,23 +168,3 @@ export async function removeProjectModuleBlock(
   return { ok: true };
 }
 
-export function parseProjectModuleBlocks(row: {
-  visualization_blocks?: unknown;
-  project_blocks?: unknown;
-  project_description?: unknown;
-}) {
-  return {
-    visualizationBlocks: parseModuleContentBlocks(row.visualization_blocks),
-    projectBlocks: parseModuleContentBlocks(row.project_blocks),
-    projectDescription: parseProjectDescriptionFormState(row.project_description),
-  };
-}
-
-export function isIndividualProjectModuleDataComplete(project: {
-  visualizationBlocks: ModuleContentBlock[];
-  projectBlocks: ModuleContentBlock[];
-}): boolean {
-  return (
-    project.visualizationBlocks.length > 0 && project.projectBlocks.length > 0
-  );
-}

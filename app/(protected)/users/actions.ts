@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { requireAction } from "@/app/lib/auth/require-permission";
 import type { PermissionSet } from "@/app/lib/auth/permissions";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
@@ -8,7 +9,11 @@ import {
   assignUserToGroup,
   updateUserGroupPermissions,
 } from "@/app/lib/users/groups-repository";
-import { inviteUser } from "@/app/lib/users/repository";
+import {
+  inviteUser,
+  removeCompanyUser,
+  updateCompanyUserStatus,
+} from "@/app/lib/users/repository";
 
 export async function inviteUserAction(email: string) {
   const { denied } = await requireAction("users.invite");
@@ -53,6 +58,49 @@ export async function updateUserGroupPermissionsAction(
 
   if (result.ok) {
     revalidatePath("/users/groups");
+    revalidatePath("/", "layout");
+  }
+
+  return result;
+}
+
+export async function setCompanyUserAccessAction(
+  userId: string,
+  status: "active" | "disabled",
+) {
+  const { denied, user } = await requireAction("users.manage_company_access");
+  if (denied) return denied;
+
+  if (user?.id === userId && status === "disabled") {
+    return { ok: false as const, error: "Nevar liegt pieeju pašam sev." };
+  }
+
+  const result = await updateCompanyUserStatus(userId, status);
+
+  if (result.ok) {
+    revalidatePath("/users");
+    revalidatePath("/", "layout");
+  }
+
+  return result;
+}
+
+export async function removeCompanyUserAction(userId: string) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return { ok: false as const, error: "Nav autorizācijas." };
+  }
+
+  const isSelf = currentUser.id === userId;
+  if (!isSelf) {
+    const { denied } = await requireAction("users.manage_company_access");
+    if (denied) return denied;
+  }
+
+  const result = await removeCompanyUser(userId);
+
+  if (result.ok) {
+    revalidatePath("/users");
     revalidatePath("/", "layout");
   }
 

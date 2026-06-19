@@ -2,6 +2,7 @@ import Link from "next/link";
 import { InviteUserButton } from "@/app/components/invite-user-button";
 import { ListEntryGrid } from "@/app/components/list-entry-card";
 import { SectionPage } from "@/app/components/section-page";
+import { UserCompanyActions } from "@/app/components/user-company-actions";
 import { UserGroupSelect } from "@/app/components/user-group-select";
 import { UserListCard } from "@/app/components/user-list-card";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
@@ -12,6 +13,18 @@ import {
   getDefaultNewUserGroupId,
 } from "@/app/lib/users/groups-repository";
 import { listUsers } from "@/app/lib/users/repository";
+
+function statusLabel(status: (Awaited<ReturnType<typeof listUsers>>)[number]["companyStatus"]) {
+  if (status === "disabled") {
+    return "Pieeja liegta";
+  }
+
+  if (status === "invited") {
+    return "Uzaicināts";
+  }
+
+  return null;
+}
 
 export default async function UsersPage() {
   const session = await assertNavAccess("users");
@@ -28,6 +41,10 @@ export default async function UsersPage() {
   const canInvite = canPerformAction(session.access, "users.invite");
   const canAssignGroup = canPerformAction(session.access, "users.assign_group");
   const canManageGroups = canPerformAction(session.access, "groups.manage");
+  const canManageCompanyAccess = canPerformAction(
+    session.access,
+    "users.manage_company_access",
+  ) || canManageGroups;
 
   const defaultGroupId = getDefaultNewUserGroupId(groups);
 
@@ -57,12 +74,26 @@ export default async function UsersPage() {
             name={user.name}
             email={user.email}
             avatarUrl={user.avatarUrl}
+            statusLabel={statusLabel(user.companyStatus)}
+            actions={
+              <UserCompanyActions
+                userId={user.id}
+                userName={user.name}
+                status={user.companyStatus}
+                canManageCompanyAccess={canManageCompanyAccess}
+                isCurrentUser={
+                  session.user?.id === user.id ||
+                  session.user?.email?.toLowerCase() === user.email.toLowerCase()
+                }
+              />
+            }
             footer={
               canAssignGroup ? (
                 <UserGroupSelect
                   userId={user.id}
                   groupId={memberships[user.id] ?? defaultGroupId}
                   groups={groups}
+                  disabled={user.companyStatus === "disabled"}
                 />
               ) : null
             }

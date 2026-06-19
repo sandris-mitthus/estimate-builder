@@ -19,6 +19,7 @@ import {
   buildEstimatePositionSectionsStorage,
   parseEstimatePositionDocumentPayload,
 } from "@/app/lib/estimate-positions/serialize-document";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
@@ -438,9 +439,15 @@ export async function propagateLaborTimeNormsFromProject(
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
     .select("id, status")
+    .eq("company_id", companyId)
     .neq("id", sourceProjectId);
 
   if (projectsError) {
@@ -458,6 +465,7 @@ export async function propagateLaborTimeNormsFromProject(
   const { data: estimateRows, error: estimatesError } = await supabase
     .from("estimates")
     .select("project_id, title, meta, categories")
+    .eq("company_id", companyId)
     .in("project_id", eligibleProjectIds);
 
   if (estimatesError) {
@@ -488,7 +496,8 @@ export async function propagateLaborTimeNormsFromProject(
     const { error } = await supabase
       .from("estimates")
       .update({ categories })
-      .eq("project_id", row.project_id as string);
+      .eq("project_id", row.project_id as string)
+      .eq("company_id", companyId);
 
     if (error) {
       return { ok: false, error: "Neizdevās sinhronizēt laika normu citos projektos." };

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   createFullPermissions,
   type NavPermissionKey,
@@ -31,6 +31,8 @@ function getDevAccessSession(): CurrentUserAccess | null {
     user: null,
     access: {
       userId: "local-dev",
+      companyId: null,
+      companyRole: null,
       group: {
         id: "local-dev-admin",
         slug: "admin",
@@ -52,7 +54,7 @@ export async function assertNavAccess(
   }
 
   if (!canAccessNav(session.access, navKey)) {
-    notFound();
+    redirect("/");
   }
 
   return session;

@@ -1,76 +1,22 @@
 import { createAdminClient } from "@/app/lib/supabase/admin";
+import {
+  BOOTSTRAP_COMPANY_ID,
+  getCurrentCompanyId,
+} from "@/app/lib/companies/current-company";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
+import {
+  getImageExtension,
+  validateModuleBlockFile,
+} from "@/app/lib/modules/file-validation";
 import { moduleAssetProxyUrl } from "@/app/lib/modules/resolve-block-asset";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
 
 export const MODULE_ASSETS_BUCKET = "module-assets";
-export const MODULE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-export const MODULE_PDF_MAX_BYTES = 20 * 1024 * 1024;
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-]);
-
-const ALLOWED_PROJECT_TYPES = new Set(["application/pdf"]);
 
 function sanitizeFileName(name: string): string {
   const base = name.trim().replace(/[/\\?%*:|"<>]/g, "-");
   return base.length > 0 ? base : "fails";
-}
-
-function getImageExtension(mimeType: string): string | null {
-  switch (mimeType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/gif":
-      return "gif";
-    default:
-      return null;
-  }
-}
-
-export function validateModuleImageFile(file: File) {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Vizualizācijām atbalstīti tikai attēli (PNG, JPG, WEBP, GIF).",
-    };
-  }
-
-  if (file.size > MODULE_IMAGE_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "Attēls nedrīkst būt lielāks par 10 MB.",
-    };
-  }
-
-  return { ok: true as const };
-}
-
-export function validateModuleProjectFile(file: File) {
-  if (!ALLOWED_PROJECT_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Projekta sadaļai atbalstīti tikai PDF faili.",
-    };
-  }
-
-  if (file.size > MODULE_PDF_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "PDF fails nedrīkst būt lielāks par 20 MB.",
-    };
-  }
-
-  return { ok: true as const };
 }
 
 function blockFolder(kind: ModuleBlockKind): string {
@@ -79,7 +25,16 @@ function blockFolder(kind: ModuleBlockKind): string {
 
 export type ModuleBlockStorageScope = "module" | "project";
 
-function storageRoot(scope: ModuleBlockStorageScope, ownerId: string): string {
+function storageRoot(
+  scope: ModuleBlockStorageScope,
+  ownerId: string,
+  companyId: string,
+): string {
+  const ownerFolder = scope === "module" ? "modules" : "projects";
+  return `companies/${companyId}/${ownerFolder}/${ownerId}`;
+}
+
+function legacyStorageRoot(scope: ModuleBlockStorageScope, ownerId: string): string {
   return scope === "module" ? `modules/${ownerId}` : `projects/${ownerId}`;
 }
 
@@ -93,10 +48,7 @@ export async function uploadScopedBlockFile(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
-  const validation =
-    kind === "visualization"
-      ? validateModuleImageFile(file)
-      : validateModuleProjectFile(file);
+  const validation = validateModuleBlockFile(kind, file);
 
   if (!validation.ok) {
     return validation;
@@ -109,7 +61,12 @@ export async function uploadScopedBlockFile(
 
   const blockId = crypto.randomUUID();
   let storagePath: string;
-  const root = storageRoot(scope, ownerId);
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const root = storageRoot(scope, ownerId, companyId);
 
   if (kind === "visualization") {
     const extension = getImageExtension(file.type);
@@ -191,19 +148,29 @@ async function deleteAllScopedBlockFiles(
   }
 
   const supabase = createAdminClient();
-  const root = storageRoot(scope, ownerId);
-  const prefixes = [
-    `${root}/visualizations`,
-    `${root}/project`,
-  ];
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return;
+  }
 
-  for (const prefix of prefixes) {
-    const { data } = await supabase.storage.from(MODULE_ASSETS_BUCKET).list(prefix);
+  const roots = [storageRoot(scope, ownerId, companyId)];
+  if (companyId === BOOTSTRAP_COMPANY_ID) {
+    roots.push(legacyStorageRoot(scope, ownerId));
+  }
 
-    if (!data?.length) continue;
+  for (const root of roots) {
+    const prefixes = [`${root}/visualizations`, `${root}/project`];
 
-    await supabase.storage
-      .from(MODULE_ASSETS_BUCKET)
-      .remove(data.map((file) => `${prefix}/${file.name}`));
+    for (const prefix of prefixes) {
+      const { data } = await supabase.storage
+        .from(MODULE_ASSETS_BUCKET)
+        .list(prefix);
+
+      if (!data?.length) continue;
+
+      await supabase.storage
+        .from(MODULE_ASSETS_BUCKET)
+        .remove(data.map((file) => `${prefix}/${file.name}`));
+    }
   }
 }

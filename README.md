@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.28` (see [Changelog](#changelog))
+**Current version:** `1.3.30` (see [Changelog](#changelog))
 
 ---
 
@@ -20,16 +20,16 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
 - **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas atsevišķā `Suspense` slotā, lai menu/lapas pārslēgšana negaida smagos materiālu vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers` vārds layoutā); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
 
-### User groups and permissions
+### Multi-company users, groups and permissions
 
-- **4 noklusējuma grupas** (DB `user_groups`, migrācija `032`): **Administrators**, **Projektu vadītājs**, **Materiālu pasūtīšana**, **Skatītājs** — katrai savas navigācijas un darbību tiesības (`app/lib/auth/permissions.ts`)
-- **`/users`** — katram lietotājam grupas izvēle (`user-group-select.tsx`); **Uzaicināt** (ja `users.invite`); saite **Grupas un tiesības** (ja `groups.manage`)
-- **`/users/groups`** — matrica: ko grupa redz izvēlnē un ko drīkst darīt (`user-groups-permissions-form.tsx`); saglabāšana ar `updateUserGroupPermissionsAction`
-- **Jauns lietotājs** — reģistrācija/uzaicinājums **neuzstāda** grupu; **pirmajā piekļuvē** bez membership automātiski piešķirts **Skatītājs** (`ensureUserDefaultMembership`); administrators `/users` var paaugstināt grupu
+- **Sistēmas administrators** — globāls profils `public.users.is_admin`; dashboardā rāda informatīvu bloku, bet uzņēmuma tiesības joprojām nāk no uzņēmuma grupas
+- **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
+- **4 noklusējuma uzņēmuma grupas** (`company_user_groups`, migrācija `035`): **Administrators**, **Projektu vadītājs**, **Materiālu pasūtīšana**, **Skatītājs** — katrai savas navigācijas un darbību tiesības (`app/lib/auth/permissions.ts`)
+- **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
+- **Bloķēta pieeja** — `company_users.status = disabled`; lietotājs paliek sarakstā ar birku **Pieeja liegta**, bet aktīvais uzņēmums viņam netiek atgriezts
+- **`/users/groups`** — matrica: ko uzņēmuma grupa redz izvēlnē un ko drīkst darīt (`user-groups-permissions-form.tsx`); jaunā atļauja `users.manage_company_access` kontrolē bloķēšanu un noņemšanu; `036` migrācija pievieno šo atslēgu esošajiem grupu JSON datiem
 - **Eforcēšana** — `requireAction()` server actions; `assertNavAccess()` lapās; `AppNav` filtrēts pēc `permissions.nav`; PDF/Excel prasa `estimate.export`
-- **UI ↔ tiesības** — `ActionPermissionsProvider` + `useActionPermission()` (`action-permissions-context.tsx`); pogas/darbības slēptas pēc `permissions.actions` (projekti, tāme, sagatave, moduļi, pozīcijas, materiāli, settings)
-- **Administrators** — pilnas tiesības `getUserAccess()` (`createFullPermissions(true)`); nav `slug` apiešanas kodā; saglabāšanā admin grupai vienmēr pilns `permissions` JSON
-- **Migrācijas** — `032_user_groups.sql` (tabulas + RLS deny + sēkla); `033_repair_admin_group_memberships.sql` (admin tiesību atjaunošana + membership bez grupas → admin)
+- **UI ↔ tiesības** — `ActionPermissionsProvider` + `useActionPermission()` (`action-permissions-context.tsx`); pogas/darbības slēptas pēc `permissions.actions` (projekti, tāme, sagatave, moduļi, pozīcijas, materiāli, users, settings)
 
 ### Navigation
 
@@ -52,8 +52,8 @@ English routes, Latvian labels:
 - **Ēku moduļi** (`/modules`, `/modules/[id]`) — module catalog in Supabase (`building_modules`); **Pievienot Moduli** (name only); cards with **Labot** / **Dzēst**; klikšķis uz kartes — tāds pats navigācijas loading overlay kā projektiem; red **`fa-house-damage`** icon + tooltip **Nav ievadīti moduļu dati** when viz or project PDF missing; click name opens detail: left column **Vizualizācijas** (image upload grid, 2 per row, drag reorder; spinner līdz ielādējās) + **Projekts** (PDF only, same grid; PDF thumbnail ar spinneri); right column **Projekta apraksts** (Pamats, L veida pamats, izgriezumi, Sienas ar **Frontoni** — augstums, skaits, pamata plakne; platums × augstums / 2 × skaits pieskaitīts ārsienu neto kvadratūrai; Logi, Durvis, Jumts — calculated fields, **Saglabāt** persists `project_description` JSON); **aptaksts** outline list below; empty states; toasts on file actions
 - **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON) un **fa-stream** (dzeltens ieslēgts — paslēpt pozīciju cenas piedāvājumā; `hiddenPricesInOffer` JSON); **pozīcijām tieši zem kategorijas** (ne sub) — **acs** darbību zonā (`hiddenPriceInOffer`; dzeltens `eye-slash` ieslēgts; acs vienmēr redzama kad cena paslēpta, labot/dzēst tikai hover); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāli · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `materials[]`, `mechanisms[]` (kataloga atsauces masīvi; vairāki materiāli summējas, vairāki mehānismi summējas × laika norma); Darbs = laika norma × stundas likme; **Laika norma** tieši rediģējama tabulā (`LaborTimeNormInput` — vienkāršs input, live pārrēķins); pozīciju / multi modāļos — `−`/`+` stepper (0,01, centrēts skaitlis); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāli/Mehānismi šūnās tooltip ar kataloga nosaukumu (ja vairāki — komatu atdalīti); rinda **sarkanā tonī** + `fa-exclamation-triangle` + teksts **Nav pievienots moduļa apjoms** pozīcijām bez `moduleSizeAttachment`, kad moduļu lielumi definēti; pozīciju modālī slēdzis **Manuāli norādīta mērvienība** (`manualUnitEnabled` / `manualUnit`) ar select no tāmē jau lietotajām mērvienībām — materiāliem ar citu mērvienību rāda patēriņu uz izvēlēto; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; katras opcijas apakšā cenu kopsāvilkums (Darbs / Materiāli / Mehānismi / Vienības cena); **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder; **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
 - **Pozicijas** (`/positions`) — **materiālu un mehānismu** unit-price katalogs Supabase (`position_prices`; **Darbs** — no **Uzstādījumi** stundas likmes, ne šeit); searchable sortable table; kompakts **Veids** filtrs zem meklēšanas (**Visi** / **Materiāls** / **Mehānismi**); columns **Nosaukums**, **Veids**, **Cena** (`2.91 EUR / gab.` + update date; bez cenas `- EUR / gab.`), **Darbības**; **Pievienot pozīciju** / **Labot** modals (tikai Materiāls / Mehānismi — cost-type radio above name + unit with hints, 80/20; optional **mainīgs apjoms** toggle — enables editable **Apj.** cell in project estimates for linked rows); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); **Vēsture** row action opens extra-wide modal with price log (date, amount, “No …” delta, supplier on two lines with phone/email icons); ielādes stāvoklī spinneris pirms **Ielādē vēsturi…**; row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`; **nosaukums / mērvienība** atjaunināti arī no sagataves vai projekta tāmes, ja rinda saistīta ar katalogu (`positionPriceId` vai unikāla nosaukuma atbilstība)
-- **Neiekļautās pozīcijas** (`/excluded-positions`) — uzņēmuma līmeņa saraksts pozīcijām, kas **nav iekļautas piedāvājumā**; pievienošana pa vienai (nosaukums); drag-and-drop secība; labošana / dzēšana; glabājas `excluded_positions` (`031` migrācija)
-- **Lietotāji** — Supabase Auth users (name, email, Google avatar); grupas piešķiršana un uzaicinājumi — skat. **User groups and permissions** augstāk
+- **Neiekļautās pozīcijas** (`/excluded-positions`) — uzņēmuma līmeņa saraksts pozīcijām, kas **nav iekļautas piedāvājumā**; pievienošana pa vienai (nosaukums); drag-and-drop secība; labošana / dzēšana; glabājas `excluded_positions` ar `company_id` (`031`, multi-company scope `035`)
+- **Lietotāji** — Supabase Auth users + `public.users` profils; uzņēmuma membership, grupas, bloķēšana un noņemšana — skat. **Multi-company users, groups and permissions** augstāk
 - **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo, piedāvājuma derīgums un piezīmes)
 
 ### Company settings (`/settings`)
@@ -66,9 +66,9 @@ English routes, Latvian labels:
 - **Darbinieka standarta stundas likme** — optional decimal; currency suffix from company settings (e.g. `EUR`)
 - **Piedāvājuma derīguma termiņš** — integer days (suffix **dienas**); default **30**; sadaļā **Piedāvājums**; PDF rāda treknrakstā **Piedāvājums spēkā X dienas** (pirms paraksta bloka)
 - **Papildus informācija piedāvājumam** — textarea sadaļā **Piedāvājums**; katra rinda = atsevišķs komentārs; priekšskatījumā un PDF piedāvājumā (pirms paraksta bloka); tukšas rindas netiek rādītas
-- **Logo upload** — drag-and-drop or file picker → Supabase Storage (`company-assets` bucket)
+- **Logo upload** — drag-and-drop or file picker → Supabase Storage (`company-assets` bucket, path `companies/{companyId}/logo.*`)
 - Live preview of company block on the right (wider sidebar column)
-- Persisted in `public.company_settings` (singleton row)
+- Persisted in `public.company_settings` per company (`company_id`)
 
 ### Estimate editor (`/[id]`)
 
@@ -102,6 +102,8 @@ English routes, Latvian labels:
 
 - **Supabase** (Postgres + Storage) when env is configured
 - Falls back to in-memory sample data only when Supabase is **not** configured (configured DB with zero projects shows empty list, not seed cards)
+- **Multi-company scoping** — projects, estimates, settings, modules, position prices/history, sagatave, excluded positions and private storage assets are scoped by active `company_id`
+- **Company access** — `public.users.is_admin` marks system admins; `company_users` controls company membership/status; `company_user_groups` + `company_group_members` control per-company permissions
 - Estimate **full state** (title, meta, categories with baked-in prices) persisted via **Saglabāt tāmi** server action; dates also auto-saved on change
 - `npm run db:migrate` applies only **pending** migrations (tracked in `public.schema_migrations`)
 - App tables use **service-role server access** with RLS deny policies for browser clients
@@ -136,6 +138,8 @@ npm run dev
 ```
 
 Open [http://localhost:3100](http://localhost:3100) — project list at `/` (login gate if Supabase auth is configured).
+
+**Repo layout note:** root-level `npm run dev` delegates into the nested `estimate-builder/` app directory, so restarts keep Next.js pointed at the same codebase that contains `app/`.
 
 **Local dev tip:** Multiple Supabase apps on `localhost` share cookies and can trigger HTTP **431** (headers too large). Use `127.0.0.1` for one app, or clear `sb-*` cookies; `dev`/`start` scripts raise the header limit and middleware prunes foreign Supabase cookies.
 
@@ -202,7 +206,7 @@ npm run db:test
 4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
 5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
-**Schema:** `supabase/migrations/` — `projects` (…), `estimates` (…), `estimate_positions` (…), `position_prices` (…), `excluded_positions` (`031`), `building_modules` (…), `company_settings` (…), **`user_groups` + `user_group_members`** (`032`–`033`, JSON `permissions`, RLS deny), `schema_migrations`, Storage `company-assets` / `module-assets` (private, `028`)
+**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
 
 ---
 
@@ -223,7 +227,7 @@ app/
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads, project description)
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
 │   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
-│   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, updateUserGroupPermissionsAction
+│   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, updateUserGroupPermissionsAction, setCompanyUserAccessAction, removeCompanyUserAction
 │   └── settings/
 ├── api/
 │   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
@@ -237,6 +241,7 @@ app/
 ├── components/         # UI (estimate-table, restore-sagatave-positions-modal, navigation-loading-context, action-permissions-context, project-materials-table, …)
 ├── lib/
 │   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
+│   ├── companies/      # current company resolution and bootstrap company id
 │   ├── client/         # cookie read/write helpers
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, sagatave-has-new-positions, project-estimate-base, sync-subcategory-offer-visibility, labor-time-norm-sync, default sagatave
 │   ├── excluded-positions/  # repository, resolve-project-excluded-positions (global list + per-project omissions)
@@ -245,18 +250,18 @@ app/
 │   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-collapsed-estimate-sections, use-assigned-materials-banner-expanded
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
-│   ├── modules/        # repository, outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (module-assets)
-│   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, has-defined-labor, variable-quantity, stale-catalog-price, filter-positions (catalog filter + search)
-│   ├── projects/       # repository, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
-│   ├── settings/       # company settings, vat-breakdown, offer-additional-info, logo storage, IBAN bank resolve, currencies
-│   ├── users/          # Auth user list, invite, groups-repository (membership + permissions)
+│   ├── modules/        # repository, outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (company-scoped module-assets), file-validation
+│   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, sync-estimate-line-items-to-catalog, has-defined-labor, variable-quantity, stale-catalog-price, filter-positions
+│   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
+│   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation, IBAN bank resolve, currencies
+│   ├── users/          # Auth user list, public.users sync, company membership status, invite, groups-repository (company membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone
 │   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
 │   └── supabase/       # clients, update-session (session refresh + auth redirect), storage-key cookie cleanup
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–033 (032 = user_groups; 033 = admin repair)
+supabase/migrations/    # 001–036 (034 = users.is_admin; 035 = multi-company foundation; 036 = company user access permission)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -348,6 +353,26 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### Unreleased
+
+- (none)
+
+### v1.3.30
+
+**Company user access UX fixes**
+
+- `/users` unauthorized access now redirects to the project list instead of showing a 404
+- `036_company_user_manage_access_permission.sql` backfills `users.manage_company_access` into existing company/user group permission JSON so the checkbox and card actions appear consistently
+- Root npm scripts now delegate into the nested `estimate-builder/` app directory, preventing dev-server restarts from serving an older parent workspace bundle
+
+### v1.3.29
+
+**Multi-company users and tenant scoping**
+
+- **Multi-company foundation** — `034_users_system_admin.sql` and `035_multi_company_foundation.sql` add `public.users.is_admin`, `companies`, `company_users`, company groups/memberships, and `company_id` scoping for projects, estimates, settings, modules, catalogs, sagatave, excluded positions and price history
+- **Company user management** — `/users` cards now support company access lock/unlock and remove/leave actions with `ConfirmModal`; new `users.manage_company_access` permission appears under group action permissions
+- **Company-scoped assets and repositories** — logo and module/project files use `companies/{companyId}/...` storage paths, and server repositories/API routes enforce the active company context
 
 ### v1.3.28
 

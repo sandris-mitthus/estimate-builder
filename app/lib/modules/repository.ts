@@ -13,6 +13,7 @@ import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/projec
 import { SAMPLE_MODULE_BLOCKS } from "@/app/lib/modules/sample-blocks";
 import { SAMPLE_MODULE_OUTLINES } from "@/app/lib/modules/sample-outlines";
 import { SAMPLE_BUILDING_MODULES } from "@/app/lib/modules/sample-modules";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import type {
   BuildingModuleDetail,
   BuildingModuleSizeOption,
@@ -92,10 +93,16 @@ export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
     return SAMPLE_BUILDING_MODULES;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return SAMPLE_BUILDING_MODULES;
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
     .select("id, name, visualization_blocks, project_blocks")
+    .eq("company_id", companyId)
     .order("name", { ascending: true });
 
   if (error || !data) {
@@ -112,10 +119,16 @@ export async function listBuildingModuleSizeOptions(): Promise<
     return [];
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
     .select("id, name, project_description")
+    .eq("company_id", companyId)
     .order("name", { ascending: true });
 
   if (error && isMissingColumnError(error, "project_description")) {
@@ -152,11 +165,17 @@ export async function getBuildingModule(
     return getSampleBuildingModule(id);
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return getSampleBuildingModule(id);
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
     .select("id, name, outline, visualization_blocks, project_blocks, project_description")
     .eq("id", id)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (!error && data) {
@@ -168,6 +187,7 @@ export async function getBuildingModule(
       .from("building_modules")
       .select("id, name, outline, visualization_blocks, project_blocks")
       .eq("id", id)
+      .eq("company_id", companyId)
       .maybeSingle();
 
     if (!legacy.error && legacy.data) {
@@ -198,10 +218,15 @@ export async function createBuildingModule(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .insert({ name })
+    .insert({ company_id: companyId, name })
     .select("id")
     .single();
 
@@ -226,11 +251,17 @@ export async function updateBuildingModule(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("building_modules")
     .update({ name })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt moduli." };
@@ -246,6 +277,11 @@ export async function updateBuildingModuleBlocks(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("building_modules")
@@ -253,7 +289,8 @@ export async function updateBuildingModuleBlocks(
       visualization_blocks: input.visualizationBlocks,
       project_blocks: input.projectBlocks,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt bloku secību." };
@@ -269,11 +306,17 @@ export async function updateBuildingModuleProjectDescription(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("building_modules")
     .update({ project_description: input.projectDescription })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt projekta aprakstu." };
@@ -365,10 +408,19 @@ export async function deleteBuildingModule(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   await deleteAllModuleBlockFiles(id);
 
-  const { error } = await supabase.from("building_modules").delete().eq("id", id);
+  const { error } = await supabase
+    .from("building_modules")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās dzēst moduli." };

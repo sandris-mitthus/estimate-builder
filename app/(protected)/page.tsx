@@ -13,6 +13,7 @@ import {
   listProjectIdsWithStaleCatalogPrices,
   listProjects,
 } from "@/app/lib/projects/repository";
+import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 
 function isArchiveView(archive: string | string[] | undefined): boolean {
   if (archive === "1" || archive === "true") {
@@ -24,6 +25,18 @@ function isArchiveView(archive: string | string[] | undefined): boolean {
   }
 
   return false;
+}
+
+function AdminDashboardNotice() {
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 shadow-sm">
+      <p className="font-semibold">Sistēmas administrators</p>
+      <p className="mt-1 text-sky-900">
+        Jūs esat ielogojies kā sistēmas administrators. Dashboard dati paliek
+        tie paši, bet jums ir pieejamas papildu pārvaldības tiesības.
+      </p>
+    </div>
+  );
 }
 
 export default async function ProjectsPage({
@@ -53,33 +66,35 @@ export default async function ProjectsPage({
   const subtitle = showArchive
     ? `${projects.length} projekti arhīvā`
     : `${projects.length} aktīvi projekti`;
+  const isAdmin = session.user ? await isSystemAdminUser(session.user) : false;
 
   return (
     <NavigationLoadingProvider>
       <ProjectsPageCreateProvider>
         <SectionPage
-        title={showArchive ? "Arhīvs" : "Projekti"}
-        subtitle={subtitle}
-        actions={<ProjectPageActions modules={modules} archive={showArchive} />}
-      >
-        {showArchive ? (
-          <ProjectArchiveContent
-            projects={projects}
-            modules={modules}
-            staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
-            newSagatavePositionProjectIds={newSagatavePositionProjectIds}
-            pendingMaterialsProjectIds={pendingMaterialsProjectIds}
-          />
-        ) : (
-          <ProjectList
-            projects={projects}
-            modules={modules}
-            staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
-            newSagatavePositionProjectIds={newSagatavePositionProjectIds}
-            pendingMaterialsProjectIds={pendingMaterialsProjectIds}
-          />
-        )}
-      </SectionPage>
+          title={showArchive ? "Arhīvs" : "Projekti"}
+          subtitle={subtitle}
+          actions={<ProjectPageActions modules={modules} archive={showArchive} />}
+        >
+          {isAdmin ? <AdminDashboardNotice /> : null}
+          {showArchive ? (
+            <ProjectArchiveContent
+              projects={projects}
+              modules={modules}
+              staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+              newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+              pendingMaterialsProjectIds={pendingMaterialsProjectIds}
+            />
+          ) : (
+            <ProjectList
+              projects={projects}
+              modules={modules}
+              staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
+              newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+              pendingMaterialsProjectIds={pendingMaterialsProjectIds}
+            />
+          )}
+        </SectionPage>
       </ProjectsPageCreateProvider>
     </NavigationLoadingProvider>
   );

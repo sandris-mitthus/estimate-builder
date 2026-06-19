@@ -5,6 +5,7 @@ import type {
   ReorderExcludedPositionsInput,
   UpdateExcludedPositionInput,
 } from "@/app/lib/excluded-positions/types";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -32,10 +33,16 @@ export async function listExcludedPositions(): Promise<ExcludedPosition[]> {
     return [];
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("excluded_positions")
     .select("id, name, sort_order")
+    .eq("company_id", companyId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -61,10 +68,16 @@ export async function createExcludedPosition(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data: maxRow, error: maxError } = await supabase
     .from("excluded_positions")
     .select("sort_order")
+    .eq("company_id", companyId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -81,6 +94,7 @@ export async function createExcludedPosition(
   const { data, error } = await supabase
     .from("excluded_positions")
     .insert({
+      company_id: companyId,
       name: input.name.trim(),
       sort_order: nextSortOrder,
     })
@@ -109,11 +123,17 @@ export async function updateExcludedPosition(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("excluded_positions")
     .update({ name: input.name.trim() })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās atjaunināt pozīciju." };
@@ -132,8 +152,17 @@ export async function deleteExcludedPosition(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
-  const { error } = await supabase.from("excluded_positions").delete().eq("id", id);
+  const { error } = await supabase
+    .from("excluded_positions")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās dzēst pozīciju." };
@@ -160,9 +189,18 @@ export async function reorderExcludedPositions(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const updates = orderedIds.map((id, index) =>
-    supabase.from("excluded_positions").update({ sort_order: index }).eq("id", id),
+    supabase
+      .from("excluded_positions")
+      .update({ sort_order: index })
+      .eq("id", id)
+      .eq("company_id", companyId),
   );
 
   const results = await Promise.all(updates);

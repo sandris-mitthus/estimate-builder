@@ -1,4 +1,5 @@
 import { DEFAULT_COMPANY_SETTINGS } from "@/app/lib/settings/defaults";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { resolveCompanyLogoDisplayUrl } from "@/app/lib/settings/logo-storage";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "@/app/lib/settings/currencies";
 import { normalizeDefaultHourlyRate } from "@/app/lib/settings/default-hourly-rate";
@@ -69,13 +70,18 @@ export async function getCompanySettings(): Promise<CompanySettings> {
     return DEFAULT_COMPANY_SETTINGS;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return DEFAULT_COMPANY_SETTINGS;
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("company_settings")
     .select(
-      "id, company_name, address, registration_number, vat_number, bank_name, swift, bank_account_number, phone, email, currency, logo_url, estimate_validity_days, default_hourly_rate, offer_additional_info, offer_validity_days",
+      "id, company_id, company_name, address, registration_number, vat_number, bank_name, swift, bank_account_number, phone, email, currency, logo_url, estimate_validity_days, default_hourly_rate, offer_additional_info, offer_validity_days",
     )
-    .eq("id", 1)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -96,9 +102,16 @@ export async function saveCompanySettings(
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const { error } = await supabase.from("company_settings").upsert({
-    id: 1,
+    company_id: companyId,
     ...mapSettings(settings),
+  }, {
+    onConflict: "company_id",
   });
 
   if (error) {

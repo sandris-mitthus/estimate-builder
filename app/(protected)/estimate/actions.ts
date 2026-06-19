@@ -9,10 +9,8 @@ import { collectSectionLineItems } from "@/app/lib/estimate-positions/collect-se
 import { saveEstimatePositionDocument } from "@/app/lib/estimate-positions/repository";
 import type { SaveEstimatePositionDocumentInput } from "@/app/lib/estimate-positions/types";
 import { listPositionPrices } from "@/app/lib/positions/repository";
-import {
-  hydrateSectionsWithCatalogLinks,
-  syncEstimateLineItemsToCatalog,
-} from "@/app/lib/positions/sync-from-estimate-line-items";
+import { syncEstimateLineItemsToCatalog } from "@/app/lib/positions/sync-estimate-line-items-to-catalog";
+import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 
 

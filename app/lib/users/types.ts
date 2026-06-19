@@ -3,4 +3,5 @@ export type UserSummary = {
   name: string;
   email: string;
   avatarUrl: string | null;
+  companyStatus: "active" | "invited" | "disabled";
 };

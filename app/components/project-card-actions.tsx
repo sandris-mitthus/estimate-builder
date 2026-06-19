@@ -11,7 +11,7 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
-import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
+import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
 type ProjectCardActionsProps = {

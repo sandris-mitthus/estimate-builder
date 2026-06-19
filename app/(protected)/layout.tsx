@@ -57,6 +57,7 @@ async function AssignedMaterialsBannerSlot({
         name: currentUser.name,
         email: "",
         avatarUrl: currentUser.avatarUrl,
+        companyStatus: "active",
       }}
     />
   );

@@ -6,7 +6,7 @@ import {
   uploadCompanyLogoAction,
 } from "@/app/(protected)/settings/actions";
 import { useActionPermission } from "@/app/components/action-permissions-context";
-import { validateCompanyLogoFile } from "@/app/lib/settings/logo-storage";
+import { validateCompanyLogoFile } from "@/app/lib/settings/logo-validation";
 
 type CompanyLogoDropzoneProps = {
   logoUrl: string;

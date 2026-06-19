@@ -17,7 +17,8 @@ export type CompanySettings = {
 };
 
 export type CompanySettingsRow = {
-  id: number;
+  id?: number | null;
+  company_id?: string;
   company_name: string;
   address: string;
   registration_number: string;

@@ -6,6 +6,7 @@ import {
   parseEstimatePositionDocumentPayload,
   sanitizeEstimatePositionSections,
 } from "@/app/lib/estimate-positions/serialize-document";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import type {
   CreateEstimatePositionInput,
   EstimatePositionDocument,
@@ -41,10 +42,16 @@ export async function ensureDefaultEstimatePosition(): Promise<EstimatePositionD
     return getSampleEstimatePosition();
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return getSampleEstimatePosition();
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimate_positions")
     .select("id, name, title, sections, created_at")
+    .eq("company_id", companyId)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -69,11 +76,17 @@ export async function getEstimatePosition(
     return getSampleEstimatePosition();
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return getSampleEstimatePosition();
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimate_positions")
     .select("id, name, title, sections, created_at")
     .eq("id", id)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -96,10 +109,16 @@ export async function createEstimatePosition(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimate_positions")
     .insert({
+      company_id: companyId,
       name,
       title: name,
       sections: [],
@@ -131,6 +150,11 @@ export async function saveEstimatePositionDocument(
     sanitizeEstimatePositionSections(input.sections),
     input.multiOptionLinks,
   );
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("estimate_positions")
@@ -139,7 +163,8 @@ export async function saveEstimatePositionDocument(
       title,
       sections,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt tāmes pozīciju." };

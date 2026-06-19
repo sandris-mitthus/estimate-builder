@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
@@ -9,6 +10,7 @@ import type { UserSummary } from "@/app/lib/users/types";
 async function mapAuthUser(
   user: User,
   supabase: ReturnType<typeof createAdminClient>,
+  companyStatus: UserSummary["companyStatus"] = "active",
 ): Promise<UserSummary> {
   const { name } = mapUserDisplay(user);
   let avatarUrl = resolveAvatarUrl(user);
@@ -26,7 +28,12 @@ async function mapAuthUser(
     name,
     email: user.email ?? "—",
     avatarUrl,
+    companyStatus,
   };
+}
+
+function normalizeCompanyStatus(value: unknown): UserSummary["companyStatus"] {
+  return value === "invited" || value === "disabled" ? value : "active";
 }
 
 export async function listUsers(): Promise<UserSummary[]> {
@@ -35,6 +42,27 @@ export async function listUsers(): Promise<UserSummary[]> {
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("company_users")
+    .select("user_id, status")
+    .eq("company_id", companyId);
+
+  if (membershipError || !memberships) {
+    return [];
+  }
+
+  const companyStatusByUserId = new Map(
+    memberships.map((membership) => [
+      membership.user_id as string,
+      normalizeCompanyStatus(membership.status),
+    ]),
+  );
+
   const { data, error } = await supabase.auth.admin.listUsers({
     page: 1,
     perPage: 1000,
@@ -49,7 +77,15 @@ export async function listUsers(): Promise<UserSummary[]> {
   }
 
   const users = await Promise.all(
-    data.users.map((user) => mapAuthUser(user, supabase)),
+    data.users
+      .filter((user) => companyStatusByUserId.has(user.id))
+      .map((user) =>
+        mapAuthUser(
+          user,
+          supabase,
+          companyStatusByUserId.get(user.id) ?? "active",
+        ),
+      ),
   );
 
   return users.sort((a, b) => a.name.localeCompare(b.name, "lv"));
@@ -78,7 +114,12 @@ export async function inviteUser(
   }
 
   const supabase = createAdminClient();
-  const { error } = await supabase.auth.admin.inviteUserByEmail(trimmed, {
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(trimmed, {
     redirectTo: inviteRedirectUrl(),
   });
 
@@ -97,6 +138,102 @@ export async function inviteUser(
     }
 
     return { ok: false, error: "Neizdevās nosūtīt uzaicinājumu." };
+  }
+
+  if (data.user?.id) {
+    const profile = {
+      id: data.user.id,
+      email: data.user.email ?? trimmed,
+      name: mapUserDisplay(data.user).name,
+      avatar_url: resolveAvatarUrl(data.user) ?? "",
+    };
+    const { error: profileInsertError } = await supabase.from("users").insert({
+      ...profile,
+      is_admin: false,
+    });
+
+    if (profileInsertError) {
+      await supabase.from("users").update(profile).eq("id", data.user.id);
+    }
+
+    await supabase.from("company_users").upsert(
+      {
+        company_id: companyId,
+        user_id: data.user.id,
+        role: "member",
+        status: "invited",
+      },
+      { onConflict: "company_id,user_id" },
+    );
+  }
+
+  return { ok: true };
+}
+
+export async function updateCompanyUserStatus(
+  userId: string,
+  status: Extract<UserSummary["companyStatus"], "active" | "disabled">,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedUserId = userId.trim();
+  if (!trimmedUserId) {
+    return { ok: false, error: "Lietotājs nav norādīts." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("company_users")
+    .update({ status })
+    .eq("company_id", companyId)
+    .eq("user_id", trimmedUserId);
+
+  if (error) {
+    return {
+      ok: false,
+      error:
+        status === "disabled"
+          ? "Neizdevās liegt pieeju lietotājam."
+          : "Neizdevās atjaunot lietotāja pieeju.",
+    };
+  }
+
+  return { ok: true };
+}
+
+export async function removeCompanyUser(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedUserId = userId.trim();
+  if (!trimmedUserId) {
+    return { ok: false, error: "Lietotājs nav norādīts." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("company_users")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("user_id", trimmedUserId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās noņemt lietotāju no uzņēmuma." };
   }
 
   return { ok: true };

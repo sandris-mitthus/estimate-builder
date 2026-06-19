@@ -7,6 +7,7 @@ import {
   type PermissionSet,
   type UserGroupSummary,
 } from "@/app/lib/auth/permissions";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -19,12 +20,17 @@ type UserGroupRow = {
 };
 
 function mapGroupRow(row: UserGroupRow): UserGroupSummary {
+  const permissions =
+    row.slug === "admin"
+      ? createFullPermissions(true)
+      : normalizePermissionSet(row.permissions);
+
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     isSystem: row.is_system,
-    permissions: normalizePermissionSet(row.permissions),
+    permissions,
   };
 }
 
@@ -33,10 +39,12 @@ const DEFAULT_NEW_USER_GROUP_SLUG = "viewer";
 async function getGroupIdBySlug(
   supabase: ReturnType<typeof createAdminClient>,
   slug: string,
+  companyId: string,
 ): Promise<string | null> {
   const { data } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .select("id")
+    .eq("company_id", companyId)
     .eq("slug", slug)
     .maybeSingle();
 
@@ -46,18 +54,24 @@ async function getGroupIdBySlug(
 async function ensureUserDefaultMembership(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
+  companyId: string,
 ): Promise<string | null> {
-  const groupId = await getGroupIdBySlug(supabase, DEFAULT_NEW_USER_GROUP_SLUG);
+  const groupId = await getGroupIdBySlug(
+    supabase,
+    DEFAULT_NEW_USER_GROUP_SLUG,
+    companyId,
+  );
   if (!groupId) {
     return null;
   }
 
-  const { error } = await supabase.from("user_group_members").upsert(
+  const { error } = await supabase.from("company_group_members").upsert(
     {
+      company_id: companyId,
       user_id: userId,
       group_id: groupId,
     },
-    { onConflict: "user_id" },
+    { onConflict: "company_id,user_id" },
   );
 
   if (error) {
@@ -91,10 +105,12 @@ function buildFallbackGroupSummary(
 async function fetchGroupById(
   supabase: ReturnType<typeof createAdminClient>,
   groupId: string,
+  companyId: string,
 ): Promise<UserGroupSummary | null> {
   const { data, error } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .select("id, slug, name, permissions, is_system")
+    .eq("company_id", companyId)
     .eq("id", groupId)
     .maybeSingle();
 
@@ -107,11 +123,13 @@ async function fetchGroupById(
 
 async function ensureDefaultGroups(
   supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
 ): Promise<void> {
   for (const group of DEFAULT_GROUP_DEFINITIONS) {
     const { data: existing } = await supabase
-      .from("user_groups")
+      .from("company_user_groups")
       .select("id")
+      .eq("company_id", companyId)
       .eq("slug", group.slug)
       .maybeSingle();
 
@@ -119,7 +137,8 @@ async function ensureDefaultGroups(
       continue;
     }
 
-    await supabase.from("user_groups").insert({
+    await supabase.from("company_user_groups").insert({
+      company_id: companyId,
       slug: group.slug,
       name: group.name,
       permissions: group.permissions,
@@ -140,11 +159,17 @@ export async function listUserGroups(): Promise<UserGroupSummary[]> {
   }
 
   const supabase = createAdminClient();
-  await ensureDefaultGroups(supabase);
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
+  await ensureDefaultGroups(supabase, companyId);
 
   const { data, error } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .select("id, slug, name, permissions, is_system")
+    .eq("company_id", companyId)
     .order("name", { ascending: true });
 
   if (error || !data) {
@@ -175,9 +200,15 @@ export async function getUserGroupById(
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return null;
+  }
+
   const { data, error } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .select("id, slug, name, permissions, is_system")
+    .eq("company_id", companyId)
     .eq("id", groupId)
     .maybeSingle();
 
@@ -207,18 +238,24 @@ export async function getUserGroupMembership(
   }
 
   const supabase = createAdminClient();
-  await ensureDefaultGroups(supabase);
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return null;
+  }
+
+  await ensureDefaultGroups(supabase, companyId);
 
   const { data: membership } = await supabase
-    .from("user_group_members")
+    .from("company_group_members")
     .select("group_id")
+    .eq("company_id", companyId)
     .eq("user_id", userId)
     .maybeSingle();
 
   let groupId = membership?.group_id ?? null;
 
   if (!groupId) {
-    groupId = await ensureUserDefaultMembership(supabase, userId);
+    groupId = await ensureUserDefaultMembership(supabase, userId, companyId);
   }
 
   if (!groupId) {
@@ -226,7 +263,7 @@ export async function getUserGroupMembership(
     return viewer ? buildFallbackGroupSummary("fallback-viewer", viewer) : null;
   }
 
-  const group = await fetchGroupById(supabase, groupId);
+  const group = await fetchGroupById(supabase, groupId, companyId);
   if (group) {
     return group;
   }
@@ -243,9 +280,15 @@ export async function listUserGroupMemberships(): Promise<
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return {};
+  }
+
   const { data, error } = await supabase
-    .from("user_group_members")
-    .select("user_id, group_id");
+    .from("company_group_members")
+    .select("user_id, group_id")
+    .eq("company_id", companyId);
 
   if (error || !data) {
     return {};
@@ -271,18 +314,34 @@ export async function assignUserToGroup(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const group = await getUserGroupById(trimmedGroupId);
   if (!group) {
     return { ok: false, error: "Grupa nav atrasta." };
   }
 
   const supabase = createAdminClient();
-  const { error } = await supabase.from("user_group_members").upsert(
+  await supabase.from("company_users").upsert(
     {
+      company_id: companyId,
+      user_id: trimmedUserId,
+      role: "member",
+      status: "active",
+    },
+    { onConflict: "company_id,user_id" },
+  );
+
+  const { error } = await supabase.from("company_group_members").upsert(
+    {
+      company_id: companyId,
       user_id: trimmedUserId,
       group_id: trimmedGroupId,
     },
-    { onConflict: "user_id" },
+    { onConflict: "company_id,user_id" },
   );
 
   if (error) {
@@ -301,10 +360,15 @@ export async function updateUserGroupPermissions(
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
 
   const { data: groupRow } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .select("slug")
+    .eq("company_id", companyId)
     .eq("id", groupId)
     .maybeSingle();
 
@@ -314,8 +378,9 @@ export async function updateUserGroupPermissions(
       : normalizePermissionSet(permissions);
 
   const { error } = await supabase
-    .from("user_groups")
+    .from("company_user_groups")
     .update({ permissions: normalized })
+    .eq("company_id", companyId)
     .eq("id", groupId);
 
   if (error) {
@@ -327,11 +392,34 @@ export async function updateUserGroupPermissions(
 
 export type UserAccess = {
   userId: string;
+  companyId: string | null;
+  companyRole: "owner" | "admin" | "member" | null;
   group: UserGroupSummary;
   permissions: PermissionSet;
 };
 
+async function getCompanyUserRole(
+  userId: string,
+  companyId: string | null,
+): Promise<UserAccess["companyRole"]> {
+  if (!companyId || !isSupabaseAdminConfigured()) {
+    return null;
+  }
+
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("company_users")
+    .select("role")
+    .eq("company_id", companyId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return data?.role === "owner" || data?.role === "admin" ? data.role : "member";
+}
+
 export async function getUserAccess(userId: string): Promise<UserAccess | null> {
+  const companyId = await getCurrentCompanyId();
+  const companyRole = await getCompanyUserRole(userId, companyId);
   const group = await getUserGroupMembership(userId);
   if (!group) {
     const viewer = getDefaultGroupDefinition();
@@ -341,6 +429,8 @@ export async function getUserAccess(userId: string): Promise<UserAccess | null> 
 
     return {
       userId,
+      companyId,
+      companyRole,
       group: buildFallbackGroupSummary("fallback-viewer", viewer),
       permissions: viewer.permissions,
     };
@@ -353,6 +443,8 @@ export async function getUserAccess(userId: string): Promise<UserAccess | null> 
 
   return {
     userId,
+    companyId,
+    companyRole,
     group: {
       ...group,
       permissions,
@@ -378,6 +470,13 @@ export function canPerformAction(
 ): boolean {
   if (!access) {
     return false;
+  }
+
+  if (
+    key === "users.manage_company_access" &&
+    (access.companyRole === "owner" || access.companyRole === "admin")
+  ) {
+    return true;
   }
 
   return access.permissions.actions[key] === true;

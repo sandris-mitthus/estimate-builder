@@ -10,6 +10,7 @@ import type {
 import { normalizePositionCostType } from "@/app/lib/positions/position-cost-type";
 import { validatePositionFields } from "@/app/lib/positions/validate-position-fields";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
@@ -54,12 +55,18 @@ export async function listPositionPrices(): Promise<PositionPriceSummary[]> {
     return SAMPLE_POSITION_PRICES;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return SAMPLE_POSITION_PRICES;
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("position_prices")
     .select(
       "id, name, unit, cost_type, unit_price, unit_price_updated_at, supplier_name, supplier_contact_name, supplier_email, supplier_phone, variable_quantity",
     )
+    .eq("company_id", companyId)
     .order("name", { ascending: true });
 
   if (error || !data) {
@@ -82,9 +89,15 @@ async function enrichPositionPricesWithLatestHistory(
   }
 
   const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return positions;
+  }
+
   const { data, error } = await supabase
     .from("position_price_history")
     .select("position_price_id, unit_price, recorded_at, created_at")
+    .eq("company_id", companyId)
     .in("position_price_id", missingPriceIds)
     .order("recorded_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -151,6 +164,11 @@ export async function listPositionPriceHistory(
     return [];
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("position_price_history")
@@ -158,6 +176,7 @@ export async function listPositionPriceHistory(
       "id, unit_price, recorded_at, supplier_name, supplier_contact_name, supplier_email, supplier_phone",
     )
     .eq("position_price_id", positionPriceId)
+    .eq("company_id", companyId)
     .order("recorded_at", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -184,10 +203,16 @@ export async function createPositionPrice(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("position_prices")
     .insert({
+      company_id: companyId,
       name,
       unit,
       cost_type: costType,
@@ -223,11 +248,17 @@ export async function updatePositionNameAndUnit(input: {
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("position_prices")
     .update({ name, unit })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt pozīciju." };
@@ -252,6 +283,11 @@ export async function updatePositionPrice(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("position_prices")
@@ -261,7 +297,8 @@ export async function updatePositionPrice(
       cost_type: costType,
       variable_quantity: input.variableQuantity === true,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt pozīciju." };
@@ -291,6 +328,11 @@ export async function updatePositionUnitPrice(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const recordedAt = todayIsoDate();
   const supplierName = input.supplierName.trim();
@@ -305,7 +347,8 @@ export async function updatePositionUnitPrice(
       supplier_email: contact.email,
       supplier_phone: contact.phone,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt cenu." };
@@ -314,6 +357,7 @@ export async function updatePositionUnitPrice(
   const { error: historyError } = await supabase
     .from("position_price_history")
     .insert({
+      company_id: companyId,
       position_price_id: input.id,
       unit_price: input.unitPrice,
       recorded_at: recordedAt,
@@ -337,8 +381,17 @@ export async function deletePositionPrice(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
-  const { error } = await supabase.from("position_prices").delete().eq("id", id);
+  const { error } = await supabase
+    .from("position_prices")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās dzēst pozīciju." };

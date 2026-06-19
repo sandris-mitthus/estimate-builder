@@ -1,10 +1,16 @@
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import {
+  BOOTSTRAP_COMPANY_ID,
+  getCurrentCompanyId,
+} from "@/app/lib/companies/current-company";
 import { MODULE_ASSETS_BUCKET } from "@/app/lib/modules/file-storage";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
 const MODULE_ASSET_PATH =
   /^(modules\/[0-9a-f-]{36}|projects\/[0-9a-f-]{36})\/(visualizations|project)\/[^/]+$/i;
+const COMPANY_MODULE_ASSET_PATH =
+  /^companies\/([0-9a-f-]{36})\/(modules\/[0-9a-f-]{36}|projects\/[0-9a-f-]{36})\/(visualizations|project)\/[^/]+$/i;
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -17,7 +23,19 @@ export async function GET(request: Request) {
   }
 
   const path = new URL(request.url).searchParams.get("path")?.trim() ?? "";
-  if (!MODULE_ASSET_PATH.test(path)) {
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  const companyPathMatch = path.match(COMPANY_MODULE_ASSET_PATH);
+  const isLegacyBootstrapPath =
+    companyId === BOOTSTRAP_COMPANY_ID && MODULE_ASSET_PATH.test(path);
+
+  if (
+    (!companyPathMatch || companyPathMatch[1] !== companyId) &&
+    !isLegacyBootstrapPath
+  ) {
     return new Response("Bad request", { status: 400 });
   }
 

@@ -29,7 +29,7 @@ import {
 import {
   validateModuleImageFile,
   validateModuleProjectFile,
-} from "@/app/lib/modules/file-storage";
+} from "@/app/lib/modules/file-validation";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
 
 const tileClassName =

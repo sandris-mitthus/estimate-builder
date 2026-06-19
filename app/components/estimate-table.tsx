@@ -184,7 +184,7 @@ import {
 import { RestoreSagatavePositionsModal } from "@/app/components/restore-sagatave-positions-modal";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import type { UserSummary } from "@/app/lib/users/types";
-import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-data";
+import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import { countPendingProjectMaterials } from "@/app/lib/projects/pending-project-materials";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 function getEstimateTableColCount(showQuantityColumn: boolean): number {

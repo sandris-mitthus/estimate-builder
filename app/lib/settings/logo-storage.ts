@@ -1,10 +1,17 @@
+import {
+  BOOTSTRAP_COMPANY_ID,
+  getCurrentCompanyId,
+} from "@/app/lib/companies/current-company";
+import {
+  COMPANY_LOGO_EXTENSIONS,
+  getLogoExtension,
+  validateCompanyLogoFile,
+} from "@/app/lib/settings/logo-validation";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { validateFileMagicBytes } from "@/app/lib/security/magic-bytes";
 
 export const COMPANY_LOGO_BUCKET = "company-assets";
-export const COMPANY_LOGO_MAX_BYTES = 2 * 1024 * 1024;
-export const COMPANY_LOGO_EXTENSIONS = ["png", "jpg", "webp", "svg"] as const;
 
 export function resolveCompanyLogoDisplayUrl(storedUrl: string): string {
   const trimmed = storedUrl.trim();
@@ -16,72 +23,41 @@ export function resolveCompanyLogoDisplayUrl(storedUrl: string): string {
 export async function downloadCompanyLogoFile(
   supabase: ReturnType<typeof createAdminClient>,
 ): Promise<{ data: Blob; mimeType: string } | null> {
-  for (const extension of COMPANY_LOGO_EXTENSIONS) {
-    const path = `company/logo.${extension}`;
-    const { data, error } = await supabase.storage
-      .from(COMPANY_LOGO_BUCKET)
-      .download(path);
+  const companyId = await getCurrentCompanyId();
+  const pathPrefixes = companyId
+    ? [`companies/${companyId}`, ...(companyId === BOOTSTRAP_COMPANY_ID ? ["company"] : [])]
+    : ["company"];
 
-    if (!error && data) {
-      const mimeType =
-        data.type ||
-        (extension === "jpg"
-          ? "image/jpeg"
-          : extension === "svg"
-            ? "image/svg+xml"
-            : `image/${extension}`);
+  for (const prefix of pathPrefixes) {
+    for (const extension of COMPANY_LOGO_EXTENSIONS) {
+      const path = `${prefix}/logo.${extension}`;
+      const { data, error } = await supabase.storage
+        .from(COMPANY_LOGO_BUCKET)
+        .download(path);
 
-      return { data, mimeType };
+      if (!error && data) {
+        const mimeType =
+          data.type ||
+          (extension === "jpg"
+            ? "image/jpeg"
+            : extension === "svg"
+              ? "image/svg+xml"
+              : `image/${extension}`);
+
+        return { data, mimeType };
+      }
     }
   }
 
   return null;
 }
 
-const ALLOWED_LOGO_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
-
-function getLogoExtension(mimeType: string) {
-  switch (mimeType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/svg+xml":
-      return "svg";
-    default:
-      return null;
-  }
-}
-
-export function validateCompanyLogoFile(file: File) {
-  if (!ALLOWED_LOGO_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
-    };
-  }
-
-  if (file.size > COMPANY_LOGO_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "Logotips nedrīkst būt lielāks par 2 MB.",
-    };
-  }
-
-  return { ok: true as const };
-}
-
 async function removeExistingCompanyLogos(
   supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
 ) {
-  const { data } = await supabase.storage.from(COMPANY_LOGO_BUCKET).list("company");
+  const prefix = `companies/${companyId}`;
+  const { data } = await supabase.storage.from(COMPANY_LOGO_BUCKET).list(prefix);
 
   if (!data?.length) {
     return;
@@ -89,7 +65,7 @@ async function removeExistingCompanyLogos(
 
   await supabase.storage
     .from(COMPANY_LOGO_BUCKET)
-    .remove(data.map((file) => `company/${file.name}`));
+    .remove(data.map((file) => `${prefix}/${file.name}`));
 }
 
 export async function uploadCompanyLogo(
@@ -117,10 +93,15 @@ export async function uploadCompanyLogo(
     return { ok: false, error: "Neatbalstīts attēla formāts." };
   }
 
-  const supabase = createAdminClient();
-  await removeExistingCompanyLogos(supabase);
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
 
-  const path = `company/logo.${extension}`;
+  const supabase = createAdminClient();
+  await removeExistingCompanyLogos(supabase, companyId);
+
+  const path = `companies/${companyId}/logo.${extension}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: uploadError } = await supabase.storage
@@ -146,5 +127,10 @@ export async function deleteCompanyLogoFromStorage() {
   }
 
   const supabase = createAdminClient();
-  await removeExistingCompanyLogos(supabase);
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return;
+  }
+
+  await removeExistingCompanyLogos(supabase, companyId);
 }

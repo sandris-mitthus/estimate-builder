@@ -1,5 +1,6 @@
 import { defaultEstimateDeadline, projectCreatedDateIso } from "@/app/lib/estimates/sample-data";
 import { resolveEstimateMeta } from "@/app/lib/estimates/resolve-estimate-meta";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import {
@@ -44,7 +45,7 @@ import type {
   ProjectSummary,
   UpdateProjectInput,
 } from "@/app/lib/projects/types";
-import { parseProjectModuleBlocks } from "@/app/lib/projects/project-module-data";
+import { parseProjectModuleBlocks } from "@/app/lib/projects/project-module-utils";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
 import { deleteAllProjectBlockFiles } from "@/app/lib/modules/file-storage";
 
@@ -110,6 +111,7 @@ function isRetryableProjectSelectError(
 
 async function fetchProjectRows(
   supabase: SupabaseAdminClient,
+  companyId: string,
 ): Promise<ProjectRow[] | null> {
   let lastError: { message?: string } | null = null;
 
@@ -117,6 +119,7 @@ async function fetchProjectRows(
     const { data, error } = await supabase
       .from("projects")
       .select(select)
+      .eq("company_id", companyId)
       .order("created_at", { ascending: true });
 
     if (!error) {
@@ -141,6 +144,7 @@ async function fetchProjectRows(
 async function fetchProjectRowById(
   supabase: SupabaseAdminClient,
   id: string,
+  companyId: string,
 ): Promise<ProjectRow | null | undefined> {
   let lastError: { message?: string } | null = null;
 
@@ -149,6 +153,7 @@ async function fetchProjectRowById(
       .from("projects")
       .select(select)
       .eq("id", id)
+      .eq("company_id", companyId)
       .maybeSingle();
 
     if (!error) {
@@ -251,10 +256,16 @@ export async function listProjectIdsWithStaleCatalogPrices(
   ]);
   const defaultHourlyRate = companySettings.defaultHourlyRate;
   const projectById = new Map(projects.map((project) => [project.id, project]));
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return new Set();
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("project_id, meta, categories, updated_at")
+    .eq("company_id", companyId)
     .in(
       "project_id",
       projects.map((project) => project.id),
@@ -323,10 +334,16 @@ export async function listProjectIdsWithNewSagatavePositions(
   }
 
   const projectById = new Map(projects.map((project) => [project.id, project]));
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return new Set();
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("project_id, meta, categories")
+    .eq("company_id", companyId)
     .in(
       "project_id",
       projects.map((project) => project.id),
@@ -382,11 +399,16 @@ export async function listProjectIdsWithPendingMaterials(
     string,
     Awaited<ReturnType<typeof getBuildingModule>>
   >();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return new Set();
+  }
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("project_id, meta, categories")
+    .eq("company_id", companyId)
     .in(
       "project_id",
       approvedProjects.map((project) => project.id),
@@ -458,8 +480,13 @@ export async function listAllProjects(): Promise<ProjectSummary[]> {
     return SAMPLE_PROJECTS;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
   const supabase = createAdminClient();
-  const rows = await fetchProjectRows(supabase);
+  const rows = await fetchProjectRows(supabase, companyId);
 
   if (!rows) {
     return [];
@@ -473,8 +500,13 @@ export async function getProject(id: string): Promise<ProjectSummary | null> {
     return getSampleProjectById(id) ?? null;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return null;
+  }
+
   const supabase = createAdminClient();
-  const row = await fetchProjectRowById(supabase, id);
+  const row = await fetchProjectRowById(supabase, id, companyId);
 
   if (!row) {
     return null;
@@ -494,11 +526,17 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
     return defaultEstimateForProject(project, validityDays);
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return defaultEstimateForProject(project, validityDays);
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("title, meta, categories, updated_at")
     .eq("project_id", id)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error) {
@@ -566,10 +604,16 @@ export async function createProject(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .insert({
+      company_id: companyId,
       name: clientName,
       address,
       phone,
@@ -604,7 +648,11 @@ export async function createProject(
     const sourceEstimate = await getProjectEstimate(input.copyEstimateFromProjectId);
 
     if (!sourceEstimate) {
-      await supabase.from("projects").delete().eq("id", project.id);
+      await supabase
+        .from("projects")
+        .delete()
+        .eq("id", project.id)
+        .eq("company_id", companyId);
       return { ok: false, error: "Avota projekta tāme nav atrasta." };
     }
 
@@ -632,6 +680,7 @@ export async function createProject(
   );
 
   const { error: estimateError } = await supabase.from("estimates").insert({
+    company_id: companyId,
     project_id: project.id,
     title: clientName,
     meta,
@@ -639,7 +688,11 @@ export async function createProject(
   });
 
   if (estimateError) {
-    await supabase.from("projects").delete().eq("id", project.id);
+    await supabase
+      .from("projects")
+      .delete()
+      .eq("id", project.id)
+      .eq("company_id", companyId);
     return { ok: false, error: "Neizdevās izveidot tāmi." };
   }
 
@@ -690,6 +743,11 @@ export async function updateProject(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error: projectError } = await supabase
     .from("projects")
@@ -700,7 +758,8 @@ export async function updateProject(
       email: contact.email,
       building_module_id: input.buildingModuleId,
     })
-    .eq("id", input.id);
+    .eq("id", input.id)
+    .eq("company_id", companyId);
 
   if (projectError) {
     return { ok: false, error: "Neizdevās saglabāt projektu." };
@@ -710,6 +769,7 @@ export async function updateProject(
     .from("estimates")
     .select("meta")
     .eq("project_id", input.id)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (estimateFetchError) {
@@ -728,7 +788,8 @@ export async function updateProject(
           project: address,
         },
       })
-      .eq("project_id", input.id);
+      .eq("project_id", input.id)
+      .eq("company_id", companyId);
 
     if (estimateError) {
       return { ok: false, error: "Neizdevās saglabāt tāmi." };
@@ -784,11 +845,17 @@ export async function updateProjectStatus(
     return { ok: false, error: "Projekts jau ir pabeigts." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("projects")
     .update({ status })
-    .eq("id", projectId);
+    .eq("id", projectId)
+    .eq("company_id", companyId);
 
   if (error) {
     if (isMissingColumnError(error, "status")) {
@@ -817,11 +884,17 @@ export async function updateProjectEstimateDates(
     return editable;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("meta")
     .eq("project_id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -837,7 +910,8 @@ export async function updateProjectEstimateDates(
   const { error: updateError } = await supabase
     .from("estimates")
     .update({ meta })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt datumus." };
@@ -859,11 +933,17 @@ export async function updateProjectEstimatePlannedProfit(
     return editable;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("meta")
     .eq("project_id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -882,7 +962,8 @@ export async function updateProjectEstimatePlannedProfit(
   const { error: updateError } = await supabase
     .from("estimates")
     .update({ meta })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt plānoto peļņu." };
@@ -909,11 +990,17 @@ export async function omitProjectExcludedPosition(
     return editable;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("meta")
     .eq("project_id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -933,7 +1020,8 @@ export async function omitProjectExcludedPosition(
   const { error: updateError } = await supabase
     .from("estimates")
     .update({ meta })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās noņemt pozīciju no projekta." };
@@ -969,11 +1057,17 @@ export async function markProjectMaterialOrdered(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("meta")
     .eq("project_id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -1003,7 +1097,8 @@ export async function markProjectMaterialOrdered(
   const { error: updateError } = await supabase
     .from("estimates")
     .update({ meta })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās atzīmēt materiālu kā pasūtītu." };
@@ -1047,11 +1142,17 @@ export async function assignProjectMaterialUser(
     };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("meta")
     .eq("project_id", projectId)
+    .eq("company_id", companyId)
     .maybeSingle();
 
   if (error || !data) {
@@ -1072,7 +1173,8 @@ export async function assignProjectMaterialUser(
   const { error: updateError } = await supabase
     .from("estimates")
     .update({ meta })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās piešķirt materiālu lietotājam." };
@@ -1099,6 +1201,11 @@ export async function saveProjectEstimate(
     return editable;
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   const categories = buildEstimatePositionSectionsStorage(
     payload.categories,
@@ -1108,7 +1215,8 @@ export async function saveProjectEstimate(
   const { error } = await supabase
     .from("estimates")
     .update({ title: payload.title, meta: payload.meta, categories })
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt tāmi." };
@@ -1132,10 +1240,19 @@ export async function deleteProject(
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
   const supabase = createAdminClient();
   await deleteAllProjectBlockFiles(id);
 
-  const { error } = await supabase.from("projects").delete().eq("id", id);
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", companyId);
 
   if (error) {
     return { ok: false, error: "Neizdevās dzēst projektu." };

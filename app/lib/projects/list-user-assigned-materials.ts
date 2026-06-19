@@ -7,6 +7,7 @@ import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/s
 import { parseEstimatePositionDocumentPayload } from "@/app/lib/estimate-positions/serialize-document";
 import { normalizeUserId } from "@/app/lib/auth/normalize-person-name";
 import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -203,10 +204,16 @@ export async function listUserAssignedMaterialGroups(
     return [];
   }
 
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("project_id, meta, categories")
+    .eq("company_id", companyId)
     .in("project_id", lockedProjects.map((project) => project.id));
 
   if (error || !data) {

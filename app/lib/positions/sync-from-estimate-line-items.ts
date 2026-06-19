@@ -12,7 +12,6 @@ import {
   getMaterialsOrMechanismsUnitPrice,
   isMaterialsOrMechanismsCostType,
 } from "@/app/lib/positions/apply-catalog-to-line-item";
-import { updatePositionNameAndUnit } from "@/app/lib/positions/repository";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 function normalizeCatalogText(value: string): string {
@@ -239,39 +238,4 @@ export function hydrateSectionsWithCatalogLinks<
 
 export function collectRowsLineItems(rows: EstimateRowItem[]): EstimateLineItem[] {
   return collectRowLineItems(rows);
-}
-
-export async function syncEstimateLineItemsToCatalog(
-  items: EstimateLineItem[],
-  catalogPositions: PositionPriceSummary[],
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const syncedIds = new Set<string>();
-
-  for (const item of items) {
-    if (isCompositeLineItem(item)) {
-      continue;
-    }
-
-    const positionPriceId = resolveLineItemPositionPriceId(item, catalogPositions);
-    const name = item.name.trim();
-    const unit = item.unit.trim();
-
-    if (!positionPriceId || !name || !unit || syncedIds.has(positionPriceId)) {
-      continue;
-    }
-
-    const result = await updatePositionNameAndUnit({
-      id: positionPriceId,
-      name,
-      unit,
-    });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    syncedIds.add(positionPriceId);
-  }
-
-  return { ok: true };
 }
