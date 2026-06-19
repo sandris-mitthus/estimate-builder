@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.30` (see [Changelog](#changelog))
+**Current version:** `1.3.31` (see [Changelog](#changelog))
 
 ---
 
@@ -24,10 +24,11 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 - **Sistēmas administrators** — globāls profils `public.users.is_admin`; dashboardā rāda informatīvu bloku, bet uzņēmuma tiesības joprojām nāk no uzņēmuma grupas
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
-- **4 noklusējuma uzņēmuma grupas** (`company_user_groups`, migrācija `035`): **Administrators**, **Projektu vadītājs**, **Materiālu pasūtīšana**, **Skatītājs** — katrai savas navigācijas un darbību tiesības (`app/lib/auth/permissions.ts`)
+- **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
+- **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
 - **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
 - **Bloķēta pieeja** — `company_users.status = disabled`; lietotājs paliek sarakstā ar birku **Pieeja liegta**, bet aktīvais uzņēmums viņam netiek atgriezts
-- **`/users/groups`** — matrica: ko uzņēmuma grupa redz izvēlnē un ko drīkst darīt (`user-groups-permissions-form.tsx`); jaunā atļauja `users.manage_company_access` kontrolē bloķēšanu un noņemšanu; `036` migrācija pievieno šo atslēgu esošajiem grupu JSON datiem
+- **`/users/groups`** — matrica: ko profils redz izvēlnē un ko drīkst darīt (`user-groups-permissions-form.tsx`); uzņēmuma profiliem ir izveide/pārsaukšana/dzēšana, bet sistēmas default profili ir aizsargāti; `users.manage_company_access` kontrolē bloķēšanu un noņemšanu
 - **Eforcēšana** — `requireAction()` server actions; `assertNavAccess()` lapās; `AppNav` filtrēts pēc `permissions.nav`; PDF/Excel prasa `estimate.export`
 - **UI ↔ tiesības** — `ActionPermissionsProvider` + `useActionPermission()` (`action-permissions-context.tsx`); pogas/darbības slēptas pēc `permissions.actions` (projekti, tāme, sagatave, moduļi, pozīcijas, materiāli, users, settings)
 
@@ -206,7 +207,7 @@ npm run db:test
 4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
 5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
-**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
+**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
 
 ---
 
@@ -227,7 +228,7 @@ app/
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads, project description)
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
 │   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
-│   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, updateUserGroupPermissionsAction, setCompanyUserAccessAction, removeCompanyUserAction
+│   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, create/update/delete group actions, updateUserGroupPermissionsAction, setCompanyUserAccessAction, removeCompanyUserAction
 │   └── settings/
 ├── api/
 │   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
@@ -357,6 +358,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.31
+
+**Company-created user profiles**
+
+- `/users/groups` now supports company-created profiles with create, rename, delete and permission editing for company-owned profiles only
+- System default profiles are reduced to **Administrators** and **Skatītājs**; company admins can view them, while permission edits require `public.users.is_admin = true`
+- `037_company_custom_user_groups.sql` converts legacy extra groups into company-owned profiles and `next.config.ts` sets `turbopack.root` explicitly to remove the multiple-lockfile workspace warning
 
 ### v1.3.30
 

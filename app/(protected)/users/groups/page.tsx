@@ -6,6 +6,7 @@ import {
   canPerformAction,
   listUserGroups,
 } from "@/app/lib/users/groups-repository";
+import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 
 export default async function UserGroupsPage() {
   const session = await assertUserGroupsPageAccess();
@@ -15,7 +16,10 @@ export default async function UserGroupsPage() {
 
   const groups = await listUserGroups();
 
-  const canManage = canPerformAction(session.access, "groups.manage");
+  const canManageCompanyGroups = canPerformAction(session.access, "groups.manage");
+  const canManageSystemGroups = session.user
+    ? await isSystemAdminUser(session.user)
+    : false;
 
   return (
     <SectionPage
@@ -31,7 +35,11 @@ export default async function UserGroupsPage() {
         </Link>
       }
     >
-      <UserGroupsPermissionsForm groups={groups} canManage={canManage} />
+      <UserGroupsPermissionsForm
+        groups={groups}
+        canManageCompanyGroups={canManageCompanyGroups}
+        canManageSystemGroups={canManageSystemGroups}
+      />
     </SectionPage>
   );
 }

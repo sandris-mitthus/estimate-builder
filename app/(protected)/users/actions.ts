@@ -7,8 +7,13 @@ import type { PermissionSet } from "@/app/lib/auth/permissions";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import {
   assignUserToGroup,
+  createUserGroup,
+  deleteUserGroup,
+  getUserGroupSystemStatus,
+  updateUserGroupName,
   updateUserGroupPermissions,
 } from "@/app/lib/users/groups-repository";
+import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import {
   inviteUser,
   removeCompanyUser,
@@ -51,12 +56,79 @@ export async function updateUserGroupPermissionsAction(
   groupId: string,
   permissions: PermissionSet,
 ) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return { ok: false as const, error: "Nav autorizācijas." };
+  }
+
+  const isSystemGroup = await getUserGroupSystemStatus(groupId);
+  if (isSystemGroup === null) {
+    return { ok: false as const, error: "Grupa nav atrasta." };
+  }
+
+  const canUpdateSystemGroups = await isSystemAdminUser(currentUser);
+  if (isSystemGroup) {
+    if (!canUpdateSystemGroups) {
+      return {
+        ok: false as const,
+        error: "Sistēmas profilu tiesības var mainīt tikai sistēmas administrators.",
+      };
+    }
+  } else {
+    const { denied } = await requireAction("groups.manage");
+    if (denied) return denied;
+  }
+
+  const result = await updateUserGroupPermissions(groupId, permissions, {
+    canUpdateSystemGroups,
+  });
+
+  if (result.ok) {
+    revalidatePath("/users/groups");
+    revalidatePath("/", "layout");
+  }
+
+  return result;
+}
+
+export async function createUserGroupAction(name: string) {
   const { denied } = await requireAction("groups.manage");
   if (denied) return denied;
 
-  const result = await updateUserGroupPermissions(groupId, permissions);
+  const result = await createUserGroup(name);
 
   if (result.ok) {
+    revalidatePath("/users");
+    revalidatePath("/users/groups");
+    revalidatePath("/", "layout");
+  }
+
+  return result;
+}
+
+export async function updateUserGroupNameAction(groupId: string, name: string) {
+  const { denied } = await requireAction("groups.manage");
+  if (denied) return denied;
+
+  const result = await updateUserGroupName(groupId, name);
+
+  if (result.ok) {
+    revalidatePath("/users");
+    revalidatePath("/users/groups");
+    revalidatePath("/", "layout");
+  }
+
+  return result;
+}
+
+export async function deleteUserGroupAction(groupId: string) {
+  const { denied } = await requireAction("groups.manage");
+  if (denied) return denied;
+
+  const result = await deleteUserGroup(groupId);
+
+  if (result.ok) {
+    revalidatePath("/users");
     revalidatePath("/users/groups");
     revalidatePath("/", "layout");
   }

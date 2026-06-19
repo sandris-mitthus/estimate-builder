@@ -1,5 +1,9 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
+const projectRoot = dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = dirname(projectRoot);
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "";
 const isDev = process.env.NODE_ENV === "development";
 
@@ -25,6 +29,9 @@ const csp = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
+  turbopack: {
+    root: workspaceRoot,
+  },
   async redirects() {
     return [
       {

@@ -20,21 +20,54 @@ type UserGroupRow = {
 };
 
 function mapGroupRow(row: UserGroupRow): UserGroupSummary {
-  const permissions =
-    row.slug === "admin"
-      ? createFullPermissions(true)
-      : normalizePermissionSet(row.permissions);
-
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     isSystem: row.is_system,
-    permissions,
+    permissions: normalizePermissionSet(row.permissions),
   };
 }
 
 const DEFAULT_NEW_USER_GROUP_SLUG = "viewer";
+
+function slugifyGroupName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "grupa";
+}
+
+async function buildUniqueGroupSlug(
+  supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  name: string,
+): Promise<string> {
+  const baseSlug = slugifyGroupName(name);
+  let slug = baseSlug;
+  let counter = 2;
+
+  while (true) {
+    const { data } = await supabase
+      .from("company_user_groups")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (!data) {
+      return slug;
+    }
+
+    slug = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
+}
 
 async function getGroupIdBySlug(
   supabase: ReturnType<typeof createAdminClient>,
@@ -299,6 +332,202 @@ export async function listUserGroupMemberships(): Promise<
   );
 }
 
+export async function getUserGroupSystemStatus(
+  groupId: string,
+): Promise<boolean | null> {
+  const trimmedGroupId = groupId.trim();
+  if (!trimmedGroupId || !isSupabaseAdminConfigured()) {
+    return null;
+  }
+
+  const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("company_user_groups")
+    .select("is_system")
+    .eq("company_id", companyId)
+    .eq("id", trimmedGroupId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.is_system === true;
+}
+
+export async function createUserGroup(
+  name: string,
+): Promise<
+  | { ok: true; group: UserGroupSummary }
+  | { ok: false; error: string }
+> {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { ok: false, error: "Grupas nosaukums nav norādīts." };
+  }
+
+  if (trimmedName.length > 80) {
+    return { ok: false, error: "Grupas nosaukums ir pārāk garš." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  await ensureDefaultGroups(supabase, companyId);
+
+  const slug = await buildUniqueGroupSlug(supabase, companyId, trimmedName);
+  const viewer = getDefaultGroupDefinition();
+  const permissions = normalizePermissionSet(viewer?.permissions);
+
+  const { data, error } = await supabase
+    .from("company_user_groups")
+    .insert({
+      company_id: companyId,
+      slug,
+      name: trimmedName,
+      permissions,
+      is_system: false,
+    })
+    .select("id, slug, name, permissions, is_system")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās izveidot grupu." };
+  }
+
+  return { ok: true, group: mapGroupRow(data as UserGroupRow) };
+}
+
+export async function updateUserGroupName(
+  groupId: string,
+  name: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedGroupId = groupId.trim();
+  const trimmedName = name.trim();
+
+  if (!trimmedGroupId || !trimmedName) {
+    return { ok: false, error: "Grupa vai nosaukums nav norādīts." };
+  }
+
+  if (trimmedName.length > 80) {
+    return { ok: false, error: "Grupas nosaukums ir pārāk garš." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const { data: groupRow } = await supabase
+    .from("company_user_groups")
+    .select("is_system")
+    .eq("company_id", companyId)
+    .eq("id", trimmedGroupId)
+    .maybeSingle();
+
+  if (!groupRow) {
+    return { ok: false, error: "Grupa nav atrasta." };
+  }
+
+  if (groupRow.is_system === true) {
+    return { ok: false, error: "Sistēmas grupas nosaukumu nevar mainīt." };
+  }
+
+  const { error } = await supabase
+    .from("company_user_groups")
+    .update({ name: trimmedName })
+    .eq("company_id", companyId)
+    .eq("id", trimmedGroupId)
+    .eq("is_system", false);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt grupas nosaukumu." };
+  }
+
+  return { ok: true };
+}
+
+export async function deleteUserGroup(
+  groupId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedGroupId = groupId.trim();
+  if (!trimmedGroupId) {
+    return { ok: false, error: "Grupa nav norādīta." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const { data: groupRow } = await supabase
+    .from("company_user_groups")
+    .select("is_system")
+    .eq("company_id", companyId)
+    .eq("id", trimmedGroupId)
+    .maybeSingle();
+
+  if (!groupRow) {
+    return { ok: false, error: "Grupa nav atrasta." };
+  }
+
+  if (groupRow.is_system === true) {
+    return { ok: false, error: "Sistēmas grupu nevar dzēst." };
+  }
+
+  const { count, error: countError } = await supabase
+    .from("company_group_members")
+    .select("user_id", { count: "exact", head: true })
+    .eq("company_id", companyId)
+    .eq("group_id", trimmedGroupId);
+
+  if (countError) {
+    return { ok: false, error: "Neizdevās pārbaudīt grupas lietotājus." };
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: "Grupu nevar dzēst, kamēr tai ir piesaistīti lietotāji.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("company_user_groups")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("id", trimmedGroupId)
+    .eq("is_system", false);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās dzēst grupu." };
+  }
+
+  return { ok: true };
+}
+
 export async function assignUserToGroup(
   userId: string,
   groupId: string,
@@ -354,6 +583,7 @@ export async function assignUserToGroup(
 export async function updateUserGroupPermissions(
   groupId: string,
   permissions: PermissionSet,
+  options: { canUpdateSystemGroups?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
@@ -367,15 +597,23 @@ export async function updateUserGroupPermissions(
 
   const { data: groupRow } = await supabase
     .from("company_user_groups")
-    .select("slug")
+    .select("is_system")
     .eq("company_id", companyId)
     .eq("id", groupId)
     .maybeSingle();
 
-  const normalized =
-    groupRow?.slug === "admin"
-      ? createFullPermissions(true)
-      : normalizePermissionSet(permissions);
+  if (!groupRow) {
+    return { ok: false, error: "Grupa nav atrasta." };
+  }
+
+  if (groupRow.is_system === true && !options.canUpdateSystemGroups) {
+    return {
+      ok: false,
+      error: "Sistēmas profilu tiesības var mainīt tikai sistēmas administrators.",
+    };
+  }
+
+  const normalized = normalizePermissionSet(permissions);
 
   const { error } = await supabase
     .from("company_user_groups")
@@ -436,10 +674,7 @@ export async function getUserAccess(userId: string): Promise<UserAccess | null> 
     };
   }
 
-  const permissions =
-    group.slug === "admin"
-      ? createFullPermissions(true)
-      : group.permissions;
+  const permissions = group.permissions;
 
   return {
     userId,
