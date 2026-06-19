@@ -12,9 +12,10 @@ function getOAuthSiteUrl() {
 export async function signInWithGoogle(returnPath?: string) {
   const supabase = createClient();
   const callbackUrl = new URL(`${getOAuthSiteUrl()}/auth/callback`);
+  const safeReturnPath = getSafeRedirectPath(returnPath);
 
-  if (returnPath) {
-    callbackUrl.searchParams.set("next", getSafeRedirectPath(returnPath));
+  if (safeReturnPath !== "/") {
+    callbackUrl.searchParams.set("next", safeReturnPath);
   }
 
   return supabase.auth.signInWithOAuth({

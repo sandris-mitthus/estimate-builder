@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.26` (see [Changelog](#changelog))
+**Current version:** `1.3.27` (see [Changelog](#changelog))
 
 ---
 
@@ -13,6 +13,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 - **Google OAuth** via Supabase — when not signed in, only a centered “Pierakstīties ar Google” button is shown (no nav or app content)
 - OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
+- Root login redirects to `/auth/callback` without `?next=/`, so Supabase Redirect URLs can match the exact callback URL in both localhost and Vercel
 - OAuth fallback in `proxy.ts` / `update-session.ts` redirects provider returns from `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still completes the session
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
@@ -347,6 +348,13 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.27
+
+**OAuth redirect allowlist match**
+
+- **Google login** — `sign-in-with-google.ts` no longer appends `?next=/` for root login, so Supabase can match the exact allowed redirect URL (`/auth/callback`) instead of falling back to the Site URL
+- **Localhost/Vercel OAuth** — root login now uses the same clean callback path on both origins; non-root return paths still use the safe `next` query
 
 ### v1.3.26
 
