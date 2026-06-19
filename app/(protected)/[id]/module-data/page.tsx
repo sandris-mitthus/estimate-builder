@@ -9,7 +9,10 @@ export default async function ProjectModuleDataPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await assertNavAccess("projects");
+  const session = await assertNavAccess("projects");
+  if (!session) {
+    return null;
+  }
 
   const { id } = await params;
   const project = await getProject(id);

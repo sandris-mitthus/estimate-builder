@@ -12,7 +12,10 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 
 
 export default async function SagatavePage() {
-  await assertNavAccess("estimate");
+  const session = await assertNavAccess("estimate");
+  if (!session) {
+    return null;
+  }
 
   const [sagatave, catalogPositions, companySettings, moduleSizeOptions] =
     await Promise.all([

@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.25` (see [Changelog](#changelog))
+**Current version:** `1.3.26` (see [Changelog](#changelog))
 
 ---
 
@@ -13,6 +13,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 - **Google OAuth** via Supabase — when not signed in, only a centered “Pierakstīties ar Google” button is shown (no nav or app content)
 - OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
+- OAuth fallback in `proxy.ts` / `update-session.ts` redirects provider returns from `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still completes the session
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
@@ -177,7 +178,7 @@ npm run db:test
 4. Enable **Google** provider: Authentication → Providers → Google  
    - **Callback URL (for OAuth)** in the Google provider screen is the Supabase URL (`https://<project-ref>.supabase.co/auth/v1/callback`) — register the same URI in Google Cloud → Authorized redirect URIs
 5. **Authentication → URL Configuration** (separate from the Google provider screen):  
-   - **Site URL:** production app URL (e.g. `https://your-app.vercel.app`); default `http://localhost:3000` causes post-login redirect to localhost with `?code=` on `/`  
+   - **Site URL:** production app URL (e.g. `https://your-app.vercel.app`); if Supabase falls back to Site URL and returns `/?code=...`, `proxy.ts` forwards it to `/auth/callback`  
    - **Redirect URLs:** add every app callback you use, e.g.  
      - `http://localhost:3100/auth/callback` (local dev)  
      - `https://your-app.vercel.app/auth/callback` (production)
@@ -346,6 +347,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ---
 
 ## Changelog
+
+### v1.3.26
+
+**Localhost OAuth and protected route fallback**
+
+- **OAuth fallback** — `update-session.ts` redirects `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still exchanges the code instead of leaving the app on the login page
+- **Local dev auth** — `assertNavAccess()` returns full local permissions when Supabase is not configured in development, while production and configured Supabase still require real sessions
+- **Protected pages** — all protected pages stop rendering child content when there is no session, letting `(protected)/layout.tsx` show the Google login gate instead of returning a 404
 
 ### v1.3.25
 

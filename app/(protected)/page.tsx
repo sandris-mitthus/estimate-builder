@@ -31,7 +31,10 @@ export default async function ProjectsPage({
 }: {
   searchParams: Promise<{ archive?: string | string[] }>;
 }) {
-  await assertNavAccess("projects");
+  const session = await assertNavAccess("projects");
+  if (!session) {
+    return null;
+  }
 
   const { archive } = await searchParams;
   const showArchive = isArchiveView(archive);

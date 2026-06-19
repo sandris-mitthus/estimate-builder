@@ -8,7 +8,10 @@ import {
 import { getCompanySettings } from "@/app/lib/settings/repository";
 
 export default async function PositionsPage() {
-  await assertNavAccess("positions");
+  const session = await assertNavAccess("positions");
+  if (!session) {
+    return null;
+  }
 
   const [positions, settings] = await Promise.all([
     listPositionPrices(),

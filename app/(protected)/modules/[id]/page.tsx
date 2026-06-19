@@ -9,7 +9,10 @@ export default async function ModuleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await assertNavAccess("modules");
+  const session = await assertNavAccess("modules");
+  if (!session) {
+    return null;
+  }
 
   const { id } = await params;
   const mod = await getBuildingModule(id);

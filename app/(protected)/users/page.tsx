@@ -5,7 +5,6 @@ import { SectionPage } from "@/app/components/section-page";
 import { UserGroupSelect } from "@/app/components/user-group-select";
 import { UserListCard } from "@/app/components/user-list-card";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
-import { getCurrentUserAccess } from "@/app/lib/auth/require-permission";
 import {
   canPerformAction,
   listUserGroupMemberships,
@@ -15,24 +14,20 @@ import {
 import { listUsers } from "@/app/lib/users/repository";
 
 export default async function UsersPage() {
-  await assertNavAccess("users");
+  const session = await assertNavAccess("users");
+  if (!session) {
+    return null;
+  }
 
-  const [users, groups, memberships, session] = await Promise.all([
+  const [users, groups, memberships] = await Promise.all([
     listUsers(),
     listUserGroups(),
     listUserGroupMemberships(),
-    getCurrentUserAccess(),
   ]);
 
-  const canInvite = session
-    ? canPerformAction(session.access, "users.invite")
-    : false;
-  const canAssignGroup = session
-    ? canPerformAction(session.access, "users.assign_group")
-    : false;
-  const canManageGroups = session
-    ? canPerformAction(session.access, "groups.manage")
-    : false;
+  const canInvite = canPerformAction(session.access, "users.invite");
+  const canAssignGroup = canPerformAction(session.access, "users.assign_group");
+  const canManageGroups = canPerformAction(session.access, "groups.manage");
 
   const defaultGroupId = getDefaultNewUserGroupId(groups);
 

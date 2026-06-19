@@ -6,7 +6,10 @@ import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { listBuildingModules } from "@/app/lib/modules/repository";
 
 export default async function ModulesPage() {
-  await assertNavAccess("modules");
+  const session = await assertNavAccess("modules");
+  if (!session) {
+    return null;
+  }
 
   const modules = await listBuildingModules();
 

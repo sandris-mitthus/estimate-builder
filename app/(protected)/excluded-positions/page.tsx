@@ -3,7 +3,10 @@ import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 
 export default async function ExcludedPositionsPage() {
-  await assertNavAccess("excluded_positions");
+  const session = await assertNavAccess("excluded_positions");
+  if (!session) {
+    return null;
+  }
 
   const positions = await listExcludedPositions();
 

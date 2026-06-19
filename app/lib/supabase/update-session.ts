@@ -31,7 +31,25 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 
+function getOAuthFallbackRedirect(request: NextRequest): NextResponse | null {
+  if (
+    request.nextUrl.pathname !== "/" ||
+    !request.nextUrl.searchParams.has("code")
+  ) {
+    return null;
+  }
+
+  const callbackUrl = request.nextUrl.clone();
+  callbackUrl.pathname = "/auth/callback";
+  return NextResponse.redirect(callbackUrl);
+}
+
 export async function updateSession(request: NextRequest) {
+  const oauthFallbackRedirect = getOAuthFallbackRedirect(request);
+  if (oauthFallbackRedirect) {
+    return oauthFallbackRedirect;
+  }
+
   const env = getSupabasePublicEnv();
   if (!env) {
     return NextResponse.next({ request });

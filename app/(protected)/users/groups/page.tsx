@@ -2,23 +2,20 @@ import Link from "next/link";
 import { UserGroupsPermissionsForm } from "@/app/components/user-groups-permissions-form";
 import { SectionPage } from "@/app/components/section-page";
 import { assertUserGroupsPageAccess } from "@/app/lib/auth/assert-nav-access";
-import { getCurrentUserAccess } from "@/app/lib/auth/require-permission";
 import {
   canPerformAction,
   listUserGroups,
 } from "@/app/lib/users/groups-repository";
 
 export default async function UserGroupsPage() {
-  await assertUserGroupsPageAccess();
+  const session = await assertUserGroupsPageAccess();
+  if (!session) {
+    return null;
+  }
 
-  const [groups, session] = await Promise.all([
-    listUserGroups(),
-    getCurrentUserAccess(),
-  ]);
+  const groups = await listUserGroups();
 
-  const canManage = session
-    ? canPerformAction(session.access, "groups.manage")
-    : false;
+  const canManage = canPerformAction(session.access, "groups.manage");
 
   return (
     <SectionPage

@@ -20,7 +20,10 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await assertNavAccess("projects");
+  const session = await assertNavAccess("projects");
+  if (!session) {
+    return null;
+  }
 
   const { id } = await params;
   const [

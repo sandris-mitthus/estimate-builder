@@ -1,30 +1,69 @@
 import { notFound } from "next/navigation";
 import {
+  createFullPermissions,
   type NavPermissionKey,
   NAV_PERMISSION_HREFS,
   NAV_PERMISSION_LABELS,
 } from "@/app/lib/auth/permissions";
 import { getCurrentUserAccess } from "@/app/lib/auth/require-permission";
+import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import {
   canAccessNav,
   canPerformAction,
+  type UserAccess,
 } from "@/app/lib/users/groups-repository";
 
-export async function assertNavAccess(navKey: NavPermissionKey): Promise<void> {
-  const session = await getCurrentUserAccess();
+type CurrentUserAccess = {
+  user:
+    | NonNullable<Awaited<ReturnType<typeof getCurrentUserAccess>>>["user"]
+    | null;
+  access: UserAccess;
+};
+
+function getDevAccessSession(): CurrentUserAccess | null {
+  if (isSupabaseConfigured() || process.env.NODE_ENV === "production") {
+    return null;
+  }
+
+  const permissions = createFullPermissions(true);
+
+  return {
+    user: null,
+    access: {
+      userId: "local-dev",
+      group: {
+        id: "local-dev-admin",
+        slug: "admin",
+        name: "Lokālais dev režīms",
+        isSystem: true,
+        permissions,
+      },
+      permissions,
+    },
+  };
+}
+
+export async function assertNavAccess(
+  navKey: NavPermissionKey,
+): Promise<CurrentUserAccess | null> {
+  const session = (await getCurrentUserAccess()) ?? getDevAccessSession();
   if (!session) {
-    notFound();
+    return null;
   }
 
   if (!canAccessNav(session.access, navKey)) {
     notFound();
   }
+
+  return session;
 }
 
-export async function assertUserGroupsPageAccess(): Promise<void> {
-  const session = await getCurrentUserAccess();
+export async function assertUserGroupsPageAccess(): Promise<
+  CurrentUserAccess | null
+> {
+  const session = (await getCurrentUserAccess()) ?? getDevAccessSession();
   if (!session) {
-    notFound();
+    return null;
   }
 
   if (
@@ -33,6 +72,8 @@ export async function assertUserGroupsPageAccess(): Promise<void> {
   ) {
     notFound();
   }
+
+  return session;
 }
 
 const NAV_PERMISSION_KEYS_FOR_MENU: Exclude<NavPermissionKey, "user_groups">[] = [
