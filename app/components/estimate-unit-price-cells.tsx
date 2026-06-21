@@ -16,6 +16,7 @@ import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns"
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { Tooltip } from "@/app/components/tooltip";
+import { useTranslations } from "@/app/components/translations-provider";
 
 const readOnlyNum =
   "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
@@ -53,6 +54,7 @@ export function EstimateUnitPriceCells({
   onTimeNormChange,
   staleCatalogPriceHints,
 }: EstimateUnitPriceCellsProps) {
+  const { t } = useTranslations();
   const total = sumBreakdown(values);
   const showLaborBreakdown = item != null && isCompositeLineItem(item);
   const timeNormText =
@@ -74,7 +76,7 @@ export function EstimateUnitPriceCells({
                 value={item?.laborTimeNorm ?? 0}
                 onChange={onTimeNormChange}
                 className={cellNum}
-                aria-label="Laika norma (c/h)"
+                aria-label={t("estimate.time_norm", "Laika norma (c/h)")}
               />
             ) : (
               <span

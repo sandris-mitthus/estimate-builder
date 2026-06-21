@@ -9,6 +9,8 @@ import {
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { Tooltip } from "@/app/components/tooltip";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { UserSummary } from "@/app/lib/users/types";
 
 type UserCompanyActionsProps = {
@@ -33,6 +35,7 @@ export function UserCompanyActions({
 }: UserCompanyActionsProps) {
   const router = useRouter();
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [pendingDialog, setPendingDialog] = useState<PendingDialog>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -51,13 +54,15 @@ export function UserCompanyActions({
     startTransition(async () => {
       const result = await setCompanyUserAccessAction(userId, nextStatus);
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       showFeedback({
         type: "success",
-        text: isDisabled ? "Lietotāja pieeja atjaunota." : "Lietotāja pieeja liegta.",
+        text: isDisabled
+          ? t("users.access.feedback.restored", "Lietotāja pieeja atjaunota.")
+          : t("users.access.feedback.disabled", "Lietotāja pieeja liegta."),
       });
       setPendingDialog(null);
       router.refresh();
@@ -68,15 +73,15 @@ export function UserCompanyActions({
     startTransition(async () => {
       const result = await removeCompanyUserAction(userId);
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       showFeedback({
         type: "success",
         text: isCurrentUser
-          ? "Jūs pametāt uzņēmumu."
-          : "Lietotājs noņemts no uzņēmuma.",
+          ? t("users.remove.feedback.left_company", "Jūs pametāt uzņēmumu.")
+          : t("users.remove.feedback.removed", "Lietotājs noņemts no uzņēmuma."),
       });
       setPendingDialog(null);
       router.refresh();
@@ -87,12 +92,22 @@ export function UserCompanyActions({
     <>
       <div className="flex items-center gap-1">
         {canManageCompanyAccess && !isCurrentUser ? (
-          <Tooltip label={isDisabled ? "Atjaunot pieeju" : "Liegt pieeju"}>
+          <Tooltip
+            label={
+              isDisabled
+                ? t("users.access.restore", "Atjaunot pieeju")
+                : t("users.access.disable", "Liegt pieeju")
+            }
+          >
             <button
               type="button"
               onClick={() => setPendingDialog("access")}
               disabled={isPending}
-              aria-label={isDisabled ? "Atjaunot pieeju" : "Liegt pieeju"}
+              aria-label={
+                isDisabled
+                  ? t("users.access.restore", "Atjaunot pieeju")
+                  : t("users.access.disable", "Liegt pieeju")
+              }
               className={actionButtonClassName}
             >
               <i
@@ -105,13 +120,21 @@ export function UserCompanyActions({
 
         {canRemove ? (
           <Tooltip
-            label={isCurrentUser ? "Pamest uzņēmumu" : "Noņemt no uzņēmuma"}
+            label={
+              isCurrentUser
+                ? t("users.remove.leave_company", "Pamest uzņēmumu")
+                : t("users.remove.from_company", "Noņemt no uzņēmuma")
+            }
           >
             <button
               type="button"
               onClick={() => setPendingDialog("remove")}
               disabled={isPending}
-              aria-label={isCurrentUser ? "Pamest uzņēmumu" : "Noņemt no uzņēmuma"}
+              aria-label={
+                isCurrentUser
+                  ? t("users.remove.leave_company", "Pamest uzņēmumu")
+                  : t("users.remove.from_company", "Noņemt no uzņēmuma")
+              }
               className={`${actionButtonClassName} hover:bg-red-50 hover:text-red-600`}
             >
               <i className="fas fa-times text-sm" aria-hidden="true" />
@@ -123,21 +146,31 @@ export function UserCompanyActions({
       <ConfirmModal
         open={pendingDialog === "access"}
         onOpenChange={(open) => (open ? setPendingDialog("access") : closeDialog())}
-        title={isDisabled ? "Atjaunot pieeju?" : "Liegt pieeju?"}
+        title={
+          isDisabled
+            ? t("users.access.restore_title", "Atjaunot pieeju?")
+            : t("users.access.disable_title", "Liegt pieeju?")
+        }
         description={
           isDisabled ? (
             <>
-              Vai tiešām vēlaties atjaunot lietotāja{" "}
-              <strong>{userName}</strong> pieeju šim uzņēmumam?
+              {t("users.access.restore_confirm_prefix", "Vai tiešām vēlaties atjaunot lietotāja")}{" "}
+              <strong>{userName}</strong>{" "}
+              {t("users.access.restore_confirm_suffix", "pieeju šim uzņēmumam?")}
             </>
           ) : (
             <>
-              Vai tiešām vēlaties liegt lietotājam <strong>{userName}</strong>{" "}
-              pieeju šim uzņēmumam?
+              {t("users.access.disable_confirm_prefix", "Vai tiešām vēlaties liegt lietotājam")}{" "}
+              <strong>{userName}</strong>{" "}
+              {t("users.access.disable_confirm_suffix", "pieeju šim uzņēmumam?")}
             </>
           )
         }
-        confirmLabel={isDisabled ? "Atjaunot pieeju" : "Liegt pieeju"}
+        confirmLabel={
+          isDisabled
+            ? t("users.access.restore", "Atjaunot pieeju")
+            : t("users.access.disable", "Liegt pieeju")
+        }
         confirmVariant={isDisabled ? "default" : "danger"}
         onConfirm={confirmAccessChange}
         blocking={isPending}
@@ -146,18 +179,27 @@ export function UserCompanyActions({
       <ConfirmModal
         open={pendingDialog === "remove"}
         onOpenChange={(open) => (open ? setPendingDialog("remove") : closeDialog())}
-        title={isCurrentUser ? "Pamest uzņēmumu?" : "Noņemt lietotāju?"}
+        title={
+          isCurrentUser
+            ? t("users.remove.leave_title", "Pamest uzņēmumu?")
+            : t("users.remove.user_title", "Noņemt lietotāju?")
+        }
         description={
           isCurrentUser ? (
-            "Vai tiešām vēlaties pamest šo uzņēmumu?"
+            t("users.remove.leave_confirm", "Vai tiešām vēlaties pamest šo uzņēmumu?")
           ) : (
             <>
-              Vai tiešām vēlaties noņemt lietotāju <strong>{userName}</strong>{" "}
-              no šī uzņēmuma?
+              {t("users.remove.confirm_prefix", "Vai tiešām vēlaties noņemt lietotāju")}{" "}
+              <strong>{userName}</strong>{" "}
+              {t("users.remove.confirm_suffix", "no šī uzņēmuma?")}
             </>
           )
         }
-        confirmLabel={isCurrentUser ? "Pamest uzņēmumu" : "Noņemt"}
+        confirmLabel={
+          isCurrentUser
+            ? t("users.remove.leave_company", "Pamest uzņēmumu")
+            : t("actions.remove", "Noņemt")
+        }
         confirmVariant="danger"
         onConfirm={confirmRemove}
         blocking={isPending}

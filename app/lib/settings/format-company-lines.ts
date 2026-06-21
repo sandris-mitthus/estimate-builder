@@ -1,4 +1,11 @@
 import type { CompanySettings } from "@/app/lib/settings/types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export type CompanyDisplayLine = {
   label?: string;
@@ -7,6 +14,7 @@ export type CompanyDisplayLine = {
 
 export function formatCompanyDisplayLines(
   settings: CompanySettings,
+  t?: Translate,
 ): CompanyDisplayLine[] {
   const lines: CompanyDisplayLine[] = [];
 
@@ -20,21 +28,21 @@ export function formatCompanyDisplayLines(
 
   if (settings.registrationNumber.trim()) {
     lines.push({
-      label: "Reģ. nr.",
+      label: t ? t("settings.company_display.registration_number", "Reģ. nr.") : "Reģ. nr.",
       value: settings.registrationNumber.trim(),
     });
   }
 
   if (settings.vatNumber.trim()) {
     lines.push({
-      label: "PVN nr.",
+      label: t ? t("settings.company_display.vat_number", "PVN nr.") : "PVN nr.",
       value: settings.vatNumber.trim(),
     });
   }
 
   if (settings.bankName.trim()) {
     lines.push({
-      label: "Banka",
+      label: t ? t("settings.company_display.bank", "Banka") : "Banka",
       value: settings.bankName.trim(),
     });
   }
@@ -48,21 +56,21 @@ export function formatCompanyDisplayLines(
 
   if (settings.bankAccountNumber.trim()) {
     lines.push({
-      label: "Konts",
+      label: t ? t("settings.company_display.account", "Konts") : "Konts",
       value: settings.bankAccountNumber.trim(),
     });
   }
 
   if (settings.phone.trim()) {
     lines.push({
-      label: "Tālrunis",
+      label: t ? t("settings.company_display.phone", "Tālrunis") : "Tālrunis",
       value: settings.phone.trim(),
     });
   }
 
   if (settings.email.trim()) {
     lines.push({
-      label: "E-pasts",
+      label: t ? t("settings.company_display.email", "E-pasts") : "E-pasts",
       value: settings.email.trim(),
     });
   }

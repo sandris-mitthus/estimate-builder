@@ -4,6 +4,8 @@ import { useMemo, useTransition } from "react";
 import { omitProjectExcludedPositionAction } from "@/app/(protected)/actions";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { resolveProjectExcludedPositions } from "@/app/lib/excluded-positions/resolve-project-excluded-positions";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 
@@ -23,6 +25,7 @@ export function ProjectExcludedPositionsPanel({
   onOmit,
 }: ProjectExcludedPositionsPanelProps) {
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [isPending, startTransition] = useTransition();
 
   const visiblePositions = useMemo(
@@ -42,14 +45,17 @@ export function ProjectExcludedPositionsPanel({
       const result = await omitProjectExcludedPositionAction(projectId, position.id);
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       onOmit(result.omittedIds);
       showFeedback({
         type: "success",
-        text: "Pozīcija noņemta no šī projekta piedāvājuma.",
+        text: t(
+          "excluded_positions.feedback.omitted_from_project",
+          "Pozīcija noņemta no šī projekta piedāvājuma.",
+        ),
       });
     });
   }
@@ -57,9 +63,14 @@ export function ProjectExcludedPositionsPanel({
   if (visiblePositions.length === 0) {
     return (
       <section className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3">
-        <p className="text-sm font-medium text-zinc-700">Neiekļautās pozīcijas</p>
+        <p className="text-sm font-medium text-zinc-700">
+          {t("nav.excluded_positions", "Neiekļautās pozīcijas")}
+        </p>
         <p className="mt-1 text-sm text-zinc-500">
-          Visas globālās neiekļautās pozīcijas ir izņemtas no šī projekta piedāvājuma.
+          {t(
+            "excluded_positions.project.all_omitted",
+            "Visas globālās neiekļautās pozīcijas ir izņemtas no šī projekta piedāvājuma.",
+          )}
         </p>
       </section>
     );
@@ -68,9 +79,14 @@ export function ProjectExcludedPositionsPanel({
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="border-b border-zinc-100 px-4 py-3">
-        <p className="text-sm font-medium text-zinc-900">Neiekļautās pozīcijas</p>
+        <p className="text-sm font-medium text-zinc-900">
+          {t("nav.excluded_positions", "Neiekļautās pozīcijas")}
+        </p>
         <p className="mt-0.5 text-xs text-zinc-500">
-          Rādītas piedāvājumā; noņemšana attiecas tikai uz šo projektu.
+          {t(
+            "excluded_positions.project.description",
+            "Rādītas piedāvājumā; noņemšana attiecas tikai uz šo projektu.",
+          )}
         </p>
       </div>
       <ul className="divide-y divide-zinc-100">
@@ -85,7 +101,10 @@ export function ProjectExcludedPositionsPanel({
             <p className="min-w-0 flex-1 text-sm text-zinc-800">{position.name}</p>
             {!readOnly ? (
               <IconActionButton
-                label="Noņemt no šī projekta piedāvājuma"
+                label={t(
+                  "excluded_positions.project.omit_action",
+                  "Noņemt no šī projekta piedāvājuma",
+                )}
                 icon="fas fa-times"
                 variant="delete"
                 tooltipAlign="end"

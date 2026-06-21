@@ -5,10 +5,12 @@ import { useEffect, useState, useTransition } from "react";
 import { updateBuildingModuleAction } from "@/app/(protected)/modules/actions";
 import { AppModal } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
 type ModuleFormModalProps = {
@@ -27,6 +29,7 @@ export function ModuleFormModal({
   const [nameError, setNameError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { t } = useTranslations();
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +52,7 @@ export function ModuleFormModal({
     setError(null);
 
     if (!name.trim()) {
-      setNameError("Ievadi nosaukumu.");
+      setNameError(t("validation.name_required", "Ievadi nosaukumu."));
       return;
     }
 
@@ -61,9 +64,9 @@ export function ModuleFormModal({
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
-          setNameError(result.error);
+          setNameError(translateActionError(t, result));
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
@@ -77,15 +80,15 @@ export function ModuleFormModal({
     <AppModal
       open={open}
       onOpenChange={handleOpenChange}
-      title="Labot moduli"
-      description="Ievadi moduļa nosaukumu"
+      title={t("modules.edit.title", "Labot moduli")}
+      description={t("modules.create.description", "Ievadi moduļa nosaukumu")}
       blocking={isPending}
       dirty={name !== module.name}
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <label htmlFor="module-edit-name" className="block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Nosaukums
+            {t("common.name", "Nosaukums")}
           </span>
           <input
             id="module-edit-name"
@@ -123,7 +126,7 @@ export function ModuleFormModal({
             disabled={isPending}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending ? "Saglabā…" : "Saglabāt"}
+            {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
       </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type IndividualProjectModuleDataSpotlightProps = {
   onDismiss: () => void;
@@ -9,6 +10,8 @@ type IndividualProjectModuleDataSpotlightProps = {
 export function IndividualProjectModuleDataSpotlight({
   onDismiss,
 }: IndividualProjectModuleDataSpotlightProps) {
+  const { t } = useTranslations();
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -25,7 +28,7 @@ export function IndividualProjectModuleDataSpotlight({
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Aizvērt"
+        aria-label={t("actions.close", "Aizvērt")}
         className="absolute right-4 top-4 z-[120] inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/95 text-zinc-600 shadow-md transition hover:bg-white hover:text-zinc-900"
       >
         <i className="fas fa-times text-sm" aria-hidden="true" />

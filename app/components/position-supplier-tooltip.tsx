@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "@/app/components/translations-provider";
 import { formatDisplayPhone } from "@/app/lib/validation/contact-fields";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
@@ -60,6 +63,7 @@ export function PositionSupplierTooltip({
   position,
   anchorRect,
 }: PositionSupplierTooltipProps) {
+  const { t } = useTranslations();
   const rows = buildSupplierTooltipRows(position);
   if (rows.length === 0) return null;
 
@@ -78,7 +82,7 @@ export function PositionSupplierTooltip({
       <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white/95 shadow-[0_12px_40px_-12px_rgba(24,24,27,0.28)] ring-1 ring-zinc-900/5 backdrop-blur-sm">
         <div className="border-b border-zinc-100 bg-zinc-50/80 px-3.5 py-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-            Veikals
+            {t("positions.supplier.store", "Veikals")}
           </p>
         </div>
         <div className="divide-y divide-zinc-100/80 px-3.5 py-1">

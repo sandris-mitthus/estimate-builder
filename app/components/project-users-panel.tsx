@@ -2,6 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { UserAvatar } from "@/app/components/user-avatar";
+import { useTranslations } from "@/app/components/translations-provider";
 import type { UserSummary } from "@/app/lib/users/types";
 
 type ProjectUsersPanelProps = {
@@ -65,6 +66,8 @@ export function ProjectUsersPanel({
   users,
   dragEnabled = false,
 }: ProjectUsersPanelProps) {
+  const { t } = useTranslations();
+
   if (users.length === 0) {
     return null;
   }
@@ -79,12 +82,17 @@ export function ProjectUsersPanel({
           id="project-users-heading"
           className="text-sm font-semibold text-zinc-900"
         >
-          Lietotāji
+          {t("nav.users", "Lietotāji")}
         </h2>
         <p className="mt-1 text-xs text-zinc-500">
           {dragEnabled
-            ? "Velc lietotāju uz materiālu, lai piešķirtu pasūtīšanu"
-            : `${users.length} lietotāji sistēmā`}
+            ? t(
+                "materials.assign.drag_hint",
+                "Velc lietotāju uz materiālu, lai piešķirtu pasūtīšanu",
+              )
+            : t("users.page.subtitle", "{count} lietotāji sistēmā", {
+                count: users.length,
+              })}
         </p>
       </div>
 

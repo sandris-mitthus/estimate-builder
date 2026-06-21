@@ -73,10 +73,12 @@ export const NAV_PERMISSION_HREFS: Record<NavPermissionKey, string> = {
 };
 
 export const ACTION_PERMISSION_GROUPS: {
+  titleKey: string;
   title: string;
   keys: ActionPermissionKey[];
 }[] = [
   {
+    titleKey: "permissions.groups.projects",
     title: "Projekti",
     keys: [
       "project.create",
@@ -92,10 +94,12 @@ export const ACTION_PERMISSION_GROUPS: {
     ],
   },
   {
+    titleKey: "permissions.groups.estimate_template",
     title: "Sagatave",
     keys: ["sagatave.save"],
   },
   {
+    titleKey: "permissions.groups.modules_catalog",
     title: "Moduļi un katalogs",
     keys: [
       "modules.manage",
@@ -104,10 +108,12 @@ export const ACTION_PERMISSION_GROUPS: {
     ],
   },
   {
+    titleKey: "permissions.groups.materials",
     title: "Materiāli",
     keys: ["materials.assign", "materials.order"],
   },
   {
+    titleKey: "permissions.groups.users_groups",
     title: "Lietotāji un grupas",
     keys: [
       "users.invite",
@@ -117,6 +123,7 @@ export const ACTION_PERMISSION_GROUPS: {
     ],
   },
   {
+    titleKey: "permissions.groups.settings",
     title: "Uzstādījumi",
     keys: ["settings.save"],
   },

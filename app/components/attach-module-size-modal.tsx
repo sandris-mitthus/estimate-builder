@@ -13,6 +13,7 @@ import {
 } from "@/app/components/app-modal";
 
 import { ModuleSizeAttachItemRow } from "@/app/components/module-size-attach-item-row";
+import { useTranslations } from "@/app/components/translations-provider";
 
 import {
 
@@ -23,6 +24,7 @@ import {
   findModuleSizeSummaryItem,
 
 } from "@/app/lib/modules/apply-module-size-adjustments";
+import { translateModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
 
 import {
 
@@ -99,12 +101,23 @@ function ModuleSizeSectionList({
   ) => void;
 
 }) {
+  const { t } = useTranslations();
+  const translatedBaseSections = useMemo(
+    () => translateModuleSizeSummarySections(baseSections, t),
+    [baseSections, t],
+  );
+  const translatedDisplaySections = useMemo(
+    () => translateModuleSizeSummarySections(displaySections, t),
+    [displaySections, t],
+  );
 
   if (baseSections.length === 0) {
 
     return (
 
-      <p className="text-sm text-zinc-500">Nav definētu lielumu šim modulim.</p>
+      <p className="text-sm text-zinc-500">
+        {t("modules.sizes.empty_for_module", "Nav definētu lielumu šim modulim.")}
+      </p>
 
     );
 
@@ -116,20 +129,21 @@ function ModuleSizeSectionList({
 
     <div className="space-y-4">
 
-      {baseSections.map((section) => {
+      {baseSections.map((section, sectionIndex) => {
+        const translatedSection = translatedBaseSections[sectionIndex] ?? section;
         return (
 
           <section key={section.title}>
 
             <h4 className="border-b border-zinc-200 pb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-700">
 
-              {section.title}
+              {translatedSection.title}
 
             </h4>
 
             <ul className="mt-2 space-y-0.5">
 
-              {section.items.map((baseItem) => {
+              {section.items.map((baseItem, index) => {
 
                 const stateKey = createAttachItemStateKey(moduleId, baseItem.key);
 
@@ -139,7 +153,9 @@ function ModuleSizeSectionList({
 
                 const displayItem =
 
-                  findModuleSizeSummaryItem(displaySections, baseItem.key) ??
+                  findModuleSizeSummaryItem(translatedDisplaySections, baseItem.key) ??
+
+                  translatedSection.items[index] ??
 
                   baseItem;
 
@@ -308,10 +324,13 @@ export function AttachModuleSizeModal({
   onAttachStateChange,
 
 }: AttachModuleSizeModalProps) {
+  const { t } = useTranslations();
 
   const description = positionName.trim()
 
-    ? `Pozīcija: ${positionName.trim()}`
+    ? t("positions.description_prefix", "Pozīcija: {name}", {
+        name: positionName.trim(),
+      })
 
     : undefined;
 
@@ -325,7 +344,7 @@ export function AttachModuleSizeModal({
 
       onOpenChange={onOpenChange}
 
-      title="Piesaisīt moduļa lielumu"
+      title={t("modules.sizes.attach_title", "Piesaisīt moduļa lielumu")}
 
       description={description}
 
@@ -337,9 +356,10 @@ export function AttachModuleSizeModal({
 
         <p className="text-sm text-zinc-500">
 
-          Nav definētu moduļa lielumu. Ievadi tos moduļa detaļā sadaļā Projekta
-
-          apraksts.
+          {t(
+            "modules.sizes.empty_description",
+            "Nav definētu moduļa lielumu. Ievadi tos moduļa detaļā sadaļā Projekta apraksts.",
+          )}
 
         </p>
 

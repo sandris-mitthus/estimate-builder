@@ -29,6 +29,8 @@ import { UpdatePositionPriceModal } from "@/app/components/update-position-price
 import { PositionPriceHistoryModal } from "@/app/components/position-price-history-modal";
 
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 import type {
   PositionPriceSummary,
@@ -65,6 +67,7 @@ export function PositionRowActions({
 
   const router = useRouter();
   const canManage = useActionPermission("positions.manage");
+  const { t } = useTranslations();
 
   const { showFeedback } = useFeedbackToast();
 
@@ -109,7 +112,7 @@ export function PositionRowActions({
 
       if (!result.ok) {
 
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
 
         return;
 
@@ -119,7 +122,7 @@ export function PositionRowActions({
 
       setEditOpen(false);
 
-      showFeedback({ type: "success", text: "Pozīcija atjaunināta." });
+      showFeedback({ type: "success", text: t("positions.feedback.updated", "Pozīcija atjaunināta.") });
 
       router.refresh();
 
@@ -147,7 +150,7 @@ export function PositionRowActions({
 
       if (!result.ok) {
 
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
 
         return;
 
@@ -157,7 +160,7 @@ export function PositionRowActions({
 
       setUpdatePriceOpen(false);
 
-      showFeedback({ type: "success", text: "Cena atjaunināta." });
+      showFeedback({ type: "success", text: t("positions.feedback.price_updated", "Cena atjaunināta.") });
 
       router.refresh();
 
@@ -181,7 +184,7 @@ export function PositionRowActions({
 
       if (!result.ok) {
 
-        setDeleteError(result.error);
+        setDeleteError(translateActionError(t, result));
 
         return;
 
@@ -191,7 +194,7 @@ export function PositionRowActions({
 
       setDeleteOpen(false);
 
-      showFeedback({ type: "success", text: "Pozīcija dzēsta." });
+      showFeedback({ type: "success", text: t("positions.feedback.deleted", "Pozīcija dzēsta.") });
 
       router.refresh();
 
@@ -213,7 +216,7 @@ export function PositionRowActions({
 
         <IconActionButton
 
-          label="Atjaunot"
+          label={t("actions.update", "Atjaunot")}
 
           icon="fas fa-level-up-alt"
 
@@ -225,7 +228,7 @@ export function PositionRowActions({
 
         <IconActionButton
 
-          label="Vēsture"
+          label={t("common.history", "Vēsture")}
 
           icon="fas fa-history"
 
@@ -237,7 +240,7 @@ export function PositionRowActions({
 
         <IconActionButton
 
-          label="Labot"
+          label={t("actions.edit", "Labot")}
 
           icon="fas fa-pen"
 
@@ -249,7 +252,7 @@ export function PositionRowActions({
 
         <IconActionButton
 
-          label="Dzēst"
+          label={t("actions.delete", "Dzēst")}
 
           icon="fas fa-trash"
 
@@ -319,7 +322,7 @@ export function PositionRowActions({
 
         onOpenChange={setDeleteOpen}
 
-        title="Dzēst pozīciju?"
+        title={t("positions.delete.title", "Dzēst pozīciju?")}
 
         description={
 
@@ -327,7 +330,7 @@ export function PositionRowActions({
 
             <p>
 
-              Vai tiešām vēlies dzēst pozīciju{" "}
+              {t("positions.delete.confirm_prefix", "Vai tiešām vēlies dzēst pozīciju")}{" "}
 
               <span className="font-medium text-zinc-900">{position.name}</span>?
 
@@ -347,7 +350,9 @@ export function PositionRowActions({
 
         }
 
-        confirmLabel={isPending ? "Dzēš…" : "Dzēst"}
+        confirmLabel={
+          isPending ? t("actions.deleting", "Dzēš…") : t("actions.delete", "Dzēst")
+        }
 
         confirmVariant="danger"
 

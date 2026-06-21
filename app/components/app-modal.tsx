@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "@/app/components/translations-provider";
 
 const overlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center p-4";
@@ -73,6 +74,7 @@ export function AppModal({
   const confirmPanelRef = useRef<HTMLDivElement>(null);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { t } = useTranslations();
 
   useEffect(() => {
     setMounted(true);
@@ -222,7 +224,7 @@ export function AppModal({
                 type="button"
                 onClick={closeDirectly}
                 disabled={blocking}
-                aria-label="Aizvērt"
+                aria-label={t("actions.close", "Aizvērt")}
                 className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <i className="fas fa-times" aria-hidden="true" />
@@ -249,10 +251,13 @@ export function AppModal({
           >
             <div className="p-6">
               <h2 id="confirm-exit-title" className="text-lg font-semibold text-zinc-900">
-                Izbeigt darbību?
+                {t("modal.confirm_exit.title", "Izbeigt darbību?")}
               </h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Vai vēlaties izbeigt šo darbību?
+                {t(
+                  "modal.confirm_exit.description",
+                  "Vai vēlaties izbeigt šo darbību?",
+                )}
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
@@ -260,14 +265,14 @@ export function AppModal({
                   onClick={cancelExit}
                   className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
                 >
-                  Turpināt
+                  {t("actions.continue", "Turpināt")}
                 </button>
                 <button
                   type="button"
                   onClick={confirmExit}
                   className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700"
                 >
-                  Izbeigt
+                  {t("actions.end", "Izbeigt")}
                 </button>
               </div>
             </div>

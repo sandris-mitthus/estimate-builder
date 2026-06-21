@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   CALLING_CODE_OPTIONS,
   DEFAULT_CALLING_CODE,
@@ -35,6 +36,7 @@ export function PhoneField({
   error,
   skipGeoLookup = false,
 }: PhoneFieldProps) {
+  const { t } = useTranslations();
   const [loadingCode, setLoadingCode] = useState(!skipGeoLookup);
   const codeTouchedRef = useRef(false);
 
@@ -84,14 +86,14 @@ export function PhoneField({
     <div className="block">
       <label htmlFor={id} className="block">
         <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-          Telefons
+          {t("common.phone", "Telefons")}
         </span>
         <div className="flex gap-2">
           <select
             value={selectValue}
             onChange={(event) => handleCallingCodeChange(event.target.value)}
             disabled={loadingCode}
-            aria-label="Valsts kods"
+            aria-label={t("phone.country_code", "Valsts kods")}
             aria-invalid={invalid}
             className={`shrink-0 px-2 ${formInputClassName(invalid)} bg-zinc-50 font-medium text-zinc-700`}
           >
@@ -118,8 +120,11 @@ export function PhoneField({
       </label>
       <p id={`${id}-hint`} className="mt-1.5 text-xs text-zinc-400">
         {loadingCode
-          ? "Noteic valsts kodu…"
-          : "Valsts kods noteikts automātiski. Maini sarakstā, ja pasūtītājs ir ārzemnieks."}
+          ? t("phone.detecting_country_code", "Noteic valsts kodu…")
+          : t(
+              "phone.auto_country_code_hint",
+              "Valsts kods noteikts automātiski. Maini sarakstā, ja pasūtītājs ir ārzemnieks.",
+            )}
       </p>
       {error ? (
         <p id={`${id}-error`} className="mt-1 text-sm text-red-600" role="alert">

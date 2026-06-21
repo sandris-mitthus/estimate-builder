@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
+import { useTranslations } from "@/app/components/translations-provider";
 import { catalogPositionToLineItemRef } from "@/app/lib/estimates/composite-line-item";
 import type { LineItemCatalogRef } from "@/app/lib/estimates/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -23,8 +24,9 @@ export function CatalogHintField({
   onChange,
   catalogPositions,
   defaultHourlyRate = null,
-  placeholder = "Meklēt katalogā",
+  placeholder,
 }: CatalogHintFieldProps) {
+  const { t } = useTranslations();
   const [query, setQuery] = useState(value?.name ?? "");
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function CatalogHintField({
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
       className={fieldClassName}
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("positions.catalog_search_placeholder", "Meklēt katalogā")}
       onNameChange={(name) => {
         setQuery(name);
         if (!name.trim()) {

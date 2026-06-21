@@ -14,6 +14,8 @@ import { ProjectMaterialsTable } from "@/app/components/project-materials-table"
 import { ProjectUsersPanel } from "@/app/components/project-users-panel";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -53,6 +55,7 @@ export function ProjectMaterialsDelegationPanel({
   const router = useRouter();
   const canAssignMaterials = useActionPermission("materials.assign");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [assigningMaterialId, setAssigningMaterialId] = useState<string | null>(
     null,
   );
@@ -105,7 +108,7 @@ export function ProjectMaterialsDelegationPanel({
         );
 
         if (!result.ok) {
-          showFeedback({ type: "error", text: result.error });
+          showFeedback({ type: "error", text: translateActionError(t, result) });
           return;
         }
 
@@ -113,7 +116,7 @@ export function ProjectMaterialsDelegationPanel({
         router.refresh();
         showFeedback({
           type: "success",
-          text: "Materiāls piešķirts lietotājam.",
+          text: t("materials.feedback.assigned", "Materiāls piešķirts lietotājam."),
         });
       } finally {
         setAssigningMaterialId(null);

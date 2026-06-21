@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "@/app/components/translations-provider";
 import { filterUnitSuggestions } from "@/app/lib/positions/collect-known-units";
 import {
   formInputClassName,
@@ -35,6 +36,7 @@ export function PositionUnitField({
   knownUnits,
   error,
 }: PositionUnitFieldProps) {
+  const { t } = useTranslations();
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -186,7 +188,7 @@ export function PositionUnitField({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-autocomplete="list"
-        placeholder="piem. m², m³, gab."
+        placeholder={t("positions.unit.placeholder", "piem. m², m³, gab.")}
         onChange={(event) => handleInputChange(event.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => {

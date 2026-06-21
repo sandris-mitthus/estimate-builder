@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "@/app/components/translations-provider";
+
 type PositionManualUnitFieldProps = {
   id: string;
   enabled: boolean;
@@ -18,6 +22,7 @@ export function PositionManualUnitField({
   onEnabledChange,
   onUnitChange,
 }: PositionManualUnitFieldProps) {
+  const { t } = useTranslations();
   const labelId = `${id}-label`;
 
   return (
@@ -31,7 +36,7 @@ export function PositionManualUnitField({
             className="fas fa-ruler-combined shrink-0 text-xs text-sky-600"
             aria-hidden="true"
           />
-          <span>Manuāli norādīta mērvienība</span>
+          <span>{t("positions.manual_unit.enabled_label", "Manuāli norādīta mērvienība")}</span>
         </div>
         <button
           type="button"
@@ -55,16 +60,18 @@ export function PositionManualUnitField({
       {enabled ? (
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-zinc-500">
-            Mērvienība
+            {t("common.unit", "Mērvienība")}
           </span>
           <select
             value={unit}
             onChange={(event) => onUnitChange(event.target.value)}
             className={selectClassName}
-            aria-label="Manuāli norādītā mērvienība"
+            aria-label={t("positions.manual_unit.aria", "Manuāli norādītā mērvienība")}
           >
             {unitOptions.length === 0 ? (
-              <option value="">Nav pieejamu mērvienību</option>
+              <option value="">
+                {t("positions.manual_unit.no_units", "Nav pieejamu mērvienību")}
+              </option>
             ) : (
               unitOptions.map((option) => (
                 <option key={option} value={option}>

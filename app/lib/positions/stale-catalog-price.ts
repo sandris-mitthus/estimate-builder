@@ -23,6 +23,13 @@ import {
 } from "@/app/lib/positions/apply-catalog-to-line-item";
 import { findCatalogPositionForLineItem } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export type StaleCatalogPriceField = "materials" | "mechanisms";
 
@@ -34,8 +41,13 @@ function pricesDiffer(stored: number, live: number): boolean {
   return roundToTwoDecimals(stored) !== roundToTwoDecimals(live);
 }
 
-function staleHintLabel(livePrice: number): string {
-  return `Atjaunināta cena: ${formatAmountDisplay(livePrice)}`;
+function staleHintLabel(livePrice: number, t?: Translate): string {
+  const price = formatAmountDisplay(livePrice);
+  return t
+    ? t("positions.price.stale_catalog_price", "Atjaunināta cena: {price}", {
+        price,
+      })
+    : `Atjaunināta cena: ${price}`;
 }
 
 const LEGACY_SAVED_ESTIMATE_MS = 120_000;
@@ -120,6 +132,7 @@ export function resolveStaleCatalogPriceHints(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  t?: Translate,
 ): StaleCatalogPriceHints {
   const hints: StaleCatalogPriceHints = {};
   const stored = item.unitPrice;
@@ -135,14 +148,14 @@ export function resolveStaleCatalogPriceHints(
       resolveEffectiveMaterials(item).some((m) => m.positionPriceId) &&
       pricesDiffer(stored.materials, live.materials)
     ) {
-      hints.materials = staleHintLabel(live.materials);
+      hints.materials = staleHintLabel(live.materials, t);
     }
 
     if (
       resolveEffectiveMechanisms(item).some((m) => m.positionPriceId) &&
       pricesDiffer(stored.mechanisms, live.mechanisms)
     ) {
-      hints.mechanisms = staleHintLabel(live.mechanisms);
+      hints.mechanisms = staleHintLabel(live.mechanisms, t);
     }
 
     return hints;
@@ -156,14 +169,14 @@ export function resolveStaleCatalogPriceHints(
   if (position.costType === "materials") {
     const live = buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
     if (pricesDiffer(stored.materials, live.materials)) {
-      hints.materials = staleHintLabel(live.materials);
+      hints.materials = staleHintLabel(live.materials, t);
     }
   }
 
   if (position.costType === "mechanisms") {
     const live = buildUnitPriceForCatalogPosition(position, defaultHourlyRate);
     if (pricesDiffer(stored.mechanisms, live.mechanisms)) {
-      hints.mechanisms = staleHintLabel(live.mechanisms);
+      hints.mechanisms = staleHintLabel(live.mechanisms, t);
     }
   }
 

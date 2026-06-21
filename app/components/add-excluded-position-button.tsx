@@ -10,15 +10,18 @@ import {
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 export function AddExcludedPositionButton() {
   const router = useRouter();
   const canManage = useActionPermission("excluded_positions.manage");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
@@ -45,7 +48,7 @@ export function AddExcludedPositionButton() {
     setNameError(undefined);
 
     if (!name.trim()) {
-      setNameError("Ievadi nosaukumu.");
+      setNameError(t("validation.name_required", "Ievadi nosaukumu."));
       return;
     }
 
@@ -54,15 +57,18 @@ export function AddExcludedPositionButton() {
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
-          setNameError(result.error);
+          setNameError(translateActionError(t, result));
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
 
       handleOpenChange(false);
-      showFeedback({ type: "success", text: "Pozīcija pievienota." });
+      showFeedback({
+        type: "success",
+        text: t("positions.feedback.added", "Pozīcija pievienota."),
+      });
       router.refresh();
     });
   }
@@ -79,14 +85,17 @@ export function AddExcludedPositionButton() {
         className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
       >
         <i className="fas fa-plus text-xs" aria-hidden="true" />
-        Pievienot pozīciju
+        {t("positions.add.action", "Pievienot pozīciju")}
       </button>
 
       <AppModal
         open={open}
         onOpenChange={handleOpenChange}
-        title="Pievienot neiekļauto pozīciju"
-        description="Norādi pozīciju, kas nav iekļauta piedāvājumā"
+        title={t("excluded_positions.add.title", "Pievienot neiekļauto pozīciju")}
+        description={t(
+          "excluded_positions.add.description",
+          "Norādi pozīciju, kas nav iekļauta piedāvājumā",
+        )}
         blocking={isPending}
         dirty={Boolean(name.trim())}
         panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
@@ -94,7 +103,7 @@ export function AddExcludedPositionButton() {
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="excluded-position-name" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Nosaukums
+              {t("common.name", "Nosaukums")}
             </label>
             <input
               id="excluded-position-name"
@@ -107,7 +116,7 @@ export function AddExcludedPositionButton() {
               }}
               autoFocus
               className={`${formInputClassName(Boolean(nameError))} ${formInputFullWidthClass}`}
-              placeholder="Piem., Demontāžas darbi"
+              placeholder={t("excluded_positions.name_placeholder", "Piem., Demontāžas darbi")}
             />
             {nameError ? (
               <p className="mt-1.5 text-sm text-red-600" role="alert">
@@ -131,7 +140,7 @@ export function AddExcludedPositionButton() {
               disabled={isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPending ? "Pievieno…" : "Pievienot"}
+              {isPending ? t("actions.adding", "Pievieno…") : t("actions.add", "Pievienot")}
             </button>
           </ModalFormActions>
         </form>

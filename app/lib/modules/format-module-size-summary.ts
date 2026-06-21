@@ -7,6 +7,7 @@ import type {
   ModuleSizeSummaryItem,
   ModuleSizeSummarySection,
 } from "@/app/lib/modules/module-size-summary-types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
 import {
   calculateCrossSectionVolumeM3,
   calculateFoundationFootprint,
@@ -28,6 +29,12 @@ import type {
   ProjectDescriptionFormState,
   RoofPlaneEntry,
 } from "@/app/lib/modules/project-description-types";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 function hasDimension(value: string): boolean {
   return value.trim().length > 0;
@@ -449,4 +456,117 @@ export function buildModuleSizeSummarySections(
     buildDoorsSection(state),
     buildRoofSection(state),
   ].filter((section): section is ModuleSizeSummarySection => section != null);
+}
+
+function translateSummaryTitle(title: string, t: Translate): string {
+  const keys: Record<string, string> = {
+    Pamats: "project_description.summary.foundation.title",
+    "Pamata izgriezumi": "project_description.summary.cross_sections.title",
+    Sienas: "project_description.summary.walls.title",
+    Logi: "project_description.summary.windows.title",
+    Durvis: "project_description.summary.doors.title",
+    Jumts: "project_description.summary.roof.title",
+  };
+
+  const key = keys[title];
+  return key ? t(key, title) : title;
+}
+
+function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): string {
+  const staticKeys: Record<string, string> = {
+    "foundation.width": "project_description.summary.foundation.width",
+    "foundation.depth": "project_description.summary.foundation.depth",
+    "foundation.height": "project_description.summary.foundation.height",
+    "foundation.extension-width": "project_description.summary.foundation.extension_width",
+    "foundation.extension-depth": "project_description.summary.foundation.extension_depth",
+    "foundation.shared-edge": "project_description.summary.foundation.shared_edge",
+    "foundation.perimeter-deduction": "project_description.summary.foundation.perimeter_deduction",
+    "foundation.perimeter": "project_description.summary.foundation.perimeter",
+    "foundation.area": "project_description.summary.foundation.area",
+    "foundation.volume": "project_description.summary.foundation.volume",
+    "cross-sections.removed-total": "project_description.summary.cross_sections.removed_total",
+    "cross-sections.net-volume": "project_description.summary.cross_sections.net_volume",
+    "walls.floor-height": "project_description.summary.walls.floor_height",
+    "walls.exterior-length": "project_description.summary.walls.exterior_length",
+    "walls.interior-length": "project_description.summary.walls.interior_length",
+    "walls.exterior-gross": "project_description.summary.walls.exterior_gross",
+    "walls.interior-gross": "project_description.summary.walls.interior_gross",
+    "walls.windows-area": "project_description.summary.walls.windows_area",
+    "walls.exterior-doors-area": "project_description.summary.walls.exterior_doors_area",
+    "walls.interior-doors-area": "project_description.summary.walls.interior_doors_area",
+    "walls.total-net": "project_description.summary.walls.total_net",
+    "walls.exterior-net": "project_description.summary.walls.exterior_net",
+    "walls.interior-net": "project_description.summary.walls.interior_net",
+    "walls.gable-total": "project_description.summary.walls.gable_total",
+    "roof.total-area": "project_description.summary.roof.total_area",
+    "roof.total-gutter": "project_description.summary.roof.total_gutter",
+    "roof.total-downpipe": "project_description.summary.roof.total_downpipe",
+  };
+
+  const staticKey = staticKeys[item.key];
+  if (staticKey) {
+    return t(staticKey, item.label);
+  }
+
+  const crossSectionMatch = item.key.match(/^cross-section\.(\d+)\.(width|depth|height|volume)$/);
+  if (crossSectionMatch) {
+    const [, rawIndex, field] = crossSectionMatch;
+    return t(`project_description.summary.cross_sections.item_${field}`, item.label, {
+      index: Number(rawIndex) + 1,
+    });
+  }
+
+  const gableMatch = item.key.match(/^gable\.(\d+)\.(height|count|plane|area)$/);
+  if (gableMatch) {
+    const [, rawIndex, field] = gableMatch;
+    return t(`project_description.summary.gable.item_${field}`, item.label, {
+      index: Number(rawIndex) + 1,
+    });
+  }
+
+  const openingMatch = item.key.match(/^(windows|doors)\.(\d+)\.(height|width|count|placement|area)$/);
+  if (openingMatch) {
+    const [, group, rawIndex, field] = openingMatch;
+    return t(`project_description.summary.${group}.item_${field}`, item.label, {
+      index: Number(rawIndex) + 1,
+    });
+  }
+
+  const roofMatch = item.key.match(/^roof\.(\d+)\.(width|height|count|area|gutter|downpipe)$/);
+  if (roofMatch) {
+    const [, rawIndex, field] = roofMatch;
+    return t(`project_description.summary.roof.item_${field}`, item.label, {
+      index: Number(rawIndex) + 1,
+    });
+  }
+
+  return item.label;
+}
+
+function translateSummaryValue(item: ModuleSizeSummaryItem, t: Translate): string {
+  if (item.key.match(/^doors\.\d+\.placement$/)) {
+    if (item.value === "Ārsienu siena") {
+      return t("project_description.summary.doors.exterior_wall", item.value);
+    }
+    if (item.value === "Starpsienu siena") {
+      return t("project_description.summary.doors.interior_wall", item.value);
+    }
+  }
+
+  return item.value;
+}
+
+export function translateModuleSizeSummarySections(
+  sections: ModuleSizeSummarySection[],
+  t: Translate,
+): ModuleSizeSummarySection[] {
+  return sections.map((section) => ({
+    ...section,
+    title: translateSummaryTitle(section.title, t),
+    items: section.items.map((item) => ({
+      ...item,
+      label: translateSummaryLabel(item, t),
+      value: translateSummaryValue(item, t),
+    })),
+  }));
 }

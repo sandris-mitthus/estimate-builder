@@ -2,6 +2,7 @@
 
 import { useAttachModuleSize } from "@/app/components/attach-module-size-context";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type AttachModuleSizeButtonProps = {
   enabled: boolean;
@@ -17,6 +18,7 @@ export function AttachModuleSizeButton({
   className = "",
 }: AttachModuleSizeButtonProps) {
   const { openAttachModal } = useAttachModuleSize();
+  const { t } = useTranslations();
 
   if (!enabled) {
     return null;
@@ -24,7 +26,7 @@ export function AttachModuleSizeButton({
 
   return (
     <IconActionButton
-      label="Piesaisīt moduļa lielumu"
+      label={t("modules.sizes.attach_title", "Piesaisīt moduļa lielumu")}
       icon="fas fa-clipboard-list"
       variant="moduleData"
       onClick={() => openAttachModal(lineItemId, positionName)}

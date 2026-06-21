@@ -2,6 +2,13 @@ import type {
   GablePedimentFoundationPlaneKey,
   ProjectDescriptionFormState,
 } from "@/app/lib/modules/project-description-types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export type FoundationPlaneOption = {
   key: GablePedimentFoundationPlaneKey;
@@ -24,6 +31,13 @@ const FOUNDATION_PLANE_LABELS: Record<GablePedimentFoundationPlaneKey, string> =
   "foundation.extension.depth": "L Pamata dziļums",
 };
 
+const FOUNDATION_PLANE_LABEL_KEYS: Record<GablePedimentFoundationPlaneKey, string> = {
+  "foundation.main.width": "project_description.foundation_plane.main_width",
+  "foundation.main.depth": "project_description.foundation_plane.main_depth",
+  "foundation.extension.width": "project_description.foundation_plane.extension_width",
+  "foundation.extension.depth": "project_description.foundation_plane.extension_depth",
+};
+
 function parseDimension(value: string): number {
   const normalized = value.trim().replace(",", ".");
   if (!normalized) {
@@ -42,27 +56,37 @@ export function isGablePedimentFoundationPlaneKey(
 
 export function getFoundationPlaneOptionLabel(
   key: GablePedimentFoundationPlaneKey,
+  t?: Translate,
 ): string {
-  return FOUNDATION_PLANE_LABELS[key];
+  return t
+    ? t(FOUNDATION_PLANE_LABEL_KEYS[key], FOUNDATION_PLANE_LABELS[key])
+    : FOUNDATION_PLANE_LABELS[key];
 }
 
 export function listFoundationPlaneOptions(
   state: GablePedimentFoundationContext,
+  t?: Translate,
 ): FoundationPlaneOption[] {
   const options: FoundationPlaneOption[] = [
-    { key: "foundation.main.width", label: FOUNDATION_PLANE_LABELS["foundation.main.width"] },
-    { key: "foundation.main.depth", label: FOUNDATION_PLANE_LABELS["foundation.main.depth"] },
+    {
+      key: "foundation.main.width",
+      label: getFoundationPlaneOptionLabel("foundation.main.width", t),
+    },
+    {
+      key: "foundation.main.depth",
+      label: getFoundationPlaneOptionLabel("foundation.main.depth", t),
+    },
   ];
 
   if (state.foundationLShape) {
     options.push(
       {
         key: "foundation.extension.width",
-        label: FOUNDATION_PLANE_LABELS["foundation.extension.width"],
+        label: getFoundationPlaneOptionLabel("foundation.extension.width", t),
       },
       {
         key: "foundation.extension.depth",
-        label: FOUNDATION_PLANE_LABELS["foundation.extension.depth"],
+        label: getFoundationPlaneOptionLabel("foundation.extension.depth", t),
       },
     );
   }

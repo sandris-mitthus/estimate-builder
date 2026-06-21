@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatQuantityDisplay,
   parseQuantityInput,
@@ -20,8 +21,9 @@ type MaterialConsumptionInputProps = {
 export function MaterialConsumptionInput({
   value,
   onChange,
-  "aria-label": ariaLabel = "Patēriņš",
+  "aria-label": ariaLabel,
 }: MaterialConsumptionInputProps) {
+  const { t } = useTranslations();
   const [draft, setDraft] = useState(() => formatQuantityDisplay(value));
   const [focused, setFocused] = useState(false);
 
@@ -38,7 +40,7 @@ export function MaterialConsumptionInput({
       pattern="[0-9.,]*"
       className="w-16 shrink-0 rounded-md border border-zinc-200 px-2 py-1 text-right text-xs tabular-nums text-zinc-900 focus:border-zinc-400 focus:outline-none"
       value={draft}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t("estimate.material_consumption.label", "Patēriņš")}
       placeholder="1,00"
       onFocus={() => setFocused(true)}
       onBlur={() => {

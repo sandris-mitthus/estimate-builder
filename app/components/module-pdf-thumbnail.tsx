@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type ModulePdfThumbnailProps = {
   storagePath: string;
@@ -34,6 +35,7 @@ async function waitForWidth(element: HTMLElement, attempts = 30): Promise<number
 }
 
 export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
+  const { t } = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState<PreviewStatus>("loading");
@@ -161,7 +163,7 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
           src={`${embedUrl}#page=1&view=FitH`}
           type="application/pdf"
           className="pointer-events-none size-full"
-          aria-label="PDF priekšskatījums"
+          aria-label={t("files.pdf_preview", "PDF priekšskatījums")}
         />
       ) : null}
 

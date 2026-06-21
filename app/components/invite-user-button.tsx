@@ -6,15 +6,18 @@ import { inviteUserAction } from "@/app/(protected)/users/actions";
 import { AppModal } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 
 export function InviteUserButton() {
   const router = useRouter();
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export function InviteUserButton() {
   function validateForm(): boolean {
     const validationError = validateRequiredEmail(email);
     if (validationError) {
-      setEmailError(validationError);
+      setEmailError(translateActionError(t, { error: validationError }));
       return false;
     }
 
@@ -50,7 +53,8 @@ export function InviteUserButton() {
       return;
     }
 
-    setEmailError(validateRequiredEmail(email));
+    const validationError = validateRequiredEmail(email);
+    setEmailError(validationError ? translateActionError(t, { error: validationError }) : null);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -68,15 +72,18 @@ export function InviteUserButton() {
       if (!result.ok) {
         const fieldError = validateRequiredEmail(email);
         if (fieldError === result.error) {
-          setEmailError(result.error);
+          setEmailError(translateActionError(t, result));
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
 
       handleOpenChange(false);
-      showFeedback({ type: "success", text: "Uzaicinājums nosūtīts." });
+      showFeedback({
+        type: "success",
+        text: t("users.invite.feedback.sent", "Uzaicinājums nosūtīts."),
+      });
       router.refresh();
     });
   }
@@ -91,21 +98,24 @@ export function InviteUserButton() {
         className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
       >
         <i className="fas fa-user-plus text-xs" aria-hidden="true" />
-        Uzaicināt
+        {t("users.invite.action", "Uzaicināt")}
       </button>
 
       <AppModal
         open={open}
         onOpenChange={handleOpenChange}
-        title="Uzaicināt lietotāju"
-        description="Ievadi e-pasta adresi, lai nosūtītu uzaicinājumu"
+        title={t("users.invite.title", "Uzaicināt lietotāju")}
+        description={t(
+          "users.invite.description",
+          "Ievadi e-pasta adresi, lai nosūtītu uzaicinājumu",
+        )}
         blocking={isPending}
         dirty={email.trim().length > 0}
       >
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
           <label htmlFor="invite-email" className="block">
             <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Epasts
+              {t("common.email", "Epasts")}
             </span>
             <input
               id="invite-email"
@@ -149,7 +159,9 @@ export function InviteUserButton() {
               disabled={isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPending ? "Sūta…" : "Nosūtīt uzaicinājumu"}
+              {isPending
+                ? t("actions.sending", "Sūta…")
+                : t("users.invite.submit", "Nosūtīt uzaicinājumu")}
             </button>
           </ModalFormActions>
         </form>

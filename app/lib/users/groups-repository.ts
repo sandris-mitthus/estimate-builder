@@ -8,6 +8,7 @@ import {
   type UserGroupSummary,
 } from "@/app/lib/auth/permissions";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { listSiteUserGroups } from "@/app/lib/site-admin/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -158,7 +159,9 @@ async function ensureDefaultGroups(
   supabase: ReturnType<typeof createAdminClient>,
   companyId: string,
 ): Promise<void> {
-  for (const group of DEFAULT_GROUP_DEFINITIONS) {
+  const defaultGroups = await listSiteUserGroups();
+
+  for (const group of defaultGroups) {
     const { data: existing } = await supabase
       .from("company_user_groups")
       .select("id")

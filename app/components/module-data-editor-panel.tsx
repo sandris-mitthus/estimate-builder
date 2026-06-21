@@ -17,6 +17,8 @@ import {
 import { ModuleDataEditor } from "@/app/components/module-data-editor";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type {
   ModuleBlockKind,
   ModuleContentBlock,
@@ -57,6 +59,7 @@ export function ModuleDataEditorPanel({
       scope.kind === "module" ? "modules.manage" : "project_module.manage",
     );
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [visualizationBlocks, setVisualizationBlocks] = useState(
     initialVisualizationBlocks,
   );
@@ -89,7 +92,7 @@ export function ModuleDataEditorPanel({
       if (!result.ok) {
         setVisualizationBlocks(initialVisualizationBlocks);
         setProjectBlocks(initialProjectBlocks);
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
@@ -136,11 +139,14 @@ export function ModuleDataEditorPanel({
           });
 
     if (!result.ok) {
-      showFeedback({ type: "error", text: result.error });
+      showFeedback({ type: "error", text: translateActionError(t, result) });
       return result;
     }
 
-    showFeedback({ type: "success", text: "Projekta apraksts saglabāts." });
+    showFeedback({
+      type: "success",
+      text: t("modules.project_description.feedback.saved", "Projekta apraksts saglabāts."),
+    });
     router.refresh();
     return result;
   }

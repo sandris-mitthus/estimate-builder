@@ -1,8 +1,15 @@
 import {
-  POSITION_COST_TYPE_LABELS,
+  getPositionCostTypeLabel,
   type CatalogPositionCostType,
 } from "@/app/lib/positions/position-cost-type";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export type PositionCostTypeFilter = "all" | CatalogPositionCostType;
 
@@ -23,6 +30,7 @@ export function sortPositionsByName(
 export function filterPositionsByQuery(
   positions: PositionPriceSummary[],
   query: string,
+  t?: Translate,
 ): PositionPriceSummary[] {
   const normalizedQuery = query.trim().toLocaleLowerCase("lv-LV");
   if (!normalizedQuery) {
@@ -32,7 +40,7 @@ export function filterPositionsByQuery(
   return positions.filter((position) => {
     const name = position.name.toLocaleLowerCase("lv-LV");
     const unit = position.unit.toLocaleLowerCase("lv-LV");
-    const costType = POSITION_COST_TYPE_LABELS[position.costType]
+    const costType = getPositionCostTypeLabel(position.costType, t)
       .toLocaleLowerCase("lv-LV");
 
     return (
@@ -60,9 +68,10 @@ export function getVisiblePositions(
   positions: PositionPriceSummary[],
   query: string,
   costTypeFilter: PositionCostTypeFilter = "all",
+  t?: Translate,
 ): PositionPriceSummary[] {
   const sorted = sortPositionsByName(positions);
   const byCostType = filterPositionsByCostType(sorted, costTypeFilter);
 
-  return filterPositionsByQuery(byCostType, query);
+  return filterPositionsByQuery(byCostType, query, t);
 }

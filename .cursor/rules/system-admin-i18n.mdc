@@ -1,0 +1,37 @@
+---
+description: System admin defaults, languages, and translation management
+alwaysApply: true
+---
+
+# Sistēmas grupas, valodas un tulkojumi
+
+Kad tiek veidota vai labota sistēmas admin sadaļa, jāparedz šie globālie moduļi.
+
+## Sistēmas default lietotāju grupas
+
+- Sistēmai ir globālas default grupas/profili, kas tiek izmantoti jauniem uzņēmumiem un sākotnējai pieejai.
+- Default grupām jābūt rediģējamām system admin sadaļā: nosaukums, apraksts, noklusējuma statuss un pieejas.
+- Uzņēmuma līmeņa grupas drīkst mantot no default grupām, bet esošām uzņēmuma grupām nedrīkst klusi pārrakstīt pieejas bez skaidras darbības.
+- Pieejas glabā strukturēti, saskaņā ar esošo `PermissionSet` (`nav` + `actions`) modeli.
+
+## Sistēmas valodas
+
+- Sistēmā ir pārvaldāms valodu saraksts. Sākumā obligāti jāatbalsta `lv` (Latviešu) un `en` (English).
+- Vienai valodai jābūt sistēmas noklusējuma valodai.
+- Lietotājam var būt aktīvā valoda; ja tā nav norādīta, UI izmanto sistēmas noklusējuma valodu.
+- Valodas ierakstam vajag vismaz: kods, nosaukums, aktīvs/neaktīvs, noklusējuma statuss, sort order.
+
+## Sistēmas tulkojumi
+
+- UI tekstiem jāizmanto tulkojumu key, nevis hardcoded teksts jaunās i18n sadaļās.
+- Tulkojumu sarakstā rāda tikai aktīvās lietotāja valodas tekstus; ja lietotājam nav aktīvās valodas, rāda sistēmas noklusējuma valodu.
+- Ja key nav tulkojuma aktīvajā valodā, fallback ir sistēmas noklusējuma valoda; ja arī tās nav, rāda key.
+- Tulkojumu rediģēšanā konkrētam key vienā formā jāparāda visas sistēmas valodas, lai var redzēt un labot šī key tulkojumus visām valodām vienlaikus.
+- Tulkojumu ierakstam vajag vismaz: key, namespace/sadaļa, valoda, vērtība, apraksts vai konteksts.
+
+## UI un datu principi
+
+- System admin lapas pieejamas tikai `public.users.is_admin = true` lietotājiem.
+- Lietotāja feedback rāda ar `useFeedbackToast()`.
+- Ja tiek pievienotas DB tabulas, migrācijām jābūt idempotentām un ar RLS deny policy anon/authenticated lomām.
+- Pēc migrācijas obligāti palaist `npm run db:migrate` un kļūdu gadījumā labot un atkārtot.

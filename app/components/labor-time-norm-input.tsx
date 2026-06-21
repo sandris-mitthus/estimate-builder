@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatTimeNormDisplay,
   parseTimeNormInput,
@@ -25,10 +26,11 @@ export function LaborTimeNormInput({
   value,
   onChange,
   className,
-  "aria-label": ariaLabel = "Laika norma (c/h)",
+  "aria-label": ariaLabel,
   withStepper = false,
   stepperButtonsAlwaysVisible = false,
 }: LaborTimeNormInputProps) {
+  const { t } = useTranslations();
   const [draft, setDraft] = useState(() => formatTimeNormDisplay(value));
   const [focused, setFocused] = useState(false);
 
@@ -75,7 +77,7 @@ export function LaborTimeNormInput({
           : className
       }
       value={draft}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t("estimate.time_norm", "Laika norma (c/h)")}
       placeholder="0,00"
       onFocus={() => setFocused(true)}
       onBlur={handleBlur}
@@ -95,7 +97,7 @@ export function LaborTimeNormInput({
     <div className="group/timenorm flex overflow-hidden rounded-lg border border-zinc-200 transition focus-within:border-zinc-400">
       <button
         type="button"
-        aria-label="Samazināt par 0,01"
+        aria-label={t("estimate.time_norm.decrease", "Samazināt par 0,01")}
         className={stepBtnClass}
         onMouseDown={(event) => {
           event.preventDefault();
@@ -107,7 +109,7 @@ export function LaborTimeNormInput({
       {inputElement}
       <button
         type="button"
-        aria-label="Palielināt par 0,01"
+        aria-label={t("estimate.time_norm.increase", "Palielināt par 0,01")}
         className={stepBtnClass}
         onMouseDown={(event) => {
           event.preventDefault();

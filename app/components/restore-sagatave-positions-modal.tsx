@@ -6,6 +6,7 @@ import {
   appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
+import { useTranslations } from "@/app/components/translations-provider";
 import type { MissingSagatavePositionGroup } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
 
 type RestoreSagatavePositionsModalProps = {
@@ -29,6 +30,7 @@ export function RestoreSagatavePositionsModal({
   disabled = false,
   onConfirm,
 }: RestoreSagatavePositionsModalProps) {
+  const { t } = useTranslations();
   const allRowIds = useMemo(() => collectAllRowIds(groups), [groups]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(allRowIds));
 
@@ -78,8 +80,11 @@ export function RestoreSagatavePositionsModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Pozīcijas no sagataves"
-      description="Atzīmē pozīcijas, kuras pievienot šai tāmei"
+      title={t("estimate.sagatave.restore_title", "Pozīcijas no sagataves")}
+      description={t(
+        "estimate.sagatave.restore_description",
+        "Atzīmē pozīcijas, kuras pievienot šai tāmei",
+      )}
       blocking={disabled}
       dirty={dirty}
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
@@ -130,7 +135,7 @@ export function RestoreSagatavePositionsModal({
             disabled={disabled || selectedIds.size === 0}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Pievienot izvēlētās
+            {t("estimate.sagatave.add_selected", "Pievienot izvēlētās")}
           </button>
         </ModalFormActions>
       </form>

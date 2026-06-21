@@ -10,6 +10,7 @@ import {
 } from "@/app/(protected)/users/actions";
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   ACTION_PERMISSION_GROUPS,
   ACTION_PERMISSION_LABELS,
@@ -18,6 +19,7 @@ import {
   type PermissionSet,
   type UserGroupSummary,
 } from "@/app/lib/auth/permissions";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 type UserGroupsPermissionsFormProps = {
   groups: UserGroupSummary[];
@@ -41,6 +43,7 @@ export function UserGroupsPermissionsForm({
 }: UserGroupsPermissionsFormProps) {
   const router = useRouter();
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.id ?? "");
   const [draftByGroupId, setDraftByGroupId] = useState<Record<string, PermissionSet>>(
     () =>
@@ -137,12 +140,15 @@ export function UserGroupsPermissionsForm({
       );
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         setPendingAction(null);
         return;
       }
 
-      showFeedback({ type: "success", text: "Grupas tiesības saglabātas." });
+      showFeedback({
+        type: "success",
+        text: t("user_groups.feedback.permissions_saved", "Grupas tiesības saglabātas."),
+      });
       router.refresh();
       setPendingAction(null);
     });
@@ -159,14 +165,17 @@ export function UserGroupsPermissionsForm({
       const result = await createUserGroupAction(trimmedName);
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         setPendingAction(null);
         return;
       }
 
       setNewGroupName("");
       setSelectedGroupId(result.group.id);
-      showFeedback({ type: "success", text: "Grupa izveidota." });
+      showFeedback({
+        type: "success",
+        text: t("user_groups.feedback.created", "Grupa izveidota."),
+      });
       router.refresh();
       setPendingAction(null);
     });
@@ -187,12 +196,15 @@ export function UserGroupsPermissionsForm({
       const result = await updateUserGroupNameAction(selectedGroup.id, trimmedName);
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         setPendingAction(null);
         return;
       }
 
-      showFeedback({ type: "success", text: "Grupas nosaukums saglabāts." });
+      showFeedback({
+        type: "success",
+        text: t("user_groups.feedback.name_saved", "Grupas nosaukums saglabāts."),
+      });
       router.refresh();
       setPendingAction(null);
     });
@@ -208,14 +220,17 @@ export function UserGroupsPermissionsForm({
       const result = await deleteUserGroupAction(selectedGroup.id);
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         setPendingAction(null);
         return;
       }
 
       setDeleteModalOpen(false);
       setSelectedGroupId(groups.find((group) => group.id !== selectedGroup.id)?.id ?? "");
-      showFeedback({ type: "success", text: "Grupa dzēsta." });
+      showFeedback({
+        type: "success",
+        text: t("user_groups.feedback.deleted", "Grupa dzēsta."),
+      });
       router.refresh();
       setPendingAction(null);
     });
@@ -229,9 +244,14 @@ export function UserGroupsPermissionsForm({
     <div className="space-y-6">
       {canManageCompanyGroups ? (
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">Jauna grupa</h2>
+          <h2 className="text-base font-semibold text-zinc-900">
+            {t("user_groups.create.title", "Jauna grupa")}
+          </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Izveido uzņēmuma grupu un pēc tam izvēlies tās tiesības zemāk.
+            {t(
+              "user_groups.create.description",
+              "Izveido uzņēmuma grupu un pēc tam izvēlies tās tiesības zemāk.",
+            )}
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input
@@ -245,7 +265,7 @@ export function UserGroupsPermissionsForm({
                 }
               }}
               disabled={isBusy}
-              placeholder="Piemēram, Projektu vadītājs"
+              placeholder={t("user_groups.name_placeholder", "Piemēram, Projektu vadītājs")}
               className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <button
@@ -255,7 +275,9 @@ export function UserGroupsPermissionsForm({
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <i className="fas fa-plus text-xs" aria-hidden="true" />
-              {pendingAction === "create" ? "Veido…" : "Izveidot grupu"}
+              {pendingAction === "create"
+                ? t("actions.creating", "Veido…")
+                : t("user_groups.create.action", "Izveidot grupu")}
             </button>
           </div>
         </section>
@@ -279,7 +301,7 @@ export function UserGroupsPermissionsForm({
               <span>{group.name}</span>
               {!group.isSystem ? (
                 <span className="mt-0.5 text-[10px] font-medium text-current opacity-70">
-                  uzņēmuma
+                  {t("user_groups.company_badge", "uzņēmuma")}
                 </span>
               ) : null}
             </button>
@@ -291,17 +313,28 @@ export function UserGroupsPermissionsForm({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-base font-semibold text-zinc-900">
-              {selectedGroup.isSystem ? "Sistēmas grupa" : "Uzņēmuma grupa"}
+              {selectedGroup.isSystem
+                ? t("user_groups.system_group", "Sistēmas grupa")
+                : t("user_groups.company_group", "Uzņēmuma grupa")}
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
               {selectedGroup.isSystem ? (
                 canManageSystemGroups ? (
-                  "Šī ir pamata grupa. Nosaukumu un dzēšanu nevar mainīt, bet sistēmas administrators var labot pieejas."
+                  t(
+                    "user_groups.system_group_admin_description",
+                    "Šī ir pamata grupa. Nosaukumu un dzēšanu nevar mainīt, bet sistēmas administrators var labot pieejas.",
+                  )
                 ) : (
-                  "Šī ir pamata grupa. Uzņēmuma lietotāji to var tikai apskatīt."
+                  t(
+                    "user_groups.system_group_readonly_description",
+                    "Šī ir pamata grupa. Uzņēmuma lietotāji to var tikai apskatīt.",
+                  )
                 )
               ) : (
-                "Šo grupu uzņēmums var pārsaukt, dzēst un mainīt tās pieejas, ja tai nav lietotāju."
+                t(
+                  "user_groups.company_group_description",
+                  "Šo grupu uzņēmums var pārsaukt, dzēst un mainīt tās pieejas, ja tai nav lietotāju.",
+                )
               )}
             </p>
           </div>
@@ -325,7 +358,9 @@ export function UserGroupsPermissionsForm({
                 }
                 className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {pendingAction === "rename" ? "Saglabā…" : "Pārsaukt"}
+                {pendingAction === "rename"
+                  ? t("actions.saving", "Saglabā…")
+                  : t("actions.rename", "Pārsaukt")}
               </button>
               <button
                 type="button"
@@ -334,7 +369,7 @@ export function UserGroupsPermissionsForm({
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <i className="fas fa-trash text-xs" aria-hidden="true" />
-                Dzēst
+                {t("actions.delete", "Dzēst")}
               </button>
             </div>
           ) : null}
@@ -343,14 +378,21 @@ export function UserGroupsPermissionsForm({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">Redzamība navigācijā</h2>
+          <h2 className="text-base font-semibold text-zinc-900">
+            {t("permissions.nav_visibility.title", "Redzamība navigācijā")}
+          </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Kuras sadaļas lietotājs redz augšējā izvēlnē.
+            {t(
+              "user_groups.nav_visibility.description",
+              "Kuras sadaļas lietotājs redz augšējā izvēlnē.",
+            )}
           </p>
           <ul className="mt-4 space-y-3">
             {NAV_PERMISSION_KEYS.filter((key) => key !== "user_groups").map((key) => (
               <li key={key} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-zinc-800">{NAV_PERMISSION_LABELS[key]}</span>
+                <span className="text-sm text-zinc-800">
+                  {t(`permissions.nav.${key}`, NAV_PERMISSION_LABELS[key])}
+                </span>
                 <label className="inline-flex items-center gap-2 text-sm text-zinc-600">
                   <input
                     type="checkbox"
@@ -359,7 +401,7 @@ export function UserGroupsPermissionsForm({
                     onChange={(event) => updateNav(key, event.target.checked)}
                     className="size-4 rounded border-zinc-300"
                   />
-                  Redzams
+                  {t("permissions.visible", "Redzams")}
                 </label>
               </li>
             ))}
@@ -367,19 +409,26 @@ export function UserGroupsPermissionsForm({
         </section>
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">Darbības</h2>
+          <h2 className="text-base font-semibold text-zinc-900">
+            {t("permissions.actions.title", "Darbības")}
+          </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Ko lietotājs drīkst veikt sistēmā.
+            {t(
+              "user_groups.actions.description",
+              "Ko lietotājs drīkst veikt sistēmā.",
+            )}
           </p>
           <div className="mt-4 space-y-5">
             {ACTION_PERMISSION_GROUPS.map((group) => (
               <div key={group.title}>
-                <h3 className="text-sm font-semibold text-zinc-800">{group.title}</h3>
+                <h3 className="text-sm font-semibold text-zinc-800">
+                  {t(group.titleKey, group.title)}
+                </h3>
                 <ul className="mt-2 space-y-2">
                   {group.keys.map((key) => (
                     <li key={key} className="flex items-center justify-between gap-3">
                       <span className="text-sm text-zinc-700">
-                        {ACTION_PERMISSION_LABELS[key]}
+                        {t(`permissions.actions.${key}`, ACTION_PERMISSION_LABELS[key])}
                       </span>
                       <input
                         type="checkbox"
@@ -406,30 +455,40 @@ export function UserGroupsPermissionsForm({
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pendingAction === "permissions"
-              ? "Saglabā…"
-              : "Saglabāt grupas tiesības"}
+              ? t("actions.saving", "Saglabā…")
+              : t("user_groups.permissions.save", "Saglabāt grupas tiesības")}
           </button>
         </div>
       ) : (
         <p className="text-sm text-zinc-500">
           {selectedGroup.isSystem
-            ? "Sistēmas profilu tiesības var mainīt tikai sistēmas administrators."
-            : "Tikai uzņēmuma administratori var mainīt uzņēmuma profilu tiesības."}
+            ? t(
+                "user_groups.system_permissions_admin_only",
+                "Sistēmas profilu tiesības var mainīt tikai sistēmas administrators.",
+              )
+            : t(
+                "user_groups.company_permissions_admin_only",
+                "Tikai uzņēmuma administratori var mainīt uzņēmuma profilu tiesības.",
+              )}
         </p>
       )}
 
       <ConfirmModal
         open={deleteModalOpen}
         onOpenChange={setDeleteModalOpen}
-        title="Dzēst grupu?"
+        title={t("user_groups.delete.title", "Dzēst grupu?")}
         description={
           <>
-            Vai tiešām dzēst grupu{" "}
+            {t("user_groups.delete.confirm_prefix", "Vai tiešām dzēst grupu")}{" "}
             <span className="font-semibold text-zinc-900">{selectedGroup.name}</span>?
-            Šo darbību nevar atsaukt.
+            {t("user_groups.delete.confirm_suffix", "Šo darbību nevar atsaukt.")}
           </>
         }
-        confirmLabel="Dzēst"
+        confirmLabel={
+          pendingAction === "delete"
+            ? t("actions.deleting", "Dzēš…")
+            : t("actions.delete", "Dzēst")
+        }
         confirmVariant="danger"
         blocking={pendingAction === "delete"}
         onConfirm={handleDeleteGroup}

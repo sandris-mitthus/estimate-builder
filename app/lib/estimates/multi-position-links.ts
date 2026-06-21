@@ -9,6 +9,13 @@ import type {
   EstimateRowItem,
   MultiOptionLinkGroup,
 } from "@/app/lib/estimates/types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export const MULTI_OPTION_LINK_DRAG_MIME =
   "application/x-estimate-multi-option-link";
@@ -68,6 +75,7 @@ export function findMultiById(
 
 export function collectMultiOptionContexts(
   categories: EstimateCategory[],
+  t?: Translate,
 ): MultiOptionContext[] {
   const result: MultiOptionContext[] = [];
 
@@ -77,7 +85,9 @@ export function collectMultiOptionContexts(
         continue;
       }
 
-      const multiName = row.name.trim() || "Multi-pozīcija";
+      const multiName =
+        row.name.trim() ||
+        (t ? t("estimate.multi.fallback_name", "Multi-pozīcija") : "Multi-pozīcija");
       for (const option of row.options) {
         if (!isLinkableMultiOption(option)) {
           continue;
@@ -126,6 +136,7 @@ export function getLinkedOptionSummaries(
   categories: EstimateCategory[],
   links: MultiOptionLinkGroup[],
   optionId: string,
+  t?: Translate,
 ): LinkedOptionSummary[] {
   const groupIndex = findLinkGroupIndex(links, optionId);
   if (groupIndex < 0) {
@@ -134,7 +145,7 @@ export function getLinkedOptionSummaries(
 
   const group = links[groupIndex];
   const contexts = new Map(
-    collectMultiOptionContexts(categories).map((entry) => [
+    collectMultiOptionContexts(categories, t).map((entry) => [
       entry.option.id,
       entry,
     ]),
@@ -146,7 +157,9 @@ export function getLinkedOptionSummaries(
       const context = contexts.get(id);
       return {
         optionId: id,
-        multiName: context?.multiName ?? "Multi-pozīcija",
+        multiName:
+          context?.multiName ??
+          (t ? t("estimate.multi.fallback_name", "Multi-pozīcija") : "Multi-pozīcija"),
         optionLabel: context?.option.lineItem.name.trim() || "—",
       };
     });

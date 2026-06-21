@@ -1,3 +1,11 @@
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
+
 export const POSITION_COST_TYPES = [
   "labor",
   "materials",
@@ -25,22 +33,40 @@ export const POSITION_COST_TYPE_LABELS: Record<PositionCostType, string> = {
   mechanisms: "Mehānismi",
 };
 
+export const POSITION_COST_TYPE_LABEL_KEYS: Record<PositionCostType, string> = {
+  labor: "position.cost_type.labor",
+  materials: "position.cost_type.materials",
+  mechanisms: "position.cost_type.mechanisms",
+};
+
 export const POSITION_COST_TYPE_ICONS: Record<PositionCostType, string> = {
   labor: "fas fa-people-carry",
   materials: "fas fa-layer-group",
   mechanisms: "fas fa-car-side",
 };
 
-export const POSITION_COST_TYPE_OPTIONS = POSITION_COST_TYPES.map((value) => ({
-  value,
-  label: POSITION_COST_TYPE_LABELS[value],
-  icon: POSITION_COST_TYPE_ICONS[value],
-}));
+export function getPositionCostTypeLabel(
+  costType: PositionCostType,
+  t?: Translate,
+): string {
+  return t
+    ? t(POSITION_COST_TYPE_LABEL_KEYS[costType], POSITION_COST_TYPE_LABELS[costType])
+    : POSITION_COST_TYPE_LABELS[costType];
+}
 
-export const CATALOG_POSITION_COST_TYPE_OPTIONS =
-  POSITION_COST_TYPE_OPTIONS.filter((option) =>
+export function getPositionCostTypeOptions(t?: Translate) {
+  return POSITION_COST_TYPES.map((value) => ({
+    value,
+    label: getPositionCostTypeLabel(value, t),
+    icon: POSITION_COST_TYPE_ICONS[value],
+  }));
+}
+
+export function getCatalogPositionCostTypeOptions(t?: Translate) {
+  return getPositionCostTypeOptions(t).filter((option) =>
     (CATALOG_POSITION_COST_TYPES as readonly string[]).includes(option.value),
   );
+}
 
 export function isCatalogPositionCostType(
   value: PositionCostType,

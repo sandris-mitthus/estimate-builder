@@ -3,6 +3,7 @@ import { ModuleList } from "@/app/components/module-list";
 import { NavigationLoadingProvider } from "@/app/components/navigation-loading-context";
 import { SectionPage } from "@/app/components/section-page";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
+import { getServerTranslations } from "@/app/lib/i18n/server";
 import { listBuildingModules } from "@/app/lib/modules/repository";
 
 export default async function ModulesPage() {
@@ -11,13 +12,18 @@ export default async function ModulesPage() {
     return null;
   }
 
-  const modules = await listBuildingModules();
+  const [{ t }, modules] = await Promise.all([
+    getServerTranslations(),
+    listBuildingModules(),
+  ]);
 
   return (
     <NavigationLoadingProvider>
       <SectionPage
-        title="Ēku moduļi"
-        subtitle={`${modules.length} moduļi katalogā`}
+        title={t("nav.modules", "Ēku moduļi")}
+        subtitle={t("modules.page.subtitle", "{count} moduļi katalogā", {
+          count: modules.length,
+        })}
         actions={<AddModuleButton />}
       >
         <ModuleList modules={modules} />

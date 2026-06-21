@@ -6,6 +6,8 @@ import { UserCompanyActions } from "@/app/components/user-company-actions";
 import { UserGroupSelect } from "@/app/components/user-group-select";
 import { UserListCard } from "@/app/components/user-list-card";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
+import { getServerTranslations } from "@/app/lib/i18n/server";
+import type { ServerTranslations } from "@/app/lib/i18n/server";
 import {
   canPerformAction,
   listUserGroupMemberships,
@@ -14,13 +16,16 @@ import {
 } from "@/app/lib/users/groups-repository";
 import { listUsers } from "@/app/lib/users/repository";
 
-function statusLabel(status: (Awaited<ReturnType<typeof listUsers>>)[number]["companyStatus"]) {
+function statusLabel(
+  status: (Awaited<ReturnType<typeof listUsers>>)[number]["companyStatus"],
+  t: ServerTranslations["t"],
+) {
   if (status === "disabled") {
-    return "Pieeja liegta";
+    return t("user_status.disabled", "Pieeja liegta");
   }
 
   if (status === "invited") {
-    return "Uzaicināts";
+    return t("user_status.invited", "Uzaicināts");
   }
 
   return null;
@@ -32,7 +37,8 @@ export default async function UsersPage() {
     return null;
   }
 
-  const [users, groups, memberships] = await Promise.all([
+  const [{ t }, users, groups, memberships] = await Promise.all([
+    getServerTranslations(),
     listUsers(),
     listUserGroups(),
     listUserGroupMemberships(),
@@ -50,8 +56,10 @@ export default async function UsersPage() {
 
   return (
     <SectionPage
-      title="Lietotāji"
-      subtitle={`${users.length} lietotāji sistēmā`}
+      title={t("nav.users", "Lietotāji")}
+      subtitle={t("users.page.subtitle", "{count} lietotāji sistēmā", {
+        count: users.length,
+      })}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {canManageGroups ? (
@@ -60,7 +68,7 @@ export default async function UsersPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition hover:border-zinc-300 hover:bg-zinc-50"
             >
               <i className="fas fa-shield-halved text-xs" aria-hidden="true" />
-              Grupas un tiesības
+              {t("nav.user_groups", "Grupas un tiesības")}
             </Link>
           ) : null}
           {canInvite ? <InviteUserButton /> : null}
@@ -74,7 +82,7 @@ export default async function UsersPage() {
             name={user.name}
             email={user.email}
             avatarUrl={user.avatarUrl}
-            statusLabel={statusLabel(user.companyStatus)}
+            statusLabel={statusLabel(user.companyStatus, t)}
             actions={
               <UserCompanyActions
                 userId={user.id}

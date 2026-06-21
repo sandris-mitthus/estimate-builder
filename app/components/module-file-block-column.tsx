@@ -23,6 +23,8 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { ModulePdfThumbnail } from "@/app/components/module-pdf-thumbnail";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { ModuleVisualizationImage } from "@/app/components/module-visualization-image";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import {
   resolveModuleBlockAssetUrl,
 } from "@/app/lib/modules/resolve-block-asset";
@@ -38,11 +40,17 @@ const tileClassName =
 function SortableModuleTile({
   block,
   dragLabel,
+  openPdfLabel,
+  openImageLabel,
+  deleteLabel,
   onDelete,
   deletePending,
 }: {
   block: ModuleContentBlock;
   dragLabel: string;
+  openPdfLabel: string;
+  openImageLabel: string;
+  deleteLabel: string;
   onDelete: () => void;
   deletePending: boolean;
 }) {
@@ -67,7 +75,7 @@ function SortableModuleTile({
         target="_blank"
         rel="noopener noreferrer"
         className="block size-full"
-        aria-label={isPdf ? `Atvērt PDF: ${block.title}` : `Atvērt attēlu: ${block.title}`}
+        aria-label={`${isPdf ? openPdfLabel : openImageLabel}: ${block.title}`}
       >
         {isPdf ? (
           <ModulePdfThumbnail storagePath={block.storagePath} />
@@ -86,7 +94,7 @@ function SortableModuleTile({
 
       <div className="absolute right-1 top-1 z-10">
         <IconActionButton
-          label="Dzēst"
+          label={deleteLabel}
           icon="fas fa-trash"
           variant="delete"
           onClick={onDelete}
@@ -134,6 +142,7 @@ export function ModuleFileBlockColumn({
   const inputRef = useRef<HTMLInputElement>(null);
   const dndContextId = useId();
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [isUploadPending, startUploadTransition] = useTransition();
   const [deletingBlockId, setDeletingBlockId] = useState<string | null>(null);
@@ -162,7 +171,7 @@ export function ModuleFileBlockColumn({
     for (const file of files) {
       const validation = validateFile(file);
       if (!validation.ok) {
-        showFeedback({ type: "error", text: validation.error });
+        showFeedback({ type: "error", text: translateActionError(t, validation) });
         return;
       }
     }
@@ -177,7 +186,7 @@ export function ModuleFileBlockColumn({
         const result = await uploadBlockAction(formData);
 
         if (!result.ok) {
-          showFeedback({ type: "error", text: result.error });
+          showFeedback({ type: "error", text: translateActionError(t, result) });
           if (uploadedBlocks.length > 0) {
             onBlocksChange([...blocks, ...uploadedBlocks]);
           }
@@ -190,7 +199,10 @@ export function ModuleFileBlockColumn({
       onBlocksChange([...blocks, ...uploadedBlocks]);
       showFeedback({
         type: "success",
-        text: files.length === 1 ? "Fails augšupielādēts." : "Faili augšupielādēti.",
+        text:
+          files.length === 1
+            ? t("files.feedback.uploaded_one", "Fails augšupielādēts.")
+            : t("files.feedback.uploaded_many", "Faili augšupielādēti."),
       });
     });
   }
@@ -205,12 +217,15 @@ export function ModuleFileBlockColumn({
       setDeletingBlockId(null);
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       onBlocksChange(blocks.filter((block) => block.id !== blockId));
-      showFeedback({ type: "success", text: "Fails dzēsts." });
+      showFeedback({
+        type: "success",
+        text: t("files.feedback.deleted", "Fails dzēsts."),
+      });
     });
   }
 
@@ -278,6 +293,9 @@ export function ModuleFileBlockColumn({
                     key={block.id}
                     block={block}
                     dragLabel={dragLabel}
+                    openPdfLabel={t("files.open_pdf", "Atvērt PDF")}
+                    openImageLabel={t("files.open_image", "Atvērt attēlu")}
+                    deleteLabel={t("actions.delete", "Dzēst")}
                     onDelete={() => handleDelete(block.id)}
                     deletePending={deletingBlockId === block.id}
                   />
@@ -289,13 +307,13 @@ export function ModuleFileBlockColumn({
 
         <div className={`${blocks.length > 0 ? "mt-3 border-t border-zinc-200 pt-3" : ""}`}>
           <p className="text-sm text-zinc-700">
-            Velc failus šeit vai{" "}
+            {t("files.drop_hint_prefix", "Velc failus šeit vai")}{" "}
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
               className="font-medium text-zinc-900 underline-offset-2 hover:underline"
             >
-              izvēlies
+              {t("files.choose", "izvēlies")}
             </button>
           </p>
           <p className="mt-1 text-xs text-zinc-500">{uploadHint}</p>
@@ -315,7 +333,9 @@ export function ModuleFileBlockColumn({
       />
 
       {isUploadPending ? (
-        <p className="mt-2 text-xs text-zinc-500">Augšupielādē…</p>
+        <p className="mt-2 text-xs text-zinc-500">
+          {t("files.uploading", "Augšupielādē…")}
+        </p>
       ) : null}
     </section>
   );

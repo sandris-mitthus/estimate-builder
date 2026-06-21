@@ -5,6 +5,7 @@ import { approvedEstimateSurfaceClassName } from "@/app/components/approved-esti
 import { PendingProjectMaterialsCardHint } from "@/app/components/pending-project-materials-banner";
 import { ProjectCardActions } from "@/app/components/project-card-actions";
 import { useOptionalProjectsPageCreate } from "@/app/components/projects-page-create-context";
+import { useTranslations } from "@/app/components/translations-provider";
 import { isPlainPrimaryNavigationClick } from "@/app/components/navigation-loading-context";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
@@ -19,14 +20,15 @@ const cardClassNameNewSagatavePositions = `${cardClassNameBase} border-amber-300
 function resolveProjectModuleName(
   buildingModuleId: string | null,
   modules: BuildingModuleSummary[],
+  fallbackName: string,
 ): string {
   if (!buildingModuleId) {
-    return "Individuāls projekts";
+    return fallbackName;
   }
 
   return (
     modules.find((module) => module.id === buildingModuleId)?.name ??
-    "Individuāls projekts"
+    fallbackName
   );
 }
 
@@ -74,11 +76,16 @@ export function ProjectCard({
   isCreating?: boolean;
 }) {
   const pageCreate = useOptionalProjectsPageCreate();
+  const { t } = useTranslations();
   const projectHref = `/${project.id}`;
   const hasEmail = Boolean(project.email.trim());
   const hasPhone = Boolean(project.phone.trim());
   const isApproved = project.status === "approved";
-  const moduleName = resolveProjectModuleName(project.buildingModuleId, modules);
+  const moduleName = resolveProjectModuleName(
+    project.buildingModuleId,
+    modules,
+    t("projects.individual_project", "Individuāls projekts"),
+  );
 
   const cardBody = (
     <>

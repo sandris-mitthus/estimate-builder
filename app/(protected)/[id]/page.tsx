@@ -14,6 +14,7 @@ import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { listUsers } from "@/app/lib/users/repository";
+import { getServerTranslations } from "@/app/lib/i18n/server";
 
 export default async function ProjectDetailPage({
   params,
@@ -26,6 +27,7 @@ export default async function ProjectDetailPage({
   }
 
   const { id } = await params;
+  const { t } = await getServerTranslations();
   const [
     project,
     estimate,
@@ -58,7 +60,8 @@ export default async function ProjectDetailPage({
     ? buildingModule.visualizationBlocks
     : project.visualizationBlocks;
 
-  const displayModuleName = buildingModule?.name ?? "Individuāls projekts";
+  const displayModuleName =
+    buildingModule?.name ?? t("projects.individual_project", "Individuāls projekts");
   const moduleSizeOptions = buildProjectModuleSizeOptions(
     project,
     buildingModule,
@@ -85,7 +88,7 @@ export default async function ProjectDetailPage({
         className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition hover:text-zinc-900"
       >
         <i className="fas fa-arrow-left text-xs" aria-hidden="true" />
-        Atpakaļ uz projektiem
+        {t("projects.back_to_projects", "Atpakaļ uz projektiem")}
       </Link>
       <EstimateTable
         initialTitle={estimate.title}

@@ -22,6 +22,7 @@ import {
 
 import { PositionCostTypeDisplay } from "@/app/components/position-cost-type-display";
 import { PositionCostTypeFilter as PositionCostTypeFilterControl } from "@/app/components/position-cost-type-filter";
+import { useTranslations } from "@/app/components/translations-provider";
 import { collectKnownUnits } from "@/app/lib/positions/collect-known-units";
 
 import {
@@ -53,6 +54,7 @@ export function PositionsPageContent({
   currency,
 
 }: PositionsPageContentProps) {
+  const { t } = useTranslations();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [costTypeFilter, setCostTypeFilter] =
@@ -68,9 +70,9 @@ export function PositionsPageContent({
   const visiblePositions = useMemo(
 
     () =>
-      getVisiblePositions(catalogPositions, searchQuery, costTypeFilter),
+      getVisiblePositions(catalogPositions, searchQuery, costTypeFilter, t),
 
-    [catalogPositions, searchQuery, costTypeFilter],
+    [catalogPositions, searchQuery, costTypeFilter, t],
 
   );
 
@@ -83,15 +85,20 @@ export function PositionsPageContent({
 
     <SectionPage
 
-      title="Pozicijas"
+      title={t("nav.positions", "Pozīcijas")}
 
       subtitle={
 
         isFiltering
 
-          ? `${visiblePositions.length} no ${catalogPositions.length} pozīcijām`
+          ? t("positions.page.filtered_subtitle", "{visible} no {total} pozīcijām", {
+              visible: visiblePositions.length,
+              total: catalogPositions.length,
+            })
 
-          : `${catalogPositions.length} pozīcijas katalogā`
+          : t("positions.page.subtitle", "{count} pozīcijas katalogā", {
+              count: catalogPositions.length,
+            })
 
       }
 
@@ -103,7 +110,7 @@ export function PositionsPageContent({
 
         <label htmlFor="positions-search" className="relative block">
 
-          <span className="sr-only">Meklēt pozīcijas</span>
+          <span className="sr-only">{t("positions.search.label", "Meklēt pozīcijas")}</span>
 
           <i
 
@@ -123,7 +130,7 @@ export function PositionsPageContent({
 
             onChange={(event) => setSearchQuery(event.target.value)}
 
-            placeholder="Meklēt pozīcijas…"
+            placeholder={t("positions.search.placeholder", "Meklēt pozīcijas…")}
 
             className={`${formInputFullWidthClass} ${formInputClassName()} pl-9`}
 
@@ -147,25 +154,25 @@ export function PositionsPageContent({
 
                 <th className="border-b border-zinc-200 px-4 py-2.5 text-left">
 
-                  Nosaukums
+                  {t("common.name", "Nosaukums")}
 
                 </th>
 
                 <th className="w-32 border-b border-zinc-200 px-4 py-2.5 text-left">
 
-                  Veids
+                  {t("common.type", "Veids")}
 
                 </th>
 
                 <th className="w-52 border-b border-zinc-200 px-4 py-2.5 text-left">
 
-                  Cena
+                  {t("common.price", "Cena")}
 
                 </th>
 
                 <th className="w-44 border-b border-zinc-200 px-4 py-2.5 text-right">
 
-                  Darbības
+                  {t("common.actions", "Darbības")}
 
                 </th>
 
@@ -189,9 +196,9 @@ export function PositionsPageContent({
 
                     {isFiltering
 
-                      ? "Nav atrastu pozīciju."
+                      ? t("positions.empty.filtered", "Nav atrastu pozīciju.")
 
-                      : "Nav pozīciju katalogā."}
+                      : t("positions.empty.catalog", "Nav pozīciju katalogā.")}
 
                   </td>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type LineItemPriceVisibilityToggleProps = {
   hiddenPriceInOffer?: boolean;
@@ -13,14 +14,15 @@ export function LineItemPriceVisibilityToggle({
   onChange,
   className = "",
 }: LineItemPriceVisibilityToggleProps) {
+  const { t } = useTranslations();
   const hidden = hiddenPriceInOffer === true;
 
   return (
     <IconActionButton
       label={
         hidden
-          ? "Piedāvājuma paslēpta pozīcijas cena"
-          : "Piedāvājuma redzama pozīcijas cena"
+          ? t("estimate.offer.line_price_hidden", "Piedāvājuma paslēpta pozīcijas cena")
+          : t("estimate.offer.line_price_visible", "Piedāvājuma redzama pozīcijas cena")
       }
       icon={hidden ? "fas fa-eye-slash" : "fas fa-eye"}
       variant="edit"

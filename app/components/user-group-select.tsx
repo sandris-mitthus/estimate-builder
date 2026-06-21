@@ -9,6 +9,8 @@ import {
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 type UserGroupSelectProps = {
   userId: string;
@@ -25,6 +27,7 @@ export function UserGroupSelect({
 }: UserGroupSelectProps) {
   const router = useRouter();
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [isPending, startTransition] = useTransition();
 
   function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
@@ -36,11 +39,14 @@ export function UserGroupSelect({
     startTransition(async () => {
       const result = await assignUserGroupAction(userId, nextGroupId);
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
-      showFeedback({ type: "success", text: "Grupa atjaunināta." });
+      showFeedback({
+        type: "success",
+        text: t("user_groups.feedback.assigned", "Grupa atjaunināta."),
+      });
       router.refresh();
     });
   }
@@ -48,7 +54,7 @@ export function UserGroupSelect({
   return (
     <label className="mt-4 block">
       <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-        Grupa
+        {t("common.group", "Grupa")}
       </span>
       <select
         value={groupId}

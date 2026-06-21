@@ -33,6 +33,7 @@ import {
 } from "@/app/(protected)/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useActionPermission } from "@/app/components/action-permissions-context";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   VolumeSumCells,
   resolveLaborWorkloadHours,
@@ -42,7 +43,7 @@ import {
 } from "@/app/components/estimate-volume-sum-cells";
 import {
   VOLUME_PRICE_COLUMN_COUNT,
-  VOLUME_PRICE_SUBHEADER_LABELS,
+  getVolumePriceSubheaderLabels,
 } from "@/app/lib/estimates/volume-price-columns";
 import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
 import {
@@ -100,6 +101,7 @@ import { PositionModalProvider, usePositionModal } from "@/app/components/positi
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { Tooltip } from "@/app/components/tooltip";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import {
   applyCatalogPositionToLineItem,
   buildUnitPriceForCatalogPosition,
@@ -254,12 +256,17 @@ function daysUntilDeadline(deadline: string): number | null {
   return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function formatDeadlineDays(days: number): string {
-  if (days === 0) return "Termiņš šodien";
-  if (days < 0) return `Termiņš beidzies pirms ${Math.abs(days)} d.`;
+function formatDeadlineDays(days: number, t: ReturnType<typeof useTranslations>["t"]): string {
+  if (days === 0) return t("estimate.deadline.today", "Termiņš šodien");
+  if (days < 0) {
+    return t("estimate.deadline.expired_days", "Termiņš beidzies pirms {count} d.", {
+      count: Math.abs(days),
+    });
+  }
   const abs = Math.abs(days);
-  const label = abs === 1 ? "diena" : "dienas";
-  return `${abs} ${label} līdz termiņam`;
+  return t("estimate.deadline.remaining_days", "{count} dienas līdz termiņam", {
+    count: abs,
+  });
 }
 
 const cellInput =
@@ -328,6 +335,7 @@ function LineItemRow({
   estimateLocked?: boolean;
   allowCompositeEdit?: boolean;
 }) {
+  const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
@@ -368,6 +376,7 @@ function LineItemRow({
         item,
         catalogPositions,
         defaultHourlyRate,
+        t,
       )
     : undefined;
   const volumeVariable = showQuantityInput || hasAttachedQuantity;
@@ -413,7 +422,7 @@ function LineItemRow({
                         : "italic text-zinc-400"
                     }`}
                   >
-                    {displayName.trim() || "Nenosaukta pozīcija"}
+                    {displayName.trim() || t("positions.unnamed", "Nenosaukta pozīcija")}
                   </button>
                   <AttachedModuleSizeLabel
                     attachment={item.moduleSizeAttachment}
@@ -477,10 +486,10 @@ function LineItemRow({
               )}
             </span>
             {showQuantityColumn && !estimateLocked && item.variableQuantity ? (
-              <Tooltip label="Noņemt individuālo apjomu">
+              <Tooltip label={t("estimate.quantity.remove_individual", "Noņemt individuālo apjomu")}>
                 <button
                   type="button"
-                  aria-label="Noņemt individuālo apjomu"
+                  aria-label={t("estimate.quantity.remove_individual", "Noņemt individuālo apjomu")}
                   onClick={() =>
                     onChange({ ...item, variableQuantity: undefined })
                   }
@@ -494,7 +503,7 @@ function LineItemRow({
             )}
             {allowCompositeEdit && isComposite ? (
               <IconActionButton
-                label="Labot pozīciju"
+                label={t("positions.edit.title", "Labot pozīciju")}
                 icon="fas fa-pen"
                 variant="edit"
                 onClick={() => openPositionModal(item, onChange)}
@@ -580,7 +589,7 @@ function LineItemRow({
       <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
         {estimateLocked ? null : (
           <DeleteButton
-            label="Dzēst pozīciju"
+            label={t("positions.delete.action", "Dzēst pozīciju")}
             onClick={onDelete}
             className="opacity-0 group-hover:opacity-100"
           />
@@ -611,6 +620,8 @@ function RowActions({
   showSub?: boolean;
   estimateLocked?: boolean;
 }) {
+  const { t } = useTranslations();
+
   if (estimateLocked) {
     return null;
   }
@@ -619,16 +630,16 @@ function RowActions({
     <div className="flex h-7 shrink-0 items-center gap-1 self-center">
       {showSub && onAddSub ? (
         <button type="button" className={actionBtn} onClick={onAddSub}>
-          + Sub
+          {t("estimate.actions.add_subcategory_short", "+ Sub")}
         </button>
       ) : null}
       {onAddMulti ? (
         <button type="button" className={actionBtn} onClick={onAddMulti}>
-          + Multi
+          {t("estimate.actions.add_multi_short", "+ Multi")}
         </button>
       ) : null}
       <button type="button" className={actionBtn} onClick={onAddItem}>
-        + Pozīcija
+        {t("estimate.actions.add_position_short", "+ Pozīcija")}
       </button>
       <DeleteButton label={deleteLabel} onClick={onDelete} />
     </div>
@@ -663,6 +674,7 @@ function SortableMultiPositionRow({
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
 }) {
+  const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
@@ -699,7 +711,7 @@ function SortableMultiPositionRow({
       dragHandle={
         estimateLocked ? null : (
           <DragHandle
-            label="Pārvietot multi-pozīciju"
+            label={t("estimate.drag.multi_position", "Pārvietot multi-pozīciju")}
             attributes={attributes}
             listeners={listeners}
           />
@@ -732,6 +744,7 @@ function SortableLineItemRow({
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
 }) {
+  const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
@@ -754,7 +767,7 @@ function SortableLineItemRow({
       dragHandle={
         props.estimateLocked ? null : (
           <DragHandle
-            label="Pārvietot pozīciju"
+            label={t("positions.drag.position", "Pārvietot pozīciju")}
             attributes={attributes}
             listeners={listeners}
           />
@@ -936,14 +949,16 @@ function SubcategoryBlock({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
 }) {
+  const { t } = useTranslations();
+
   return (
     <>
       <SortableSectionRow
         sortId={subcategoryDragId(subcategory.id)}
-        dragLabel="Pārvietot subkategoriju"
+        dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         colSpan={colSpan}
         kind="subcategory"
-        placeholder="Subkategorijas nosaukums"
+        placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
         value={subcategory.title}
         onChange={(title) => onChange({ ...subcategory, title })}
         estimateLocked={estimateLocked}
@@ -951,7 +966,7 @@ function SubcategoryBlock({
         actions={
           <RowActions
             showSub={false}
-            deleteLabel="Dzēst subkategoriju"
+            deleteLabel={t("estimate.delete.subcategory", "Dzēst subkategoriju")}
             estimateLocked={estimateLocked}
             onAddMulti={
               showQuantityColumn
@@ -1061,21 +1076,23 @@ function CategoryBlock({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
 }) {
+  const { t } = useTranslations();
+
   return (
     <>
       <SortableSectionRow
         sortId={categoryDragId(category.id)}
-        dragLabel="Pārvietot kategoriju"
+        dragLabel={t("estimate.drag.category", "Pārvietot kategoriju")}
         colSpan={colSpan}
         kind="category"
-        placeholder="Kategorijas nosaukums"
+        placeholder={t("estimate.placeholder.category", "Kategorijas nosaukums")}
         value={category.title}
         onChange={(title) => onChange({ ...category, title })}
         estimateLocked={estimateLocked}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(category.id)}
         actions={
           <RowActions
-            deleteLabel="Dzēst kategoriju"
+            deleteLabel={t("estimate.delete.category", "Dzēst kategoriju")}
             estimateLocked={estimateLocked}
             onAddSub={() =>
               onChange({
@@ -1301,6 +1318,7 @@ function EstimateDndTableInner({
   estimateLocked?: boolean;
   colSpan: number;
 }) {
+  const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
   const [linkDragSourceOptionId, setLinkDragSourceOptionId] = useState<
     string | null
@@ -1312,7 +1330,7 @@ function EstimateDndTableInner({
       onLinkDragStart: (optionId) => setLinkDragSourceOptionId(optionId),
       onLinkDragEnd: () => setLinkDragSourceOptionId(null),
       getLinkedOptions: (optionId) =>
-        getLinkedOptionSummaries(categories, multiOptionLinks, optionId),
+        getLinkedOptionSummaries(categories, multiOptionLinks, optionId, t),
       onLinkDrop: (sourceOptionId, targetOptionId) => {
         setMultiOptionLinks((current) =>
           linkMultiOptions(
@@ -1358,6 +1376,7 @@ function EstimateDndTableInner({
       multiOptionLinks,
       setCategories,
       setMultiOptionLinks,
+      t,
     ],
   );
 
@@ -1423,38 +1442,38 @@ function EstimateDndTableInner({
               rowSpan={2}
               className="border-b border-r border-zinc-200 px-3 py-2.5 text-left whitespace-normal"
             >
-              Nosaukums
+              {t("common.name", "Nosaukums")}
             </th>
             <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
-              Mērv.
+              {t("common.unit_short", "Mērv.")}
             </th>
             {showQuantityColumn ? (
               <th
                 rowSpan={2}
                 className="border-b border-r border-zinc-200 px-2 py-2.5 text-center"
-                title="Individuāls apjoms katram projektam"
+                title={t("estimate.quantity.individual_title", "Individuāls apjoms katram projektam")}
               >
-                Apj.
+                {t("common.quantity_short", "Apj.")}
               </th>
             ) : null}
             <th
               colSpan={UNIT_PRICE_COLUMN_COUNT}
               className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
             >
-              Vienības cena
+              {t("estimate.unit_price", "Vienības cena")}
             </th>
             {showQuantityColumn ? (
               <th
                 colSpan={VOLUME_PRICE_COLUMN_COUNT}
                 className="border-b border-r border-zinc-200 bg-emerald-50/80 px-2 py-2 text-center text-emerald-800/70"
               >
-                Apjoma cena
+                {t("estimate.volume_price", "Apjoma cena")}
               </th>
             ) : null}
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {getUnitPriceSubheaderLabels(currency).map((label) => (
+            {getUnitPriceSubheaderLabels(currency, t).map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -1463,18 +1482,23 @@ function EstimateDndTableInner({
               </th>
             ))}
             {showQuantityColumn
-              ? VOLUME_PRICE_SUBHEADER_LABELS.map((label) => (
-                  <th
-                    key={`volume-${label}`}
-                    className={`border-b border-r border-zinc-200 px-2 py-1.5 text-right ${
-                      label === "Kopā"
-                        ? "bg-emerald-50/60"
-                        : "bg-emerald-50/40"
-                    }`}
-                  >
-                    {label}
-                  </th>
-                ))
+              ? getVolumePriceSubheaderLabels(t).map((label, index) => {
+                  const translatedLabel =
+                    [
+                      t("estimate.column.workload_hours", "Darbietilpība (c/h)"),
+                      t("estimate.column.material", "Materiāls"),
+                      t("estimate.column.mechanisms", "Mehānismi"),
+                    ][index] ?? label;
+
+                  return (
+                    <th
+                      key={`volume-${label}`}
+                      className="border-b border-r border-zinc-200 bg-emerald-50/40 px-2 py-1.5 text-right"
+                    >
+                      {translatedLabel}
+                    </th>
+                  );
+                })
               : null}
           </tr>
         </thead>
@@ -1520,7 +1544,7 @@ function EstimateDndTableInner({
               colSpan={showQuantityColumn ? 3 : 2}
               className="border-t-2 border-zinc-300 px-3 py-2.5 text-right text-sm font-semibold text-zinc-600"
             >
-              Kopā
+              {t("common.total", "Kopā")}
             </td>
             {showQuantityColumn ? (
               Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
@@ -1702,6 +1726,7 @@ export function EstimateTable({
   globalExcludedPositions = [],
   users = [],
 }: EstimateTableProps = {}) {
+  const { t } = useTranslations();
   const [title, setTitle] = useState(initialTitle);
   const [meta, setMeta] = useState(initialMeta);
   const [categories, setCategories] = useState<EstimateCategory[]>(
@@ -1845,7 +1870,10 @@ export function EstimateTable({
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
     } catch {
-      showFeedback({ type: "error", text: "Lejupiel\u0101de neizdeva\u0161. M\u0113\u0123iniet v\u0113lreiz." });
+      showFeedback({
+        type: "error",
+        text: t("estimate.download.failed", "Lejupielāde neizdevās. Mēģiniet vēlreiz."),
+      });
     } finally {
       setLoading(false);
     }
@@ -1861,7 +1889,11 @@ export function EstimateTable({
     if (missingQuantityCount > 0) {
       showFeedback({
         type: "error",
-        text: `Jāievada apjoms ${missingQuantityCount === 1 ? "1 pozīcijai" : `${missingQuantityCount} pozīcijām`} ar individuālu apjomu.`,
+        text: t(
+          "estimate.validation.variable_quantity_required",
+          "Jāievada apjoms {count} pozīcijām ar individuālu apjomu.",
+          { count: missingQuantityCount },
+        ),
       });
       return;
     }
@@ -1907,9 +1939,9 @@ export function EstimateTable({
         serializeEstimatePositionDocument(title, bakedCategories, multiOptionLinks),
       );
       setSavedAt(savedAtIso);
-      showFeedback({ type: "success", text: "Tāme saglabāta." });
+      showFeedback({ type: "success", text: t("estimate.feedback.saved", "Tāme saglabāta.") });
     } else {
-      showFeedback({ type: "error", text: result.error });
+      showFeedback({ type: "error", text: translateActionError(t, result) });
     }
   }
 
@@ -2000,7 +2032,7 @@ export function EstimateTable({
   const { flushSyncFromLineItem, scheduleSyncFromLineItem } =
     useSyncCatalogPositionFromLineItem(catalogPositions);
 
-  const displayModuleName = moduleName ?? "Individuāls projekts";
+  const displayModuleName = moduleName ?? t("projects.individual_project", "Individuāls projekts");
   const showModuleDataSpotlight = Boolean(
     project &&
       project.buildingModuleId === null &&
@@ -2022,12 +2054,15 @@ export function EstimateTable({
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
-            aria-label="Tāmes nosaukums"
+            aria-label={t("estimate.title.aria", "Tāmes nosaukums")}
           />
           )
         ) : null}
         <p className="text-xs text-zinc-500">
-          {categories.length} tāmes pozīcijas · {positionCount} rindas
+          {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
+            sections: categories.length,
+            rows: positionCount,
+          })}
         </p>
         {!editorLocked ? (
           <button
@@ -2037,7 +2072,7 @@ export function EstimateTable({
             }
             className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
           >
-            + Tāmes pozīcija
+            {t("estimate.actions.add_section", "+ Tāmes pozīcija")}
           </button>
         ) : null}
       </div>
@@ -2126,7 +2161,7 @@ export function EstimateTable({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-              Tāmes piedāvājums
+              {t("estimate.offer.title", "Tāmes piedāvājums")}
             </p>
             {editorLocked ? (
               <p className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">
@@ -2149,7 +2184,7 @@ export function EstimateTable({
             ) : null}
             <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-right">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                Kopā
+                {t("common.total", "Kopā")}
               </p>
               <p className="text-sm font-semibold tabular-nums text-white">
                 {formatMoneyDisplay(totals.grand, currency)}
@@ -2160,13 +2195,13 @@ export function EstimateTable({
 
         <div className="space-y-4">
           <MetaField
-            label="Pasūtītāja vārds, uzvārds"
+            label={t("projects.client_name", "Pasūtītāja vārds, uzvārds")}
             value={meta.client}
             readOnly={editorLocked}
             onChange={(client) => setMeta({ ...meta, client })}
           />
           <MetaField
-            label="Objekts"
+            label={t("estimate.object", "Objekts")}
             value={meta.project}
             readOnly={editorLocked}
             onChange={(project) => setMeta({ ...meta, project })}
@@ -2186,7 +2221,7 @@ export function EstimateTable({
             {project ? (
               <div className="w-full max-w-[8.5rem] shrink-0">
                 <MetaField
-                  label="Plānotā peļņa"
+                  label={t("estimate.planned_profit", "Plānotā peļņa")}
                   value={
                     meta.plannedProfitPercent != null
                       ? String(meta.plannedProfitPercent)
@@ -2209,7 +2244,7 @@ export function EstimateTable({
               </div>
             ) : null}
             <MetaField
-              label="Datums"
+              label={t("common.date", "Datums")}
               type="date"
               value={meta.date}
               readOnly={datesReadOnly}
@@ -2218,7 +2253,7 @@ export function EstimateTable({
             {!estimateStatusLocked ? (
               <div>
                 <MetaField
-                  label="Tāmes termiņš"
+                  label={t("estimate.deadline.label", "Tāmes termiņš")}
                   type="date"
                   value={meta.deadline}
                   readOnly={datesReadOnly}
@@ -2230,7 +2265,7 @@ export function EstimateTable({
                   const isExpired = days < 0;
                   return (
                     <p className={`mt-1 text-[11px] font-medium ${isExpired ? "text-red-500" : "text-zinc-400"}`}>
-                      {formatDeadlineDays(days)}
+                      {formatDeadlineDays(days, t)}
                     </p>
                   );
                 })() : null}
@@ -2280,7 +2315,7 @@ export function EstimateTable({
           className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
         >
           <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
-          Pieejami jauni izcenojumi
+          {t("estimate.stale_prices.available", "Pieejami jauni izcenojumi")}
         </div>
       ) : null}
 
@@ -2291,7 +2326,10 @@ export function EstimateTable({
         >
           <div className="flex items-center gap-2">
             <i className="fas fa-layer-group text-xs" aria-hidden="true" />
-            Sagatavē ir pozīcijas, kuras nav šajā tāmē
+            {t(
+              "estimate.sagatave.new_positions_available",
+              "Sagatavē ir pozīcijas, kuras nav šajā tāmē",
+            )}
           </div>
           <button
             type="button"
@@ -2299,7 +2337,7 @@ export function EstimateTable({
             disabled={isSaving || editorLocked}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Atjaunot pozīcijas
+            {t("estimate.sagatave.restore_positions", "Atjaunot pozīcijas")}
           </button>
         </div>
       ) : null}
@@ -2334,10 +2372,14 @@ export function EstimateTable({
       {project ? (
         <div className="flex flex-wrap items-center justify-end gap-3">
           {isDirty ? (
-            <span className="text-xs text-zinc-400">Nesaglabātas izmaiņas</span>
+            <span className="text-xs text-zinc-400">
+              {t("common.unsaved_changes", "Nesaglabātas izmaiņas")}
+            </span>
           ) : isEstimateSaved && savedAt ? (
             <span className="text-xs text-zinc-400">
-              Saglabāts: {formatDisplayDateDdMmYy(savedAt)}
+              {t("common.saved_at", "Saglabāts: {date}", {
+                date: formatDisplayDateDdMmYy(savedAt),
+              })}
             </span>
           ) : null}
 
@@ -2361,7 +2403,9 @@ export function EstimateTable({
                   <i className="fas fa-file-pdf text-red-500 text-xs" aria-hidden="true" />
                 )}
                 PDF
-                <span className="text-xs text-zinc-400">(piedāvājums)</span>
+                <span className="text-xs text-zinc-400">
+                  {t("estimate.export.offer_suffix", "(piedāvājums)")}
+                </span>
               </button>
               <button
                 type="button"
@@ -2381,7 +2425,9 @@ export function EstimateTable({
                   <i className="fas fa-file-excel text-green-600 text-xs" aria-hidden="true" />
                 )}
                 Excel
-                <span className="text-xs text-zinc-400">(tāme)</span>
+                <span className="text-xs text-zinc-400">
+                  {t("estimate.export.estimate_suffix", "(tāme)")}
+                </span>
               </button>
             </>
           ) : null}
@@ -2393,7 +2439,9 @@ export function EstimateTable({
               disabled={isSaving || !isDirty}
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isSaving ? "Saglabā..." : "Saglabāt tāmi"}
+              {isSaving
+                ? t("actions.saving", "Saglabā…")
+                : t("estimate.actions.save", "Saglabāt tāmi")}
             </button>
           ) : null}
 
@@ -2405,7 +2453,7 @@ export function EstimateTable({
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
-              Atjaunot cenas
+              {t("estimate.actions.refresh_prices", "Atjaunot cenas")}
             </button>
           ) : null}
         </div>

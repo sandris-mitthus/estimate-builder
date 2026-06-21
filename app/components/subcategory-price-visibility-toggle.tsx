@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/app/components/tooltip";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type SubcategoryPriceVisibilityToggleProps = {
   hiddenPricesInOffer?: boolean;
@@ -11,23 +12,17 @@ export function SubcategoryPriceVisibilityToggle({
   hiddenPricesInOffer = false,
   onChange,
 }: SubcategoryPriceVisibilityToggleProps) {
+  const { t } = useTranslations();
   const hidden = hiddenPricesInOffer === true;
+  const label = hidden
+    ? t("estimate.offer.subcategory_prices_hidden", "Piedāvājuma paslēptas pozīciju cenas")
+    : t("estimate.offer.subcategory_prices_visible", "Piedāvājuma redzamas pozīciju cenas");
 
   return (
-    <Tooltip
-      label={
-        hidden
-          ? "Piedāvājuma paslēptas pozīciju cenas"
-          : "Piedāvājuma redzamas pozīciju cenas"
-      }
-    >
+    <Tooltip label={label}>
       <button
         type="button"
-        aria-label={
-          hidden
-            ? "Piedāvājuma paslēptas pozīciju cenas"
-            : "Piedāvājuma redzamas pozīciju cenas"
-        }
+        aria-label={label}
         onClick={() => onChange(!hidden)}
         className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${
           hidden

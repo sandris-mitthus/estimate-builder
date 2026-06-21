@@ -3,6 +3,7 @@
 import { ModuleFileBlockColumn } from "@/app/components/module-file-block-column";
 import { ModuleOutlineView } from "@/app/components/module-outline-view";
 import { ModuleProjectDescriptionForm } from "@/app/components/module-project-description-form";
+import { useTranslations } from "@/app/components/translations-provider";
 import type {
   ModuleBlockKind,
   ModuleContentBlock,
@@ -51,17 +52,22 @@ export function ModuleDataEditor({
   initialProjectDescription,
   onSaveProjectDescription,
 }: ModuleDataEditorProps) {
+  const { t } = useTranslations();
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
         <div className="space-y-4">
           <ModuleFileBlockColumn
-            title="Vizualizācijas"
+            title={t("modules.visualizations.title", "Vizualizācijas")}
             kind="visualization"
             blocks={visualizationBlocks}
-            dragLabel="Pārvietot vizualizācijas bloku"
-            emptyLabel="Nav vizualizāciju."
-            uploadHint="Tikai attēli: PNG, JPG, WEBP, GIF · max 10 MB"
+            dragLabel={t("modules.visualizations.drag", "Pārvietot vizualizācijas bloku")}
+            emptyLabel={t("modules.visualizations.empty", "Nav vizualizāciju.")}
+            uploadHint={t(
+              "modules.visualizations.upload_hint",
+              "Tikai attēli: PNG, JPG, WEBP, GIF · max 10 MB",
+            )}
             accept="image/png,image/jpeg,image/webp,image/gif"
             uploadBlockAction={(formData) =>
               uploadBlockAction("visualization", formData)
@@ -74,12 +80,12 @@ export function ModuleDataEditor({
           />
 
           <ModuleFileBlockColumn
-            title="Projekts"
+            title={t("common.project", "Projekts")}
             kind="project"
             blocks={projectBlocks}
-            dragLabel="Pārvietot projekta bloku"
-            emptyLabel="Nav projekta failu."
-            uploadHint="Tikai PDF faili · max 20 MB"
+            dragLabel={t("modules.project_files.drag", "Pārvietot projekta bloku")}
+            emptyLabel={t("modules.project_files.empty", "Nav projekta failu.")}
+            uploadHint={t("modules.project_files.upload_hint", "Tikai PDF faili · max 20 MB")}
             accept="application/pdf,.pdf"
             uploadBlockAction={(formData) => uploadBlockAction("project", formData)}
             removeBlockAction={(blockId) => removeBlockAction("project", blockId)}

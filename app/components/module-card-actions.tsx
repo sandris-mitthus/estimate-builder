@@ -8,12 +8,15 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ModuleFormModal } from "@/app/components/module-form-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
 export function ModuleCardActions({ module }: { module: BuildingModuleSummary }) {
   const router = useRouter();
   const canManage = useActionPermission("modules.manage");
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -33,12 +36,15 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
       const result = await deleteBuildingModuleAction(module.id);
 
       if (!result.ok) {
-        setDeleteError(result.error);
+        setDeleteError(translateActionError(t, result));
         return;
       }
 
       setDeleteOpen(false);
-      showFeedback({ type: "success", text: "Modulis dzēsts." });
+      showFeedback({
+        type: "success",
+        text: t("modules.feedback.deleted", "Modulis dzēsts."),
+      });
       router.refresh();
     });
   }
@@ -51,13 +57,13 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
     <>
       <div className="flex shrink-0 items-center gap-0.5">
         <IconActionButton
-          label="Labot"
+          label={t("actions.edit", "Labot")}
           icon="fas fa-pen"
           variant="edit"
           onClick={() => setEditOpen(true)}
         />
         <IconActionButton
-          label="Dzēst"
+          label={t("actions.delete", "Dzēst")}
           icon="fas fa-trash"
           variant="delete"
           onClick={() => setDeleteOpen(true)}
@@ -73,11 +79,11 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
       <ConfirmModal
         open={deleteOpen}
         onOpenChange={handleDeleteOpenChange}
-        title="Dzēst moduli?"
+        title={t("modules.delete.title", "Dzēst moduli?")}
         description={
           <>
             <p>
-              Vai tiešām vēlies dzēst moduli{" "}
+              {t("modules.delete.confirm_prefix", "Vai tiešām vēlies dzēst moduli")}{" "}
               <span className="font-medium text-zinc-900">{module.name}</span>?
             </p>
             {deleteError ? (
@@ -87,7 +93,9 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Dzēš…" : "Dzēst"}
+        confirmLabel={
+          isPending ? t("actions.deleting", "Dzēš…") : t("actions.delete", "Dzēst")
+        }
         confirmVariant="danger"
         onConfirm={handleConfirmDelete}
         blocking={isPending}

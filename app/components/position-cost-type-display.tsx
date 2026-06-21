@@ -1,8 +1,11 @@
+"use client";
+
 import {
   POSITION_COST_TYPE_ICONS,
-  POSITION_COST_TYPE_LABELS,
+  getPositionCostTypeLabel,
   type PositionCostType,
 } from "@/app/lib/positions/position-cost-type";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type PositionCostTypeDisplayProps = {
   costType: PositionCostType;
@@ -17,6 +20,8 @@ export function PositionCostTypeDisplay({
   className = "",
   iconClassName = "text-xs",
 }: PositionCostTypeDisplayProps) {
+  const { t } = useTranslations();
+
   return (
     <span className={`inline-flex items-center gap-2 ${className}`.trim()}>
       <i
@@ -24,7 +29,7 @@ export function PositionCostTypeDisplay({
         aria-hidden="true"
       />
       {showLabel ? (
-        <span>{POSITION_COST_TYPE_LABELS[costType]}</span>
+        <span>{getPositionCostTypeLabel(costType, t)}</span>
       ) : null}
     </span>
   );

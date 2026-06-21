@@ -6,7 +6,10 @@ import { CompanyLogoDropzone } from "@/app/components/company-logo-dropzone";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 import { formatAmount } from "@/app/lib/estimates/calculate-line";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
 import { CURRENCY_OPTIONS } from "@/app/lib/settings/currencies";
 import { parseDefaultHourlyRateInput } from "@/app/lib/settings/default-hourly-rate";
 import {
@@ -68,7 +71,19 @@ function SettingsSection({
   );
 }
 
-function CompanyPreview({ settings }: { settings: CompanySettings }) {
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
+
+function CompanyPreview({
+  settings,
+  t,
+}: {
+  settings: CompanySettings;
+  t: Translate;
+}) {
   const lines = useMemo(() => formatCompanyDisplayLines(settings), [settings]);
   const currencyLabel =
     CURRENCY_OPTIONS.find((option) => option.value === settings.currency)
@@ -77,13 +92,13 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-5">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-        Priekšskatījums
+        {t("site_settings.preview.title", "Priekšskatījums")}
       </p>
       {settings.logoUrl ? (
         <div className="mt-4 flex h-16 items-center">
           <img
             src={settings.logoUrl}
-            alt="Uzņēmuma logotips"
+            alt={t("settings.company_logo", "Uzņēmuma logotips")}
             className="max-h-16 max-w-full object-contain"
           />
         </div>
@@ -107,35 +122,44 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
         </div>
       ) : (
         <p className="mt-4 text-sm text-zinc-500">
-          Aizpildi laukus, lai redzētu uzņēmuma datus.
+          {t("settings.preview.empty", "Aizpildi laukus, lai redzētu uzņēmuma datus.")}
         </p>
       )}
       <p className="mt-5 border-t border-zinc-200/80 pt-4 text-sm text-zinc-600">
-        <span className="text-zinc-500">Valūta: </span>
+        <span className="text-zinc-500">{t("settings.currency", "Valūta")}: </span>
         {currencyLabel}
       </p>
       <p className="mt-3 text-sm text-zinc-600">
-        <span className="text-zinc-500">Tāmes derīgums: </span>
+        <span className="text-zinc-500">
+          {t("settings.estimate_validity", "Tāmes derīgums")}:{" "}
+        </span>
         {settings.estimateValidityDays > 0
-          ? `${settings.estimateValidityDays} dienas`
+          ? t("common.days_count", "{count} dienas", {
+              count: settings.estimateValidityDays,
+            })
           : "—"}
       </p>
       <p className="mt-3 text-sm text-zinc-600">
-        <span className="text-zinc-500">Stundas likme: </span>
+        <span className="text-zinc-500">
+          {t("settings.hourly_rate", "Stundas likme")}:{" "}
+        </span>
         {settings.defaultHourlyRate !== null
           ? `${formatAmount(settings.defaultHourlyRate)} ${settings.currency}`
           : "—"}
       </p>
       {!settings.vatNumber.trim() ? (
         <p className="mt-3 text-xs text-zinc-400">
-          PVN numurs netiks rādīts, kamēr lauks ir tukšs.
+          {t(
+            "settings.preview.vat_hidden",
+            "PVN numurs netiks rādīts, kamēr lauks ir tukšs.",
+          )}
         </p>
       ) : null}
       {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).length > 0 ||
       settings.offerValidityDays > 0 ? (
         <div className="mt-5 border-t border-zinc-200/80 pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-            Piedāvājuma piezīmes
+            {t("settings.preview.offer_notes", "Piedāvājuma piezīmes")}
           </p>
           <ul className="mt-2 space-y-1.5 text-sm text-zinc-600">
             {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).map(
@@ -146,7 +170,9 @@ function CompanyPreview({ settings }: { settings: CompanySettings }) {
           </ul>
           {settings.offerValidityDays > 0 ? (
             <p className="mt-3 text-sm font-semibold text-zinc-800">
-              Piedāvājums spēkā {settings.offerValidityDays} dienas
+              {t("settings.preview.offer_validity", "Piedāvājums spēkā {count} dienas", {
+                count: settings.offerValidityDays,
+              })}
             </p>
           ) : null}
         </div>
@@ -167,6 +193,7 @@ export function CompanySettingsForm({
       : "",
   );
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const canSave = useActionPermission("settings.save");
   const [isPending, startTransition] = useTransition();
 
@@ -198,7 +225,10 @@ export function CompanySettingsForm({
     if (settings.estimateValidityDays < 1) {
       showFeedback({
         type: "error",
-        text: "Ievadi tāmes derīguma termiņu dienās.",
+        text: t(
+          "settings.validation.estimate_validity_required",
+          "Ievadi tāmes derīguma termiņu dienās.",
+        ),
       });
       return;
     }
@@ -206,7 +236,10 @@ export function CompanySettingsForm({
     if (settings.offerValidityDays < 1) {
       showFeedback({
         type: "error",
-        text: "Ievadi piedāvājuma derīguma termiņu dienās.",
+        text: t(
+          "settings.validation.offer_validity_required",
+          "Ievadi piedāvājuma derīguma termiņu dienās.",
+        ),
       });
       return;
     }
@@ -215,7 +248,7 @@ export function CompanySettingsForm({
     if (hourlyRateInput.trim() && parsedHourlyRate === null) {
       showFeedback({
         type: "error",
-        text: "Ievadi derīgu stundas likmi.",
+        text: t("settings.validation.hourly_rate_invalid", "Ievadi derīgu stundas likmi."),
       });
       return;
     }
@@ -230,11 +263,14 @@ export function CompanySettingsForm({
 
       if (result.ok) {
         setSettings(settingsToSave);
-        showFeedback({ type: "success", text: "Uzstādījumi saglabāti." });
+        showFeedback({
+          type: "success",
+          text: t("settings.feedback.saved", "Uzstādījumi saglabāti."),
+        });
         return;
       }
 
-      showFeedback({ type: "error", text: result.error });
+      showFeedback({ type: "error", text: translateActionError(t, result) });
     });
   }
 
@@ -243,7 +279,7 @@ export function CompanySettingsForm({
       <form onSubmit={handleSubmit} className="space-y-8">
         <fieldset disabled={!canSave} className="space-y-8 disabled:opacity-80">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title="Uzņēmums">
+          <SettingsSection title={t("settings.section.company", "Uzņēmums")}>
             <CompanyLogoDropzone
               logoUrl={settings.logoUrl}
               onLogoChange={(logoUrl) => updateField("logoUrl", logoUrl)}
@@ -255,7 +291,7 @@ export function CompanySettingsForm({
             />
             <div className="sm:col-span-2">
               <FormField
-                label="Uzņēmuma nosaukums"
+                label={t("settings.company_name", "Uzņēmuma nosaukums")}
                 id="companyName"
                 value={settings.companyName}
                 onChange={(value) => updateField("companyName", value)}
@@ -263,33 +299,33 @@ export function CompanySettingsForm({
             </div>
             <div className="sm:col-span-2">
               <FormField
-                label="Adrese"
+                label={t("settings.address", "Adrese")}
                 id="address"
                 value={settings.address}
                 onChange={(value) => updateField("address", value)}
               />
             </div>
             <FormField
-              label="Reģistrācijas numurs"
+              label={t("settings.registration_number", "Reģistrācijas numurs")}
               id="registrationNumber"
               value={settings.registrationNumber}
               onChange={(value) => updateField("registrationNumber", value)}
             />
             <FormField
-              label="PVN numurs"
+              label={t("settings.vat_number", "PVN numurs")}
               id="vatNumber"
               value={settings.vatNumber}
-              placeholder="Nav obligāts"
+              placeholder={t("common.optional", "Nav obligāts")}
               onChange={(value) => updateField("vatNumber", value)}
             />
           </SettingsSection>
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title="Bankas rekvizīti">
+          <SettingsSection title={t("settings.section.bank", "Bankas rekvizīti")}>
             <div className="sm:col-span-2">
               <FormField
-                label="Bankas konta numurs"
+                label={t("settings.bank_account_number", "Bankas konta numurs")}
                 id="bankAccountNumber"
                 value={settings.bankAccountNumber}
                 placeholder="LV… IBAN"
@@ -299,7 +335,7 @@ export function CompanySettingsForm({
             {settings.bankAccountNumber.trim() ? (
               <>
                 <FormField
-                  label="Bankas nosaukums"
+                  label={t("settings.bank_name", "Bankas nosaukums")}
                   id="bankName"
                   value={settings.bankName}
                   onChange={(value) => updateField("bankName", value)}
@@ -316,10 +352,10 @@ export function CompanySettingsForm({
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title="Tāme">
+          <SettingsSection title={t("settings.section.estimate", "Tāme")}>
             <label htmlFor="estimateValidityDays" className="block">
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                Tāmes derīguma termiņš
+                {t("settings.estimate_validity_term", "Tāmes derīguma termiņš")}
               </span>
               <InputWithSuffix
                 id="estimateValidityDays"
@@ -345,7 +381,7 @@ export function CompanySettingsForm({
             </label>
             <label htmlFor="defaultHourlyRate" className="block">
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                Darbinieka standarta stundas likme
+                {t("settings.default_hourly_rate", "Darbinieka standarta stundas likme")}
               </span>
               <InputWithSuffix
                 id="defaultHourlyRate"
@@ -371,13 +407,16 @@ export function CompanySettingsForm({
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title="Piedāvājums">
+          <SettingsSection title={t("settings.section.offer", "Piedāvājums")}>
             <label htmlFor="offerValidityDays" className="block">
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                Piedāvājuma derīguma termiņš
+                {t("settings.offer_validity_term", "Piedāvājuma derīguma termiņš")}
               </span>
               <span className="mb-2 block text-xs text-zinc-500">
-                PDF rāda treknrakstā: „Piedāvājums spēkā X dienas”.
+                {t(
+                  "settings.offer_validity_hint",
+                  "PDF rāda treknrakstā: „Piedāvājums spēkā X dienas”.",
+                )}
               </span>
               <InputWithSuffix
                 id="offerValidityDays"
@@ -404,10 +443,13 @@ export function CompanySettingsForm({
             <div className="sm:col-span-2">
               <label htmlFor="offerAdditionalInfo" className="block">
                 <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Papildus informācija piedāvājumam
+                  {t("settings.offer_additional_info", "Papildus informācija piedāvājumam")}
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
-                  Katra rinda tiek rādīta kā atsevišķs komentārs piedāvājuma PDF.
+                  {t(
+                    "settings.offer_additional_info_hint",
+                    "Katra rinda tiek rādīta kā atsevišķs komentārs piedāvājuma PDF.",
+                  )}
                 </span>
                 <textarea
                   id="offerAdditionalInfo"
@@ -415,7 +457,10 @@ export function CompanySettingsForm({
                   rows={5}
                   value={settings.offerAdditionalInfo}
                   placeholder={
-                    "Pozīcijas, kas nav minētas piedāvājumā – nav iekļautas.\nPrecizējot un mainot pozīcijas cenas piedāvājums var tikt precizēts."
+                    t(
+                      "settings.offer_additional_info_placeholder",
+                      "Pozīcijas, kas nav minētas piedāvājumā – nav iekļautas.\nPrecizējot un mainot pozīcijas cenas piedāvājums var tikt precizēts.",
+                    )
                   }
                   onChange={(event) =>
                     updateField("offerAdditionalInfo", event.target.value)
@@ -428,16 +473,16 @@ export function CompanySettingsForm({
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title="Kontakti un valūta">
+          <SettingsSection title={t("settings.section.contacts_currency", "Kontakti un valūta")}>
             <FormField
-              label="Info telefons"
+              label={t("settings.info_phone", "Info telefons")}
               id="phone"
               type="tel"
               value={settings.phone}
               onChange={(value) => updateField("phone", value)}
             />
             <FormField
-              label="Info e-pasts"
+              label={t("settings.info_email", "Info e-pasts")}
               id="email"
               type="email"
               value={settings.email}
@@ -446,7 +491,7 @@ export function CompanySettingsForm({
             <div className="sm:col-span-2">
               <label htmlFor="currency" className="block">
                 <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Valūta
+                  {t("settings.currency", "Valūta")}
                 </span>
                 <select
                   id="currency"
@@ -475,7 +520,7 @@ export function CompanySettingsForm({
             disabled={isPending}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending ? "Saglabā…" : "Saglabāt"}
+            {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
           </button>
           ) : null}
         </div>
@@ -483,7 +528,7 @@ export function CompanySettingsForm({
       </form>
 
       <div className="lg:sticky lg:top-[4.5rem]">
-        <CompanyPreview settings={settings} />
+        <CompanyPreview settings={settings} t={t} />
       </div>
     </div>
   );

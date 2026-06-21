@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type NavigationLoadingContextValue = {
   beginNavigation: (href: string, message?: string) => void;
@@ -16,8 +17,6 @@ type NavigationLoadingContextValue = {
 
 const NavigationLoadingContext =
   createContext<NavigationLoadingContextValue | null>(null);
-
-const DEFAULT_LOADING_MESSAGE = "Ielādē…";
 
 function NavigationLoadingOverlay({ message }: { message: string }) {
   return (
@@ -44,6 +43,7 @@ export function NavigationLoadingProvider({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { t } = useTranslations();
   const [pendingNavigation, setPendingNavigation] = useState<{
     href: string;
     message: string;
@@ -54,10 +54,13 @@ export function NavigationLoadingProvider({
   }, [pathname]);
 
   const beginNavigation = useCallback(
-    (href: string, message = DEFAULT_LOADING_MESSAGE) => {
-      setPendingNavigation({ href, message });
+    (href: string, message?: string) => {
+      setPendingNavigation({
+        href,
+        message: message ?? t("common.loading", "Ielādē…"),
+      });
     },
-    [],
+    [t],
   );
 
   const value = useMemo(

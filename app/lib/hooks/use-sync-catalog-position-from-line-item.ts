@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useTransition } from "react";
 import { syncPositionFromEstimateLineItemAction } from "@/app/(protected)/positions/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { EstimateLineItem } from "@/app/lib/estimates/types";
 import {
   applyLineItemCatalogEdit,
@@ -18,6 +20,7 @@ export function useSyncCatalogPositionFromLineItem(
 ) {
   const router = useRouter();
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [isSyncing, startSync] = useTransition();
   const debounceTimersRef = useRef(
     new Map<string, ReturnType<typeof setTimeout>>(),
@@ -73,14 +76,14 @@ export function useSyncCatalogPositionFromLineItem(
         }
 
         if (!result.ok) {
-          showFeedback({ type: "error", text: result.error });
+          showFeedback({ type: "error", text: translateActionError(t, result) });
           return;
         }
 
         router.refresh();
       });
     },
-    [catalogPositions, router, showFeedback],
+    [catalogPositions, router, showFeedback, t],
   );
 
   const scheduleSyncFromLineItem = useCallback(

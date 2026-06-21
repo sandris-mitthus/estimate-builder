@@ -8,6 +8,7 @@ import {
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
+import { useTranslations } from "@/app/components/translations-provider";
 import type {
   CatalogPositionCostType,
   PositionCostType,
@@ -60,6 +61,7 @@ export function EditPositionModal({
     resolveCatalogCostType(position.costType),
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const { t } = useTranslations();
 
   useEffect(() => {
     if (!open) return;
@@ -73,11 +75,11 @@ export function EditPositionModal({
     const nextErrors: FieldErrors = {};
 
     if (!name.trim()) {
-      nextErrors.name = "Ievadi nosaukumu.";
+      nextErrors.name = t("validation.name_required", "Ievadi nosaukumu.");
     }
 
     if (!unit.trim()) {
-      nextErrors.unit = "Ievadi mērvienību.";
+      nextErrors.unit = t("validation.unit_required", "Ievadi mērvienību.");
     }
 
     setFieldErrors(nextErrors);
@@ -103,8 +105,11 @@ export function EditPositionModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Labot pozīciju"
-      description="Atjaunini pozīcijas nosaukumu, mērvienību un izmaksu veidu"
+      title={t("positions.edit.title", "Labot pozīciju")}
+      description={t(
+        "positions.edit.description",
+        "Atjaunini pozīcijas nosaukumu, mērvienību un izmaksu veidu",
+      )}
       blocking={blocking}
       dirty={
         name !== position.name ||
@@ -152,7 +157,7 @@ export function EditPositionModal({
             disabled={blocking}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {blocking ? "Saglabā…" : "Saglabāt"}
+            {blocking ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
       </form>

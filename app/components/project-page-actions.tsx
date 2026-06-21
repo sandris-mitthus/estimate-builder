@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
+import { useTranslations } from "@/app/components/translations-provider";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
 type ProjectPageActionsProps = {
@@ -17,6 +18,7 @@ export function ProjectPageActions({
 }: ProjectPageActionsProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const canCreate = useActionPermission("project.create");
+  const { t } = useTranslations();
 
   return (
     <>
@@ -28,7 +30,7 @@ export function ProjectPageActions({
             className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
           >
             <i className="fas fa-plus text-xs" aria-hidden="true" />
-            Jauns projekts
+            {t("projects.create.action", "Jauns projekts")}
           </button>
         ) : null}
 
@@ -41,7 +43,7 @@ export function ProjectPageActions({
           }`}
         >
           <i className="fas fa-archive text-xs" aria-hidden="true" />
-          Arhīvs
+          {t("projects.archive.title", "Arhīvs")}
         </Link>
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type SubcategoryOfferVisibilityToggleProps = {
   hiddenInOffer?: boolean;
@@ -11,14 +12,15 @@ export function SubcategoryOfferVisibilityToggle({
   hiddenInOffer = false,
   onChange,
 }: SubcategoryOfferVisibilityToggleProps) {
+  const { t } = useTranslations();
   const hidden = hiddenInOffer === true;
 
   return (
     <IconActionButton
       label={
         hidden
-          ? "Piedāvājuma paslēptas pozīcijas"
-          : "Piedāvājuma redzamas pozicijas"
+          ? t("estimate.offer.subcategory_hidden", "Piedāvājuma paslēptas pozīcijas")
+          : t("estimate.offer.subcategory_visible", "Piedāvājuma redzamas pozīcijas")
       }
       icon={hidden ? "fas fa-eye-slash" : "fas fa-eye"}
       variant="edit"

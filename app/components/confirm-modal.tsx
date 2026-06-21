@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 
 const overlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center p-4";
@@ -35,7 +36,7 @@ export function ConfirmModal({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Atcelt",
+  cancelLabel,
   onConfirm,
   confirmVariant = "default",
   blocking = false,
@@ -46,6 +47,8 @@ export function ConfirmModal({
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const onConfirmRef = useRef(onConfirm);
   const blockingRef = useRef(blocking);
+  const { t } = useTranslations();
+  const resolvedCancelLabel = cancelLabel ?? t("actions.cancel", "Atcelt");
 
   useEffect(() => {
     onConfirmRef.current = onConfirm;
@@ -150,7 +153,7 @@ export function ConfirmModal({
               disabled={blocking}
               className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {cancelLabel}
+              {resolvedCancelLabel}
             </button>
             <button
               ref={confirmButtonRef}

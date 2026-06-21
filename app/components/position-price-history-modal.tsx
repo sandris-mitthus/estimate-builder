@@ -7,6 +7,7 @@ import {
   AppModal,
   appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
+import { useTranslations } from "@/app/components/translations-provider";
 import { formatAmount } from "@/app/lib/estimates/calculate-line";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import type {
@@ -78,6 +79,7 @@ export function PositionPriceHistoryModal({
   position,
   currency,
 }: PositionPriceHistoryModalProps) {
+  const { t } = useTranslations();
   const [entries, setEntries] = useState<PositionPriceHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -115,7 +117,7 @@ export function PositionPriceHistoryModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Vēsture"
+      title={t("common.history", "Vēsture")}
       description={`${position.name} · ${position.unit}`}
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
     >
@@ -129,11 +131,11 @@ export function PositionPriceHistoryModal({
             className="fas fa-spinner animate-spin text-zinc-400"
             aria-hidden="true"
           />
-          <span>Ielādē vēsturi…</span>
+          <span>{t("positions.history.loading", "Ielādē vēsturi…")}</span>
         </div>
       ) : entries.length === 0 ? (
         <p className="py-6 text-center text-sm text-zinc-500">
-          Nav saglabātu cenu izmaiņu.
+          {t("positions.history.empty", "Nav saglabātu cenu izmaiņu.")}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-200">
@@ -141,13 +143,13 @@ export function PositionPriceHistoryModal({
             <thead>
               <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                 <th className="border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 text-left">
-                  Datums
+                  {t("common.date", "Datums")}
                 </th>
                 <th className="border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 text-left">
-                  Cena
+                  {t("common.price", "Cena")}
                 </th>
                 <th className="border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 text-left">
-                  Veikals
+                  {t("positions.supplier.store", "Veikals")}
                 </th>
               </tr>
             </thead>
@@ -170,7 +172,10 @@ export function PositionPriceHistoryModal({
                       {previousPrice !== undefined &&
                       previousPrice !== entry.unitPrice ? (
                         <p className="mt-0.5 text-xs text-zinc-400">
-                          {`No ${formatAmount(previousPrice)} ${currency}`}
+                          {t("positions.history.previous_price", "No {price} {currency}", {
+                            price: formatAmount(previousPrice),
+                            currency,
+                          })}
                         </p>
                       ) : null}
                     </td>
@@ -191,7 +196,7 @@ export function PositionPriceHistoryModal({
           onClick={() => onOpenChange(false)}
           className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
         >
-          Aizvērt
+          {t("actions.close", "Aizvērt")}
         </button>
       </div>
     </AppModal>

@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useNavigationLoading } from "@/app/components/navigation-loading-context";
+import { useTranslations } from "@/app/components/translations-provider";
 import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
 import type { ProjectSummary } from "@/app/lib/projects/types";
 
@@ -55,6 +56,7 @@ function ProjectsPageCreateProviderInner({
   children: React.ReactNode;
 }) {
   const { beginNavigation } = useNavigationLoading();
+  const { t } = useTranslations();
   const [optimisticProject, setOptimisticProject] = useState<ProjectSummary | null>(
     null,
   );
@@ -69,9 +71,9 @@ function ProjectsPageCreateProviderInner({
 
   const beginProjectNavigation = useCallback(
     (href: string) => {
-      beginNavigation(href, "Ielādē projektu…");
+      beginNavigation(href, t("projects.loading", "Ielādē projektu…"));
     },
-    [beginNavigation],
+    [beginNavigation, t],
   );
 
   const value = useMemo(

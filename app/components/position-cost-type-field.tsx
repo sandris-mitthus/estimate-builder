@@ -1,9 +1,12 @@
+"use client";
+
 import {
-  CATALOG_POSITION_COST_TYPE_OPTIONS,
-  POSITION_COST_TYPE_OPTIONS,
+  getCatalogPositionCostTypeOptions,
+  getPositionCostTypeOptions,
   type CatalogPositionCostType,
   type PositionCostType,
 } from "@/app/lib/positions/position-cost-type";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type PositionCostTypeFieldProps = {
   id: string;
@@ -28,16 +31,17 @@ export function PositionCostTypeField({
   error,
   catalogOnly = false,
 }: PositionCostTypeFieldProps) {
+  const { t } = useTranslations();
   const options = catalogOnly
-    ? CATALOG_POSITION_COST_TYPE_OPTIONS
-    : POSITION_COST_TYPE_OPTIONS;
+    ? getCatalogPositionCostTypeOptions(t)
+    : getPositionCostTypeOptions(t);
   return (
     <fieldset>
       <legend
         id={`${id}-legend`}
         className="mb-1.5 block text-sm font-medium text-zinc-700"
       >
-        Izmaksu veids
+        {t("position.cost_type.label", "Izmaksu veids")}
       </legend>
       <div
         role="radiogroup"

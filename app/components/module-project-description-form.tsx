@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { DeleteButton } from "@/app/components/delete-button";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
@@ -155,23 +156,26 @@ function GablePedimentRow({
   onChange: (next: GablePedimentEntry) => void;
   onDelete: () => void;
 }) {
-  const foundationPlaneOptions = listFoundationPlaneOptions(foundationContext);
+  const { t } = useTranslations();
+  const foundationPlaneOptions = listFoundationPlaneOptions(foundationContext, t);
   const areaM2 = calculateGablePedimentAreaM2(entry, foundationContext);
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-zinc-500">
-          Frontons {index + 1}
+          {t("project_description.gable.item", "Frontons {index}", { index: index + 1 })}
         </span>
         <DeleteButton
-          label={`Dzēst frontonu ${index + 1}`}
+          label={t("project_description.gable.delete", "Dzēst frontonu {index}", {
+            index: index + 1,
+          })}
           onClick={onDelete}
         />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Augstums (m)" id={`gable-height-${entry.id}`}>
+        <Field label={t("project_description.field.height_m", "Augstums (m)")} id={`gable-height-${entry.id}`}>
           <DimensionInput
             id={`gable-height-${entry.id}`}
             value={entry.heightM}
@@ -180,7 +184,7 @@ function GablePedimentRow({
           />
         </Field>
 
-        <Field label="Skaits" id={`gable-count-${entry.id}`}>
+        <Field label={t("common.count", "Skaits")} id={`gable-count-${entry.id}`}>
           <CountInput
             id={`gable-count-${entry.id}`}
             value={entry.count}
@@ -188,7 +192,7 @@ function GablePedimentRow({
           />
         </Field>
 
-        <Field label="Pamata plakne" id={`gable-plane-${entry.id}`}>
+        <Field label={t("project_description.foundation_plane", "Pamata plakne")} id={`gable-plane-${entry.id}`}>
           <select
             id={`gable-plane-${entry.id}`}
             value={entry.foundationPlaneKey}
@@ -200,7 +204,7 @@ function GablePedimentRow({
             }
             className={`${formInputFullWidthClass} ${formInputClassName()} cursor-pointer`}
           >
-            <option value="">Izvēlies plakni</option>
+            <option value="">{t("project_description.choose_plane", "Izvēlies plakni")}</option>
             {foundationPlaneOptions.map((option) => (
               <option key={option.key} value={option.key}>
                 {formatFoundationPlaneOptionLabel(option, foundationContext)}
@@ -211,7 +215,7 @@ function GablePedimentRow({
       </div>
 
       <div className="mt-3">
-        <CalculatedField label="Frontona platība" value={areaM2} unit="m²" />
+        <CalculatedField label={t("project_description.gable.area", "Frontona platība")} value={areaM2} unit="m²" />
       </div>
     </div>
   );
@@ -232,15 +236,25 @@ function OpeningRow({
   onDelete: () => void;
   extra?: ReactNode;
 }) {
+  const { t } = useTranslations();
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-zinc-500">Veids {index + 1}</span>
-        <DeleteButton label={`Dzēst ${prefix} veidu ${index + 1}`} onClick={onDelete} />
+        <span className="text-xs font-medium text-zinc-500">
+          {t("project_description.opening.item", "Veids {index}", { index: index + 1 })}
+        </span>
+        <DeleteButton
+          label={t("project_description.opening.delete", "Dzēst {prefix} veidu {index}", {
+            prefix,
+            index: index + 1,
+          })}
+          onClick={onDelete}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Augstums (m)" id={`${prefix}-height-${entry.id}`}>
+        <Field label={t("project_description.field.height_m", "Augstums (m)")} id={`${prefix}-height-${entry.id}`}>
           <DimensionInput
             id={`${prefix}-height-${entry.id}`}
             value={entry.heightM}
@@ -249,7 +263,7 @@ function OpeningRow({
           />
         </Field>
 
-        <Field label="Platums (m)" id={`${prefix}-width-${entry.id}`}>
+        <Field label={t("project_description.field.width_m", "Platums (m)")} id={`${prefix}-width-${entry.id}`}>
           <DimensionInput
             id={`${prefix}-width-${entry.id}`}
             value={entry.widthM}
@@ -258,7 +272,7 @@ function OpeningRow({
           />
         </Field>
 
-        <Field label="Skaits" id={`${prefix}-count-${entry.id}`}>
+        <Field label={t("common.count", "Skaits")} id={`${prefix}-count-${entry.id}`}>
           <CountInput
             id={`${prefix}-count-${entry.id}`}
             value={entry.count}
@@ -285,24 +299,29 @@ function CrossSectionRow({
   onChange: (next: FoundationCrossSectionEntry) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslations();
   const volumeM3 = calculateCrossSectionVolumeM3(entry);
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-zinc-500">
-          Izgriezums {index + 1}
+          {t("project_description.cross_section.item", "Izgriezums {index}", {
+            index: index + 1,
+          })}
         </span>
         {canDelete ? (
           <DeleteButton
-            label={`Dzēst izgriezumu ${index + 1}`}
+            label={t("project_description.cross_section.delete", "Dzēst izgriezumu {index}", {
+              index: index + 1,
+            })}
             onClick={onDelete}
           />
         ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Platums (m)" id={`cross-section-width-${entry.id}`}>
+        <Field label={t("project_description.field.width_m", "Platums (m)")} id={`cross-section-width-${entry.id}`}>
           <DimensionInput
             id={`cross-section-width-${entry.id}`}
             value={entry.widthM}
@@ -310,7 +329,7 @@ function CrossSectionRow({
             placeholder="12"
           />
         </Field>
-        <Field label="Dziļums (m)" id={`cross-section-depth-${entry.id}`}>
+        <Field label={t("project_description.field.depth_m", "Dziļums (m)")} id={`cross-section-depth-${entry.id}`}>
           <DimensionInput
             id={`cross-section-depth-${entry.id}`}
             value={entry.depthM}
@@ -318,7 +337,7 @@ function CrossSectionRow({
             placeholder="8"
           />
         </Field>
-        <Field label="Augstums (m)" id={`cross-section-height-${entry.id}`}>
+        <Field label={t("project_description.field.height_m", "Augstums (m)")} id={`cross-section-height-${entry.id}`}>
           <DimensionInput
             id={`cross-section-height-${entry.id}`}
             value={entry.heightM}
@@ -329,7 +348,11 @@ function CrossSectionRow({
       </div>
 
       <div className="mt-3">
-        <CalculatedField label="Izgriezuma tilpums (atņemams)" value={volumeM3} unit="m³" />
+        <CalculatedField
+          label={t("project_description.cross_section.volume_removed", "Izgriezuma tilpums (atņemams)")}
+          value={volumeM3}
+          unit="m³"
+        />
       </div>
     </div>
   );
@@ -350,25 +373,37 @@ function RoofPlaneRow({
   onChange: (next: RoofPlaneEntry) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslations();
   const calc = calculateRoofPlane(plane, floorHeightM);
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-zinc-500">Plakne {index + 1}</span>
+        <span className="text-xs font-medium text-zinc-500">
+          {t("project_description.roof.plane_item", "Plakne {index}", {
+            index: index + 1,
+          })}
+        </span>
         {canDelete ? (
-          <DeleteButton label={`Dzēst jumta plakni ${index + 1}`} onClick={onDelete} />
+          <DeleteButton
+            label={t("project_description.roof.delete_plane", "Dzēst jumta plakni {index}", {
+              index: index + 1,
+            })}
+            onClick={onDelete}
+          />
         ) : null}
       </div>
 
       <p className="mb-3 text-xs text-zinc-500">
-        Ieslēdz slēdzi &quot;Tekne&quot; pie platuma vai augstuma. Aktīvs var būt tikai
-        viens slēdzis.
+        {t(
+          "project_description.roof.gutter_hint",
+          "Ieslēdz slēdzi \"Tekne\" pie platuma vai augstuma. Aktīvs var būt tikai viens slēdzis.",
+        )}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <DimensionFieldWithPlaneToggle
-          label="Platums (m)"
+          label={t("project_description.field.width_m", "Platums (m)")}
           id={`roof-width-${plane.id}`}
           value={plane.widthM}
           onChange={(widthM) => onChange({ ...plane, widthM })}
@@ -376,10 +411,10 @@ function RoofPlaneRow({
           attachmentEnabled={plane.gutterEdge === "width"}
           onAttachmentSelect={() => onChange({ ...plane, gutterEdge: "width" })}
           attachmentToggleId={`roof-width-gutter-${plane.id}`}
-          attachmentLabel="Tekne"
+          attachmentLabel={t("project_description.roof.gutter", "Tekne")}
         />
         <DimensionFieldWithPlaneToggle
-          label="Augstums (m)"
+          label={t("project_description.field.height_m", "Augstums (m)")}
           id={`roof-height-${plane.id}`}
           value={plane.heightM}
           onChange={(heightM) => onChange({ ...plane, heightM })}
@@ -387,9 +422,9 @@ function RoofPlaneRow({
           attachmentEnabled={plane.gutterEdge === "height"}
           onAttachmentSelect={() => onChange({ ...plane, gutterEdge: "height" })}
           attachmentToggleId={`roof-height-gutter-${plane.id}`}
-          attachmentLabel="Tekne"
+          attachmentLabel={t("project_description.roof.gutter", "Tekne")}
         />
-        <Field label="Skaits" id={`roof-count-${plane.id}`}>
+        <Field label={t("common.count", "Skaits")} id={`roof-count-${plane.id}`}>
           <CountInput
             id={`roof-count-${plane.id}`}
             value={plane.count}
@@ -399,9 +434,21 @@ function RoofPlaneRow({
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <CalculatedField label="Plaknes laukums" value={calc.areaM2} unit="m²" />
-        <CalculatedField label="Teknes garums" value={calc.gutterLengthM} unit="m" />
-        <CalculatedField label="Noteku garums" value={calc.downpipeLengthM} unit="m" />
+        <CalculatedField
+          label={t("project_description.roof.plane_area", "Plaknes laukums")}
+          value={calc.areaM2}
+          unit="m²"
+        />
+        <CalculatedField
+          label={t("project_description.roof.gutter_length", "Teknes garums")}
+          value={calc.gutterLengthM}
+          unit="m"
+        />
+        <CalculatedField
+          label={t("project_description.roof.downpipe_length", "Noteku garums")}
+          value={calc.downpipeLengthM}
+          unit="m"
+        />
       </div>
     </div>
   );
@@ -448,7 +495,7 @@ function DimensionFieldWithPlaneToggle({
   attachmentEnabled,
   onAttachmentSelect,
   attachmentToggleId,
-  attachmentLabel = "Pievienots 1. pamatam",
+  attachmentLabel,
 }: {
   label: string;
   id: string;
@@ -460,6 +507,11 @@ function DimensionFieldWithPlaneToggle({
   attachmentToggleId: string;
   attachmentLabel?: string;
 }) {
+  const { t } = useTranslations();
+  const resolvedAttachmentLabel =
+    attachmentLabel ??
+    t("project_description.foundation.attached_first", "Pievienots 1. pamatam");
+
   return (
     <div className="block">
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -467,7 +519,7 @@ function DimensionFieldWithPlaneToggle({
           {label}
         </label>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{attachmentLabel}</span>
+          <span className="text-xs text-zinc-500">{resolvedAttachmentLabel}</span>
           <CompactToggle
             id={attachmentToggleId}
             enabled={attachmentEnabled}
@@ -534,10 +586,12 @@ function ExteriorWallToggle({
   enabled: boolean;
   onChange: (enabled: boolean) => void;
 }) {
+  const { t } = useTranslations();
+
   return (
     <ToggleSwitch
       id={id}
-      label="Atrodas ārsienā"
+      label={t("project_description.opening.exterior_wall", "Atrodas ārsienā")}
       enabled={enabled}
       onChange={onChange}
     />
@@ -555,6 +609,7 @@ export function ModuleProjectDescriptionForm({
   initialProjectDescription,
   onSave,
 }: ModuleProjectDescriptionFormProps) {
+  const { t } = useTranslations();
   const [form, setForm] = useState(initialProjectDescription);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     serializeProjectDescriptionFormState(initialProjectDescription),
@@ -690,14 +745,16 @@ export function ModuleProjectDescriptionForm({
 
   return (
     <section className="min-w-0">
-      <h2 className="text-sm font-semibold text-zinc-900">Projekta apraksts</h2>
+      <h2 className="text-sm font-semibold text-zinc-900">
+        {t("project_description.title", "Projekta apraksts")}
+      </h2>
 
       <div className="mt-3 space-y-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         <section className="space-y-4">
-          <SectionHeading>Pamats</SectionHeading>
+          <SectionHeading>{t("project_description.section.foundation", "Pamats")}</SectionHeading>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Platums (m)" id="foundation-width">
+            <Field label={t("project_description.field.width_m", "Platums (m)")} id="foundation-width">
               <DimensionInput
                 id="foundation-width"
                 value={form.foundationWidthM}
@@ -707,7 +764,7 @@ export function ModuleProjectDescriptionForm({
                 placeholder="12"
               />
             </Field>
-            <Field label="Dziļums (m)" id="foundation-depth">
+            <Field label={t("project_description.field.depth_m", "Dziļums (m)")} id="foundation-depth">
               <DimensionInput
                 id="foundation-depth"
                 value={form.foundationDepthM}
@@ -717,7 +774,7 @@ export function ModuleProjectDescriptionForm({
                 placeholder="8"
               />
             </Field>
-            <Field label="Augstums (m)" id="foundation-height">
+            <Field label={t("project_description.field.height_m", "Augstums (m)")} id="foundation-height">
               <DimensionInput
                 id="foundation-height"
                 value={form.foundationHeightM}
@@ -731,7 +788,7 @@ export function ModuleProjectDescriptionForm({
 
           <ToggleSwitch
             id="foundation-l-shape"
-            label="L veida pamats"
+            label={t("project_description.foundation.l_shape", "L veida pamats")}
             enabled={form.foundationLShape}
             onChange={(foundationLShape) =>
               setForm((current) => ({ ...current, foundationLShape }))
@@ -740,14 +797,18 @@ export function ModuleProjectDescriptionForm({
 
           {form.foundationLShape ? (
             <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
-              <p className="text-xs font-medium text-zinc-500">L veida papildu pamats</p>
+              <p className="text-xs font-medium text-zinc-500">
+                {t("project_description.foundation.l_shape_extension", "L veida papildu pamats")}
+              </p>
               <p className="text-xs text-zinc-500">
-                Ieslēdz slēdzi pie plaknes, kas piegulst pamatam. Aktīvs var būt tikai
-                viens slēdzis.
+                {t(
+                  "project_description.foundation.attachment_hint",
+                  "Ieslēdz slēdzi pie plaknes, kas piegulst pamatam. Aktīvs var būt tikai viens slēdzis.",
+                )}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <DimensionFieldWithPlaneToggle
-                  label="Platums (m)"
+                  label={t("project_description.field.width_m", "Platums (m)")}
                   id="foundation-extension-width"
                   value={form.foundationExtensionWidthM}
                   onChange={(foundationExtensionWidthM) =>
@@ -764,7 +825,7 @@ export function ModuleProjectDescriptionForm({
                   attachmentToggleId="foundation-extension-width-attach"
                 />
                 <DimensionFieldWithPlaneToggle
-                  label="Dziļums (m)"
+                  label={t("project_description.field.depth_m", "Dziļums (m)")}
                   id="foundation-extension-depth"
                   value={form.foundationExtensionDepthM}
                   onChange={(foundationExtensionDepthM) =>
@@ -783,12 +844,12 @@ export function ModuleProjectDescriptionForm({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <CalculatedField
-                  label="Savienojuma plaknes garums"
+                  label={t("project_description.foundation.shared_edge", "Savienojuma plaknes garums")}
                   value={footprint.sharedEdgeLengthM}
                   unit="m"
                 />
                 <CalculatedField
-                  label="Atņemams no perimetra (×2)"
+                  label={t("project_description.foundation.perimeter_deduction", "Atņemams no perimetra (×2)")}
                   value={footprint.perimeterDeductionM}
                   unit="m"
                 />
@@ -797,15 +858,15 @@ export function ModuleProjectDescriptionForm({
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <CalculatedField label="Perimetrs" value={footprint.perimeterM} unit="m" />
-            <CalculatedField label="Laukums" value={footprint.areaM2} unit="m²" />
-            <CalculatedField label="Pamatu tilpums" value={footprint.volumeM3} unit="m³" />
+            <CalculatedField label={t("project_description.foundation.perimeter", "Perimetrs")} value={footprint.perimeterM} unit="m" />
+            <CalculatedField label={t("project_description.foundation.area", "Laukums")} value={footprint.areaM2} unit="m²" />
+            <CalculatedField label={t("project_description.foundation.volume", "Pamatu tilpums")} value={footprint.volumeM3} unit="m³" />
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <SectionHeading>Pamata izgriezumi</SectionHeading>
+            <SectionHeading>{t("project_description.section.cross_sections", "Pamata izgriezumi")}</SectionHeading>
             <button
               type="button"
               onClick={() =>
@@ -816,7 +877,7 @@ export function ModuleProjectDescriptionForm({
               }
               className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
             >
-              + Pievienot izgriezumu
+              {t("project_description.cross_section.add", "+ Pievienot izgriezumu")}
             </button>
           </div>
 
@@ -845,12 +906,12 @@ export function ModuleProjectDescriptionForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <CalculatedField
-              label="Atņemams tilpums (kopā)"
+              label={t("project_description.cross_section.total_removed", "Atņemams tilpums (kopā)")}
               value={removedCrossSectionVolumeM3}
               unit="m³"
             />
             <CalculatedField
-              label="Galīgais pamatu tilpums"
+              label={t("project_description.foundation.net_volume", "Galīgais pamatu tilpums")}
               value={netFoundationVolumeM3}
               unit="m³"
             />
@@ -858,10 +919,10 @@ export function ModuleProjectDescriptionForm({
         </section>
 
         <section className="space-y-4">
-          <SectionHeading>Sienas</SectionHeading>
+          <SectionHeading>{t("project_description.section.walls", "Sienas")}</SectionHeading>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Stāvu augstums (m)" id="floor-height">
+            <Field label={t("project_description.field.floor_height_m", "Stāvu augstums (m)")} id="floor-height">
               <DimensionInput
                 id="floor-height"
                 value={form.floorHeightM}
@@ -872,7 +933,7 @@ export function ModuleProjectDescriptionForm({
               />
             </Field>
 
-            <Field label="Ārsienu garums (m)" id="exterior-wall-length">
+            <Field label={t("project_description.field.exterior_wall_length_m", "Ārsienu garums (m)")} id="exterior-wall-length">
               <DimensionInput
                 id="exterior-wall-length"
                 value={form.exteriorWallLengthM}
@@ -883,7 +944,7 @@ export function ModuleProjectDescriptionForm({
               />
             </Field>
 
-            <Field label="Starpsienu garums (m)" id="interior-wall-length">
+            <Field label={t("project_description.field.interior_wall_length_m", "Starpsienu garums (m)")} id="interior-wall-length">
               <DimensionInput
                 id="interior-wall-length"
                 value={form.interiorWallLengthM}
@@ -897,32 +958,32 @@ export function ModuleProjectDescriptionForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <CalculatedField
-              label="Ārsienu kvadratūra (bruto)"
+              label={t("project_description.walls.gross_exterior", "Ārsienu kvadratūra (bruto)")}
               value={walls.grossExteriorWallAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Starpsienu kvadratūra (bruto)"
+              label={t("project_description.walls.gross_interior", "Starpsienu kvadratūra (bruto)")}
               value={walls.grossInteriorWallAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Logu laukums (atņemams no ārsienām)"
+              label={t("project_description.walls.window_area_removed", "Logu laukums (atņemams no ārsienām)")}
               value={walls.windowOpeningAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Durvju laukums ārsienās (atņemams)"
+              label={t("project_description.walls.exterior_door_area_removed", "Durvju laukums ārsienās (atņemams)")}
               value={walls.exteriorDoorOpeningAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Durvju laukums starpsienās (atņemams)"
+              label={t("project_description.walls.interior_door_area_removed", "Durvju laukums starpsienās (atņemams)")}
               value={walls.interiorDoorOpeningAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Kopējā sienu kvadratūra (neto)"
+              label={t("project_description.walls.total_net", "Kopējā sienu kvadratūra (neto)")}
               value={walls.totalNetWallAreaM2}
               unit="m²"
             />
@@ -930,17 +991,17 @@ export function ModuleProjectDescriptionForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <CalculatedField
-              label="Ārsienu kvadratūra (neto)"
+              label={t("project_description.walls.net_exterior", "Ārsienu kvadratūra (neto)")}
               value={walls.netExteriorWallAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Starpsienu kvadratūra (neto)"
+              label={t("project_description.walls.net_interior", "Starpsienu kvadratūra (neto)")}
               value={walls.netInteriorWallAreaM2}
               unit="m²"
             />
             <CalculatedField
-              label="Frontonu kopējā platība"
+              label={t("project_description.walls.gable_total_area", "Frontonu kopējā platība")}
               value={walls.gablePedimentAreaM2}
               unit="m²"
             />
@@ -948,7 +1009,9 @@ export function ModuleProjectDescriptionForm({
 
           <div className="space-y-3 border-t border-zinc-100 pt-4">
             <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold text-zinc-900">Frontoni</h4>
+              <h4 className="text-sm font-semibold text-zinc-900">
+                {t("project_description.section.gables", "Frontoni")}
+              </h4>
               <button
                 type="button"
                 onClick={() =>
@@ -959,12 +1022,14 @@ export function ModuleProjectDescriptionForm({
                 }
                 className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
               >
-                + Pievienot frontonu
+                {t("project_description.gable.add", "+ Pievienot frontonu")}
               </button>
             </div>
 
             {form.gablePediments.length === 0 ? (
-              <p className="text-sm text-zinc-500">Nav pievienotu frontonu.</p>
+              <p className="text-sm text-zinc-500">
+                {t("project_description.gable.empty", "Nav pievienotu frontonu.")}
+              </p>
             ) : (
               <div className="space-y-3">
                 {form.gablePediments.map((entry, index) => (
@@ -994,18 +1059,20 @@ export function ModuleProjectDescriptionForm({
 
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <SectionHeading>Logi</SectionHeading>
+            <SectionHeading>{t("project_description.section.windows", "Logi")}</SectionHeading>
             <button
               type="button"
               onClick={() => updateWindows([...form.windows, createWindowEntry()])}
               className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
             >
-              + Pievienot logu veidu
+              {t("project_description.windows.add", "+ Pievienot logu veidu")}
             </button>
           </div>
 
           {form.windows.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nav pievienotu logu veidu.</p>
+            <p className="text-sm text-zinc-500">
+              {t("project_description.windows.empty", "Nav pievienotu logu veidu.")}
+            </p>
           ) : (
             <div className="space-y-3">
               {form.windows.map((entry, index) => (
@@ -1030,18 +1097,20 @@ export function ModuleProjectDescriptionForm({
 
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <SectionHeading>Durvis</SectionHeading>
+            <SectionHeading>{t("project_description.section.doors", "Durvis")}</SectionHeading>
             <button
               type="button"
               onClick={() => updateDoors([...form.doors, createDoorEntry()])}
               className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
             >
-              + Pievienot durvju veidu
+              {t("project_description.doors.add", "+ Pievienot durvju veidu")}
             </button>
           </div>
 
           {form.doors.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nav pievienotu durvju veidu.</p>
+            <p className="text-sm text-zinc-500">
+              {t("project_description.doors.empty", "Nav pievienotu durvju veidu.")}
+            </p>
           ) : (
             <div className="space-y-3">
               {form.doors.map((entry, index) => (
@@ -1081,7 +1150,7 @@ export function ModuleProjectDescriptionForm({
 
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <SectionHeading>Jumts</SectionHeading>
+            <SectionHeading>{t("project_description.section.roof", "Jumts")}</SectionHeading>
             <button
               type="button"
               onClick={() =>
@@ -1089,12 +1158,14 @@ export function ModuleProjectDescriptionForm({
               }
               className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
             >
-              + Pievienot plakni
+              {t("project_description.roof.add_plane", "+ Pievienot plakni")}
             </button>
           </div>
 
           {form.roofPlanes.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nav pievienotu jumta plakņu.</p>
+            <p className="text-sm text-zinc-500">
+              {t("project_description.roof.empty", "Nav pievienotu jumta plakņu.")}
+            </p>
           ) : (
             <div className="space-y-3">
               {form.roofPlanes.map((plane, index) => (
@@ -1124,17 +1195,17 @@ export function ModuleProjectDescriptionForm({
           {form.roofPlanes.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-3">
               <CalculatedField
-                label="Kopējā jumta platība"
+                label={t("project_description.roof.total_area", "Kopējā jumta platība")}
                 value={roofTotals.totalAreaM2}
                 unit="m²"
               />
               <CalculatedField
-                label="Kopējais teknes garums"
+                label={t("project_description.roof.total_gutter_length", "Kopējais teknes garums")}
                 value={roofTotals.totalGutterLengthM}
                 unit="m"
               />
               <CalculatedField
-                label="Kopējais noteku garums"
+                label={t("project_description.roof.total_downpipe_length", "Kopējais noteku garums")}
                 value={roofTotals.totalDownpipeLengthM}
                 unit="m"
               />
@@ -1150,7 +1221,7 @@ export function ModuleProjectDescriptionForm({
           disabled={!isDirty || isSaving}
           className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSaving ? "Saglabā…" : "Saglabāt"}
+          {isSaving ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
         </button>
       </div>
     </section>

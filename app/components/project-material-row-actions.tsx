@@ -9,6 +9,8 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { UpdatePositionPriceModal } from "@/app/components/update-position-price-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { AggregatedProjectMaterial } from "@/app/lib/estimates/aggregate-project-materials";
 import type {
   PositionPriceSummary,
@@ -41,6 +43,7 @@ export function ProjectMaterialRowActions({
   const canOrder = useActionPermission("materials.order");
   const canUpdatePrice = useActionPermission("positions.manage");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [updatePriceOpen, setUpdatePriceOpen] = useState(false);
   const [orderedConfirmOpen, setOrderedConfirmOpen] = useState(false);
   const [isOrdering, startOrderTransition] = useTransition();
@@ -71,12 +74,12 @@ export function ProjectMaterialRowActions({
       );
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       onOrdered(result.orderedIds);
-      showFeedback({ type: "success", text: "Materiāls atzīmēts kā pasūtīts." });
+      showFeedback({ type: "success", text: t("materials.feedback.ordered", "Materiāls atzīmēts kā pasūtīts.") });
     });
   }
 
@@ -88,12 +91,12 @@ export function ProjectMaterialRowActions({
       });
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       setUpdatePriceOpen(false);
-      showFeedback({ type: "success", text: "Cena atjaunināta." });
+      showFeedback({ type: "success", text: t("positions.feedback.price_updated", "Cena atjaunināta.") });
       router.refresh();
       setOrderedConfirmOpen(true);
     });
@@ -110,13 +113,13 @@ export function ProjectMaterialRowActions({
       );
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
       setOrderedConfirmOpen(false);
       onOrdered(result.orderedIds);
-      showFeedback({ type: "success", text: "Materiāls atzīmēts kā pasūtīts." });
+      showFeedback({ type: "success", text: t("materials.feedback.ordered", "Materiāls atzīmēts kā pasūtīts.") });
     });
   }
 
@@ -131,8 +134,8 @@ export function ProjectMaterialRowActions({
           <IconActionButton
             label={
               material.hasPriceChange
-                ? "Atjaunot cenu (kataloga cena atšķiras no budžeta)"
-                : "Atjaunot cenu"
+                ? t("materials.price.update_changed", "Atjaunot cenu (kataloga cena atšķiras no budžeta)")
+                : t("positions.price.update_title", "Atjaunot cenu")
             }
             icon="fas fa-level-up-alt"
             variant="approve"
@@ -152,7 +155,7 @@ export function ProjectMaterialRowActions({
             <span
               className="inline-flex h-8 w-8 items-center justify-center"
               role="status"
-              aria-label="Saglabā"
+              aria-label={t("actions.saving", "Saglabā…")}
             >
               <i
                 className="fas fa-spinner animate-spin text-sm text-zinc-400"
@@ -161,7 +164,7 @@ export function ProjectMaterialRowActions({
             </span>
           ) : (
             <IconActionButton
-              label="Pasūtīts"
+              label={t("materials.order.mark_ordered", "Pasūtīts")}
               icon="fas fa-check"
               variant="complete"
               tooltipAlign="end"
@@ -189,16 +192,21 @@ export function ProjectMaterialRowActions({
         <ConfirmModal
         open={orderedConfirmOpen}
         onOpenChange={setOrderedConfirmOpen}
-        title="Vai pasūtīji materiālu?"
+        title={t("materials.order.confirm_title", "Vai pasūtīji materiālu?")}
         description={
           <p>
-            Materiāls{" "}
+            {t("materials.order.confirm_prefix", "Materiāls")}{" "}
             <span className="font-medium text-zinc-900">{material.name}</span> —
-            ja pasūtījums ir veikts, apstiprini, lai noņemtu to no saraksta.
+            {t(
+              "materials.order.confirm_suffix",
+              "ja pasūtījums ir veikts, apstiprini, lai noņemtu to no saraksta.",
+            )}
           </p>
         }
-        confirmLabel={isOrdering ? "Saglabā…" : "Jā, pasūtīts"}
-        cancelLabel="Nē"
+        confirmLabel={
+          isOrdering ? t("actions.saving", "Saglabā…") : t("materials.order.confirm", "Jā, pasūtīts")
+        }
+        cancelLabel={t("actions.no", "Nē")}
         onConfirm={handleConfirmOrderedAfterPriceUpdate}
         blocking={isOrdering}
       />

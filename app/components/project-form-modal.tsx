@@ -10,6 +10,7 @@ import { AppModal } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { PhoneField } from "@/app/components/phone-field";
 import { useOptionalProjectsPageCreate } from "@/app/components/projects-page-create-context";
+import { useTranslations } from "@/app/components/translations-provider";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   formInputClassName,
@@ -25,6 +26,7 @@ import {
   validateEmail,
   validatePhone,
 } from "@/app/lib/validation/contact-fields";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 type FormState = {
   clientName: string;
@@ -53,14 +55,15 @@ function moduleSelectionFromProject(project: ProjectSummary): string {
 function moduleLabelFromSelection(
   moduleSelection: string,
   modules: BuildingModuleSummary[],
+  individualProjectLabel: string,
 ): string {
   if (moduleSelection === INDIVIDUAL_PROJECT_MODULE) {
-    return "Individuāls projekts";
+    return individualProjectLabel;
   }
 
   return (
     modules.find((module) => module.id === moduleSelection)?.name ??
-    "Individuāls projekts"
+    individualProjectLabel
   );
 }
 
@@ -142,6 +145,7 @@ export function ProjectFormModal({
 }: ProjectFormModalProps) {
   const router = useRouter();
   const pageCreate = useOptionalProjectsPageCreate();
+  const { t } = useTranslations();
   const isEdit = mode === "edit";
   const isCopyCreate = !isEdit && Boolean(copyFromProject);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -211,22 +215,25 @@ export function ProjectFormModal({
     let nextModuleError: string | undefined;
 
     if (!moduleSelection) {
-      nextModuleError = "Izvēlies moduli.";
+      nextModuleError = t("validation.module_required", "Izvēlies moduli.");
     }
 
     if (!form.clientName.trim()) {
-      nextErrors.clientName = "Ievadi pasūtītāja vārdu un uzvārdu.";
+      nextErrors.clientName = t(
+        "projects.validation.client_name_required",
+        "Ievadi pasūtītāja vārdu un uzvārdu.",
+      );
     }
 
     if (!form.address.trim()) {
-      nextErrors.address = "Ievadi adresi.";
+      nextErrors.address = t("validation.address_required", "Ievadi adresi.");
     }
 
     const emailError = validateEmail(form.email);
-    if (emailError) nextErrors.email = emailError;
+    if (emailError) nextErrors.email = translateActionError(t, { error: emailError });
 
     const phoneError = validatePhone(form.phone, phoneCallingCode);
-    if (phoneError) nextErrors.phone = phoneError;
+    if (phoneError) nextErrors.phone = translateActionError(t, { error: phoneError });
 
     setFieldErrors(nextErrors);
     setModuleError(nextModuleError);
@@ -253,7 +260,7 @@ export function ProjectFormModal({
         });
 
         if (!result.ok) {
-          setError(result.error);
+          setError(translateActionError(t, result));
           return;
         }
 
@@ -288,7 +295,7 @@ export function ProjectFormModal({
           pageCreate!.clearOptimisticCreate();
           handleOpenChange(true, true);
         }
-        setError(result.error);
+        setError(translateActionError(t, result));
         return;
       }
 
@@ -338,14 +345,21 @@ export function ProjectFormModal({
     <AppModal
       open={open}
       onOpenChange={handleOpenChange}
-      title={isEdit ? "Labot projektu" : "Jauns projekts"}
-      description="Ievadi pasūtītāja kontaktinformāciju"
+      title={
+        isEdit
+          ? t("projects.edit.title", "Labot projektu")
+          : t("projects.create.title", "Jauns projekts")
+      }
+      description={t(
+        "projects.form.description",
+        "Ievadi pasūtītāja kontaktinformāciju",
+      )}
       blocking={isPending}
       dirty={isDirty}
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <FormField
-          label="Pasūtītāja vārds, uzvārds"
+          label={t("projects.client_name", "Pasūtītāja vārds, uzvārds")}
           id="clientName"
           value={form.clientName}
           onChange={(value) => updateField("clientName", value)}
@@ -353,14 +367,18 @@ export function ProjectFormModal({
         />
         <label htmlFor="moduleSelection" className="block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Modulis
+            {t("common.module", "Modulis")}
           </span>
           {isCopyCreate ? (
             <input
               id="moduleSelection"
               name="moduleSelection"
               type="text"
-              value={moduleLabelFromSelection(moduleSelection, modules)}
+              value={moduleLabelFromSelection(
+                moduleSelection,
+                modules,
+                t("projects.individual_project", "Individuāls projekts"),
+              )}
               readOnly
               className={`${formInputFullWidthClass} ${formInputClassName()} cursor-not-allowed bg-zinc-50 text-zinc-600`}
               aria-readonly="true"
@@ -379,13 +397,15 @@ export function ProjectFormModal({
               aria-describedby={moduleError ? "moduleSelection-error" : undefined}
               required
             >
-              <option value="">Izvēlies Moduli</option>
+              <option value="">{t("validation.module_required", "Izvēlies moduli.")}</option>
               {modules.map((module) => (
                 <option key={module.id} value={module.id}>
                   {module.name}
                 </option>
               ))}
-              <option value={INDIVIDUAL_PROJECT_MODULE}>Individuāls projekts</option>
+              <option value={INDIVIDUAL_PROJECT_MODULE}>
+                {t("projects.individual_project", "Individuāls projekts")}
+              </option>
             </select>
           )}
           {moduleError ? (
@@ -408,7 +428,7 @@ export function ProjectFormModal({
           skipGeoLookup={isEdit}
         />
         <FormField
-          label="Epasts"
+          label={t("common.email", "Epasts")}
           id="email"
           type="email"
           value={form.email}
@@ -416,7 +436,7 @@ export function ProjectFormModal({
           error={fieldErrors.email}
         />
         <FormField
-          label="Adrese"
+          label={t("settings.address", "Adrese")}
           id="address"
           value={form.address}
           onChange={(value) => updateField("address", value)}
@@ -441,12 +461,12 @@ export function ProjectFormModal({
             {isPending ? (
               <>
                 <i className="fas fa-spinner animate-spin text-xs" aria-hidden="true" />
-                {isEdit ? "Saglabā…" : "Izveido…"}
+                {isEdit ? t("actions.saving", "Saglabā…") : t("actions.creating", "Izveido…")}
               </>
             ) : isEdit ? (
-              "Saglabāt"
+              t("actions.save", "Saglabāt")
             ) : (
-              "Izveidot projektu"
+              t("projects.create.submit", "Izveidot projektu")
             )}
           </button>
         </ModalFormActions>

@@ -7,6 +7,13 @@ import {
 import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import type { EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimatePositionSection } from "@/app/lib/estimate-positions/types";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 function cookieName(documentId: string): string {
   return `eb_estimate_collapsed_${documentId}`;
@@ -77,6 +84,7 @@ export function collectVisibleSectionDragIds(
 
 export function getCollapsedSectionSummary(
   section: EstimatePositionSection,
+  t: Translate,
 ): string {
   const subcategoryCount = section.subcategories.length;
   const itemCount =
@@ -89,24 +97,31 @@ export function getCollapsedSectionSummary(
   const parts: string[] = [];
   if (subcategoryCount > 0) {
     parts.push(
-      subcategoryCount === 1 ? "1 apakškategorija" : `${subcategoryCount} apakškategorijas`,
+      t("estimate.collapsed.subcategory_count", "{count} apakškategorijas", {
+        count: subcategoryCount,
+      }),
     );
   }
   if (itemCount > 0) {
-    parts.push(itemCount === 1 ? "1 pozīcija" : `${itemCount} pozīcijas`);
+    parts.push(t("estimate.collapsed.position_count", "{count} pozīcijas", {
+      count: itemCount,
+    }));
   }
 
-  return parts.length > 0 ? parts.join(" · ") : "Sakļauts";
+  return parts.length > 0 ? parts.join(" · ") : t("estimate.collapsed.summary", "Sakļauts");
 }
 
 export function getCollapsedSubcategorySummary(
   subcategory: EstimateSubcategory,
+  t: Translate,
 ): string {
   const itemCount = subcategory.items.length;
 
   if (itemCount === 0) {
-    return "Sakļauts";
+    return t("estimate.collapsed.summary", "Sakļauts");
   }
 
-  return itemCount === 1 ? "1 pozīcija" : `${itemCount} pozīcijas`;
+  return t("estimate.collapsed.position_count", "{count} pozīcijas", {
+    count: itemCount,
+  });
 }

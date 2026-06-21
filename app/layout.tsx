@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { FeedbackToastProvider } from "@/app/components/feedback-toast-provider";
+import { getSiteSettings } from "@/app/lib/site-admin/repository";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
 
@@ -9,10 +10,18 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Estimate Builder",
-  description: "Tāmes piedāvājumu veidošana",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+
+  return {
+    title: settings.systemName,
+    description: settings.slogan,
+    openGraph: {
+      title: settings.systemName,
+      description: settings.slogan,
+    },
+  };
+}
 
 export default function RootLayout({
   children,

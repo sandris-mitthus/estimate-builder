@@ -1,0 +1,40 @@
+---
+description: I18n translation key reuse and naming rules
+alwaysApply: true
+---
+
+# Tulkojumu atslēgas — nedublēt
+
+UI tekstiem izmanto `site_translations` atslēgas un `t(key, fallback, params)`.
+
+## Nedublēt vienādas vērtības
+
+Ja teksts ir vispārīga darbība vai bieži atkārtojas, tam jābūt **vienai kopīgai atslēgai**.
+
+```tsx
+// ✅
+t("actions.edit", "Labot")
+t("actions.delete", "Dzēst")
+t("common.actions", "Darbības")
+
+// ❌
+t("admin.edit_button_text", "Labot")
+t("modal.delete_button", "Dzēst")
+t("site_languages.actions_column", "Darbības")
+```
+
+## Kad drīkst būt sadaļas atslēga
+
+Sadaļas atslēgu lieto tikai tad, ja tekstam ir specifiska nozīme vai konteksts:
+
+- `site_languages.delete.default_disabled` — specifisks iemesls, kāpēc valodu nevar dzēst
+- `site_settings.preview.description` — konkrētas sadaļas paskaidrojums
+
+## Nosaukumu principi
+
+- Kopīgas darbības: `actions.save`, `actions.edit`, `actions.delete`, `actions.add`
+- Kopīgas kolonnas/virsraksti: `common.actions`, `common.dates`, `common.status`
+- Kopīgi statusi/lomas: `status.active`, `roles.admin`
+- Sadaļas teksts tikai unikālam saturam: `site_translations.help`
+
+Pirms pievieno jaunu atslēgu, pārbaudi, vai tāds pats teksts jau nav `043_seed_system_ui_translations.sql` vai vēlākā seed migrācijā.

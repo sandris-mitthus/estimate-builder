@@ -13,6 +13,7 @@ import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-l
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   UNIT_PRICE_COLUMN_COUNT,
 } from "@/app/lib/estimates/unit-price-columns";
@@ -212,6 +213,7 @@ function MultiOptionSubRow({
   onTimeNormChange?: (value: number) => void;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
+  const { t } = useTranslations();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
   const label =
@@ -253,6 +255,7 @@ function MultiOptionSubRow({
         option.lineItem,
         catalogPositions,
         defaultHourlyRate,
+        t,
       )
     : undefined;
   const linkable = isLinkableMultiOption(option);
@@ -358,12 +361,12 @@ function MultiOptionSubRow({
                 </div>
                 {missingModuleSize ? (
                   <span className="text-xs text-red-500">
-                    Nav pievienots moduļa apjoms
+                    {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
                   </span>
                 ) : null}
                 {missingTimeNorm ? (
                   <span className="text-xs text-amber-600">
-                    Nav ievadīta Laika norma
+                    {t("estimate.time_norm.missing", "Nav ievadīta Laika norma")}
                   </span>
                 ) : null}
                 <AttachedModuleSizeLabel
@@ -393,8 +396,12 @@ function MultiOptionSubRow({
                         type="button"
                         onClick={() => onUnlink(linked.optionId)}
                         className="inline-flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-300 transition hover:bg-zinc-100 hover:text-zinc-600"
-                        aria-label={`Atvienot no ${linked.optionLabel}`}
-                        title="Atvienot"
+                        aria-label={t(
+                          "estimate.multi.unlink_from_option",
+                          "Atvienot no {option}",
+                          { option: linked.optionLabel },
+                        )}
+                        title={t("estimate.multi.unlink", "Atvienot")}
                       >
                         <i
                           className="fas fa-times text-[9px]"
@@ -467,6 +474,7 @@ export function EstimateMultiPositionRow({
   moduleSizeOptions = [],
   allowOfferMultiEdit = false,
 }: EstimateMultiPositionRowProps) {
+  const { t } = useTranslations();
   const [editOpen, setEditOpen] = useState(false);
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const selectionOptions = getMultiPositionSelectionOptions(
@@ -549,6 +557,7 @@ export function EstimateMultiPositionRow({
           selectedLineItem,
           catalogPositions,
           defaultHourlyRate,
+          t,
         )
       : undefined;
   const linkedOptions =
@@ -585,7 +594,7 @@ export function EstimateMultiPositionRow({
                       <select
                         className={`${cellInput} cursor-pointer text-zinc-800`}
                         value={selectedId}
-                        aria-label="Multi-pozīcijas opcija"
+                        aria-label={t("estimate.multi.option_aria", "Multi-pozīcijas opcija")}
                         onChange={(event) => {
                           const nextId = event.target.value;
                           onChange({
@@ -608,7 +617,7 @@ export function EstimateMultiPositionRow({
                           Multi
                         </span>
                         <span className="text-xs font-normal text-zinc-500">
-                          {value.name.trim() || "Multi-pozīcija"}
+                          {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                         </span>
                       </div>
                       {linkedOptions.length > 0 ? (
@@ -636,7 +645,7 @@ export function EstimateMultiPositionRow({
                     </div>
                     {allowOfferMultiEdit ? (
                       <IconActionButton
-                        label="Labot multi-pozīciju"
+                        label={t("estimate.multi.edit", "Labot multi-pozīciju")}
                         icon="fas fa-pen"
                         variant="edit"
                         onClick={() => setEditOpen(true)}
@@ -735,12 +744,12 @@ export function EstimateMultiPositionRow({
                             onClick={() => setEditOpen(true)}
                             className="text-left text-sm font-medium text-zinc-900 transition hover:text-violet-700 hover:underline"
                           >
-                            {value.name.trim() || "Multi-pozīcija"}
+                            {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                           </button>
                         </div>
                       </div>
                       <IconActionButton
-                        label="Labot multi-pozīciju"
+                        label={t("estimate.multi.edit", "Labot multi-pozīciju")}
                         icon="fas fa-pen"
                         variant="edit"
                         onClick={() => setEditOpen(true)}
@@ -753,7 +762,7 @@ export function EstimateMultiPositionRow({
               <EmptyHeaderMetricCells showQuantityColumn={showQuantityColumn} />
               <td className={rowActionCell}>
                 <DeleteButton
-                  label="Dzēst multi-pozīciju"
+                  label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
                   onClick={onDelete}
                   className="opacity-0 group-hover/multi:opacity-100"
                 />

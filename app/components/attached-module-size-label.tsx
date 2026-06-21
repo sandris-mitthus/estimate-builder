@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 import { resolveAttachedModuleSizeDetail } from "@/app/lib/modules/format-attached-module-size-display";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
@@ -16,12 +17,13 @@ export function AttachedModuleSizeLabel({
   moduleSizeOptions,
   className = "",
 }: AttachedModuleSizeLabelProps) {
+  const { t } = useTranslations();
   const detail = useMemo(
     () =>
       attachment
-        ? resolveAttachedModuleSizeDetail(attachment, moduleSizeOptions)
+        ? resolveAttachedModuleSizeDetail(attachment, moduleSizeOptions, t)
         : null,
-    [attachment, moduleSizeOptions],
+    [attachment, moduleSizeOptions, t],
   );
 
   if (!detail) {

@@ -16,9 +16,11 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 
 import { PositionCostTypeField } from "@/app/components/position-cost-type-field";
 import { PositionNameUnitFields } from "@/app/components/position-name-unit-fields";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import {
   DEFAULT_CATALOG_POSITION_COST_TYPE,
   type CatalogPositionCostType,
@@ -68,6 +70,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
   const canManage = useActionPermission("positions.manage");
 
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
 
   const [open, setOpen] = useState(false);
 
@@ -115,7 +118,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
     if (!form.name.trim()) {
 
-      nextErrors.name = "Ievadi nosaukumu.";
+      nextErrors.name = t("validation.name_required", "Ievadi nosaukumu.");
 
     }
 
@@ -123,7 +126,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
     if (!form.unit.trim()) {
 
-      nextErrors.unit = "Ievadi mērvienību.";
+      nextErrors.unit = t("validation.unit_required", "Ievadi mērvienību.");
 
     }
 
@@ -188,13 +191,13 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
-          setFieldErrors({ name: result.error });
+          setFieldErrors({ name: translateActionError(t, result) });
         } else if (result.error === "Ievadi mērvienību.") {
-          setFieldErrors({ unit: result.error });
+          setFieldErrors({ unit: translateActionError(t, result) });
         } else if (result.error === "Izvēlies izmaksu veidu.") {
-          setFieldErrors({ costType: result.error });
+          setFieldErrors({ costType: translateActionError(t, result) });
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
@@ -203,7 +206,10 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
       handleOpenChange(false);
 
-      showFeedback({ type: "success", text: "Pozīcija pievienota." });
+      showFeedback({
+        type: "success",
+        text: t("positions.feedback.added", "Pozīcija pievienota."),
+      });
 
       router.refresh();
 
@@ -233,7 +239,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         <i className="fas fa-plus text-xs" aria-hidden="true" />
 
-        Pievienot Pozīciju
+        {t("positions.add.action", "Pievienot pozīciju")}
 
       </button>
 
@@ -245,9 +251,12 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
 
         onOpenChange={handleOpenChange}
 
-        title="Pievienot pozīciju"
+        title={t("positions.add.title", "Pievienot pozīciju")}
 
-        description="Norādi pozīcijas nosaukumu, mērvienību un izmaksu veidu"
+        description={t(
+          "positions.form.description",
+          "Norādi pozīcijas nosaukumu, mērvienību un izmaksu veidu",
+        )}
 
         blocking={isPending}
 
@@ -315,7 +324,7 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
               disabled={isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPending ? "Pievieno…" : "Pievienot"}
+              {isPending ? t("actions.adding", "Pievieno…") : t("actions.add", "Pievienot")}
             </button>
           </ModalFormActions>
 

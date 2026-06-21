@@ -34,6 +34,13 @@ import {
 import type { PdfImageAsset } from "@/app/lib/exports/pdf-image-fetch";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 import type { ReactNode } from "react";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 const fontsDir = path.join(process.cwd(), "public", "fonts");
 
@@ -175,6 +182,7 @@ function buildSubcategoryOfferRows(
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   plannedProfitPercent: number,
+  t: Translate,
 ): SubcategoryPdfRowsResult {
   const displayItems = collectSubcategoryOfferLineItems(sub);
   if (displayItems.length === 0) {
@@ -187,7 +195,7 @@ function buildSubcategoryOfferRows(
     defaultHourlyRate,
     plannedProfitPercent,
   );
-  const subTitle = sub.title || "Bez nosaukuma";
+  const subTitle = sub.title || t("common.untitled", "Bez nosaukuma");
   let rowNr = startRowNr;
   const rows: ReactNode[] = [];
 
@@ -291,6 +299,7 @@ type Props = {
   projectInfo: OfferProjectInfo;
   visualizationImages: PdfImageAsset[];
   excludedPositions: ExcludedPosition[];
+  t?: Translate;
 };
 
 function pairImages(images: PdfImageAsset[]): Array<[PdfImageAsset, PdfImageAsset | null]> {
@@ -312,7 +321,9 @@ export function EstimatePdfDocument({
   projectInfo,
   visualizationImages,
   excludedPositions,
+  t,
 }: Props) {
+  const tx: Translate = t ?? ((_key, fallback) => fallback ?? _key);
   const plannedProfitPercent = meta.plannedProfitPercent ?? 0;
   const totals = calculateEstimateTotals(
     categories,
@@ -320,7 +331,7 @@ export function EstimatePdfDocument({
     defaultHourlyRate,
     plannedProfitPercent,
   );
-  const companyLines = formatCompanyDisplayLines(company);
+  const companyLines = formatCompanyDisplayLines(company, tx);
   const imagePairs = pairImages(visualizationImages);
   const showVat = hasCompanyVatNumber(company.vatNumber);
   const vatBreakdown = showVat ? calculateVatBreakdown(totals.grand) : null;
@@ -336,7 +347,7 @@ export function EstimatePdfDocument({
   let rowNr = 0;
 
   return (
-    <Document title={title} author={meta.author} subject="Piedavajums">
+    <Document title={title} author={meta.author} subject={tx("exports.pdf.subject", "Piedāvājums")}>
       <Page size="A4" style={s.page}>
 
         {/* Rekviziti + logo */}
@@ -358,21 +369,21 @@ export function EstimatePdfDocument({
         <View style={s.divider} />
 
         {/* Virsraksts + projekta info */}
-        <Text style={s.offerTitle}>{"Pied\u0101v\u0101jums"}</Text>
+        <Text style={s.offerTitle}>{tx("exports.pdf.offer", "Piedāvājums")}</Text>
         <View style={s.infoGrid}>
           <View style={s.infoRow}>
             <View style={s.infoBlock}>
-              <Text style={s.infoLabel}>Projekts</Text>
+              <Text style={s.infoLabel}>{tx("exports.pdf.project", "Projekts")}</Text>
               <Text style={s.infoValue}>{projectInfo.moduleName}</Text>
             </View>
             <View style={s.infoBlock}>
-              <Text style={s.infoLabel}>{"Pas\u016bt\u012bt\u0101js"}</Text>
+              <Text style={s.infoLabel}>{tx("exports.pdf.client", "Pasūtītājs")}</Text>
               <Text style={s.infoValue}>{projectInfo.clientName || "\u2014"}</Text>
             </View>
           </View>
           <View style={s.infoRow}>
             <View style={[s.infoBlock, { minWidth: 280, flex: 1 }]}>
-              <Text style={s.infoLabel}>Adrese</Text>
+              <Text style={s.infoLabel}>{tx("common.address", "Adrese")}</Text>
               <Text style={s.infoValue}>{projectInfo.address || "\u2014"}</Text>
             </View>
           </View>
@@ -380,13 +391,13 @@ export function EstimatePdfDocument({
             <View style={s.infoRow}>
               {projectInfo.email ? (
                 <View style={s.infoBlock}>
-                  <Text style={s.infoLabel}>E-pasts</Text>
+                  <Text style={s.infoLabel}>{tx("common.email", "E-pasts")}</Text>
                   <Text style={s.infoValue}>{projectInfo.email}</Text>
                 </View>
               ) : null}
               {projectInfo.phone ? (
                 <View style={s.infoBlock}>
-                  <Text style={s.infoLabel}>{"T\u0101lrunis"}</Text>
+                  <Text style={s.infoLabel}>{tx("common.phone", "Tālrunis")}</Text>
                   <Text style={s.infoValue}>{formatDisplayPhone(projectInfo.phone)}</Text>
                 </View>
               ) : null}
@@ -395,17 +406,19 @@ export function EstimatePdfDocument({
           <View style={s.infoRow}>
             {meta.number ? (
               <View style={s.infoBlock}>
-                <Text style={s.infoLabel}>Numurs</Text>
+                <Text style={s.infoLabel}>{tx("common.number", "Numurs")}</Text>
                 <Text style={s.infoValue}>{meta.number}</Text>
               </View>
             ) : null}
             <View style={s.infoBlock}>
-              <Text style={s.infoLabel}>Datums</Text>
+              <Text style={s.infoLabel}>{tx("common.date", "Datums")}</Text>
               <Text style={s.infoValue}>{formatDisplayDateDdMmYy(meta.date)}</Text>
             </View>
             {meta.deadline ? (
               <View style={s.infoBlock}>
-                <Text style={s.infoLabel}>{"Der\u012bguma termi\u0146\u0161"}</Text>
+                <Text style={s.infoLabel}>
+                  {tx("estimate.valid_until", "Derīguma termiņš")}
+                </Text>
                 <Text style={s.infoValue}>{formatDisplayDateDdMmYy(meta.deadline)}</Text>
               </View>
             ) : null}
@@ -417,7 +430,7 @@ export function EstimatePdfDocument({
         {/* Vizualizacijas — 2 kolonnas ar eksplicitem platumu */}
         {imagePairs.length > 0 ? (
           <View>
-            <Text style={s.imgSectionTitle}>{"Vizualiz\u0101cija"}</Text>
+            <Text style={s.imgSectionTitle}>{tx("exports.pdf.visualization", "Vizualizācija")}</Text>
             {imagePairs.map(([left, right], i) => (
               <View key={i} style={s.imgRow} wrap={false}>
                 <Image src={left.dataUrl} style={[s.imgItem, right ? { marginRight: 8 } : {}]} />
@@ -430,9 +443,11 @@ export function EstimatePdfDocument({
 
         {/* Tabulas galvene */}
         <View style={s.tableHeader}>
-          <Text style={[s.tableHeaderCell, s.colNr]}>Nr.</Text>
-          <Text style={[s.tableHeaderCell, s.colName]}>Nosaukums</Text>
-          <Text style={[s.tableHeaderCell, s.colTotal]}>{"Kop\u0101 \u20AC"}</Text>
+          <Text style={[s.tableHeaderCell, s.colNr]}>{tx("exports.pdf.nr", "Nr.")}</Text>
+          <Text style={[s.tableHeaderCell, s.colName]}>{tx("common.name", "Nosaukums")}</Text>
+          <Text style={[s.tableHeaderCell, s.colTotal]}>
+            {tx("estimate.column.total_eur", "Kopā €")}
+          </Text>
         </View>
 
         {/* Tabulas rindas */}
@@ -446,7 +461,7 @@ export function EstimatePdfDocument({
           return (
             <View key={cat.id}>
               <View style={s.catRow}>
-                <Text style={s.catText}>{cat.title || "Bez nosaukuma"}</Text>
+                <Text style={s.catText}>{cat.title || tx("common.untitled", "Bez nosaukuma")}</Text>
                 <Text style={s.catTotal}>{fmtMoney(catTotals.grand)}</Text>
               </View>
 
@@ -487,6 +502,7 @@ export function EstimatePdfDocument({
                     catalogPositions,
                     defaultHourlyRate,
                     plannedProfitPercent,
+                    tx,
                   );
                   subRowNr = result.nextRowNr;
                   return result.rows;
@@ -501,7 +517,9 @@ export function EstimatePdfDocument({
         {/* Pavisam kopa */}
         <View style={s.totalRow}>
           <Text style={s.totalLabel}>
-            {showVat ? "Summa bez PVN" : "PAVISAM KOP\u0100"}
+            {showVat
+              ? tx("exports.total_without_vat", "Summa bez PVN")
+              : tx("exports.grand_total", "PAVISAM KOPĀ")}
           </Text>
           <Text style={s.totalValue}>{fmtMoney(totals.grand)}</Text>
         </View>
@@ -515,7 +533,7 @@ export function EstimatePdfDocument({
               <Text style={s.vatValue}>{fmtMoney(vatBreakdown.vatAmount)}</Text>
             </View>
             <View style={s.grossRow}>
-              <Text style={s.grossLabel}>{"KOP\u0100 AR PVN"}</Text>
+              <Text style={s.grossLabel}>{tx("exports.total_with_vat", "KOPĀ AR PVN")}</Text>
               <Text style={s.grossValue}>{fmtMoney(vatBreakdown.gross)}</Text>
             </View>
           </>
@@ -524,7 +542,7 @@ export function EstimatePdfDocument({
         {excludedPositions.length > 0 ? (
           <View style={s.excludedBlock}>
             <Text style={s.excludedTitle}>
-              {"Pied\u0101v\u0101jum\u0101 neiek\u013caut\u0101s poz\u012bcijas"}
+              {tx("exports.pdf.excluded_positions", "Piedāvājumā neiekļautās pozīcijas")}
             </Text>
             {excludedPositions.map((position, index) => (
               <Text key={position.id} style={s.excludedLine}>
@@ -543,7 +561,11 @@ export function EstimatePdfDocument({
             ))}
             {company.offerValidityDays > 0 ? (
               <Text style={s.offerValidityLine}>
-                {`Pied\u0101v\u0101jums sp\u0113k\u0101 ${company.offerValidityDays} dienas`}
+                {tx(
+                  "exports.pdf.offer_valid_days",
+                  "Piedāvājums spēkā {days} dienas",
+                  { days: company.offerValidityDays },
+                )}
               </Text>
             ) : null}
           </View>

@@ -25,6 +25,8 @@ import { DragHandle } from "@/app/components/drag-handle";
 import { ExcludedPositionRowActions } from "@/app/components/excluded-position-row-actions";
 import { SectionPage } from "@/app/components/section-page";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 
 type ExcludedPositionsPageContentProps = {
@@ -35,10 +37,12 @@ function SortableExcludedPositionRow({
   position,
   index,
   canReorder,
+  dragLabel,
 }: {
   position: ExcludedPosition;
   index: number;
   canReorder: boolean;
+  dragLabel: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -60,7 +64,7 @@ function SortableExcludedPositionRow({
     >
       {canReorder ? (
         <DragHandle
-          label={`Pārvietot pozīciju: ${position.name}`}
+          label={dragLabel}
           attributes={attributes}
           listeners={listeners}
         />
@@ -78,6 +82,7 @@ export function ExcludedPositionsPageContent({
   const dndContextId = useId();
   const canManage = useActionPermission("excluded_positions.manage");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [positions, setPositions] = useState(initialPositions);
   const [isReorderPending, startReorderTransition] = useTransition();
 
@@ -115,25 +120,32 @@ export function ExcludedPositionsPageContent({
 
       if (!result.ok) {
         setPositions(previousPositions);
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
       }
     });
   }
 
   return (
     <SectionPage
-      title="Neiekļautās pozīcijas"
+      title={t("nav.excluded_positions", "Neiekļautās pozīcijas")}
       subtitle={
         positions.length === 0
-          ? "Nav definētu pozīciju"
-          : `${positions.length} pozīcijas piedāvājumā neiekļautas`
+          ? t("excluded_positions.empty.subtitle", "Nav definētu pozīciju")
+          : t(
+              "excluded_positions.page.subtitle",
+              "{count} pozīcijas piedāvājumā neiekļautas",
+              { count: positions.length },
+            )
       }
       actions={<AddExcludedPositionButton />}
     >
       {positions.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-12 text-center">
           <p className="text-sm text-zinc-500">
-            Pievieno pozīcijas, kas netiek iekļautas piedāvājumā. Saraksts parādīsies piedāvājuma PDF.
+            {t(
+              "excluded_positions.empty.description",
+              "Pievieno pozīcijas, kas netiek iekļautas piedāvājumā. Saraksts parādīsies piedāvājuma PDF.",
+            )}
           </p>
         </div>
       ) : (
@@ -158,6 +170,9 @@ export function ExcludedPositionsPageContent({
                   position={position}
                   index={index}
                   canReorder={canManage}
+                  dragLabel={t("positions.drag.named", "Pārvietot pozīciju: {name}", {
+                    name: position.name,
+                  })}
                 />
               ))}
             </SortableContext>

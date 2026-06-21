@@ -23,6 +23,13 @@ import {
   hasCompanyVatNumber,
 } from "@/app/lib/settings/vat-breakdown";
 import { formatDisplayDateDdMmYyyy } from "@/app/lib/format-display-date";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 function fmtNum(v: number): number | string {
   if (!Number.isFinite(v) || v === 0) return "";
@@ -104,7 +111,9 @@ export async function buildEstimateExcel(
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   vatNumber: string = "",
+  t?: Translate,
 ): Promise<Buffer> {
+  const tx: Translate = t ?? ((_key, fallback) => fallback ?? _key);
   const plannedProfitPercent = meta.plannedProfitPercent ?? 0;
   const totals = calculateEstimateTotals(
     categories,
@@ -115,7 +124,7 @@ export async function buildEstimateExcel(
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Estimate Builder";
-  const ws = workbook.addWorksheet("Tāme");
+  const ws = workbook.addWorksheet(tx("exports.excel.sheet_name", "Tāme"));
 
   const NUM_FMT = "0.00";
 
@@ -139,10 +148,10 @@ export async function buildEstimateExcel(
   titleRow.getCell(1).font = { bold: true, size: 13 };
   titleRow.height = 20;
 
-  ws.addRow(["Pasūtītājs:", meta.client]);
-  ws.addRow(["Objekts:", meta.project]);
+  ws.addRow([tx("exports.excel.client_label", "Pasūtītājs:"), meta.client]);
+  ws.addRow([tx("exports.excel.object_label", "Objekts:"), meta.project]);
   ws.addRow([
-    "Datums:",
+    tx("exports.excel.date_label", "Datums:"),
     formatDisplayDateDdMmYyyy(meta.date),
     "",
     "",
@@ -151,7 +160,7 @@ export async function buildEstimateExcel(
     "",
     "",
     "",
-    "Termiņš:",
+    tx("exports.excel.deadline_label", "Termiņš:"),
     formatDisplayDateDdMmYyyy(meta.deadline),
   ]);
   ws.addRow([]); // empty spacer
@@ -164,14 +173,14 @@ export async function buildEstimateExcel(
   const h2RowIdx = h1RowIdx + 1;
 
   const h1 = ws.addRow([
-    "Nr.",
-    "Nosaukums",
-    "Vienība",
-    "Daudzums",
-    "Vienības cena",
+    tx("exports.excel.nr", "Nr."),
+    tx("common.name", "Nosaukums"),
+    tx("common.unit", "Vienība"),
+    tx("estimate.quantity", "Daudzums"),
+    tx("estimate.unit_price", "Vienības cena"),
     "",
     "",
-    "Apjoma cena",
+    tx("estimate.volume_price", "Apjoma cena"),
     "",
     "",
     "",
@@ -183,13 +192,13 @@ export async function buildEstimateExcel(
     "",
     "",
     "",
-    "Darbs",
-    "Materiāli",
-    "Mehānismi",
-    "Darbs",
-    "Materiāli",
-    "Mehānismi",
-    "Kopā €",
+    tx("estimate.column.labor", "Darbs"),
+    tx("estimate.column.materials", "Materiāli"),
+    tx("estimate.column.mechanisms", "Mehānismi"),
+    tx("estimate.column.labor", "Darbs"),
+    tx("estimate.column.materials", "Materiāli"),
+    tx("estimate.column.mechanisms", "Mehānismi"),
+    tx("estimate.column.total_eur", "Kopā €"),
   ]);
   h2.height = 18;
 
@@ -243,7 +252,7 @@ export async function buildEstimateExcel(
     // Category header row
     const catRow = ws.addRow([
       "",
-      cat.title || "Bez nosaukuma",
+      cat.title || tx("common.untitled", "Bez nosaukuma"),
       "",
       "",
       "",
@@ -278,7 +287,7 @@ export async function buildEstimateExcel(
 
       const subRow = ws.addRow([
         "",
-        `  ${sub.title || "Bez nosaukuma"}`,
+        `  ${sub.title || tx("common.untitled", "Bez nosaukuma")}`,
       ]);
       subRow.height = 16;
       styleRowCells(subRow, 11, { italic: true, fontSize: 10, bgColor: BG_SUBCATEGORY, border: true });
@@ -303,7 +312,9 @@ export async function buildEstimateExcel(
 
   const totalRow = ws.addRow([
     "",
-    showVat ? "Summa bez PVN" : "PAVISAM KOPĀ",
+    showVat
+      ? tx("exports.total_without_vat", "Summa bez PVN")
+      : tx("exports.grand_total", "PAVISAM KOPĀ"),
     "",
     "",
     "",
@@ -342,7 +353,7 @@ export async function buildEstimateExcel(
 
     const grossRow = ws.addRow([
       "",
-      "KOPĀ AR PVN",
+      tx("exports.total_with_vat", "KOPĀ AR PVN"),
       "",
       "",
       "",

@@ -8,6 +8,8 @@ import { EditExcludedPositionModal } from "@/app/components/edit-excluded-positi
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 
 type ExcludedPositionRowActionsProps = {
@@ -18,6 +20,7 @@ export function ExcludedPositionRowActions({ position }: ExcludedPositionRowActi
   const router = useRouter();
   const canManage = useActionPermission("excluded_positions.manage");
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -30,12 +33,15 @@ export function ExcludedPositionRowActions({ position }: ExcludedPositionRowActi
       const result = await deleteExcludedPositionAction(position.id);
 
       if (!result.ok) {
-        setDeleteError(result.error);
+        setDeleteError(translateActionError(t, result));
         return;
       }
 
       setDeleteOpen(false);
-      showFeedback({ type: "success", text: "Pozīcija dzēsta." });
+      showFeedback({
+        type: "success",
+        text: t("positions.feedback.deleted", "Pozīcija dzēsta."),
+      });
       router.refresh();
     });
   }
@@ -48,13 +54,13 @@ export function ExcludedPositionRowActions({ position }: ExcludedPositionRowActi
     <>
       <div className="flex items-center justify-end gap-0.5">
         <IconActionButton
-          label="Labot"
+          label={t("actions.edit", "Labot")}
           icon="fas fa-pen"
           variant="edit"
           onClick={() => setEditOpen(true)}
         />
         <IconActionButton
-          label="Dzēst"
+          label={t("actions.delete", "Dzēst")}
           icon="fas fa-trash"
           variant="delete"
           onClick={() => setDeleteOpen(true)}
@@ -72,11 +78,11 @@ export function ExcludedPositionRowActions({ position }: ExcludedPositionRowActi
       <ConfirmModal
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Dzēst pozīciju?"
+        title={t("positions.delete.title", "Dzēst pozīciju?")}
         description={
           <>
             <p>
-              Vai tiešām vēlies dzēst pozīciju{" "}
+              {t("positions.delete.confirm_prefix", "Vai tiešām vēlies dzēst pozīciju")}{" "}
               <span className="font-medium text-zinc-900">{position.name}</span>?
             </p>
             {deleteError ? (
@@ -86,7 +92,9 @@ export function ExcludedPositionRowActions({ position }: ExcludedPositionRowActi
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Dzēš…" : "Dzēst"}
+        confirmLabel={
+          isPending ? t("actions.deleting", "Dzēš…") : t("actions.delete", "Dzēst")
+        }
         confirmVariant="danger"
         onConfirm={handleConfirmDelete}
         blocking={isPending}

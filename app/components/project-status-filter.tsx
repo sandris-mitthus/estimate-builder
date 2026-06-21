@@ -1,4 +1,7 @@
+"use client";
+
 import type { ProjectArchiveFilter } from "@/app/lib/projects/filter-projects";
+import { useTranslations } from "@/app/components/translations-provider";
 
 type ProjectStatusFilterProps = {
   id: string;
@@ -8,14 +11,15 @@ type ProjectStatusFilterProps = {
 
 const FILTER_OPTIONS: {
   value: ProjectArchiveFilter;
-  label: string;
+  labelKey: string;
+  fallbackLabel: string;
   icon: string;
 }[] = [
-  { value: "all", label: "Visi", icon: "fas fa-list" },
-  { value: "active", label: "Aktīvie", icon: "fas fa-circle" },
-  { value: "in_progress", label: "Procesā", icon: "fas fa-check" },
-  { value: "completed", label: "Pabeigtie", icon: "fas fa-check-double" },
-  { value: "rejected", label: "Noraidītie", icon: "fas fa-times" },
+  { value: "all", labelKey: "filters.all", fallbackLabel: "Visi", icon: "fas fa-list" },
+  { value: "active", labelKey: "filters.active", fallbackLabel: "Aktīvie", icon: "fas fa-circle" },
+  { value: "in_progress", labelKey: "filters.in_progress", fallbackLabel: "Procesā", icon: "fas fa-check" },
+  { value: "completed", labelKey: "filters.completed", fallbackLabel: "Pabeigtie", icon: "fas fa-check-double" },
+  { value: "rejected", labelKey: "filters.rejected", fallbackLabel: "Noraidītie", icon: "fas fa-times" },
 ];
 
 export function ProjectStatusFilter({
@@ -23,10 +27,12 @@ export function ProjectStatusFilter({
   value,
   onChange,
 }: ProjectStatusFilterProps) {
+  const { t } = useTranslations();
+
   return (
     <div
       role="radiogroup"
-      aria-label="Filtrēt pēc statusa"
+      aria-label={t("filters.status.aria", "Filtrēt pēc statusa")}
       className="inline-flex overflow-hidden rounded-lg border border-zinc-200 bg-white text-xs"
     >
       {FILTER_OPTIONS.map((option, index) => {
@@ -56,7 +62,7 @@ export function ProjectStatusFilter({
             />
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <i className={`${option.icon} text-[10px]`} aria-hidden="true" />
-              {option.label}
+              {t(option.labelKey, option.fallbackLabel)}
             </span>
           </label>
         );

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "@/app/components/translations-provider";
 import { PositionUnitField } from "@/app/components/position-unit-field";
 import {
   formInputClassName,
@@ -29,11 +32,13 @@ export function PositionNameUnitFields({
   unitError,
   autoFocusName = false,
 }: PositionNameUnitFieldsProps) {
+  const { t } = useTranslations();
+
   return (
     <div className="grid grid-cols-[minmax(0,8fr)_minmax(0,2fr)] items-start gap-3">
       <label htmlFor={nameId} className="block min-w-0">
         <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-          Nosaukums
+          {t("common.name", "Nosaukums")}
         </span>
         <input
           id={nameId}
@@ -59,7 +64,7 @@ export function PositionNameUnitFields({
 
       <label htmlFor={unitId} className="block min-w-0">
         <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-          Mērvienība
+          {t("common.unit", "Mērvienība")}
         </span>
         <PositionUnitField
           id={unitId}

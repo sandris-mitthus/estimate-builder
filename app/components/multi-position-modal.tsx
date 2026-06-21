@@ -13,6 +13,7 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { DeleteButton } from "@/app/components/delete-button";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatAmountDisplay,
   sumBreakdown,
@@ -118,6 +119,7 @@ export function MultiPositionModal({
   defaultHourlyRate,
   moduleSizeOptions = [],
 }: MultiPositionModalProps) {
+  const { t } = useTranslations();
   const [name, setName] = useState(value.name);
   const [attachment, setAttachment] =
     useState<LineItemModuleSizeAttachment | null>(null);
@@ -328,20 +330,23 @@ export function MultiPositionModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Multi-pozīcija"
-      description="Vienots apjoms; katrai opcijai sava laika norma, materiāli un mehānismi."
+      title={t("estimate.multi.title", "Multi-pozīcija")}
+      description={t(
+        "estimate.multi.description",
+        "Vienots apjoms; katrai opcijai sava laika norma, materiāli un mehānismi.",
+      )}
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
       dirty={dirty}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
-          <span className={labelClassName}>Nosaukums</span>
+          <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
           <input
             type="text"
             value={name}
             onChange={(event) => setName(event.target.value)}
             className={inputClassName}
-            placeholder="piem. Fasādes apdare"
+            placeholder={t("estimate.multi.name_placeholder", "piem. Fasādes apdare")}
             autoFocus
           />
         </label>
@@ -349,7 +354,7 @@ export function MultiPositionModal({
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className={labelClassName}>
-              Apjoms no moduļa lieluma (vienots)
+              {t("estimate.multi.module_size_quantity", "Apjoms no moduļa lieluma (vienots)")}
             </span>
             {attachment ? (
               <AttachedModuleSizeLabel
@@ -368,7 +373,9 @@ export function MultiPositionModal({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-zinc-700">Opcijas</p>
+            <p className="text-sm font-medium text-zinc-700">
+              {t("estimate.multi.options", "Opcijas")}
+            </p>
             <button
               type="button"
               className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
@@ -376,7 +383,7 @@ export function MultiPositionModal({
                 setOptions((current) => [...current, createOptionDraft()])
               }
             >
-              + Opcija
+              {t("estimate.multi.add_option", "+ Opcija")}
             </button>
           </div>
 
@@ -391,7 +398,9 @@ export function MultiPositionModal({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      Opcija {index + 1}
+                      {t("estimate.multi.option_item", "Opcija {index}", {
+                        index: index + 1,
+                      })}
                     </span>
                     <div className="flex items-center gap-3">
                       <span className="text-sm tabular-nums text-zinc-700">
@@ -399,7 +408,7 @@ export function MultiPositionModal({
                       </span>
                       {options.length > 1 ? (
                         <DeleteButton
-                          label="Dzēst opciju"
+                          label={t("estimate.multi.delete_option", "Dzēst opciju")}
                           onClick={() =>
                             setOptions((current) =>
                               current.filter(
@@ -414,7 +423,7 @@ export function MultiPositionModal({
 
                   <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3">
                     <label className="block">
-                      <span className={subLabelClassName}>Nosaukums</span>
+                      <span className={subLabelClassName}>{t("common.name", "Nosaukums")}</span>
                       <input
                         type="text"
                         value={option.label}
@@ -424,11 +433,14 @@ export function MultiPositionModal({
                           })
                         }
                         className={inputClassName}
-                        placeholder="piem. Standarta (nav obligāts)"
+                        placeholder={t(
+                          "estimate.multi.option_name_placeholder",
+                          "piem. Standarta (nav obligāts)",
+                        )}
                       />
                     </label>
                     <label className="block">
-                      <span className={subLabelClassName}>Laika norma (c/h)</span>
+                      <span className={subLabelClassName}>{t("estimate.time_norm", "Laika norma (c/h)")}</span>
                       <LaborTimeNormInput
                         value={option.timeNorm}
                         onChange={(timeNorm) =>
@@ -443,7 +455,7 @@ export function MultiPositionModal({
                   <div className="grid grid-cols-2 gap-3">
                     {/* Materiāli */}
                     <div>
-                      <span className={subLabelClassName}>Materiāli</span>
+                      <span className={subLabelClassName}>{t("estimate.column.materials", "Materiāli")}</span>
                       <div className="space-y-1.5">
                         {option.materials.map((mat, matIdx) => {
                           const showConsumption =
@@ -468,7 +480,14 @@ export function MultiPositionModal({
                                         consumption,
                                       )
                                     }
-                                    aria-label={`Patēriņš ${mat.unit} uz ${positionUnit}`}
+                                    aria-label={t(
+                                      "estimate.material_consumption.aria",
+                                      "Patēriņš {unit} uz {positionUnit}",
+                                      {
+                                        unit: mat.unit,
+                                        positionUnit: positionUnit ?? "",
+                                      },
+                                    )}
                                   />
                                   <span className="text-xs text-zinc-400">
                                     {mat.unit}/{positionUnit}
@@ -480,7 +499,7 @@ export function MultiPositionModal({
                                 </span>
                               )}
                               <IconActionButton
-                                label="Noņemt materiālu"
+                                label={t("estimate.materials.remove", "Noņemt materiālu")}
                                 icon="fas fa-times"
                                 variant="delete"
                                 onClick={() =>
@@ -498,14 +517,14 @@ export function MultiPositionModal({
                           }}
                           catalogPositions={materialPositions}
                           defaultHourlyRate={defaultHourlyRate}
-                          placeholder="Pievienot materiālu..."
+                          placeholder={t("estimate.materials.add_placeholder", "Pievienot materiālu...")}
                         />
                       </div>
                     </div>
 
                     {/* Mehānismi */}
                     <div>
-                      <span className={subLabelClassName}>Mehānismi</span>
+                      <span className={subLabelClassName}>{t("estimate.column.mechanisms", "Mehānismi")}</span>
                       <div className="space-y-1.5">
                         {option.mechanisms.map((mech, mechIdx) => (
                           <div
@@ -519,7 +538,7 @@ export function MultiPositionModal({
                               {mech.unit}
                             </span>
                             <IconActionButton
-                              label="Noņemt mehānismu"
+                              label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
                               icon="fas fa-times"
                               variant="delete"
                               onClick={() =>
@@ -536,7 +555,7 @@ export function MultiPositionModal({
                           }}
                           catalogPositions={mechanismPositions}
                           defaultHourlyRate={defaultHourlyRate}
-                          placeholder="Pievienot mehānismu..."
+                          placeholder={t("estimate.mechanisms.add_placeholder", "Pievienot mehānismu...")}
                         />
                       </div>
                     </div>
@@ -545,9 +564,9 @@ export function MultiPositionModal({
                   <dl className="grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm">
                     {(
                       [
-                        ["Darbs", unitPrice.labor],
-                        ["Materiāli", unitPrice.materials],
-                        ["Mehānismi", unitPrice.mechanisms],
+                        [t("estimate.column.labor", "Darbs"), unitPrice.labor],
+                        [t("estimate.column.materials", "Materiāli"), unitPrice.materials],
+                        [t("estimate.column.mechanisms", "Mehānismi"), unitPrice.mechanisms],
                       ] as const
                     ).map(([label, amount]) => (
                       <div key={label}>
@@ -558,7 +577,7 @@ export function MultiPositionModal({
                       </div>
                     ))}
                     <div>
-                      <dt className="text-xs text-zinc-500">Vienības cena</dt>
+                      <dt className="text-xs text-zinc-500">{t("estimate.unit_price", "Vienības cena")}</dt>
                       <dd className="font-semibold tabular-nums text-zinc-900">
                         {formatAmountDisplay(unitTotal)}
                       </dd>
@@ -575,7 +594,7 @@ export function MultiPositionModal({
             type="submit"
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700"
           >
-            Saglabāt
+            {t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
       </form>

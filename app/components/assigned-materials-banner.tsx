@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ProjectMaterialsTable } from "@/app/components/project-materials-table";
+import { useTranslations } from "@/app/components/translations-provider";
 import { useAssignedMaterialsBannerExpanded } from "@/app/lib/hooks/use-assigned-materials-banner-expanded";
 import type { UserAssignedMaterialsProjectGroup } from "@/app/lib/projects/list-user-assigned-materials";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -23,6 +24,7 @@ export function AssignedMaterialsBanner({
   currentUser,
 }: AssignedMaterialsBannerProps) {
   const router = useRouter();
+  const { t } = useTranslations();
   const [activeIndex, setActiveIndex] = useState(0);
   const { isExpanded, preferenceLoaded, toggleExpanded } =
     useAssignedMaterialsBannerExpanded(currentUser.id);
@@ -64,7 +66,7 @@ export function AssignedMaterialsBanner({
             id="assigned-materials-banner-heading"
             className="text-sm font-semibold leading-none text-amber-950"
           >
-            Jums piešķirti materiāli pasūtīšanai
+            {t("materials.assigned_banner.title", "Jums piešķirti materiāli pasūtīšanai")}
           </h2>
 
           <button
@@ -72,7 +74,11 @@ export function AssignedMaterialsBanner({
             onClick={handleToggleExpanded}
             aria-expanded={isContentOpen}
             aria-controls="assigned-materials-banner-content"
-            aria-label={isContentOpen ? "Sakļaut bloku" : "Izvērst bloku"}
+            aria-label={
+              isContentOpen
+                ? t("actions.collapse_block", "Sakļaut bloku")
+                : t("actions.expand_block", "Izvērst bloku")
+            }
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-white text-amber-800 transition hover:bg-amber-100"
           >
             <i
@@ -106,7 +112,7 @@ export function AssignedMaterialsBanner({
             >
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <p className="min-w-0 text-sm text-amber-900/90">
-                Projekts{" "}
+                {t("common.project", "Projekts")}{" "}
                 <Link
                   href={`/${group.projectId}`}
                   className="font-medium text-amber-950 underline decoration-amber-300 underline-offset-2 transition hover:decoration-amber-500"
@@ -129,7 +135,7 @@ export function AssignedMaterialsBanner({
                       setActiveIndex((index) => Math.max(0, index - 1))
                     }
                     disabled={activeIndex === 0}
-                    aria-label="Iepriekšējais projekts"
+                    aria-label={t("projects.previous", "Iepriekšējais projekts")}
                     className="inline-flex size-8 items-center justify-center rounded-md border border-amber-200 bg-white text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <i
@@ -148,7 +154,7 @@ export function AssignedMaterialsBanner({
                       )
                     }
                     disabled={activeIndex >= groups.length - 1}
-                    aria-label="Nākamais projekts"
+                    aria-label={t("projects.next", "Nākamais projekts")}
                     className="inline-flex size-8 items-center justify-center rounded-md border border-amber-200 bg-white text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <i

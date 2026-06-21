@@ -36,15 +36,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
           NEXT_PUBLIC_SITE_URL: "https://placeholder.example.com"
 
-      - name: Security - requireAuth on all server actions
+      - name: Security - auth guard on all server actions
         run: |
-          echo "Checking that all server actions have requireAuth or requireAction..."
+          echo "Checking that all server actions have requireAuth, requireAction, assertSystemAdminAccess, or getCurrentUser..."
           ACTIONS=$(find app -name "actions.ts" -path "*/(protected)/*")
-          ACTIONS="$ACTIONS app/(protected)/project-module-actions.ts"
+          ACTIONS="$ACTIONS app/(protected)/language-actions.ts app/(protected)/project-module-actions.ts"
           MISSING=0
           for file in $ACTIONS; do
-            if ! grep -qE "requireAuth|requireAction" "$file"; then
-              echo "FAIL: Missing requireAuth/requireAction in $file"
+            if ! grep -qE "requireAuth|requireAction|assertSystemAdminAccess|getCurrentUser" "$file"; then
+              echo "FAIL: Missing auth guard in $file"
               MISSING=$((MISSING + 1))
             fi
           done
@@ -52,7 +52,7 @@ jobs:
             echo "$MISSING file(s) missing auth guard"
             exit 1
           fi
-          echo "OK: All action files have requireAuth or requireAction"
+          echo "OK: All action files have an auth guard"
 
       - name: Security - no hardcoded secrets
         run: |

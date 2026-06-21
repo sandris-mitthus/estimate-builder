@@ -2,9 +2,17 @@ import { getLineItemModuleSizeAdjustments } from "@/app/lib/estimates/module-siz
 import {
   buildAdjustedModuleSizeSummarySections,
 } from "@/app/lib/modules/apply-module-size-adjustments";
+import { translateModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
+import type { TranslationParams } from "@/app/lib/i18n/translations";
 import type { ModuleSizeSummarySection } from "@/app/lib/modules/module-size-summary-types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
+
+type Translate = (
+  key: string,
+  fallback?: string,
+  params?: TranslationParams,
+) => string;
 
 export type AttachedModuleSizeDetail = {
   sectionTitle: string;
@@ -36,11 +44,16 @@ function resolveAttachmentSections(
 export function resolveAttachedModuleSizeDetail(
   attachment: LineItemModuleSizeAttachment,
   moduleSizeOptions: BuildingModuleSizeOption[],
+  t?: Translate,
 ): AttachedModuleSizeDetail | null {
   const result = resolveAttachmentSections(attachment, moduleSizeOptions);
   if (!result) return null;
 
-  for (const section of result.sections) {
+  const sections = t
+    ? translateModuleSizeSummarySections(result.sections, t)
+    : result.sections;
+
+  for (const section of sections) {
     const item = section.items.find((entry) => entry.key === attachment.itemKey);
     if (item) {
       return { sectionTitle: section.title, label: item.label, value: item.value };
@@ -52,8 +65,9 @@ export function resolveAttachedModuleSizeDetail(
 export function formatAttachedModuleSizeDisplay(
   attachment: LineItemModuleSizeAttachment,
   moduleSizeOptions: BuildingModuleSizeOption[],
+  t?: Translate,
 ): string | null {
-  const detail = resolveAttachedModuleSizeDetail(attachment, moduleSizeOptions);
+  const detail = resolveAttachedModuleSizeDetail(attachment, moduleSizeOptions, t);
   if (!detail) return null;
   return `${detail.label} · ${detail.value}`;
 }

@@ -15,6 +15,7 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { syncSubcategoryOfferVisibilityFromSagatave } from "@/app/lib/estimate-positions/sync-subcategory-offer-visibility";
+import { getServerTranslations } from "@/app/lib/i18n/server";
 
 export async function GET(
   _request: Request,
@@ -30,14 +31,15 @@ export async function GET(
     return new Response("Forbidden", { status: 403 });
   }
 
-  if (!checkRateLimit(`pdf:${user.id}`, 20, 60_000)) {
+  if (!(await checkRateLimit(`pdf:${user.id}`, 20, 60_000))) {
     return rateLimitResponse();
   }
 
   const { projectId } = await params;
 
-  const [project, estimate, catalogPositions, companySettings, globalExcludedPositions] =
+  const [{ t }, project, estimate, catalogPositions, companySettings, globalExcludedPositions] =
     await Promise.all([
+      getServerTranslations(),
       getProject(projectId),
       getProjectEstimate(projectId),
       listPositionPrices(),
@@ -53,7 +55,8 @@ export async function GET(
     ? await getBuildingModule(project.buildingModuleId)
     : null;
 
-  const displayModuleName = buildingModule?.name ?? "Individuāls projekts";
+  const displayModuleName =
+    buildingModule?.name ?? t("projects.individual_project", "Individuāls projekts");
   const moduleVisualizations = buildingModule
     ? buildingModule.visualizationBlocks
     : project.visualizationBlocks;
@@ -92,6 +95,7 @@ export async function GET(
       },
       visualizationImages,
       excludedPositions,
+      t,
     }),
   );
 

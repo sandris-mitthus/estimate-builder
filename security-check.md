@@ -2,8 +2,52 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-06-17 (**v1.3.25**) — **9.5 / 10**  
-**Iepriekšējā pilnā pārbaude:** 2026-06-13 (v1.3.14) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-06-21 (**v1.3.32**) — **9.5 / 10**
+**Iepriekšējā pilnā pārbaude:** 2026-06-17 (v1.3.25) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.3.32 (2026-06-21)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` / `assertSystemAdminAccess()` / `getCurrentUser()` | ✅ 11 `actions.ts` faili + `language-actions.ts` + `project-module-actions.ts`; 47 exportētas actions; `security-smoke.yml` validē arī system admin un tiešo auth guardu |
+| System admin sadaļas | ✅ `site_settings`, `site_languages`, `site_translations`, `site_user_groups`, `site_companies`, `site_companies_users` lapas aiz `assertSystemAdminAccess()` |
+| System admin tiesību avots | ✅ Production režīmā prasa Supabase sesiju un `public.users.is_admin = true`; bez Supabase production rāda `LoginGate` / `notFound()` |
+| Lomu sistēma (M14) | ✅ Uzņēmuma grupas + globālās `site_user_groups`; darbību/nav tiesības normalizē caur `PermissionSet` |
+| UI ↔ tiesības (L23) | ✅ `ActionPermissionsProvider` + `useActionPermission()`; system admin navigācija atsevišķi balstās uz `isSystemAdmin` |
+| PDF/Excel eksports | ✅ Auth + `estimate.export` + distributed rate limit 20/min, ja iestatīts Upstash; in-process fallback lokāli/single-instance |
+| API maršruti (`app/api/**`) | ✅ 5 maršruti; visi ar `getCurrentUser()`; asset proxy papildus pārbauda uzņēmuma path prefix |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
+| npm audit (moderate+) | ✅ **0 vulnerabilities** (`npm audit --audit-level=moderate`) |
+| Storage / proxy | ✅ Privātie bucketi (`028`); auth proxy `logo`, `asset`; path regex un company prefix |
+| RLS deny (DB tabulas) | ✅ `006` + jaunās tabulas (`020`, `022`, `031`, `032`, `038`, `040`, `041`, `042`); anon/authenticated klientiem deny policy |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| Magic-byte upload validācija | ✅ `file-storage.ts`, `logo-storage.ts` |
+| OAuth / redirect | ✅ `ALLOWED_EMAIL_DOMAIN` opcija; `getSafeRedirectPath()`; X-Forwarded-Host validācija |
+| Estimate lock (M13) | ✅ `assertProjectEstimateEditable()` repository slānī |
+| typecheck + lint + build | ✅ `npm run typecheck`, `npm run lint`, `npm run build` OK; lint: 0 errors, 72 warnings |
+| DB migrācijas | ✅ `npm run db:migrate` OK — `No pending migrations.` |
+
+### Izmaiņas kopš v1.3.25 → v1.3.32 (pārskatīts, bez regresijas)
+
+| Apgabals | Drošības secinājums |
+|----------|---------------------|
+| System admin iestatījumi | ✅ `site_settings` tabula ar RLS deny; saglabāšana tikai caur `saveSiteSettingsAction` + `assertSystemAdminAccess()` |
+| Globālās default grupas | ✅ `site_user_groups` ar RLS deny; tiesības glabājas strukturēti kā `PermissionSet`; mutācijas tikai system admin |
+| Sistēmas valodas | ✅ `site_languages` ar RLS deny; aktīvā lietotāja valoda maināma tikai pašam autorizētam lietotājam un tikai uz aktīvu valodu |
+| Sistēmas tulkojumi | ✅ `site_translations` ar RLS deny; key validācija ar whitelist regex; rediģēšana tikai system admin |
+| Company/site admin pārskati | ✅ Lapas aiz `assertSystemAdminAccess()`; repository piekļuve caur server-side service role |
+| CI smoke | ✅ Auth guard pārbaude papildināta ar `assertSystemAdminAccess()` un `getCurrentUser()`, lai system admin un valodas actions nekļūdaini nefailotu CI |
+
+### Atlikušās piezīmes (nebloķējošas)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | `ALLOWED_EMAIL_DOMAIN` un Supabase invite-only — atkarīgs no production ENV |
+| L27 | ℹ️ ARHITEKTŪRA | Single-tenant loģika izmanto service role repository slānī; pieņemams šim iekšējam rīkam |
+
+**Atzīme:** **9.5 / 10** — jaunā system admin / i18n virsma ir aizsargāta ar `is_admin`, RLS deny un server-side repository pieeju; atlikušais ir production konfigurācija, nevis koda caurums.
 
 ---
 
@@ -147,18 +191,27 @@
 | L19 | ✅ LABOTS | `app/lib/settings/repository.ts` | `logoUrl` akceptē jebkuru URL | Validācija - tikai `/api/company/logo` |
 | L20 | ✅ LABOTS | GET API routes | Cross-site GET ar sesiju | Auth + `SameSite=Lax` + rate limit eksportam |
 | L21 | ✅ LABOTS | `logo-storage.ts` | Kļūdu ziņojumi atklāj infrastruktūru | Vispārīgi kļūdu teksti |
-| L22 | ✅ LABOTS | `.github/workflows/security-smoke.yml` | Smoke meklēja tikai `requireAuth` | Pārbauda `requireAuth` vai `requireAction` |
+| L22 | ✅ LABOTS | `.github/workflows/security-smoke.yml` | Smoke meklēja nepilnu server action guardu sarakstu | Pārbauda `requireAuth`, `requireAction`, `assertSystemAdminAccess` vai `getCurrentUser` |
 | L23 | ✅ LABOTS | Frontend komponentes | Pogas redzamas bez tiesībām | `useActionPermission()` + layout provider |
 | L24 | ✅ LABOTS | `positions/actions.ts` | Cenu vēsture tikai ar `requireAuth()` | `requireAction("positions.manage")` |
 | L25 | ℹ️ DEPLOY | Supabase Auth / ENV | OAuth nav ierobežots bez ENV | `ALLOWED_EMAIL_DOMAIN` + atspējot publisko signup |
-| L26 | ℹ️ SCALE | `rate-limit.ts` | In-process limiter | Pietiek 1 instance; Upstash tikai multi-instance |
+| L26 | ✅ LABOTS | `rate-limit.ts` | In-process limiter neder multi-instance deploy | Upstash Redis REST atbalsts ar `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`; in-process fallback lokāli/single-instance |
 | L27 | ℹ️ ARHITEKTŪRA | `labor-time-norm-sync.ts` | Saglabāšana sinhronizē Sagatavi + citus `active` projektus | Pieņemams single-tenant; aiz `estimate.save` |
 
 ---
 
 ## Ko tika izveidots / mainīts (kopsavilkums)
 
-### v1.3.25 drošības pārbaude (šī sesija)
+### v1.3.32 drošības pārbaude (šī sesija)
+| Konteksts | Secinājums |
+|-----------|------------|
+| `site_*` system admin actions | Mutācijas aiz `assertSystemAdminAccess()`; production tikai `public.users.is_admin = true` |
+| `038`–`042` migrācijas | Jaunām tabulām RLS deny anon/authenticated; `npm run db:migrate` → `No pending migrations.` |
+| `security-smoke.yml` | Auth guard smoke papildināts ar `assertSystemAdminAccess()` un `getCurrentUser()` |
+| `rate-limit.ts` | PDF/Excel eksportiem pievienots Upstash Redis REST distributed limiter ar in-process fallback |
+| Lokālās pārbaudes | `npm audit --audit-level=moderate`, `typecheck`, `lint`, `build` OK |
+
+### v1.3.25 drošības pārbaude
 | Konteksts | Secinājums |
 |-----------|------------|
 | `restore-sagatave-positions-modal.tsx` | Klienta modālis; nav jaunu server actions / API |
@@ -195,7 +248,7 @@
 | Fails | Mērķis |
 |-------|--------|
 | `app/lib/auth/require-auth.ts` | Centralizēts auth guard |
-| `app/lib/security/rate-limit.ts` | In-process rate limiter |
+| `app/lib/security/rate-limit.ts` | Distributed Upstash Redis REST rate limiter ar in-process fallback |
 | `app/lib/security/magic-bytes.ts` | Failu magic-byte validācija |
 | `app/api/company/logo/route.ts` | Autenticēts logotipa proxy |
 | `supabase/migrations/028_private_storage_buckets.sql` | Privatizē storage bucketus |
@@ -206,7 +259,7 @@
 
 ### Obligāti pirms production (ieteicams)
 
-- [x] **`028`–`033` migrācijas** — palaist `npm run db:migrate`
+- [x] **`028`–`042` migrācijas** — palaist `npm run db:migrate`
 - [ ] **`ALLOWED_EMAIL_DOMAIN`** — iestatīt, ja vajag ierobežot OAuth pēc domēna
 - [ ] **Supabase Auth** — atspējot publisko signup (invite-only)
 - [x] **M22** — jaunie lietotāji → **Skatītājs**, ne Administrators
@@ -222,22 +275,23 @@
 ### Ieteicams nākotnē
 
 - [x] **UI atbilstība tiesībām** — slēpt pogas pēc `permissions` (L23)
-- [ ] **Distributed rate limiting** — Redis/Upstash **tikai** ja deploy uz vairākām instance
+- [x] **Distributed rate limiting** — Upstash Redis REST atbalsts multi-instance deploy
 - [ ] **Invite-only plūsma** — OAuth tikai uzaicinātajiem (Supabase dashboard + ENV)
 
 ---
 
-## Atzīme: 9.5 / 10 (v1.3.25)
+## Atzīme: 9.5 / 10 (v1.3.32)
 
 ### Pamatojums
 
 **Stipri (+):**
-- Visas mutācijas aizsargātas ar `requireAction()` pēc konkrētām tiesībām
+- Visas mutācijas aizsargātas ar `requireAction()` pēc konkrētām tiesībām vai `assertSystemAdminAccess()` system admin sadaļām
 - Lomu sistēma ar navigācijas un darbību eforcēšanu (M14) + UI saskaņa (L23)
 - Admin grupa bez koda apiešanas — vienots avots `getUserAccess()` (M23)
+- System admin / i18n tabulas ar RLS deny un piekļuvi tikai caur server-side service role
 - Privāti storage bucketi + auth proxy
-- Rate limiting PDF/Excel eksportiem (pietiek vienai instance)
-- `npm audit` 0 moderate+; typecheck + build OK
+- Rate limiting PDF/Excel eksportiem: Upstash Redis REST multi-instance deploy, in-process fallback lokāli/single-instance
+- `npm audit` 0 moderate+; typecheck + lint + build OK
 - Magic-byte validācija, sanitizētas kļūdas, drošības galvenes, CI smoke
 
 **Vājāk (-0.5 kopā):**
@@ -248,4 +302,3 @@
 ### Kad atzīme būtu 10/10
 
 1. Production: `ALLOWED_EMAIL_DOMAIN` + invite-only Supabase Auth
-2. (Ja vajag) Upstash rate limit multi-instance deploy

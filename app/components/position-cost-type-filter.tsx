@@ -1,5 +1,8 @@
+"use client";
+
+import { useTranslations } from "@/app/components/translations-provider";
 import {
-  CATALOG_POSITION_COST_TYPE_OPTIONS,
+  getCatalogPositionCostTypeOptions,
   type CatalogPositionCostType,
 } from "@/app/lib/positions/position-cost-type";
 import type { PositionCostTypeFilter } from "@/app/lib/positions/filter-positions";
@@ -10,31 +13,32 @@ type PositionCostTypeFilterProps = {
   onChange: (value: PositionCostTypeFilter) => void;
 };
 
-const FILTER_OPTIONS: {
-  value: PositionCostTypeFilter;
-  label: string;
-  icon: string;
-}[] = [
-  { value: "all", label: "Visi", icon: "fas fa-list" },
-  ...CATALOG_POSITION_COST_TYPE_OPTIONS.map((option) => ({
-    value: option.value as CatalogPositionCostType,
-    label: option.label,
-    icon: option.icon,
-  })),
-];
-
 export function PositionCostTypeFilter({
   id,
   value,
   onChange,
 }: PositionCostTypeFilterProps) {
+  const { t } = useTranslations();
+  const filterOptions: {
+    value: PositionCostTypeFilter;
+    label: string;
+    icon: string;
+  }[] = [
+    { value: "all", label: t("filters.all", "Visi"), icon: "fas fa-list" },
+    ...getCatalogPositionCostTypeOptions(t).map((option) => ({
+      value: option.value as CatalogPositionCostType,
+      label: option.label,
+      icon: option.icon,
+    })),
+  ];
+
   return (
     <div
       role="radiogroup"
-      aria-label="Filtrēt pēc veida"
+      aria-label={t("filters.type.aria", "Filtrēt pēc veida")}
       className="inline-flex overflow-hidden rounded-lg border border-zinc-200 bg-white text-xs"
     >
-      {FILTER_OPTIONS.map((option, index) => {
+      {filterOptions.map((option, index) => {
         const isSelected = value === option.value;
         const inputId = `${id}-${option.value}`;
 

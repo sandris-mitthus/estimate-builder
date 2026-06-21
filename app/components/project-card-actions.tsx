@@ -10,6 +10,8 @@ import { ConfirmModal } from "@/app/components/confirm-modal";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { ProjectFormModal } from "@/app/components/project-form-modal";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import type { ProjectSummary } from "@/app/lib/projects/types";
@@ -48,6 +50,7 @@ export function ProjectCardActions({
   const canRejectAction = useActionPermission("project.reject");
   const canCompleteAction = useActionPermission("project.complete");
   const canManageModuleData = useActionPermission("project_module.manage");
+  const { t } = useTranslations();
 
   function handleDeleteOpenChange(open: boolean) {
     if (!open && !isPending) {
@@ -74,7 +77,7 @@ export function ProjectCardActions({
       const result = await deleteProjectAction(project.id);
 
       if (!result.ok) {
-        setDeleteError(result.error);
+        setDeleteError(translateActionError(t, result));
         return;
       }
 
@@ -90,7 +93,7 @@ export function ProjectCardActions({
       const result = await updateProjectStatusAction(project.id, "approved");
 
       if (!result.ok) {
-        setStatusError(result.error);
+        setStatusError(translateActionError(t, result));
         return;
       }
 
@@ -106,7 +109,7 @@ export function ProjectCardActions({
       const result = await updateProjectStatusAction(project.id, "rejected");
 
       if (!result.ok) {
-        setStatusError(result.error);
+        setStatusError(translateActionError(t, result));
         return;
       }
 
@@ -123,7 +126,7 @@ export function ProjectCardActions({
       const result = await updateProjectStatusAction(project.id, "completed");
 
       if (!result.ok) {
-        setStatusError(result.error);
+        setStatusError(translateActionError(t, result));
         return;
       }
 
@@ -140,8 +143,11 @@ export function ProjectCardActions({
           <IconActionButton
             label={
               moduleDataComplete
-                ? "Moduļa dati"
-                : "Moduļa dati – trūkst vizualizāciju vai projekta failu"
+                ? t("projects.module_data.action", "Moduļa dati")
+                : t(
+                    "projects.module_data.missing_action",
+                    "Moduļa dati – trūkst vizualizāciju vai projekta failu",
+                  )
             }
             icon="fas fa-level-up-alt"
             variant="moduleData"
@@ -152,7 +158,7 @@ export function ProjectCardActions({
         ) : null}
         {canCreate ? (
           <IconActionButton
-            label="Kopēt"
+            label={t("actions.copy", "Kopēt")}
             icon="fas fa-copy"
             variant="copy"
             onClick={() => setCopyOpen(true)}
@@ -161,7 +167,7 @@ export function ProjectCardActions({
         {canEditOrDelete && canEdit ? (
           <>
             <IconActionButton
-              label="Labot"
+              label={t("actions.edit", "Labot")}
               icon="fas fa-pen"
               variant="edit"
               onClick={() => setEditOpen(true)}
@@ -170,7 +176,7 @@ export function ProjectCardActions({
         ) : null}
         {canEditOrDelete && canDelete ? (
           <IconActionButton
-            label="Dzēst"
+            label={t("actions.delete", "Dzēst")}
             icon="fas fa-trash"
             variant="delete"
             onClick={() => setDeleteOpen(true)}
@@ -178,7 +184,7 @@ export function ProjectCardActions({
         ) : null}
         {canApprove && canApproveAction ? (
           <IconActionButton
-            label="Apstiprināts"
+            label={t("actions.approve", "Apstiprināt")}
             icon="fas fa-check"
             variant="approve"
             onClick={() => setApproveOpen(true)}
@@ -186,7 +192,7 @@ export function ProjectCardActions({
         ) : null}
         {canComplete && canCompleteAction ? (
           <IconActionButton
-            label="Pabeigts"
+            label={t("actions.complete", "Pabeigts")}
             icon="fas fa-check-double"
             variant="complete"
             onClick={() => setCompleteOpen(true)}
@@ -194,7 +200,7 @@ export function ProjectCardActions({
         ) : null}
         {canReject && canRejectAction ? (
           <IconActionButton
-            label="Noraidīts"
+            label={t("actions.reject", "Noraidīt")}
             icon="fas fa-times"
             variant="reject"
             onClick={() => setRejectOpen(true)}
@@ -221,11 +227,11 @@ export function ProjectCardActions({
       <ConfirmModal
         open={deleteOpen}
         onOpenChange={handleDeleteOpenChange}
-        title="Dzēst projektu?"
+        title={t("projects.delete.title", "Dzēst projektu?")}
         description={
           <>
             <p>
-              Vai tiešām vēlies dzēst projektu{" "}
+              {t("projects.delete.confirm_prefix", "Vai tiešām vēlies dzēst projektu")}{" "}
               <span className="font-medium text-zinc-900">{project.name}</span>?
             </p>
             {deleteError ? (
@@ -235,7 +241,9 @@ export function ProjectCardActions({
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Dzēš…" : "Dzēst"}
+        confirmLabel={
+          isPending ? t("actions.deleting", "Dzēš…") : t("actions.delete", "Dzēst")
+        }
         confirmVariant="danger"
         onConfirm={handleConfirmDelete}
         blocking={isPending}
@@ -244,12 +252,14 @@ export function ProjectCardActions({
       <ConfirmModal
         open={approveOpen}
         onOpenChange={handleStatusOpenChange}
-        title="Apstiprināt tāmi?"
+        title={t("projects.approve.title", "Apstiprināt tāmi?")}
         description={
           <>
             <p>
-              Pēc apstiprināšanas tāmi vairs nevarēs labot un brīdinājumi par
-              jauniem izcenojumiem pazudīs.
+              {t(
+                "projects.approve.description",
+                "Pēc apstiprināšanas tāmi vairs nevarēs labot un brīdinājumi par jauniem izcenojumiem pazudīs.",
+              )}
             </p>
             {statusError ? (
               <p className="mt-2 text-red-600" role="alert">
@@ -258,7 +268,11 @@ export function ProjectCardActions({
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Apstiprina…" : "Apstiprināt"}
+        confirmLabel={
+          isPending
+            ? t("actions.approving", "Apstiprina…")
+            : t("actions.approve", "Apstiprināt")
+        }
         onConfirm={handleConfirmApprove}
         blocking={isPending}
       />
@@ -266,12 +280,14 @@ export function ProjectCardActions({
       <ConfirmModal
         open={completeOpen}
         onOpenChange={handleStatusOpenChange}
-        title="Atzīmēt projektu kā pabeigtu?"
+        title={t("projects.complete.title", "Atzīmēt projektu kā pabeigtu?")}
         description={
           <>
             <p>
-              Projekts pazudīs no saraksta, bet netiks dzēsts — vēlāk varēsi
-              atvērt to tieši pēc saites.
+              {t(
+                "projects.complete.description",
+                "Projekts pazudīs no saraksta, bet netiks dzēsts — vēlāk varēsi atvērt to tieši pēc saites.",
+              )}
             </p>
             {statusError ? (
               <p className="mt-2 text-red-600" role="alert">
@@ -280,7 +296,9 @@ export function ProjectCardActions({
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Saglabā…" : "Pabeigts"}
+        confirmLabel={
+          isPending ? t("actions.saving", "Saglabā…") : t("actions.complete", "Pabeigts")
+        }
         onConfirm={handleConfirmComplete}
         blocking={isPending}
       />
@@ -288,11 +306,14 @@ export function ProjectCardActions({
       <ConfirmModal
         open={rejectOpen}
         onOpenChange={handleStatusOpenChange}
-        title="Noraidīt projektu?"
+        title={t("projects.reject.title", "Noraidīt projektu?")}
         description={
           <>
             <p>
-              Projekts pazudīs no saraksta, bet netiks dzēsts no datubāzes.
+              {t(
+                "projects.reject.description",
+                "Projekts pazudīs no saraksta, bet netiks dzēsts no datubāzes.",
+              )}
             </p>
             {statusError ? (
               <p className="mt-2 text-red-600" role="alert">
@@ -301,7 +322,11 @@ export function ProjectCardActions({
             ) : null}
           </>
         }
-        confirmLabel={isPending ? "Noraida…" : "Noraidīt"}
+        confirmLabel={
+          isPending
+            ? t("actions.rejecting", "Noraida…")
+            : t("actions.reject", "Noraidīt")
+        }
         confirmVariant="danger"
         onConfirm={handleConfirmReject}
         blocking={isPending}

@@ -13,6 +13,8 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
 
 import { PhoneField } from "@/app/components/phone-field";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 import { formatAmount } from "@/app/lib/estimates/calculate-line";
 
@@ -181,6 +183,7 @@ export function UpdatePositionPriceModal({
   blocking = false,
 
 }: UpdatePositionUnitPriceModalProps) {
+  const { t } = useTranslations();
 
   const [unitPrice, setUnitPrice] = useState("");
 
@@ -312,7 +315,10 @@ export function UpdatePositionPriceModal({
 
     if (parsedUnitPrice === null || parsedUnitPrice < 0) {
 
-      nextErrors.unitPrice = "Ievadi derīgu cenu par 1 mērvienību.";
+      nextErrors.unitPrice = t(
+        "positions.validation.unit_price_invalid",
+        "Ievadi derīgu cenu par 1 mērvienību.",
+      );
 
     }
 
@@ -320,7 +326,9 @@ export function UpdatePositionPriceModal({
 
     const emailError = validateEmail(supplierForm.supplierEmail);
 
-    if (emailError) nextErrors.supplierEmail = emailError;
+    if (emailError) {
+      nextErrors.supplierEmail = translateActionError(t, { error: emailError });
+    }
 
 
 
@@ -332,7 +340,9 @@ export function UpdatePositionPriceModal({
 
     );
 
-    if (phoneError) nextErrors.supplierPhone = phoneError;
+    if (phoneError) {
+      nextErrors.supplierPhone = translateActionError(t, { error: phoneError });
+    }
 
 
 
@@ -411,7 +421,7 @@ export function UpdatePositionPriceModal({
 
       onOpenChange={onOpenChange}
 
-      title="Atjaunot cenu"
+      title={t("positions.price.update_title", "Atjaunot cenu")}
 
       description={`${position.name} · ${position.unit}`}
 
@@ -429,7 +439,7 @@ export function UpdatePositionPriceModal({
 
           <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-            Cena par 1 {position.unit}
+            {t("positions.price.per_unit", "Cena par 1 {unit}", { unit: position.unit })}
 
           </span>
 
@@ -485,13 +495,16 @@ export function UpdatePositionPriceModal({
 
             <div>
 
-              <p className={modalSectionTitleClassName}>Aprēķins no apjoma</p>
+              <p className={modalSectionTitleClassName}>
+                {t("positions.price.volume_calculation", "Aprēķins no apjoma")}
+              </p>
 
               <p className="mt-1 text-sm leading-snug text-zinc-600">
 
-                Ievadi kopējo apjomu un kopējo cenu — cena par 1 mērvienību
-
-                aizpildīsies automātiski.
+                {t(
+                  "positions.price.volume_calculation_help",
+                  "Ievadi kopējo apjomu un kopējo cenu — cena par 1 mērvienību aizpildīsies automātiski.",
+                )}
 
               </p>
 
@@ -513,7 +526,7 @@ export function UpdatePositionPriceModal({
 
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-                Kopējais apjoms
+                {t("positions.price.total_volume", "Kopējais apjoms")}
 
               </span>
 
@@ -549,7 +562,7 @@ export function UpdatePositionPriceModal({
 
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-                Kopējā cena
+                {t("positions.price.total_price", "Kopējā cena")}
 
               </span>
 
@@ -595,11 +608,16 @@ export function UpdatePositionPriceModal({
 
             <div>
 
-              <p className={modalSectionTitleClassName}>Veikals</p>
+              <p className={modalSectionTitleClassName}>
+                {t("positions.supplier.store", "Veikals")}
+              </p>
 
               <p className="mt-1 text-sm leading-snug text-zinc-600">
 
-                Norādi veikalu un kontaktpersonu, no kuras iegādāta cena.
+                {t(
+                  "positions.supplier.description",
+                  "Norādi veikalu un kontaktpersonu, no kuras iegādāta cena.",
+                )}
 
               </p>
 
@@ -623,7 +641,7 @@ export function UpdatePositionPriceModal({
 
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-                Veikala nosaukums
+                {t("positions.supplier.store_name", "Veikala nosaukums")}
 
               </span>
 
@@ -661,7 +679,7 @@ export function UpdatePositionPriceModal({
 
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-                Saziņas personas vārds
+                {t("positions.supplier.contact_name", "Saziņas personas vārds")}
 
               </span>
 
@@ -703,7 +721,7 @@ export function UpdatePositionPriceModal({
 
               <span className="mb-1.5 block text-sm font-medium text-zinc-700">
 
-                Epasts
+                {t("common.email", "Epasts")}
 
               </span>
 
@@ -784,7 +802,7 @@ export function UpdatePositionPriceModal({
             disabled={blocking}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {blocking ? "Saglabā…" : "Saglabāt"}
+            {blocking ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
 

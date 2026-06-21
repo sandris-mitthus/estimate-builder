@@ -6,6 +6,8 @@ import {
   uploadCompanyLogoAction,
 } from "@/app/(protected)/settings/actions";
 import { useActionPermission } from "@/app/components/action-permissions-context";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { validateCompanyLogoFile } from "@/app/lib/settings/logo-validation";
 
 type CompanyLogoDropzoneProps = {
@@ -20,6 +22,7 @@ export function CompanyLogoDropzone({
   onError,
 }: CompanyLogoDropzoneProps) {
   const canSave = useActionPermission("settings.save");
+  const { t } = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -34,7 +37,7 @@ export function CompanyLogoDropzone({
 
     const validation = validateCompanyLogoFile(file);
     if (!validation.ok) {
-      onError(validation.error);
+      onError(translateActionError(t, validation));
       return;
     }
 
@@ -46,7 +49,7 @@ export function CompanyLogoDropzone({
       const result = await uploadCompanyLogoAction(formData);
 
       if (!result.ok) {
-        onError(result.error);
+        onError(translateActionError(t, result));
         return;
       }
 
@@ -61,7 +64,7 @@ export function CompanyLogoDropzone({
       const result = await removeCompanyLogoAction();
 
       if (!result.ok) {
-        onError(result.error);
+        onError(translateActionError(t, result));
         return;
       }
 
@@ -72,12 +75,14 @@ export function CompanyLogoDropzone({
   if (!canSave) {
     return (
       <div className="sm:col-span-2">
-        <p className="mb-1.5 text-sm font-medium text-zinc-700">Uzņēmuma logotips</p>
+        <p className="mb-1.5 text-sm font-medium text-zinc-700">
+          {t("settings.company_logo", "Uzņēmuma logotips")}
+        </p>
         <div className="flex size-24 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt="Uzņēmuma logotips"
+              alt={t("settings.company_logo", "Uzņēmuma logotips")}
               className="max-h-full max-w-full object-contain p-2"
             />
           ) : (
@@ -90,7 +95,9 @@ export function CompanyLogoDropzone({
 
   return (
     <div className="sm:col-span-2">
-      <p className="mb-1.5 text-sm font-medium text-zinc-700">Uzņēmuma logotips</p>
+      <p className="mb-1.5 text-sm font-medium text-zinc-700">
+        {t("settings.company_logo", "Uzņēmuma logotips")}
+      </p>
 
       <div
         onDragEnter={(event) => {
@@ -123,7 +130,7 @@ export function CompanyLogoDropzone({
             {logoUrl ? (
               <img
                 src={logoUrl}
-                alt="Uzņēmuma logotips"
+                alt={t("settings.company_logo", "Uzņēmuma logotips")}
                 className="max-h-full max-w-full object-contain p-2"
               />
             ) : (
@@ -136,13 +143,13 @@ export function CompanyLogoDropzone({
 
           <div className="min-w-0 flex-1">
             <p className="text-sm text-zinc-700">
-              Velc un nomet logotipu šeit vai{" "}
+              {t("settings.logo_drop_hint_prefix", "Velc un nomet logotipu šeit vai")}{" "}
               <button
                 type="button"
                 onClick={openFilePicker}
                 className="font-medium text-zinc-900 underline-offset-2 hover:underline"
               >
-                izvēlies failu
+                {t("files.choose_file", "izvēlies failu")}
               </button>
             </p>
             <p className="mt-1 text-xs text-zinc-500">
@@ -156,7 +163,7 @@ export function CompanyLogoDropzone({
                 disabled={isPending}
                 className="mt-3 text-xs font-medium text-red-600 transition hover:text-red-700 disabled:opacity-50"
               >
-                Noņemt logotipu
+              {t("settings.logo_remove", "Noņemt logotipu")}
               </button>
             ) : null}
           </div>
@@ -175,7 +182,9 @@ export function CompanyLogoDropzone({
       />
 
       {isPending ? (
-        <p className="mt-2 text-xs text-zinc-500">Augšupielādē logotipu…</p>
+        <p className="mt-2 text-xs text-zinc-500">
+          {t("settings.logo_uploading", "Augšupielādē logotipu…")}
+        </p>
       ) : null}
     </div>
   );

@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.31` (see [Changelog](#changelog))
+**Current version:** `1.3.35` (see [Changelog](#changelog))
 
 ---
 
@@ -11,7 +11,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 ### Authentication
 
-- **Google OAuth** via Supabase — when not signed in, only a centered “Pierakstīties ar Google” button is shown (no nav or app content)
+- **Google OAuth** via Supabase — unauthenticated users see a dedicated `/login` screen with the configured `site_settings` system name/slogan, a Google sign-in button, and a language dropdown when more than one UI language is active (anonymous choice stored in `eb_language` cookie)
 - OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
 - Root login redirects to `/auth/callback` without `?next=/`, so Supabase Redirect URLs can match the exact callback URL in both localhost and Vercel
 - OAuth fallback in `proxy.ts` / `update-session.ts` redirects provider returns from `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still completes the session
@@ -22,7 +22,8 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 ### Multi-company users, groups and permissions
 
-- **Sistēmas administrators** — globāls profils `public.users.is_admin`; dashboardā rāda informatīvu bloku, bet uzņēmuma tiesības joprojām nāk no uzņēmuma grupas
+- **Sistēmas administrators** — globāls profils `public.users.is_admin`; top menu pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Sistēmas uzstādījumi**, **Grupas**, **Valodas**, **Tulkojumi**) un slēpj uzņēmuma izvēlni
+- **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_settings`, `/site_user_groups`, `/site_languages`, `/site_translations`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown top barā
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
@@ -45,6 +46,7 @@ English routes, Latvian labels:
 | Neiekļautās pozīcijas | `/excluded-positions` |
 | Lietotāji | `/users` (apakšlapa **Grupas un tiesības**: `/users/groups`) |
 | Uzstādījumi | `/settings` |
+| System admin | `/site_companies`, `/site_companies_users`, `/site_settings`, `/site_user_groups`, `/site_languages`, `/site_translations` |
 
 - **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms)
 - **Kartes → detaļa** — projekta un moduļa kartēm pilnekrāna blur + modālis (**Ielādē projektu…** / **Ielādē moduli…**) līdz navigācija pabeigta (`navigation-loading-context.tsx`)
@@ -105,6 +107,7 @@ English routes, Latvian labels:
 - Falls back to in-memory sample data only when Supabase is **not** configured (configured DB with zero projects shows empty list, not seed cards)
 - **Multi-company scoping** — projects, estimates, settings, modules, position prices/history, sagatave, excluded positions and private storage assets are scoped by active `company_id`
 - **Company access** — `public.users.is_admin` marks system admins; `company_users` controls company membership/status; `company_user_groups` + `company_group_members` control per-company permissions
+- **System admin data** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits
 - Estimate **full state** (title, meta, categories with baked-in prices) persisted via **Saglabāt tāmi** server action; dates also auto-saved on change
 - `npm run db:migrate` applies only **pending** migrations (tracked in `public.schema_migrations`)
 - App tables use **service-role server access** with RLS deny policies for browser clients
@@ -169,6 +172,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
+| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional for multi-instance production | Enables distributed PDF/Excel export rate limiting; without these, local/single-instance deploys use in-process limits |
 
 ### Supabase setup
 
@@ -202,12 +206,13 @@ npm run db:test
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key |
 | `NEXT_PUBLIC_SITE_URL` | `https://your-app.vercel.app` |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Optional, recommended when Vercel scales to multiple instances |
 
 3. **Redeploy** after changing any `NEXT_PUBLIC_*` variable (values are embedded at build time)
 4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
 5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
-**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
+**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`; `041`, active language), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), system admin tables (`038` site settings, `040` site user groups, `041` site languages, `042` site translations), system/company UI translation normalization and seed coverage (`043`–`058`), legacy group cleanup (`039`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
 
 ---
 
@@ -229,6 +234,12 @@ app/
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
 │   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
 │   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, create/update/delete group actions, updateUserGroupPermissionsAction, setCompanyUserAccessAction, removeCompanyUserAction
+│   ├── site_companies/ # System admin company overview
+│   ├── site_companies_users/ # System admin company-user overview
+│   ├── site_settings/  # Global system name/slogan metadata settings
+│   ├── site_user_groups/ # Global default group permissions
+│   ├── site_languages/ # System languages and default/active toggles
+│   ├── site_translations/ # Translation key CRUD and live search
 │   └── settings/
 ├── api/
 │   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
@@ -255,6 +266,7 @@ app/
 │   ├── positions/      # repository, apply-catalog-to-line-item, sync-from-estimate-line-items, sync-estimate-line-items-to-catalog, has-defined-labor, variable-quantity, stale-catalog-price, filter-positions
 │   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
 │   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation, IBAN bank resolve, currencies
+│   ├── site-admin/     # system admin access, site settings, languages, translations, default groups
 │   ├── users/          # Auth user list, public.users sync, company membership status, invite, groups-repository (company membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone
 │   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
@@ -262,7 +274,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–036 (034 = users.is_admin; 035 = multi-company foundation; 036 = company user access permission)
+supabase/migrations/    # 001–042 (038–042 = system admin settings, groups, languages, translations)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -300,6 +312,7 @@ supabase/migrations/    # 001–036 (034 = users.is_admin; 035 = multi-company f
 - [x] Materiālu saraksts — apstiprinātiem projektiem **virs tāmes**; agregēts apjoms un budžets; **Pasūtīts** + **Atjaunot cenu**; brīdinājums sarakstā un projekta lapā, kamēr nav visi pasūtīti
 - [x] Materiālu delegācija — drag lietotāju uz materiālu (`materialAssigneeUserIds`); globālais baneris zem nav ar animāciju un cookie
 - [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
+- [x] System admin sadaļas — uzņēmumi, lietotāji, sistēmas uzstādījumi, default grupas, valodas un tulkojumi
 - [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm audit` 0)
 
 ---
@@ -358,6 +371,38 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.35
+
+**Language UX and translation caching**
+
+- Added anonymous login language switching in the login card, backed by the `eb_language` cookie and the same DB translation dictionary used after sign-in
+- Cached site translation dictionaries per language with `site-translations` tag invalidation on translation and language admin changes
+- Removed the visible sagatave title field from the template editor header and filled remaining module/estimate/position i18n gaps, including module empty states and phone/roof/position labels
+
+### v1.3.34
+
+**Settings-backed login and i18n completion**
+
+- Added a dedicated `/login` route and full-screen login card that uses the global system name and slogan from `site_settings`
+- Removed hardcoded login marketing copy and cleaned obsolete login translation keys while keeping Google OAuth button/error text translatable
+- Expanded remaining UI translation seed coverage across company pages, estimate/module/position flows and backend/action errors through the latest seed migrations
+
+### v1.3.33
+
+**System UI translations and rate-limit hardening**
+
+- Seeded Latvian/English UI translation keys for navigation, system admin pages, language/translation forms, roles, statuses and permission labels via `043_seed_system_ui_translations.sql`
+- Wired core navigation, language switching and permissions forms through the translation dictionary while keeping fallbacks for missing keys
+- Added Upstash Redis REST support for distributed PDF/Excel export rate limiting, plus README/env/security-check documentation and CI smoke guard updates
+
+### v1.3.32
+
+**System admin settings, languages and translations**
+
+- Added `is_admin`-only system admin navigation and pages for companies, company users, global settings, default user groups, languages and translations
+- Added global `site_settings`, `site_user_groups`, `site_languages` and `site_translations` management, including top-bar language switching and app metadata from DB
+- Added migrations `038`–`042` plus legacy group cleanup `039`, with editable default group permissions and translation CRUD/search
 
 ### v1.3.31
 

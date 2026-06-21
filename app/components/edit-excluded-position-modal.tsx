@@ -9,10 +9,12 @@ import {
 } from "@/app/components/app-modal";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 
 type EditExcludedPositionModalProps = {
@@ -30,6 +32,7 @@ export function EditExcludedPositionModal({
 }: EditExcludedPositionModalProps) {
   const router = useRouter();
   const { showFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [name, setName] = useState(position.name);
   const [nameError, setNameError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export function EditExcludedPositionModal({
     setNameError(undefined);
 
     if (!name.trim()) {
-      setNameError("Ievadi nosaukumu.");
+      setNameError(t("validation.name_required", "Ievadi nosaukumu."));
       return;
     }
 
@@ -64,15 +67,18 @@ export function EditExcludedPositionModal({
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
-          setNameError(result.error);
+          setNameError(translateActionError(t, result));
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
 
       handleOpenChange(false);
-      showFeedback({ type: "success", text: "Pozīcija atjaunināta." });
+      showFeedback({
+        type: "success",
+        text: t("positions.feedback.updated", "Pozīcija atjaunināta."),
+      });
       router.refresh();
     });
   }
@@ -81,8 +87,8 @@ export function EditExcludedPositionModal({
     <AppModal
       open={open}
       onOpenChange={handleOpenChange}
-      title="Labot neiekļauto pozīciju"
-      description="Atjaunini pozīcijas nosaukumu"
+      title={t("excluded_positions.edit.title", "Labot neiekļauto pozīciju")}
+      description={t("positions.edit_name.description", "Atjaunini pozīcijas nosaukumu")}
       blocking={isBlocking}
       dirty={name.trim() !== position.name}
       panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
@@ -90,7 +96,7 @@ export function EditExcludedPositionModal({
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="edit-excluded-position-name" className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Nosaukums
+            {t("common.name", "Nosaukums")}
           </label>
           <input
             id="edit-excluded-position-name"
@@ -126,7 +132,7 @@ export function EditExcludedPositionModal({
             disabled={isBlocking}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending ? "Saglabā…" : "Saglabāt"}
+            {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
       </form>

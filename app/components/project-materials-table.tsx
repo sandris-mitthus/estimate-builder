@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, type ReactNode } from "react";
 import { ProjectMaterialRowActions } from "@/app/components/project-material-row-actions";
+import { useTranslations } from "@/app/components/translations-provider";
 import { aggregateProjectMaterials } from "@/app/lib/estimates/aggregate-project-materials";
 import type { AggregatedProjectMaterial } from "@/app/lib/estimates/aggregate-project-materials";
 import { formatMoneyDisplay } from "@/app/lib/estimates/format-money";
@@ -82,6 +83,7 @@ export function ProjectMaterialsTable({
   useFrozenPrices = false,
   onMaterialOrdered,
 }: ProjectMaterialsTableProps) {
+  const { t } = useTranslations();
   const visibleMaterialIdSet = useMemo(
     () =>
       visibleMaterialIds ? new Set(visibleMaterialIds) : null,
@@ -153,11 +155,13 @@ export function ProjectMaterialsTable({
             id={headingId}
             className="text-sm font-semibold text-zinc-900"
           >
-            Materiālu saraksts
+            {t("materials.list.title", "Materiālu saraksts")}
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
-            Apstiprinātās tāmes materiāli ar apjomiem un budžeta cenu uz mērvienību
-            — salīdzini ar pasūtījuma cenu.
+            {t(
+              "materials.list.description",
+              "Apstiprinātās tāmes materiāli ar apjomiem un budžeta cenu uz mērvienību — salīdzini ar pasūtījuma cenu.",
+            )}
           </p>
         </div>
       )}
@@ -166,14 +170,14 @@ export function ProjectMaterialsTable({
         <table className="min-w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-zinc-100 bg-white text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
-              <th className="px-4 py-2.5 font-medium">Nosaukums</th>
-              <th className="px-3 py-2.5 font-medium">Mērv.</th>
-              <th className="px-3 py-2.5 text-right font-medium">Apjoms</th>
+              <th className="px-4 py-2.5 font-medium">{t("common.name", "Nosaukums")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("common.unit_short", "Mērv.")}</th>
+              <th className="px-3 py-2.5 text-right font-medium">{t("common.quantity_short", "Apjoms")}</th>
               <th className="px-3 py-2.5 text-right font-medium">
-                Budžeta cena
+                {t("materials.budget_unit_price", "Budžeta cena")}
               </th>
-              <th className="px-4 py-2.5 text-right font-medium">Budžets</th>
-              <th className="px-3 py-2.5 text-right font-medium">Darbības</th>
+              <th className="px-4 py-2.5 text-right font-medium">{t("materials.budget", "Budžets")}</th>
+              <th className="px-3 py-2.5 text-right font-medium">{t("common.actions", "Darbības")}</th>
             </tr>
           </thead>
           <tbody>
@@ -223,7 +227,7 @@ export function ProjectMaterialsTable({
                     </span>
                     {row.hasPriceChange ? (
                       <p className="mt-0.5 text-[11px] font-normal text-red-600">
-                        Katalogā:{" "}
+                        {t("materials.catalog_price_prefix", "Katalogā:")}{" "}
                         {formatMoneyDisplay(row.catalogUnitPrice, currency)}
                       </p>
                     ) : null}
@@ -251,7 +255,7 @@ export function ProjectMaterialsTable({
                 colSpan={4}
                 className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
               >
-                Kopā materiāli
+                {t("materials.total", "Kopā materiāli")}
               </td>
               <td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-zinc-900">
                 {formatMoneyDisplay(budgetGrandTotal, currency)}

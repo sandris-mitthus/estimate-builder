@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ModuleSizeAttachItemRow } from "@/app/components/module-size-attach-item-row";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   buildAdjustedModuleSizeSummarySections,
   findModuleSizeSummaryItem,
 } from "@/app/lib/modules/apply-module-size-adjustments";
+import { translateModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
 import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 
@@ -41,6 +43,7 @@ function ModuleCard({
   attachment: LineItemModuleSizeAttachment | null;
   onChange: (attachment: LineItemModuleSizeAttachment | null) => void;
 }) {
+  const { t } = useTranslations();
   const isAttachedModule = attachment?.moduleId === module.id;
 
   // Lokālais korekciju stāvoklis — darbojas arī pirms kāda elementa piesaistīšanas.
@@ -72,6 +75,14 @@ function ModuleCard({
       adjustments,
     );
   }, [adjustments, module]);
+  const translatedBaseSections = useMemo(
+    () => translateModuleSizeSummarySections(module.sections, t),
+    [module.sections, t],
+  );
+  const translatedDisplaySections = useMemo(
+    () => translateModuleSizeSummarySections(displaySections, t),
+    [displaySections, t],
+  );
 
   const [openSection, setOpenSection] = useState<string | null>(() =>
     isAttachedModule
@@ -97,7 +108,7 @@ function ModuleCard({
       <li className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
         <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
         <p className="mt-2 text-sm text-zinc-500">
-          Nav definētu lielumu šim modulim.
+          {t("modules.sizes.empty_for_module", "Nav definētu lielumu šim modulim.")}
         </p>
       </li>
     );
@@ -107,8 +118,9 @@ function ModuleCard({
     <li className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
       <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
       <div className="mt-3 space-y-1">
-        {module.sections.map((section) => {
+        {module.sections.map((section, sectionIndex) => {
           const isOpen = openSection === section.title;
+          const translatedSection = translatedBaseSections[sectionIndex] ?? section;
           return (
             <section key={section.title}>
               <button
@@ -117,7 +129,7 @@ function ModuleCard({
                 className="flex w-full items-center justify-between border-b border-zinc-200 pb-1.5 pt-2 text-left"
               >
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
-                  {section.title}
+                  {translatedSection.title}
                 </h4>
                 <i
                   className={`fas ${isOpen ? "fa-chevron-up" : "fa-chevron-down"} text-xs text-zinc-400 transition-transform`}
@@ -126,12 +138,14 @@ function ModuleCard({
               </button>
               {isOpen && (
                 <ul className="mt-2 space-y-0.5">
-                  {section.items.map((baseItem) => {
+                  {section.items.map((baseItem, index) => {
                     const enabled =
                       isAttachedModule && attachment?.itemKey === baseItem.key;
-                    const displayItem =
-                      findModuleSizeSummaryItem(displaySections, baseItem.key) ??
-                      baseItem;
+                      const translatedBaseItem =
+                        translatedSection.items[index] ?? baseItem;
+                      const displayItem =
+                        findModuleSizeSummaryItem(translatedDisplaySections, baseItem.key) ??
+                        translatedBaseItem;
                     const baseDisplayValue =
                       displayItem.value !== baseItem.value
                         ? baseItem.value
@@ -197,11 +211,15 @@ export function ModuleSizeAttachPicker({
   attachment,
   onChange,
 }: ModuleSizeAttachPickerProps) {
+  const { t } = useTranslations();
+
   if (moduleSizeOptions.length === 0) {
     return (
       <p className="text-sm text-zinc-500">
-        Nav definētu moduļa lielumu. Ievadi tos moduļa detaļā sadaļā Projekta
-        apraksts.
+        {t(
+          "modules.sizes.empty_description",
+          "Nav definētu moduļa lielumu. Ievadi tos moduļa detaļā sadaļā Projekta apraksts.",
+        )}
       </p>
     );
   }

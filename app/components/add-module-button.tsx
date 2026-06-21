@@ -7,15 +7,18 @@ import { AppModal } from "@/app/components/app-modal";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 
 export function AddModuleButton() {
   const router = useRouter();
   const canManage = useActionPermission("modules.manage");
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const { t } = useTranslations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
@@ -41,7 +44,7 @@ export function AddModuleButton() {
     setError(null);
 
     if (!name.trim()) {
-      setNameError("Ievadi nosaukumu.");
+      setNameError(t("validation.name_required", "Ievadi nosaukumu."));
       return;
     }
 
@@ -52,15 +55,18 @@ export function AddModuleButton() {
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
-          setNameError(result.error);
+          setNameError(t("validation.name_required", result.error));
         } else {
-          setError(result.error);
+          setError(translateActionError(t, result));
         }
         return;
       }
 
       handleOpenChange(false);
-      showFeedback({ type: "success", text: "Modulis pievienots." });
+      showFeedback({
+        type: "success",
+        text: t("modules.feedback.created", "Modulis pievienots."),
+      });
       router.refresh();
     });
   }
@@ -77,21 +83,21 @@ export function AddModuleButton() {
         className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
       >
         <i className="fas fa-plus text-xs" aria-hidden="true" />
-        Pievienot Moduli
+        {t("modules.create.action", "Pievienot moduli")}
       </button>
 
       <AppModal
         open={open}
         onOpenChange={handleOpenChange}
-        title="Pievienot moduli"
-        description="Ievadi moduļa nosaukumu"
+        title={t("modules.create.title", "Pievienot moduli")}
+        description={t("modules.create.description", "Ievadi moduļa nosaukumu")}
         blocking={isPending}
         dirty={name.trim().length > 0}
       >
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
           <label htmlFor="module-name" className="block">
             <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Nosaukums
+              {t("common.name", "Nosaukums")}
             </span>
             <input
               id="module-name"
@@ -130,7 +136,7 @@ export function AddModuleButton() {
               disabled={isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPending ? "Pievieno…" : "Pievienot"}
+              {isPending ? t("actions.adding", "Pievieno…") : t("actions.add", "Pievienot")}
             </button>
           </ModalFormActions>
         </form>

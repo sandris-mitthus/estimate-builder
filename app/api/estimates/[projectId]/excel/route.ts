@@ -7,6 +7,7 @@ import { buildEstimateExcel } from "@/app/lib/exports/estimate-excel";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getProjectEstimate } from "@/app/lib/projects/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
+import { getServerTranslations } from "@/app/lib/i18n/server";
 
 export async function GET(
   _request: Request,
@@ -22,12 +23,13 @@ export async function GET(
     return new Response("Forbidden", { status: 403 });
   }
 
-  if (!checkRateLimit(`excel:${user.id}`, 20, 60_000)) {
+  if (!(await checkRateLimit(`excel:${user.id}`, 20, 60_000))) {
     return rateLimitResponse();
   }
 
   const { projectId } = await params;
-  const [estimate, catalogPositions, companySettings] = await Promise.all([
+  const [{ t }, estimate, catalogPositions, companySettings] = await Promise.all([
+    getServerTranslations(),
     getProjectEstimate(projectId),
     listPositionPrices(),
     getCompanySettings(),
@@ -44,6 +46,7 @@ export async function GET(
     catalogPositions,
     companySettings.defaultHourlyRate,
     companySettings.vatNumber,
+    t,
   );
 
   const filename = `tame-${projectId.slice(0, 8)}.xlsx`;

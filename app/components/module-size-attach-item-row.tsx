@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   createAttachItemStateKey,
   defaultModuleSizeAttachItemState,
@@ -33,13 +34,17 @@ function CompactAttachSwitch({
   onChange: (enabled: boolean) => void;
   label: string;
 }) {
+  const { t } = useTranslations();
+
   return (
     <button
       type="button"
       id={id}
       role="switch"
       aria-checked={enabled}
-      aria-label={`Piesaistīt: ${label}`}
+      aria-label={t("modules.sizes.attach_item_aria", "Piesaistīt: {label}", {
+        label,
+      })}
       onClick={() => onChange(!enabled)}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
         enabled ? "bg-violet-600" : "bg-zinc-200"
@@ -71,6 +76,7 @@ export function ModuleSizeAttachItemRow({
   onEnabledChange,
   onAdjustmentChange,
 }: ModuleSizeAttachItemRowProps) {
+  const { t } = useTranslations();
   const canAdjust = item.adjustable && item.numericValue != null;
   const valueChanged =
     baseDisplayValue != null && baseDisplayValue !== item.value;
@@ -141,7 +147,11 @@ export function ModuleSizeAttachItemRow({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            aria-label={sign === "+" ? "Pārslēgt uz atņemšanu" : "Pārslēgt uz saskaitīšanu"}
+            aria-label={
+              sign === "+"
+                ? t("actions.switch_to_subtract", "Pārslēgt uz atņemšanu")
+                : t("actions.switch_to_add", "Pārslēgt uz saskaitīšanu")
+            }
             onClick={handleSignToggle}
             className={`w-4 text-center text-xs font-semibold transition ${
               sign === "-"
@@ -156,7 +166,9 @@ export function ModuleSizeAttachItemRow({
             inputMode="decimal"
             value={inputValue}
             placeholder="0"
-            aria-label={`Korekcija: ${item.label}`}
+            aria-label={t("modules.sizes.adjustment_aria", "Korekcija: {label}", {
+              label: item.label,
+            })}
             onChange={(event) => {
               const sanitized = sanitizeQuantityInputString(event.target.value);
               setInputValue(sanitized);

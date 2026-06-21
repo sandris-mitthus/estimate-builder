@@ -31,6 +31,8 @@ import {
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useActionPermission } from "@/app/components/action-permissions-context";
+import { useTranslations } from "@/app/components/translations-provider";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
 import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guard";
 import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
@@ -159,6 +161,7 @@ function LineItemRow({
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
+  const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
   const missingModuleSize =
     moduleSizeOptions.length > 0 &&
@@ -209,7 +212,7 @@ function LineItemRow({
                       : "italic text-zinc-400"
                   }`}
                 >
-                  {item.name.trim() || "Nenosaukta pozīcija"}
+                  {item.name.trim() || t("positions.unnamed", "Nenosaukta pozīcija")}
                   {missingModuleSize ? (
                     <i
                       className="fas fa-exclamation-triangle ml-1.5 text-xs text-red-500"
@@ -226,13 +229,13 @@ function LineItemRow({
               </div>
               {missingModuleSize ? (
                 <span className="text-xs text-red-500">
-                  Nav pievienots moduļa apjoms
+                  {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
                 </span>
               ) : null}
               {missingTimeNorm ? (
                 <span className="text-xs text-amber-600">
                   <i className="fas fa-exclamation-triangle mr-1" aria-hidden="true" />
-                  Nav ievadīta Laika norma
+                  {t("estimate.time_norm.missing", "Nav ievadīta Laika norma")}
                 </span>
               ) : null}
               <AttachedModuleSizeLabel
@@ -281,14 +284,14 @@ function LineItemRow({
             />
           ) : null}
           <IconActionButton
-            label="Labot pozīciju"
+            label={t("positions.edit.title", "Labot pozīciju")}
             icon="fas fa-pen"
             variant="edit"
             onClick={() => openPositionModal(item, onChange)}
             className={hoverOnlyActionClass}
           />
           <DeleteButton
-            label="Dzēst pozīciju"
+            label={t("positions.delete.action", "Dzēst pozīciju")}
             onClick={onDelete}
             className={hoverOnlyActionClass}
           />
@@ -314,6 +317,7 @@ function SortableLineItemRow({
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
+  const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
@@ -330,7 +334,7 @@ function SortableLineItemRow({
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
         <DragHandle
-          label="Pārvietot pozīciju"
+          label={t("positions.drag.position", "Pārvietot pozīciju")}
           attributes={attributes}
           listeners={listeners}
         />
@@ -354,20 +358,22 @@ function RowActions({
   deleteLabel: string;
   showSub?: boolean;
 }) {
+  const { t } = useTranslations();
+
   return (
     <div className="flex h-7 shrink-0 items-center gap-1 self-center">
       {showSub && onAddSub ? (
         <button type="button" className={actionBtn} onClick={onAddSub}>
-          + Sub
+          {t("estimate.actions.add_subcategory_short", "+ Sub")}
         </button>
       ) : null}
       {onAddMulti ? (
         <button type="button" className={actionBtn} onClick={onAddMulti}>
-          + Multi
+          {t("estimate.actions.add_multi_short", "+ Multi")}
         </button>
       ) : null}
       <button type="button" className={actionBtn} onClick={onAddItem}>
-        + Pozīcija
+        {t("estimate.actions.add_position_short", "+ Pozīcija")}
       </button>
       <DeleteButton label={deleteLabel} onClick={onDelete} />
     </div>
@@ -392,6 +398,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
+  const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
@@ -415,7 +422,7 @@ function SortableMultiPositionRow({
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
         <DragHandle
-          label="Pārvietot multi-pozīciju"
+          label={t("estimate.drag.multi_position", "Pārvietot multi-pozīciju")}
           attributes={attributes}
           listeners={listeners}
         />
@@ -453,6 +460,7 @@ function SectionRow({
   onToggleCollapse?: () => void;
   nameTrailing?: ReactNode;
 }) {
+  const { t } = useTranslations();
   const isCategory = kind === "category";
   const topBorderClass = showDropLine
     ? "border-t-4 border-t-zinc-900"
@@ -487,11 +495,11 @@ function SectionRow({
               aria-label={
                 collapsed
                   ? isCategory
-                    ? "Izvērst tāmes pozīciju"
-                    : "Izvērst subkategoriju"
+                    ? t("estimate.expand.category", "Izvērst tāmes pozīciju")
+                    : t("estimate.expand.subcategory", "Izvērst subkategoriju")
                   : isCategory
-                    ? "Sakļaut tāmes pozīciju"
-                    : "Sakļaut subkategoriju"
+                    ? t("estimate.collapse.category", "Sakļaut tāmes pozīciju")
+                    : t("estimate.collapse.subcategory", "Sakļaut subkategoriju")
               }
               className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white hover:text-zinc-800"
             >
@@ -597,6 +605,7 @@ function SubcategoryBlock({
   onEnsureExpanded: () => void;
   optionLinkActions: MultiOptionLinkActions;
 }) {
+  const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
 
   function withExpandedContent(
@@ -619,9 +628,9 @@ function SubcategoryBlock({
     <>
       <SortableSectionRow
         sortId={subcategoryDragId(subcategory.id)}
-        dragLabel="Pārvietot subkategoriju"
+        dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         kind="subcategory"
-        placeholder="Subkategorijas nosaukums"
+        placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
         value={subcategory.title}
         onChange={(title) => onChange({ ...subcategory, title })}
         collapsed={collapsed}
@@ -646,7 +655,7 @@ function SubcategoryBlock({
         actions={
           <RowActions
             showSub={false}
-            deleteLabel="Dzēst subkategoriju"
+            deleteLabel={t("estimate.delete.subcategory", "Dzēst subkategoriju")}
             onAddMulti={() =>
               withExpandedContent((current) => ({
                 ...current,
@@ -731,6 +740,7 @@ function SectionBlock({
   expandSection: (rowId: string) => void;
   optionLinkActions: MultiOptionLinkActions;
 }) {
+  const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
 
   function withExpandedContent(
@@ -753,9 +763,9 @@ function SectionBlock({
     <>
       <SortableSectionRow
         sortId={categoryDragId(section.id)}
-        dragLabel="Pārvietot tāmes pozīciju"
+        dragLabel={t("estimate.drag.section", "Pārvietot tāmes pozīciju")}
         kind="category"
-        placeholder="Tāmes pozīcijas grupas nosaukums"
+        placeholder={t("estimate.placeholder.section", "Tāmes pozīcijas grupas nosaukums")}
         value={section.title}
         onChange={(title) => onChange({ ...section, title })}
         collapsed={collapsed}
@@ -763,7 +773,7 @@ function SectionBlock({
         onToggleCollapse={onToggleCollapse}
         actions={
           <RowActions
-            deleteLabel="Dzēst tāmes pozīciju"
+            deleteLabel={t("estimate.delete.section", "Dzēst tāmes pozīciju")}
             onAddSub={() =>
               withExpandedContent((current) => ({
                 ...current,
@@ -790,7 +800,7 @@ function SectionBlock({
           defaultHourlyRate={defaultHourlyRate}
           moduleSizeOptions={moduleSizeOptions}
           collapsed={collapsedSectionIds.has(subcategory.id)}
-          collapsedSummary={getCollapsedSubcategorySummary(subcategory)}
+          collapsedSummary={getCollapsedSubcategorySummary(subcategory, t)}
           onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
           onEnsureExpanded={() => expandSection(subcategory.id)}
           optionLinkActions={optionLinkActions}
@@ -881,6 +891,7 @@ function EstimatePositionDndTable({
   toggleSectionCollapsed: (sectionId: string) => void;
   expandSection: (sectionId: string) => void;
 }) {
+  const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
   const [linkDragSourceOptionId, setLinkDragSourceOptionId] = useState<
     string | null
@@ -892,7 +903,7 @@ function EstimatePositionDndTable({
       onLinkDragStart: (optionId) => setLinkDragSourceOptionId(optionId),
       onLinkDragEnd: () => setLinkDragSourceOptionId(null),
       getLinkedOptions: (optionId) =>
-        getLinkedOptionSummaries(sections, multiOptionLinks, optionId),
+        getLinkedOptionSummaries(sections, multiOptionLinks, optionId, t),
       onLinkDrop: (sourceOptionId, targetOptionId) => {
         setMultiOptionLinks((current) =>
           linkMultiOptions(
@@ -938,6 +949,7 @@ function EstimatePositionDndTable({
       sections,
       setMultiOptionLinks,
       setSections,
+      t,
     ],
   );
 
@@ -995,21 +1007,21 @@ function EstimatePositionDndTable({
               rowSpan={2}
               className="border-b border-r border-zinc-200 px-3 py-2.5 text-left whitespace-normal"
             >
-              Nosaukums
+              {t("common.name", "Nosaukums")}
             </th>
             <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
-              Mērv.
+              {t("common.unit_short", "Mērv.")}
             </th>
             <th
               colSpan={UNIT_PRICE_COLUMN_COUNT}
               className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
             >
-              Vienības cena
+              {t("estimate.unit_price", "Vienības cena")}
             </th>
             <th rowSpan={2} className="border-b border-zinc-200" />
           </tr>
           <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {getUnitPriceSubheaderLabels(currency).map((label) => (
+            {getUnitPriceSubheaderLabels(currency, t).map((label) => (
               <th
                 key={label}
                 className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
@@ -1030,7 +1042,7 @@ function EstimatePositionDndTable({
               defaultHourlyRate={defaultHourlyRate}
               moduleSizeOptions={moduleSizeOptions}
               collapsed={collapsedSectionIds.has(section.id)}
-              collapsedSummary={getCollapsedSectionSummary(section)}
+              collapsedSummary={getCollapsedSectionSummary(section, t)}
               optionLinkActions={optionLinkActions}
                 onToggleCollapse={() => toggleSectionCollapsed(section.id)}
                 onEnsureExpanded={() => expandSection(section.id)}
@@ -1080,6 +1092,7 @@ export function EstimatePositionTable({
   moduleSizeOptions = [],
 }: EstimatePositionTableProps) {
   const router = useRouter();
+  const { t } = useTranslations();
   const canSaveSagatave = useActionPermission("sagatave.save");
   const readOnly = !canSaveSagatave;
   const { showFeedback, clearFeedback } = useFeedbackToast();
@@ -1104,7 +1117,7 @@ export function EstimatePositionTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  const [title, setTitle] = useState(initialTitle);
+  const [title] = useState(initialTitle);
   const [sections, setSections] =
     useState<EstimatePositionSection[]>(normalizedInitialSections);
   const [multiOptionLinks, setMultiOptionLinks] = useState<
@@ -1150,7 +1163,7 @@ export function EstimatePositionTable({
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       setPositionModalState({ item, onSave });
     },
-    [],
+    [setPositionModalState],
   );
 
   function handleSave() {
@@ -1179,7 +1192,7 @@ export function EstimatePositionTable({
       }
 
       if (!result.ok) {
-        showFeedback({ type: "error", text: result.error });
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
@@ -1191,7 +1204,10 @@ export function EstimatePositionTable({
       );
       setSavedSnapshot(nextSnapshot);
       router.refresh();
-      showFeedback({ type: "success", text: "Tāmes pozīcija saglabāta." });
+      showFeedback({
+        type: "success",
+        text: t("estimate_position.feedback.saved", "Tāmes pozīcija saglabāta."),
+      });
     });
   }
 
@@ -1199,21 +1215,18 @@ export function EstimatePositionTable({
     <div className="max-w-full space-y-4">
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
-          {readOnly ? (
+          {readOnly && title.trim() ? (
             <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
               {title}
             </p>
           ) : (
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
-              aria-label="Bibliotēkas ieraksta nosaukums"
-            />
+            <div className="min-w-[12rem] flex-1" aria-hidden="true" />
           )}
           <p className="text-xs text-zinc-500">
-            {sections.length} tāmes pozīcijas · {lineItemCount} rindas
+            {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
+              sections: sections.length,
+              rows: lineItemCount,
+            })}
           </p>
           {!readOnly ? (
           <button
@@ -1223,7 +1236,7 @@ export function EstimatePositionTable({
             }
             className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
           >
-            + Tāmes pozīcija
+            {t("estimate.actions.add_section", "+ Tāmes pozīcija")}
           </button>
           ) : null}
         </div>
@@ -1279,7 +1292,7 @@ export function EstimatePositionTable({
           disabled={!isDirty || isSaving}
           className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSaving ? "Saglabā…" : "Saglabāt"}
+          {isSaving ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
         </button>
       </div>
       ) : null}

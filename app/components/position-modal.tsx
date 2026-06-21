@@ -14,6 +14,7 @@ import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-pick
 import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatAmountDisplay,
   roundToTwoDecimals,
@@ -86,6 +87,7 @@ export function PositionModal({
   moduleSizeOptions,
   estimateUnits = [],
 }: PositionModalProps) {
+  const { t } = useTranslations();
   const [draft, setDraft] = useState<EstimateLineItem>(() => prepareDraft(value));
   const [initialSnapshot, setInitialSnapshot] = useState(() =>
     snapshot(prepareDraft(value)),
@@ -220,26 +222,29 @@ export function PositionModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Pozīcija"
-      description="Definē nosaukumu, apjomu, laika normu, materiālus un mehānismus."
+      title={t("positions.modal.title", "Pozīcija")}
+      description={t(
+        "positions.modal.description",
+        "Definē nosaukumu, apjomu, laika normu, materiālus un mehānismus.",
+      )}
       panelMaxWidthClassName={appModalExtraWidePanelMaxWidthClassName}
       dirty={dirty}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-[minmax(0,1fr)_10rem] gap-3">
           <label className="block">
-            <span className={labelClassName}>Nosaukums</span>
+            <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
             <input
               type="text"
               value={draft.name}
               onChange={(event) => patch({ name: event.target.value })}
               className={inputClassName}
-              placeholder="piem. Sienas mūrēšana"
+              placeholder={t("positions.modal.name_placeholder", "piem. Sienas mūrēšana")}
               autoFocus
             />
           </label>
           <label className="block">
-            <span className={labelClassName}>Laika norma (c/h)</span>
+            <span className={labelClassName}>{t("estimate.time_norm", "Laika norma (c/h)")}</span>
             <LaborTimeNormInput
               value={draft.laborTimeNorm ?? 0}
               onChange={(laborTimeNorm) => patch({ laborTimeNorm })}
@@ -248,7 +253,9 @@ export function PositionModal({
             />
             {defaultHourlyRate != null ? (
               <span className="mt-1 block text-xs text-zinc-500">
-                Darbs = {formatAmountDisplay(defaultHourlyRate)} €/h
+                {t("estimate.labor_rate_display", "Darbs = {rate} €/h", {
+                  rate: formatAmountDisplay(defaultHourlyRate),
+                })}
               </span>
             ) : null}
           </label>
@@ -257,7 +264,7 @@ export function PositionModal({
         <div className="grid grid-cols-2 gap-3">
           {/* Materiāli */}
           <div>
-            <span className={labelClassName}>Materiāli</span>
+            <span className={labelClassName}>{t("estimate.column.materials", "Materiāli")}</span>
             <div className="space-y-1.5">
               {draftMaterials.map((mat, index) => {
                 const showConsumption =
@@ -278,7 +285,10 @@ export function PositionModal({
                           onChange={(consumption) =>
                             updateMaterialConsumption(index, consumption)
                           }
-                          aria-label={`Patēriņš ${mat.unit} uz ${positionUnit}`}
+                          aria-label={t("estimate.material_consumption.aria", "Patēriņš {unit} uz {positionUnit}", {
+                            unit: mat.unit,
+                            positionUnit: positionUnit ?? "",
+                          })}
                         />
                         <span className="text-xs text-zinc-400">
                           {mat.unit}/{positionUnit}
@@ -290,7 +300,7 @@ export function PositionModal({
                       </span>
                     )}
                     <IconActionButton
-                      label="Noņemt materiālu"
+                      label={t("estimate.materials.remove", "Noņemt materiālu")}
                       icon="fas fa-times"
                       variant="delete"
                       onClick={() => removeMaterial(index)}
@@ -306,14 +316,14 @@ export function PositionModal({
                 }}
                 catalogPositions={materialPositions}
                 defaultHourlyRate={defaultHourlyRate}
-                placeholder="Pievienot materiālu..."
+                placeholder={t("estimate.materials.add_placeholder", "Pievienot materiālu...")}
               />
             </div>
           </div>
 
           {/* Mehānismi */}
           <div>
-            <span className={labelClassName}>Mehānismi</span>
+            <span className={labelClassName}>{t("estimate.column.mechanisms", "Mehānismi")}</span>
             <div className="space-y-1.5">
               {draftMechanisms.map((mech, index) => (
                 <div
@@ -327,7 +337,7 @@ export function PositionModal({
                     {mech.unit}
                   </span>
                   <IconActionButton
-                    label="Noņemt mehānismu"
+                    label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
                     icon="fas fa-times"
                     variant="delete"
                     onClick={() => removeMechanism(index)}
@@ -342,7 +352,7 @@ export function PositionModal({
                 }}
                 catalogPositions={mechanismPositions}
                 defaultHourlyRate={defaultHourlyRate}
-                placeholder="Pievienot mehānismu..."
+                placeholder={t("estimate.mechanisms.add_placeholder", "Pievienot mehānismu...")}
               />
             </div>
           </div>
@@ -351,9 +361,9 @@ export function PositionModal({
         <dl className="grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-2.5 text-sm">
           {(
             [
-              ["Darbs", unitPrice.labor],
-              ["Materiāli", unitPrice.materials],
-              ["Mehānismi", unitPrice.mechanisms],
+              [t("estimate.column.labor", "Darbs"), unitPrice.labor],
+              [t("estimate.column.materials", "Materiāli"), unitPrice.materials],
+              [t("estimate.column.mechanisms", "Mehānismi"), unitPrice.mechanisms],
             ] as const
           ).map(([label, amount]) => (
             <div key={label}>
@@ -364,7 +374,7 @@ export function PositionModal({
             </div>
           ))}
           <div>
-            <dt className="text-xs text-zinc-500">Vienības cena</dt>
+            <dt className="text-xs text-zinc-500">{t("estimate.unit_price", "Vienības cena")}</dt>
             <dd className="font-semibold tabular-nums text-zinc-900">
               {formatAmountDisplay(unitTotal)}
             </dd>
@@ -394,7 +404,9 @@ export function PositionModal({
 
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
-            <span className={labelClassName}>Apjoms no moduļa lieluma</span>
+            <span className={labelClassName}>
+              {t("estimate.module_size.quantity_source", "Apjoms no moduļa lieluma")}
+            </span>
             {draft.moduleSizeAttachment ? (
               <AttachedModuleSizeLabel
                 attachment={draft.moduleSizeAttachment}
@@ -418,7 +430,7 @@ export function PositionModal({
             type="submit"
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700"
           >
-            Saglabāt
+            {t("actions.save", "Saglabāt")}
           </button>
         </ModalFormActions>
       </form>

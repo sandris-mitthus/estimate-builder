@@ -1,6 +1,7 @@
 import { CompanySettingsForm } from "@/app/components/company-settings-form";
 import { SectionPage } from "@/app/components/section-page";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
+import { getServerTranslations } from "@/app/lib/i18n/server";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 
 export default async function SettingsPage() {
@@ -9,12 +10,18 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const settings = await getCompanySettings();
+  const [{ t }, settings] = await Promise.all([
+    getServerTranslations(),
+    getCompanySettings(),
+  ]);
 
   return (
     <SectionPage
-      title="Uzstādījumi"
-      subtitle="Uzņēmuma dati tāmēs un piedāvājumos"
+      title={t("nav.settings", "Uzstādījumi")}
+      subtitle={t(
+        "settings.page.subtitle",
+        "Uzņēmuma dati tāmēs un piedāvājumos",
+      )}
     >
       <CompanySettingsForm initialSettings={settings} />
     </SectionPage>

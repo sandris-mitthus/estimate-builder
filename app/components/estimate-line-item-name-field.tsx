@@ -18,6 +18,7 @@ import {
 } from "@/app/lib/positions/apply-catalog-to-line-item";
 import { getVisiblePositions } from "@/app/lib/positions/filter-positions";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
+import { useTranslations } from "@/app/components/translations-provider";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 type DropdownRect = {
@@ -77,10 +78,12 @@ export function EstimateLineItemNameField({
   currency = null,
   excludedCatalogKeys = EMPTY_EXCLUDED_CATALOG_KEYS,
   className,
-  placeholder = "Meklēt pozīciju katalogā",
+  placeholder,
   readOnly = false,
   footer,
 }: EstimateLineItemNameFieldProps) {
+  const { t } = useTranslations();
+  const resolvedPlaceholder = placeholder ?? t("positions.search_catalog_placeholder", "Meklēt pozīciju katalogā");
   const compact = footer != null;
   const excludedKeysFingerprint = excludedCatalogKeysFingerprint(
     excludedCatalogKeys,
@@ -110,6 +113,8 @@ export function EstimateLineItemNameField({
   const suggestions = getVisiblePositions(
     availableCatalogPositions,
     value,
+    "all",
+    t,
   ).slice(0, 30);
 
   function updateDropdownRect() {
@@ -176,6 +181,8 @@ export function EstimateLineItemNameField({
     const nextSuggestions = getVisiblePositions(
       availableCatalogPositions,
       nextValue,
+      "all",
+      t,
     );
     setOpen(nextSuggestions.length > 0);
   }
@@ -292,7 +299,7 @@ export function EstimateLineItemNameField({
         ref={inputRef}
         rows={compact ? 1 : 2}
         value={value}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         autoComplete="off"
         role="combobox"
         aria-expanded={open}

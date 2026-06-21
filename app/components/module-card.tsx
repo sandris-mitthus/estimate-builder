@@ -7,6 +7,7 @@ import {
   isPlainPrimaryNavigationClick,
   useOptionalNavigationLoading,
 } from "@/app/components/navigation-loading-context";
+import { useTranslations } from "@/app/components/translations-provider";
 import type { BuildingModuleSummary } from "@/app/lib/modules/types";
 
 const cardClassName =
@@ -14,6 +15,7 @@ const cardClassName =
 
 export function ModuleCard({ module }: { module: BuildingModuleSummary }) {
   const navigationLoading = useOptionalNavigationLoading();
+  const { t } = useTranslations();
   const moduleHref = `/modules/${module.id}`;
 
   return (
@@ -27,7 +29,7 @@ export function ModuleCard({ module }: { module: BuildingModuleSummary }) {
               return;
             }
 
-            navigationLoading?.beginNavigation(moduleHref, "Ielādē moduli…");
+            navigationLoading?.beginNavigation(moduleHref, t("modules.loading", "Ielādē moduli…"));
           }}
         >
           <div className="flex min-w-0 items-center gap-2">
