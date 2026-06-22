@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.36` (see [Changelog](#changelog))
+**Current version:** `1.3.37` (see [Changelog](#changelog))
 
 ---
 
@@ -23,7 +23,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 ### Multi-company users, groups and permissions
 
 - **Sistēmas administrators** — globāls profils `public.users.is_admin`; top menu pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Sistēmas uzstādījumi**, **Grupas**, **Valodas**, **Tulkojumi**) un slēpj uzņēmuma izvēlni
-- **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_settings`, `/site_user_groups`, `/site_languages`, `/site_translations`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown top barā
+- **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_settings`, `/site_user_groups`, `/site_languages`, `/site_translations`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown top barā; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
@@ -371,6 +371,12 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.37
+
+**System admin access redirect**
+
+- Redirected signed-in non-admin users from system admin pages back to `/` instead of showing a 404
 
 ### v1.3.36
 
