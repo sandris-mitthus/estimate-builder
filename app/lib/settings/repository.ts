@@ -91,6 +91,33 @@ export async function getCompanySettings(): Promise<CompanySettings> {
   return mapRow(data as CompanySettingsRow);
 }
 
+export async function getCompanyDisplayName(): Promise<string> {
+  if (!isSupabaseAdminConfigured()) {
+    return DEFAULT_COMPANY_SETTINGS.companyName;
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return "";
+  }
+
+  const supabase = createAdminClient();
+  const [{ data: settings }, { data: company }] = await Promise.all([
+    supabase
+      .from("company_settings")
+      .select("company_name")
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    supabase.from("companies").select("name").eq("id", companyId).maybeSingle(),
+  ]);
+
+  return (
+    (typeof settings?.company_name === "string" && settings.company_name.trim()) ||
+    (typeof company?.name === "string" && company.name.trim()) ||
+    ""
+  );
+}
+
 export async function saveCompanySettings(
   settings: CompanySettings,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

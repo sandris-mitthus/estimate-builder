@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.39` (see [Changelog](#changelog))
+**Current version:** `1.3.40` (see [Changelog](#changelog))
 
 ---
 
@@ -17,7 +17,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - OAuth fallback in `proxy.ts` / `update-session.ts` redirects provider returns from `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still completes the session
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
-- **Top nav (right):** signed-in user avatar, name, and sign-out button
+- **Top nav (right):** signed-in user avatar, name, active company name under the user name for non-system-admin users, and sign-out button
 - **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas pēc lapas parādīšanas caur `/api/assigned-materials`, lai sākotnējā SSR navigācija negaida smagos materiālu vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers`); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
 
 ### Multi-company users, groups and permissions
@@ -371,6 +371,12 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.40
+
+**Company name in top navigation**
+
+- Shows the active company name under the signed-in user name in the top menu for non-system-admin users
 
 ### v1.3.39
 

@@ -17,6 +17,7 @@ import {
   listSiteLanguages,
 } from "@/app/lib/site-admin/repository";
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
+import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
@@ -45,6 +46,7 @@ export default async function ProtectedLayout({
 }>) {
   let currentUser = null;
   let currentUserId: string | null = null;
+  let companyName: string | null = null;
   let allowedNavKeys: NavPermissionKey[] | null = null;
   let actionPermissions = createFullPermissions(true).actions;
   let isSystemAdmin = false;
@@ -93,6 +95,10 @@ export default async function ProtectedLayout({
         .map(([key]) => key as NavPermissionKey);
       allowedNavKeys = navKeys.length > 0 ? navKeys : null;
     }
+
+    if (!isSystemAdmin) {
+      companyName = await getCompanyDisplayName();
+    }
   } else if (process.env.NODE_ENV === "production") {
     activeLanguageCode = await getAnonymousActiveLanguageCode(languages);
     translations = await getSiteTranslationDictionary(activeLanguageCode);
@@ -120,6 +126,7 @@ export default async function ProtectedLayout({
       >
         <AppNav
           currentUser={currentUser}
+          companyName={companyName}
           allowedNavKeys={allowedNavKeys}
           isSystemAdmin={isSystemAdmin}
           languages={languages}

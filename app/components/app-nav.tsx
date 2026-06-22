@@ -224,10 +224,12 @@ function LanguageSelector({
 
 function NavUserSection({
   user,
+  companyName,
   languages,
   activeLanguageCode,
 }: {
   user: UserDisplay;
+  companyName?: string | null;
   languages: SiteLanguageSummary[];
   activeLanguageCode: string;
 }) {
@@ -252,8 +254,13 @@ function NavUserSection({
       />
       <div className="hidden items-center gap-2.5 sm:flex">
         <UserAvatar avatarUrl={user.avatarUrl} name={user.name} size="xs" />
-        <span className="max-w-[140px] truncate text-sm text-zinc-700">
-          {user.name}
+        <span className="flex min-w-0 max-w-[170px] flex-col leading-tight">
+          <span className="truncate text-sm text-zinc-700">{user.name}</span>
+          {companyName ? (
+            <span className="truncate text-[11px] text-zinc-400">
+              {companyName}
+            </span>
+          ) : null}
         </span>
       </div>
       <div className="sm:hidden">
@@ -276,6 +283,7 @@ function NavUserSection({
 
 type AppNavProps = {
   currentUser?: UserDisplay | null;
+  companyName?: string | null;
   allowedNavKeys?: NavPermissionKey[] | null;
   isSystemAdmin?: boolean;
   languages?: SiteLanguageSummary[];
@@ -284,6 +292,7 @@ type AppNavProps = {
 
 export function AppNav({
   currentUser = null,
+  companyName = null,
   allowedNavKeys = null,
   isSystemAdmin = false,
   languages = [],
@@ -365,6 +374,7 @@ export function AppNav({
           <div className="flex shrink-0 items-center gap-2 self-center border-l border-zinc-200 pl-2 md:gap-2.5 md:pl-3">
             <NavUserSection
               user={currentUser}
+              companyName={companyName}
               languages={languages}
               activeLanguageCode={activeLanguageCode}
             />
