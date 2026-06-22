@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import {
@@ -20,36 +21,39 @@ export type ServerTranslations = {
   t: (key: string, fallback?: string, params?: TranslationParams) => string;
 };
 
-export async function getServerTranslations(): Promise<ServerTranslations> {
-  let languageCode = "lv";
+export const getServerTranslations = cache(
+  async function getServerTranslations(): Promise<ServerTranslations> {
+    let languageCode = "lv";
 
-  if (isSupabaseAdminConfigured()) {
-    const user = await getCurrentUser();
-    if (user) {
-      languageCode = await getUserActiveLanguageCode(user.id);
-    } else {
-      const [languages, defaultCode, cookieStore] = await Promise.all([
-        listSiteLanguages({ activeOnly: true }),
-        getDefaultSiteLanguageCode(),
-        cookies(),
-      ]);
-      const activeCodes = new Set(languages.map((language) => language.code));
-      const cookieCode =
-        cookieStore.get(ANONYMOUS_LANGUAGE_COOKIE)?.value?.trim() ?? "";
+    if (isSupabaseAdminConfigured()) {
+      const user = await getCurrentUser();
+      if (user) {
+        languageCode = await getUserActiveLanguageCode(user.id);
+      } else {
+        const [languages, defaultCode, cookieStore] = await Promise.all([
+          listSiteLanguages({ activeOnly: true }),
+          getDefaultSiteLanguageCode(),
+          cookies(),
+        ]);
+        const activeCodes = new Set(languages.map((language) => language.code));
+        const cookieCode =
+          cookieStore.get(ANONYMOUS_LANGUAGE_COOKIE)?.value?.trim() ?? "";
 
-      languageCode = activeCodes.has(cookieCode)
-        ? cookieCode
-        : activeCodes.has(defaultCode)
-          ? defaultCode
-          : (languages[0]?.code ?? "lv");
+        languageCode = activeCodes.has(cookieCode)
+          ? cookieCode
+          : activeCodes.has(defaultCode)
+            ? defaultCode
+            : (languages[0]?.code ?? "lv");
+      }
     }
-  }
 
-  const translations = await getSiteTranslationDictionary(languageCode);
+    const translations = await getSiteTranslationDictionary(languageCode);
 
-  return {
-    languageCode,
-    translations,
-    t: (key, fallback, params) => translateText(translations, key, fallback, params),
-  };
-}
+    return {
+      languageCode,
+      translations,
+      t: (key, fallback, params) =>
+        translateText(translations, key, fallback, params),
+    };
+  },
+);

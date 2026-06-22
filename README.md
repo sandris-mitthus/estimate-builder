@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.35` (see [Changelog](#changelog))
+**Current version:** `1.3.36` (see [Changelog](#changelog))
 
 ---
 
@@ -18,7 +18,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - Protected app routes under `app/(protected)/`; OAuth callback at `/auth/callback`
 - Session refresh via `proxy.ts` on every request
 - **Top nav (right):** signed-in user avatar, name, and sign-out button
-- **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas atsevišķā `Suspense` slotā, lai menu/lapas pārslēgšana negaida smagos materiālu vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers` vārds layoutā); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
+- **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas pēc lapas parādīšanas caur `/api/assigned-materials`, lai sākotnējā SSR navigācija negaida smagos materiālu vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers`); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
 
 ### Multi-company users, groups and permissions
 
@@ -107,7 +107,7 @@ English routes, Latvian labels:
 - Falls back to in-memory sample data only when Supabase is **not** configured (configured DB with zero projects shows empty list, not seed cards)
 - **Multi-company scoping** — projects, estimates, settings, modules, position prices/history, sagatave, excluded positions and private storage assets are scoped by active `company_id`
 - **Company access** — `public.users.is_admin` marks system admins; `company_users` controls company membership/status; `company_user_groups` + `company_group_members` control per-company permissions
-- **System admin data** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits
+- **System admin data** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits; request-level caches prevent duplicate translation/admin checks during one SSR render
 - Estimate **full state** (title, meta, categories with baked-in prices) persisted via **Saglabāt tāmi** server action; dates also auto-saved on change
 - `npm run db:migrate` applies only **pending** migrations (tracked in `public.schema_migrations`)
 - App tables use **service-role server access** with RLS deny policies for browser clients
@@ -371,6 +371,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.36
+
+**Protected navigation performance**
+
+- Moved the assigned-materials banner out of blocking protected layout SSR and into a post-load `/api/assigned-materials` fetch
+- Added request-level caching for server translations and system-admin checks to reduce duplicate Supabase calls during one render
+- Kept the existing assigned-materials banner UX while preventing heavy project/estimate/catalog reads from delaying unrelated protected pages
 
 ### v1.3.35
 

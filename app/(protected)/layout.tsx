@@ -1,18 +1,13 @@
-import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { ActionPermissionsProvider } from "@/app/components/action-permissions-context";
 import { AppNav } from "@/app/components/app-nav";
-import { AssignedMaterialsBanner } from "@/app/components/assigned-materials-banner";
+import { AssignedMaterialsBannerLoader } from "@/app/components/assigned-materials-banner-loader";
 import { LoginGate } from "@/app/components/login-gate";
 import { TranslationsProvider } from "@/app/components/translations-provider";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
-import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
 import { getCurrentUserAccess } from "@/app/lib/auth/require-permission";
 import { createFullPermissions } from "@/app/lib/auth/permissions";
-import { listUserAssignedMaterialGroups } from "@/app/lib/projects/list-user-assigned-materials";
-import { listPositionPrices } from "@/app/lib/positions/repository";
-import { getCompanySettings } from "@/app/lib/settings/repository";
 import {
   getDefaultSiteLanguageCode,
   DEFAULT_SITE_LANGUAGES,
@@ -23,10 +18,8 @@ import {
 } from "@/app/lib/site-admin/repository";
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
-import { listUsers } from "@/app/lib/users/repository";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
-import type { UserDisplay } from "@/app/lib/auth/map-user-display";
 
 export const dynamic = "force-dynamic";
 
@@ -43,51 +36,6 @@ async function getAnonymousActiveLanguageCode(
 
   const defaultCode = await getDefaultSiteLanguageCode();
   return activeCodes.has(defaultCode) ? defaultCode : (languages[0]?.code ?? "lv");
-}
-
-async function AssignedMaterialsBannerSlot({
-  currentUser,
-  currentUserId,
-}: {
-  currentUser: UserDisplay;
-  currentUserId: string;
-}) {
-  const [allUsers, catalogPositions, companySettings] = await Promise.all([
-    listUsers(),
-    listPositionPrices(),
-    getCompanySettings(),
-  ]);
-  const currentUserFromList = allUsers.find(
-    (listedUser) => listedUser.id === currentUserId,
-  );
-  const groups = await listUserAssignedMaterialGroups(currentUserId, {
-    relatedUserIds: resolveRelatedUserIds(
-      currentUserId,
-      currentUserFromList?.name ?? currentUser.name,
-      allUsers,
-    ),
-    allUsers,
-    catalogPositions,
-  });
-
-  if (groups.length === 0) {
-    return null;
-  }
-
-  return (
-    <AssignedMaterialsBanner
-      groups={groups}
-      catalogPositions={catalogPositions}
-      currency={companySettings.currency}
-      currentUser={{
-        id: currentUserId,
-        name: currentUser.name,
-        email: "",
-        avatarUrl: currentUser.avatarUrl,
-        companyStatus: "active",
-      }}
-    />
-  );
 }
 
 export default async function ProtectedLayout({
@@ -177,14 +125,7 @@ export default async function ProtectedLayout({
           languages={languages}
           activeLanguageCode={activeLanguageCode}
         />
-        {currentUser && currentUserId ? (
-          <Suspense fallback={null}>
-            <AssignedMaterialsBannerSlot
-              currentUser={currentUser}
-              currentUserId={currentUserId}
-            />
-          </Suspense>
-        ) : null}
+        {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
         {children}
       </TranslationsProvider>
     </ActionPermissionsProvider>

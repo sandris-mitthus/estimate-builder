@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -18,7 +19,9 @@ function mapAuthUserProfile(user: User) {
   };
 }
 
-export async function isSystemAdminUser(user: User): Promise<boolean> {
+export const isSystemAdminUser = cache(async function isSystemAdminUser(
+  user: User,
+): Promise<boolean> {
   if (!isSupabaseAdminConfigured()) {
     return false;
   }
@@ -51,4 +54,4 @@ export async function isSystemAdminUser(user: User): Promise<boolean> {
   }
 
   return false;
-}
+});
