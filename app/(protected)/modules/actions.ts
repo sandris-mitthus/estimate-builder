@@ -48,6 +48,7 @@ export async function updateBuildingModuleAction(input: UpdateBuildingModuleInpu
 
   if (result.ok) {
     revalidateModules();
+    revalidateModuleDetail(input.id);
   }
 
   return result;

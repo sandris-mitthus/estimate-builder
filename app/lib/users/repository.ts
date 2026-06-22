@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js";
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -7,33 +6,32 @@ import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { SAMPLE_USERS } from "@/app/lib/users/sample-users";
 import type { UserSummary } from "@/app/lib/users/types";
 
-async function mapAuthUser(
-  user: User,
-  supabase: ReturnType<typeof createAdminClient>,
-  companyStatus: UserSummary["companyStatus"] = "active",
-): Promise<UserSummary> {
-  const { name } = mapUserDisplay(user);
-  let avatarUrl = resolveAvatarUrl(user);
-
-  // listUsers bieži neatgriež pilnu identity_data — ielādē lietotāju atsevišķi.
-  if (!avatarUrl) {
-    const { data } = await supabase.auth.admin.getUserById(user.id);
-    if (data.user) {
-      avatarUrl = resolveAvatarUrl(data.user);
-    }
-  }
-
-  return {
-    id: user.id,
-    name,
-    email: user.email ?? "—",
-    avatarUrl,
-    companyStatus,
-  };
-}
+type UserProfileRow = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  avatar_url: string | null;
+};
 
 function normalizeCompanyStatus(value: unknown): UserSummary["companyStatus"] {
   return value === "invited" || value === "disabled" ? value : "active";
+}
+
+function mapUserProfile(
+  row: UserProfileRow | undefined,
+  userId: string,
+  companyStatus: UserSummary["companyStatus"],
+): UserSummary {
+  const email = row?.email?.trim() || "—";
+  const name = row?.name?.trim() || (email !== "—" ? email.split("@")[0] : "—");
+
+  return {
+    id: userId,
+    name,
+    email,
+    avatarUrl: row?.avatar_url?.trim() || null,
+    companyStatus,
+  };
 }
 
 export async function listUsers(): Promise<UserSummary[]> {
@@ -62,30 +60,30 @@ export async function listUsers(): Promise<UserSummary[]> {
       normalizeCompanyStatus(membership.status),
     ]),
   );
+  const userIds = Array.from(companyStatusByUserId.keys());
 
-  const { data, error } = await supabase.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-
-  if (error) {
+  if (userIds.length === 0) {
     return [];
   }
 
-  if (!data.users.length) {
+  const { data: profiles, error: profilesError } = await supabase
+    .from("users")
+    .select("id, email, name, avatar_url")
+    .in("id", userIds);
+
+  if (profilesError || !profiles) {
     return [];
   }
 
-  const users = await Promise.all(
-    data.users
-      .filter((user) => companyStatusByUserId.has(user.id))
-      .map((user) =>
-        mapAuthUser(
-          user,
-          supabase,
-          companyStatusByUserId.get(user.id) ?? "active",
-        ),
-      ),
+  const profileByUserId = new Map(
+    (profiles as UserProfileRow[]).map((profile) => [profile.id, profile]),
+  );
+  const users = userIds.map((userId) =>
+    mapUserProfile(
+      profileByUserId.get(userId),
+      userId,
+      companyStatusByUserId.get(userId) ?? "active",
+    ),
   );
 
   return users.sort((a, b) => a.name.localeCompare(b.name, "lv"));

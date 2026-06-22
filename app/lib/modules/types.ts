@@ -17,6 +17,7 @@ export type ModuleOutline = ModuleOutlineCategory[];
 export type BuildingModuleSummary = {
   id: string;
   name: string;
+  note: string;
   moduleDataComplete: boolean;
 };
 
@@ -58,6 +59,7 @@ export type UpdateBuildingModuleBlocksInput = {
 
 export type CreateBuildingModuleInput = {
   name: string;
+  note?: string;
 };
 
 export type UpdateBuildingModuleInput = CreateBuildingModuleInput & {

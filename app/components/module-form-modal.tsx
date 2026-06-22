@@ -26,7 +26,9 @@ export function ModuleFormModal({
 }: ModuleFormModalProps) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [note, setNote] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
+  const [noteError, setNoteError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { t } = useTranslations();
@@ -35,13 +37,16 @@ export function ModuleFormModal({
     if (!open) return;
 
     setName(module.name);
+    setNote(module.note);
     setNameError(undefined);
+    setNoteError(undefined);
     setError(null);
   }, [open, module]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && !isPending) {
       setNameError(undefined);
+      setNoteError(undefined);
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -56,15 +61,28 @@ export function ModuleFormModal({
       return;
     }
 
+    if (note.trim().length > 255) {
+      setNoteError(
+        t(
+          "modules.validation.note_too_long",
+          "Piezīme nedrīkst būt garāka par 255 zīmēm.",
+        ),
+      );
+      return;
+    }
+
     startTransition(async () => {
       const result = await updateBuildingModuleAction({
         id: module.id,
         name: name.trim(),
+        note: note.trim(),
       });
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
           setNameError(translateActionError(t, result));
+        } else if (result.error === "Piezīme nedrīkst būt garāka par 255 zīmēm.") {
+          setNoteError(translateActionError(t, result));
         } else {
           setError(translateActionError(t, result));
         }
@@ -83,7 +101,7 @@ export function ModuleFormModal({
       title={t("modules.edit.title", "Labot moduli")}
       description={t("modules.create.description", "Ievadi moduļa nosaukumu")}
       blocking={isPending}
-      dirty={name !== module.name}
+      dirty={name !== module.name || note !== module.note}
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <label htmlFor="module-edit-name" className="block">
@@ -107,6 +125,33 @@ export function ModuleFormModal({
           {nameError ? (
             <p id="module-edit-name-error" className="mt-1 text-sm text-red-600" role="alert">
               {nameError}
+            </p>
+          ) : null}
+        </label>
+
+        <label htmlFor="module-edit-note" className="block">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            {t("common.note", "Piezīme")}
+          </span>
+          <input
+            id="module-edit-note"
+            name="module-edit-note"
+            type="text"
+            value={note}
+            maxLength={255}
+            placeholder={t("modules.note.placeholder", "Piemēram: Spogulis")}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setNoteError(undefined);
+              setError(null);
+            }}
+            className={`${formInputFullWidthClass} ${formInputClassName(Boolean(noteError))}`}
+            aria-invalid={Boolean(noteError)}
+            aria-describedby={noteError ? "module-edit-note-error" : undefined}
+          />
+          {noteError ? (
+            <p id="module-edit-note-error" className="mt-1 text-sm text-red-600" role="alert">
+              {noteError}
             </p>
           ) : null}
         </label>

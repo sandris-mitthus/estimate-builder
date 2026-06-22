@@ -32,11 +32,18 @@ export function ModuleCard({ module }: { module: BuildingModuleSummary }) {
             navigationLoading?.beginNavigation(moduleHref, t("modules.loading", "Ielādē moduli…"));
           }}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="min-w-0 text-base font-semibold text-zinc-900 group-hover:text-zinc-700">
-              {module.name}
-            </p>
-            {!module.moduleDataComplete ? <ModuleMissingDataIcon /> : null}
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="min-w-0 text-base font-semibold text-zinc-900 group-hover:text-zinc-700">
+                {module.name}
+              </p>
+              {!module.moduleDataComplete ? <ModuleMissingDataIcon /> : null}
+            </div>
+            {module.note ? (
+              <p className="-mt-0.5 text-[0.7875rem] leading-5 text-zinc-500">
+                {module.note}
+              </p>
+            ) : null}
           </div>
         </Link>
 

@@ -520,8 +520,13 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
   if (!project) return null;
 
   const companySettings = await getCompanySettings();
-  const validityDays = companySettings.estimateValidityDays;
+  return getProjectEstimateForProject(project, companySettings.estimateValidityDays);
+}
 
+export async function getProjectEstimateForProject(
+  project: ProjectSummary,
+  validityDays: number,
+): Promise<ProjectEstimate | null> {
   if (!isSupabaseAdminConfigured()) {
     return defaultEstimateForProject(project, validityDays);
   }
@@ -535,7 +540,7 @@ export async function getProjectEstimate(id: string): Promise<ProjectEstimate | 
   const { data, error } = await supabase
     .from("estimates")
     .select("title, meta, categories, updated_at")
-    .eq("project_id", id)
+    .eq("project_id", project.id)
     .eq("company_id", companyId)
     .maybeSingle();
 

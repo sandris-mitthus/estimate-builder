@@ -10,7 +10,10 @@ import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repo
 import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
-import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
+import {
+  getProject,
+  getProjectEstimateForProject,
+} from "@/app/lib/projects/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { listUsers } from "@/app/lib/users/repository";
@@ -30,7 +33,6 @@ export default async function ProjectDetailPage({
   const { t } = await getServerTranslations();
   const [
     project,
-    estimate,
     modules,
     companySettings,
     catalogPositions,
@@ -39,7 +41,6 @@ export default async function ProjectDetailPage({
     users,
   ] = await Promise.all([
     getProject(id),
-    getProjectEstimate(id),
     listBuildingModules(),
     getCompanySettings(),
     listPositionPrices(),
@@ -48,7 +49,16 @@ export default async function ProjectDetailPage({
     listUsers(),
   ]);
 
-  if (!project || !estimate) {
+  if (!project) {
+    notFound();
+  }
+
+  const estimate = await getProjectEstimateForProject(
+    project,
+    companySettings.estimateValidityDays,
+  );
+
+  if (!estimate) {
     notFound();
   }
 

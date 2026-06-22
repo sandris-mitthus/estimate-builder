@@ -31,19 +31,31 @@ import { isMissingColumnError } from "@/app/lib/supabase/missing-column";
 type BuildingModuleRow = {
   id: string;
   name: string;
+  note?: string | null;
   outline?: unknown;
   visualization_blocks?: unknown;
   project_blocks?: unknown;
   project_description?: unknown;
+  module_data_complete?: boolean | null;
 };
 
 function mapBuildingModuleSummary(row: BuildingModuleRow): BuildingModuleSummary {
+  if (typeof row.module_data_complete === "boolean") {
+    return {
+      id: row.id,
+      name: row.name,
+      note: row.note?.trim() ?? "",
+      moduleDataComplete: row.module_data_complete,
+    };
+  }
+
   const visualizationBlocks = parseModuleContentBlocks(row.visualization_blocks);
   const projectBlocks = parseModuleContentBlocks(row.project_blocks);
 
   return {
     id: row.id,
     name: row.name,
+    note: row.note?.trim() ?? "",
     moduleDataComplete: isBuildingModuleDataComplete({
       visualizationBlocks,
       projectBlocks,
@@ -88,6 +100,18 @@ function validateName(name: string): string | null {
   return null;
 }
 
+function normalizeNote(note: string | undefined): string {
+  return note?.trim() ?? "";
+}
+
+function validateNote(note: string): string | null {
+  if (note.length > 255) {
+    return "Piezīme nedrīkst būt garāka par 255 zīmēm.";
+  }
+
+  return null;
+}
+
 export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
   if (!isSupabaseAdminConfigured()) {
     return SAMPLE_BUILDING_MODULES;
@@ -101,7 +125,7 @@ export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, visualization_blocks, project_blocks")
+    .select("id, name, note, module_data_complete")
     .eq("company_id", companyId)
     .order("name", { ascending: true });
 
@@ -127,7 +151,7 @@ export async function listBuildingModuleSizeOptions(): Promise<
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, project_description")
+    .select("id, name, note, project_description")
     .eq("company_id", companyId)
     .order("name", { ascending: true });
 
@@ -173,7 +197,7 @@ export async function getBuildingModule(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, outline, visualization_blocks, project_blocks, project_description")
+    .select("id, name, note, outline, visualization_blocks, project_blocks, project_description")
     .eq("id", id)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -185,7 +209,7 @@ export async function getBuildingModule(
   if (error && isMissingColumnError(error, "project_description")) {
     const legacy = await supabase
       .from("building_modules")
-      .select("id, name, outline, visualization_blocks, project_blocks")
+      .select("id, name, note, outline, visualization_blocks, project_blocks")
       .eq("id", id)
       .eq("company_id", companyId)
       .maybeSingle();
@@ -208,10 +232,16 @@ export async function createBuildingModule(
   input: CreateBuildingModuleInput,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const name = input.name.trim();
+  const note = normalizeNote(input.note);
   const validationError = validateName(name);
 
   if (validationError) {
     return { ok: false, error: validationError };
+  }
+
+  const noteError = validateNote(note);
+  if (noteError) {
+    return { ok: false, error: noteError };
   }
 
   if (!isSupabaseAdminConfigured()) {
@@ -226,7 +256,7 @@ export async function createBuildingModule(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .insert({ company_id: companyId, name })
+    .insert({ company_id: companyId, name, note })
     .select("id")
     .single();
 
@@ -241,10 +271,16 @@ export async function updateBuildingModule(
   input: UpdateBuildingModuleInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const name = input.name.trim();
+  const note = normalizeNote(input.note);
   const validationError = validateName(name);
 
   if (validationError) {
     return { ok: false, error: validationError };
+  }
+
+  const noteError = validateNote(note);
+  if (noteError) {
+    return { ok: false, error: noteError };
   }
 
   if (!isSupabaseAdminConfigured()) {
@@ -259,7 +295,7 @@ export async function updateBuildingModule(
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("building_modules")
-    .update({ name })
+    .update({ name, note })
     .eq("id", input.id)
     .eq("company_id", companyId);
 

@@ -21,13 +21,17 @@ export function AddModuleButton() {
   const { t } = useTranslations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [note, setNote] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
+  const [noteError, setNoteError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function resetForm() {
     setName("");
+    setNote("");
     setNameError(undefined);
+    setNoteError(undefined);
     setError(null);
   }
 
@@ -48,14 +52,30 @@ export function AddModuleButton() {
       return;
     }
 
+    if (note.trim().length > 255) {
+      setNoteError(
+        t(
+          "modules.validation.note_too_long",
+          "Piezīme nedrīkst būt garāka par 255 zīmēm.",
+        ),
+      );
+      return;
+    }
+
     setNameError(undefined);
+    setNoteError(undefined);
 
     startTransition(async () => {
-      const result = await createBuildingModuleAction({ name: name.trim() });
+      const result = await createBuildingModuleAction({
+        name: name.trim(),
+        note: note.trim(),
+      });
 
       if (!result.ok) {
         if (result.error === "Ievadi nosaukumu.") {
           setNameError(t("validation.name_required", result.error));
+        } else if (result.error === "Piezīme nedrīkst būt garāka par 255 zīmēm.") {
+          setNoteError(translateActionError(t, result));
         } else {
           setError(translateActionError(t, result));
         }
@@ -92,7 +112,7 @@ export function AddModuleButton() {
         title={t("modules.create.title", "Pievienot moduli")}
         description={t("modules.create.description", "Ievadi moduļa nosaukumu")}
         blocking={isPending}
-        dirty={name.trim().length > 0}
+        dirty={name.trim().length > 0 || note.trim().length > 0}
       >
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
           <label htmlFor="module-name" className="block">
@@ -117,6 +137,33 @@ export function AddModuleButton() {
             {nameError ? (
               <p id="module-name-error" className="mt-1 text-sm text-red-600" role="alert">
                 {nameError}
+              </p>
+            ) : null}
+          </label>
+
+          <label htmlFor="module-note" className="block">
+            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+              {t("common.note", "Piezīme")}
+            </span>
+            <input
+              id="module-note"
+              name="module-note"
+              type="text"
+              value={note}
+              maxLength={255}
+              placeholder={t("modules.note.placeholder", "Piemēram: Spogulis")}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setNoteError(undefined);
+                setError(null);
+              }}
+              className={`${formInputFullWidthClass} ${formInputClassName(Boolean(noteError))}`}
+              aria-invalid={Boolean(noteError)}
+              aria-describedby={noteError ? "module-note-error" : undefined}
+            />
+            {noteError ? (
+              <p id="module-note-error" className="mt-1 text-sm text-red-600" role="alert">
+                {noteError}
               </p>
             ) : null}
           </label>
