@@ -5,10 +5,16 @@ function hasDimension(value: string): boolean {
 }
 
 function hasOpeningData(
-  entries: ReadonlyArray<{ heightM: string; widthM: string; count: string }>,
+  entries: ReadonlyArray<{
+    mark?: string;
+    heightM: string;
+    widthM: string;
+    count: string;
+  }>,
 ): boolean {
   return entries.some(
     (entry) =>
+      hasDimension(entry.mark ?? "") ||
       hasDimension(entry.heightM) ||
       hasDimension(entry.widthM) ||
       entry.count.trim().replace(/\D/g, "").length > 0,

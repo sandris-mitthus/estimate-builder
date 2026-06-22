@@ -135,6 +135,30 @@ function CountInput({
   );
 }
 
+function MarkInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      maxLength={40}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${formInputFullWidthClass} ${formInputClassName()}`}
+    />
+  );
+}
+
 function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <h3 className="border-b border-zinc-100 pb-2 text-sm font-semibold text-zinc-900">
@@ -225,6 +249,7 @@ function OpeningRow({
   entry,
   index,
   prefix,
+  markPlaceholder,
   onChange,
   onDelete,
   extra,
@@ -232,6 +257,7 @@ function OpeningRow({
   entry: OpeningEntry;
   index: number;
   prefix: string;
+  markPlaceholder: string;
   onChange: (next: OpeningEntry) => void;
   onDelete: () => void;
   extra?: ReactNode;
@@ -253,7 +279,16 @@ function OpeningRow({
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Field label={t("project_description.field.mark", "Marka")} id={`${prefix}-mark-${entry.id}`}>
+          <MarkInput
+            id={`${prefix}-mark-${entry.id}`}
+            value={entry.mark}
+            onChange={(mark) => onChange({ ...entry, mark })}
+            placeholder={markPlaceholder}
+          />
+        </Field>
+
         <Field label={t("project_description.field.height_m", "Augstums (m)")} id={`${prefix}-height-${entry.id}`}>
           <DimensionInput
             id={`${prefix}-height-${entry.id}`}
@@ -1081,6 +1116,7 @@ export function ModuleProjectDescriptionForm({
                   entry={entry}
                   index={index}
                   prefix="logu"
+                  markPlaceholder="L1"
                   onChange={(next) =>
                     updateWindows(
                       form.windows.map((item) => (item.id === entry.id ? next : item)),
@@ -1119,6 +1155,7 @@ export function ModuleProjectDescriptionForm({
                   entry={entry}
                   index={index}
                   prefix="durvju"
+                  markPlaceholder="D2"
                   onChange={(next) =>
                     updateDoors(
                       form.doors.map((item) =>

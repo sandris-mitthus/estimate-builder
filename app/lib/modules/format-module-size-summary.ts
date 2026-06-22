@@ -154,6 +154,7 @@ function hasCrossSectionData(entry: FoundationCrossSectionEntry): boolean {
 
 function hasOpeningData(entry: OpeningEntry): boolean {
   return (
+    hasDimension(entry.mark) ||
     hasDimension(entry.heightM) ||
     hasDimension(entry.widthM) ||
     entry.count.trim().replace(/\D/g, "").length > 0
@@ -377,7 +378,8 @@ function buildWindowsSection(
 
   activeWindows.forEach((entry, index) => {
     const prefix = `windows.${index}`;
-    const labelPrefix = `Logu veids ${index + 1}`;
+    const labelPrefix = entry.mark.trim() || `Logu veids ${index + 1}`;
+    pushText(items, `${prefix}.mark`, `${labelPrefix} — marka`, entry.mark);
     pushInput(items, `${prefix}.height`, `${labelPrefix} — augstums (m)`, entry.heightM, "m");
     pushInput(items, `${prefix}.width`, `${labelPrefix} — platums (m)`, entry.widthM, "m");
     pushCount(items, `${prefix}.count`, `${labelPrefix} — skaits`, entry.count);
@@ -399,7 +401,8 @@ function buildDoorsSection(
 
   activeDoors.forEach((entry, index) => {
     const prefix = `doors.${index}`;
-    const labelPrefix = `Durvju veids ${index + 1}`;
+    const labelPrefix = entry.mark.trim() || `Durvju veids ${index + 1}`;
+    pushText(items, `${prefix}.mark`, `${labelPrefix} — marka`, entry.mark);
     pushInput(items, `${prefix}.height`, `${labelPrefix} — augstums (m)`, entry.heightM, "m");
     pushInput(items, `${prefix}.width`, `${labelPrefix} — platums (m)`, entry.widthM, "m");
     pushCount(items, `${prefix}.count`, `${labelPrefix} — skaits`, entry.count);
@@ -524,7 +527,7 @@ function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): strin
     });
   }
 
-  const openingMatch = item.key.match(/^(windows|doors)\.(\d+)\.(height|width|count|placement|area)$/);
+  const openingMatch = item.key.match(/^(windows|doors)\.(\d+)\.(mark|height|width|count|placement|area)$/);
   if (openingMatch) {
     const [, group, rawIndex, field] = openingMatch;
     return t(`project_description.summary.${group}.item_${field}`, item.label, {

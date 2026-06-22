@@ -32,6 +32,7 @@ function parseOpeningEntry(value: unknown): OpeningEntry | null {
 
   return {
     id: row.id,
+    mark: typeof row.mark === "string" ? row.mark : "",
     heightM: typeof row.heightM === "string" ? row.heightM : "",
     widthM: typeof row.widthM === "string" ? row.widthM : "",
     count: typeof row.count === "string" ? row.count : "1",

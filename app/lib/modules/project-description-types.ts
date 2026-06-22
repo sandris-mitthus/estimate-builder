@@ -1,5 +1,6 @@
 export type OpeningEntry = {
   id: string;
+  mark: string;
   heightM: string;
   widthM: string;
   count: string;
@@ -86,6 +87,7 @@ export function createCrossSectionEntry(): FoundationCrossSectionEntry {
 export function createWindowEntry(): OpeningEntry {
   return {
     id: crypto.randomUUID(),
+    mark: "",
     heightM: "",
     widthM: "",
     count: "1",
@@ -95,6 +97,7 @@ export function createWindowEntry(): OpeningEntry {
 export function createDoorEntry(): DoorEntry {
   return {
     id: crypto.randomUUID(),
+    mark: "",
     heightM: "",
     widthM: "",
     count: "1",
