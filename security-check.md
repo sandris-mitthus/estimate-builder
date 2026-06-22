@@ -2,8 +2,51 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-06-21 (**v1.3.32**) — **9.5 / 10**
-**Iepriekšējā pilnā pārbaude:** 2026-06-17 (v1.3.25) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-06-23 (**v1.3.44**) — **9.5 / 10**
+**Iepriekšējā pilnā pārbaude:** 2026-06-21 (v1.3.32) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.3.44 (2026-06-23)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` / `assertSystemAdminAccess()` / `getCurrentUser()` | ✅ 13 action faili; 56 exportētas actions; mutācijas aiz `requireAction()` vai `assertSystemAdminAccess()`, valodas maiņa aiz `getCurrentUser()` |
+| Protected lapas | ✅ 17 `page.tsx` faili; uzņēmuma sadaļas aiz `assertNavAccess()`, system admin sadaļas aiz `assertSystemAdminAccess()` |
+| System admin sadaļas | ✅ `site_settings`, `site_languages`, `site_translations`, `site_user_groups`, `site_companies`, `site_companies_users` lapas joprojām aiz `public.users.is_admin = true` pārbaudes |
+| API maršruti (`app/api/**`) | ✅ 6 maršruti; visi sāk ar `getCurrentUser()`; klāt `assigned-materials`, kas arī prasa auth |
+| Tulkojumu/i18n izmaiņas | ✅ `site_translations` paliek RLS deny; rediģēšana tikai system admin; vārdnīcas cache versējas pēc `site_translations.updated_at`, lai seed tulkojumi neiestrēgst vecā cache |
+| Settings / logo plūsma | ✅ `settings.save` guards visām saglabāšanas/logo darbībām; logo upload/remove joprojām caur server action un storage helperiem |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
+| npm audit (moderate+) | ✅ **0 vulnerabilities** (`npm audit --audit-level=moderate`) |
+| Storage / proxy | ✅ Privātie bucketi (`028`); auth proxy `logo`, `asset`; path regex un company prefix paliek spēkā |
+| RLS deny (DB tabulas) | ✅ RLS deny kontroles saglabātas; jaunākās `062`–`067` SQL migrācijas ir translation seed, bez jaunu klientam atvērtu tabulu |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| Magic-byte upload validācija | ✅ `file-storage.ts`, `logo-storage.ts` |
+| OAuth / redirect | ✅ `ALLOWED_EMAIL_DOMAIN` opcija; `getSafeRedirectPath()`; X-Forwarded-Host validācija |
+| Estimate lock (M13) | ✅ `assertProjectEstimateEditable()` repository slānī |
+| typecheck + lint + build | ✅ `npm run typecheck`, `npm run lint`, `npm run build` OK; lint: 0 errors, ~75 warnings |
+| DB migrācijas | ✅ `npm run db:migrate` OK — `No pending migrations.` |
+
+### Izmaiņas kopš v1.3.32 → v1.3.44 (pārskatīts, bez regresijas)
+
+| Apgabals | Drošības secinājums |
+|----------|---------------------|
+| Company logo / site company UI | ✅ Auth proxy un server-side logo storage saglabāts; API route prasa `getCurrentUser()` |
+| Assigned materials banner/API | ✅ Jauns `app/api/assigned-materials` route prasa `getCurrentUser()`; nav publiska datu noplūdes endpointa |
+| Settings forma un nesaglabātu izmaiņu guard | ✅ Klienta UI izmaiņas; saglabāšana joprojām tikai caur `settings.save` server actions |
+| I18n seed migrācijas (`062`–`067`) | ✅ Tikai idempotenti `site_translations` seed ieraksti; `site_translations` tabulai RLS deny un mutācijas tikai system admin |
+| Translation cache versēšana | ✅ Cache invalidācija drošāka pēc DB `updated_at`; nepaplašina klienta DB piekļuvi |
+| System admin konteksts/navigācija | ✅ Navigācija balstīta uz `isSystemAdmin`; system admin lapas paliek ar server-side guardu |
+
+### Atlikušās piezīmes (nebloķējošas)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | `ALLOWED_EMAIL_DOMAIN` un Supabase invite-only — atkarīgs no production ENV |
+| L27 | ℹ️ ARHITEKTŪRA | Single-tenant loģika izmanto service role repository slānī; pieņemams šim iekšējam rīkam |
+
+**Atzīme:** **9.5 / 10** — recheck neatrada jaunu auth/API/RLS regresiju; vienīgās atlikušās drošības piezīmes joprojām ir production konfigurācija un apzināta single-tenant arhitektūra.
 
 ---
 
@@ -202,7 +245,16 @@
 
 ## Ko tika izveidots / mainīts (kopsavilkums)
 
-### v1.3.32 drošības pārbaude (šī sesija)
+### v1.3.44 drošības pārbaude (recheck)
+| Konteksts | Secinājums |
+|-----------|------------|
+| `app/api/assigned-materials` | Jauns API route prasa `getCurrentUser()`; nav publiska endpointa |
+| `settings` / i18n / unsaved changes UI | Klienta UI izmaiņas bez jaunas mutāciju virsmas; saglabāšana joprojām aiz `settings.save` |
+| `site_translations` cache | Cache versēts pēc `updated_at`; nemaina DB piekļuves modeli, tikai novērš vecu vārdnīcu |
+| `062`–`067` migrācijas | Tulkojumu seed migrācijas; `site_translations` paliek aiz RLS deny un system admin actions |
+| Lokālās pārbaudes | `npm audit --audit-level=moderate`, `db:migrate`, `typecheck`, `lint`, `build` OK |
+
+### v1.3.32 drošības pārbaude
 | Konteksts | Secinājums |
 |-----------|------------|
 | `site_*` system admin actions | Mutācijas aiz `assertSystemAdminAccess()`; production tikai `public.users.is_admin = true` |
@@ -280,7 +332,7 @@
 
 ---
 
-## Atzīme: 9.5 / 10 (v1.3.32)
+## Atzīme: 9.5 / 10 (v1.3.44)
 
 ### Pamatojums
 

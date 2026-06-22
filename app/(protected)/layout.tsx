@@ -3,6 +3,7 @@ import { ActionPermissionsProvider } from "@/app/components/action-permissions-c
 import { AppNav } from "@/app/components/app-nav";
 import { AssignedMaterialsBannerLoader } from "@/app/components/assigned-materials-banner-loader";
 import { LoginGate } from "@/app/components/login-gate";
+import { SystemAdminProvider } from "@/app/components/system-admin-context";
 import { TranslationsProvider } from "@/app/components/translations-provider";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
@@ -53,10 +54,13 @@ export default async function ProtectedLayout({
   let languages = DEFAULT_SITE_LANGUAGES.filter((language) => language.isActive);
   let activeLanguageCode = "lv";
   let translations = {};
-  const siteSettings = await getSiteSettings();
+
+  const [siteSettings, user] = await Promise.all([
+    getSiteSettings(),
+    isSupabaseConfigured() ? getCurrentUser() : Promise.resolve(null),
+  ]);
 
   if (isSupabaseConfigured()) {
-    const user = await getCurrentUser();
     if (!user) {
       languages = await listSiteLanguages({ activeOnly: true });
       activeLanguageCode = await getAnonymousActiveLanguageCode(languages);
@@ -80,24 +84,31 @@ export default async function ProtectedLayout({
     const currentUserDisplay = mapUserDisplay(user);
     currentUser = currentUserDisplay;
     currentUserId = user.id;
-    [isSystemAdmin, languages, activeLanguageCode] = await Promise.all([
-      isSystemAdminUser(user),
-      listSiteLanguages({ activeOnly: true }),
-      getUserActiveLanguageCode(user.id),
-    ]);
-    translations = await getSiteTranslationDictionary(activeLanguageCode);
 
-    const session = await getCurrentUserAccess();
+    const [adminFlag, languagesResult, activeLanguageCodeResult, session] =
+      await Promise.all([
+        isSystemAdminUser(user),
+        listSiteLanguages({ activeOnly: true }),
+        getUserActiveLanguageCode(user.id),
+        getCurrentUserAccess(),
+      ]);
+    isSystemAdmin = adminFlag;
+    languages = languagesResult;
+    activeLanguageCode = activeLanguageCodeResult;
+
+    const [translationsResult, companyNameResult] = await Promise.all([
+      getSiteTranslationDictionary(activeLanguageCode),
+      isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
+    ]);
+    translations = translationsResult;
+    companyName = companyNameResult;
+
     if (session) {
       actionPermissions = session.access.permissions.actions;
       const navKeys = Object.entries(session.access.permissions.nav)
         .filter(([, enabled]) => enabled)
         .map(([key]) => key as NavPermissionKey);
       allowedNavKeys = navKeys.length > 0 ? navKeys : null;
-    }
-
-    if (!isSystemAdmin) {
-      companyName = await getCompanyDisplayName();
     }
   } else if (process.env.NODE_ENV === "production") {
     activeLanguageCode = await getAnonymousActiveLanguageCode(languages);
@@ -120,21 +131,28 @@ export default async function ProtectedLayout({
 
   return (
     <ActionPermissionsProvider actions={actionPermissions}>
-      <TranslationsProvider
-        languageCode={activeLanguageCode}
-        translations={translations}
-      >
-        <AppNav
-          currentUser={currentUser}
-          companyName={companyName}
-          allowedNavKeys={allowedNavKeys}
-          isSystemAdmin={isSystemAdmin}
-          languages={languages}
-          activeLanguageCode={activeLanguageCode}
-        />
-        {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
-        {children}
-      </TranslationsProvider>
+      <SystemAdminProvider isSystemAdmin={isSystemAdmin}>
+        <TranslationsProvider
+          languageCode={activeLanguageCode}
+          translations={translations}
+        >
+          <div className="min-h-screen bg-zinc-100">
+            <AppNav
+              currentUser={currentUser}
+              systemName={siteSettings.systemName}
+              companyName={companyName}
+              allowedNavKeys={allowedNavKeys}
+              isSystemAdmin={isSystemAdmin}
+              languages={languages}
+              activeLanguageCode={activeLanguageCode}
+            />
+            <div className="min-w-0 pl-[86px] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[284px]">
+              {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
+              {children}
+            </div>
+          </div>
+        </TranslationsProvider>
+      </SystemAdminProvider>
     </ActionPermissionsProvider>
   );
 }

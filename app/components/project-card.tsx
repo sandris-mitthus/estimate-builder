@@ -21,12 +21,14 @@ function resolveProjectModuleName(
   buildingModuleId: string | null,
   modules: BuildingModuleSummary[],
   fallbackName: string,
+  moduleNameById?: ReadonlyMap<string, string>,
 ): string {
   if (!buildingModuleId) {
     return fallbackName;
   }
 
   return (
+    moduleNameById?.get(buildingModuleId) ??
     modules.find((module) => module.id === buildingModuleId)?.name ??
     fallbackName
   );
@@ -63,6 +65,7 @@ function ContactRow({
 export function ProjectCard({
   project,
   modules,
+  moduleNameById,
   hasStaleCatalogPrices = false,
   hasNewSagatavePositions = false,
   hasPendingMaterials = false,
@@ -70,6 +73,7 @@ export function ProjectCard({
 }: {
   project: ProjectSummary;
   modules: BuildingModuleSummary[];
+  moduleNameById?: ReadonlyMap<string, string>;
   hasStaleCatalogPrices?: boolean;
   hasNewSagatavePositions?: boolean;
   hasPendingMaterials?: boolean;
@@ -85,6 +89,7 @@ export function ProjectCard({
     project.buildingModuleId,
     modules,
     t("projects.individual_project", "Individuāls projekts"),
+    moduleNameById,
   );
 
   const cardBody = (

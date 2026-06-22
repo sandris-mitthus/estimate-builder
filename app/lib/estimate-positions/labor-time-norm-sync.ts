@@ -26,6 +26,8 @@ import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
+const PROJECT_SYNC_UPDATE_CONCURRENCY = 5;
+
 export type LaborTimeNormLocation = {
   categoryIndex: number;
   subcategoryIndex: number | null;
@@ -472,6 +474,8 @@ export async function propagateLaborTimeNormsFromProject(
     return { ok: false, error: "Neizdevās ielādēt projektu tāmes laika normu sinhronizācijai." };
   }
 
+  const updates: Array<() => Promise<{ error: { message?: string } | null }>> = [];
+
   for (const row of estimateRows ?? []) {
     const parsed = parseEstimatePositionDocumentPayload(
       row.categories as EstimateCategory[],
@@ -484,7 +488,9 @@ export async function propagateLaborTimeNormsFromProject(
       defaultHourlyRate,
     );
 
-    if (JSON.stringify(nextCategories) === JSON.stringify(parsed.sections)) {
+    const currentSnapshot = JSON.stringify(parsed.sections);
+    const nextSnapshot = JSON.stringify(nextCategories);
+    if (nextSnapshot === currentSnapshot) {
       continue;
     }
 
@@ -493,13 +499,21 @@ export async function propagateLaborTimeNormsFromProject(
       parsed.multiOptionLinks,
     );
 
-    const { error } = await supabase
-      .from("estimates")
-      .update({ categories })
-      .eq("project_id", row.project_id as string)
-      .eq("company_id", companyId);
+    updates.push(async () => {
+      const { error } = await supabase
+        .from("estimates")
+        .update({ categories })
+        .eq("project_id", row.project_id as string)
+        .eq("company_id", companyId);
 
-    if (error) {
+      return { error };
+    });
+  }
+
+  for (let index = 0; index < updates.length; index += PROJECT_SYNC_UPDATE_CONCURRENCY) {
+    const batch = updates.slice(index, index + PROJECT_SYNC_UPDATE_CONCURRENCY);
+    const results = await Promise.all(batch.map((update) => update()));
+    if (results.some((result) => result.error)) {
       return { ok: false, error: "Neizdevās sinhronizēt laika normu citos projektos." };
     }
   }

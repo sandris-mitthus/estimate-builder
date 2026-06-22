@@ -1,4 +1,5 @@
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
+import { cache } from "react";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
@@ -34,7 +35,7 @@ function mapUserProfile(
   };
 }
 
-export async function listUsers(): Promise<UserSummary[]> {
+export const listUsers = cache(async function listUsers(): Promise<UserSummary[]> {
   if (!isSupabaseAdminConfigured()) {
     return SAMPLE_USERS;
   }
@@ -87,7 +88,7 @@ export async function listUsers(): Promise<UserSummary[]> {
   );
 
   return users.sort((a, b) => a.name.localeCompare(b.name, "lv"));
-}
+});
 
 function inviteRedirectUrl(): string {
   const siteUrl =

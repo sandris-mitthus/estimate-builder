@@ -29,15 +29,36 @@ export type EstimateLineItemPrices = {
   lineTotal: PriceBreakdown;
 };
 
+type CatalogPositionMap = Map<string, PositionPriceSummary>;
+
 export function resolveEstimateLineItemPrices(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   plannedProfitPercent = 0,
 ): EstimateLineItemPrices {
-  const catalogById = new Map(
-    catalogPositions.map((position) => [position.id, position]),
+  return resolveEstimateLineItemPricesWithCatalogMap(
+    item,
+    catalogPositions,
+    buildCatalogPositionMap(catalogPositions),
+    defaultHourlyRate,
+    plannedProfitPercent,
   );
+}
+
+function buildCatalogPositionMap(
+  catalogPositions: PositionPriceSummary[],
+): CatalogPositionMap {
+  return new Map(catalogPositions.map((position) => [position.id, position]));
+}
+
+function resolveEstimateLineItemPricesWithCatalogMap(
+  item: EstimateLineItem,
+  catalogPositions: PositionPriceSummary[],
+  catalogById: CatalogPositionMap,
+  defaultHourlyRate: number | null,
+  plannedProfitPercent = 0,
+): EstimateLineItemPrices {
   const hasModuleSize =
     !item.variableQuantity &&
     normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null;
@@ -80,12 +101,14 @@ export function resolveEstimateLineItemPrices(
 function resolveLineItemBreakdown(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
+  catalogById: CatalogPositionMap,
   defaultHourlyRate: number | null,
   plannedProfitPercent = 0,
 ): PriceBreakdown {
-  return resolveEstimateLineItemPrices(
+  return resolveEstimateLineItemPricesWithCatalogMap(
     item,
     catalogPositions,
+    catalogById,
     defaultHourlyRate,
     plannedProfitPercent,
   ).lineTotal;
@@ -121,11 +144,13 @@ export function calculateEstimateTotals(
     mechanisms: 0,
     grand: 0,
   };
+  const catalogById = buildCatalogPositionMap(catalogPositions);
 
   for (const item of collectEstimateLineItems(categories, { forTotals: true })) {
     const breakdown = resolveLineItemBreakdown(
       item,
       catalogPositions,
+      catalogById,
       defaultHourlyRate,
       profitPercent,
     );

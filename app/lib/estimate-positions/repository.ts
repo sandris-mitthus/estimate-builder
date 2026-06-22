@@ -7,6 +7,7 @@ import {
   sanitizeEstimatePositionSections,
 } from "@/app/lib/estimate-positions/serialize-document";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { cache } from "react";
 import type {
   CreateEstimatePositionInput,
   EstimatePositionDocument,
@@ -37,7 +38,8 @@ function mapDocument(row: EstimatePositionRow): EstimatePositionDocument {
   };
 }
 
-export async function ensureDefaultEstimatePosition(): Promise<EstimatePositionDocument> {
+export const ensureDefaultEstimatePosition = cache(
+  async function ensureDefaultEstimatePosition(): Promise<EstimatePositionDocument> {
   if (!isSupabaseAdminConfigured()) {
     return getSampleEstimatePosition();
   }
@@ -67,7 +69,8 @@ export async function ensureDefaultEstimatePosition(): Promise<EstimatePositionD
 
   const document = await getEstimatePosition(created.id);
   return document ?? getSampleEstimatePosition();
-}
+  },
+);
 
 export async function getEstimatePosition(
   id: string,

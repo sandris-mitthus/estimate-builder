@@ -1,4 +1,5 @@
 import { SectionPage } from "@/app/components/section-page";
+import { UserAvatar } from "@/app/components/user-avatar";
 import { addThousandSeparators } from "@/app/lib/estimates/calculate-line";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { getServerTranslations } from "@/app/lib/i18n/server";
@@ -11,8 +12,12 @@ function formatCount(value: number): string {
 }
 
 function roleLabel(role: string, t: ServerTranslations["t"]): string {
+  if (role === "system_admin") {
+    return t("roles.system_admin", "Sistēmas administrators");
+  }
   if (role === "owner") return t("roles.owner", "Īpašnieks");
   if (role === "admin") return t("roles.admin", "Administrators");
+  if (role === "member") return t("roles.member", "Dalībnieks");
   return t("roles.user", "Lietotājs");
 }
 
@@ -88,47 +93,60 @@ export default async function SiteCompanyUsersPage() {
               <tbody className="divide-y divide-zinc-100">
                 {memberships.map((membership) => (
                   <tr
-                    key={`${membership.companyId}:${membership.userId}`}
+                    key={`${membership.companyId ?? "system"}:${membership.userId}`}
                     className="align-top"
                   >
                     <td className="px-5 py-4">
-                      <div className="flex flex-wrap items-start gap-2">
-                        <div>
+                      <div className="flex items-start gap-3">
+                        {membership.avatarUrl ? (
+                          <UserAvatar
+                            avatarUrl={membership.avatarUrl}
+                            name={membership.userName}
+                            size="sm"
+                          />
+                        ) : null}
+                        <div className="min-w-0">
                           <p className="font-semibold text-zinc-900">
                             {membership.userName}
                           </p>
-                          <p className="mt-1 text-sm text-zinc-500">
+                          <p className="mt-1 text-xs text-zinc-500">
                             {membership.userEmail}
                           </p>
                         </div>
-                        {membership.isSystemAdmin ? (
-                          <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
-                            is_admin
-                          </span>
-                        ) : null}
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-zinc-900">
-                        {membership.companyName}
-                      </p>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {roleLabel(membership.role, t)}
-                      </p>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {statusLabel(membership.status, t)}
-                      </p>
+                      <div className="flex items-start gap-3">
+                        {membership.companyLogoUrl ? (
+                          <img
+                            src={membership.companyLogoUrl}
+                            alt={t("settings.company_logo", "Uzņēmuma logotips")}
+                            className="size-9 shrink-0 rounded-lg object-contain ring-1 ring-zinc-200"
+                          />
+                        ) : null}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-zinc-900">
+                            {membership.companyName ?? "—"}
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {membership.roleName ?? roleLabel(membership.role, t)}
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {statusLabel(membership.status, t)}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <p className="font-semibold text-zinc-900">
                         {t("common.registered", "Reģistrēts")}{" "}
                         {formatDisplayDateDdMmYy(membership.registeredAt) || "—"}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500">
                         {t("common.edited", "Labots")}{" "}
                         {formatDisplayDateDdMmYy(membership.editedAt) || "—"}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500">
                         {t("site_company_users.last_seen", "Pēdējo reizi sistēmā")}{" "}
                         {formatLastSeen(membership.lastSeenAt)}
                       </p>

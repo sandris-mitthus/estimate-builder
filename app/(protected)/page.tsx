@@ -6,16 +6,12 @@ import { ProjectsPageCreateProvider } from "@/app/components/projects-page-creat
 import { SectionPage } from "@/app/components/section-page";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { getServerTranslations } from "@/app/lib/i18n/server";
-import type { ServerTranslations } from "@/app/lib/i18n/server";
 import { listBuildingModules } from "@/app/lib/modules/repository";
 import {
+  getProjectListBadges,
   listAllProjects,
-  listProjectIdsWithNewSagatavePositions,
-  listProjectIdsWithPendingMaterials,
-  listProjectIdsWithStaleCatalogPrices,
   listProjects,
 } from "@/app/lib/projects/repository";
-import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 
 function isArchiveView(archive: string | string[] | undefined): boolean {
   if (archive === "1" || archive === "true") {
@@ -27,22 +23,6 @@ function isArchiveView(archive: string | string[] | undefined): boolean {
   }
 
   return false;
-}
-
-function AdminDashboardNotice({ t }: { t: ServerTranslations["t"] }) {
-  return (
-    <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 shadow-sm">
-      <p className="font-semibold">
-        {t("admin_notice.title", "Sistēmas administrators")}
-      </p>
-      <p className="mt-1 text-sky-900">
-        {t(
-          "admin_notice.description",
-          "Jūs esat ielogojies kā sistēmas administrators. Dashboard dati paliek tie paši, bet jums ir pieejamas papildu pārvaldības tiesības.",
-        )}
-      </p>
-    </div>
-  );
 }
 
 export default async function ProjectsPage({
@@ -58,17 +38,18 @@ export default async function ProjectsPage({
   const { archive } = await searchParams;
   const showArchive = isArchiveView(archive);
 
-  const [{ t }, projects, modules] = await Promise.all([
+  const projectsPromise = showArchive ? listAllProjects() : listProjects();
+  const [{ t }, projects, modules, badges] = await Promise.all([
     getServerTranslations(),
-    showArchive ? listAllProjects() : listProjects(),
+    projectsPromise,
     listBuildingModules(),
+    projectsPromise.then(getProjectListBadges),
   ]);
-  const [staleCatalogPriceProjectIds, newSagatavePositionProjectIds, pendingMaterialsProjectIds] =
-    await Promise.all([
-      listProjectIdsWithStaleCatalogPrices(projects),
-      listProjectIdsWithNewSagatavePositions(projects),
-      listProjectIdsWithPendingMaterials(projects),
-    ]);
+  const {
+    staleCatalogPriceProjectIds,
+    newSagatavePositionProjectIds,
+    pendingMaterialsProjectIds,
+  } = badges;
 
   const subtitle = showArchive
     ? t("projects.page.archive_subtitle", "{count} projekti arhīvā", {
@@ -77,7 +58,6 @@ export default async function ProjectsPage({
     : t("projects.page.active_subtitle", "{count} aktīvi projekti", {
         count: projects.length,
       });
-  const isAdmin = session.user ? await isSystemAdminUser(session.user) : false;
 
   return (
     <NavigationLoadingProvider>
@@ -91,7 +71,6 @@ export default async function ProjectsPage({
           subtitle={subtitle}
           actions={<ProjectPageActions modules={modules} archive={showArchive} />}
         >
-          {isAdmin ? <AdminDashboardNotice t={t} /> : null}
           {showArchive ? (
             <ProjectArchiveContent
               projects={projects}

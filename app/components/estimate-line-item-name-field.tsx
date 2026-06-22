@@ -16,7 +16,10 @@ import {
   getCatalogHintPrice,
   isMaterialsOrMechanismsCostType,
 } from "@/app/lib/positions/apply-catalog-to-line-item";
-import { getVisiblePositions } from "@/app/lib/positions/filter-positions";
+import {
+  filterPositionsByQuery,
+  sortPositionsByName,
+} from "@/app/lib/positions/filter-positions";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { useTranslations } from "@/app/components/translations-provider";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -97,6 +100,10 @@ export function EstimateLineItemNameField({
     // excludedCatalogKeys content is captured by excludedKeysFingerprint
     [catalogPositions, excludedKeysFingerprint],
   );
+  const sortedAvailableCatalogPositions = useMemo(
+    () => sortPositionsByName(availableCatalogPositions),
+    [availableCatalogPositions],
+  );
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -110,12 +117,14 @@ export function EstimateLineItemNameField({
     setPortalReady(true);
   }, []);
 
-  const suggestions = getVisiblePositions(
-    availableCatalogPositions,
-    value,
-    "all",
-    t,
-  ).slice(0, 30);
+  const suggestions = useMemo(
+    () =>
+      filterPositionsByQuery(sortedAvailableCatalogPositions, value, t).slice(
+        0,
+        30,
+      ),
+    [sortedAvailableCatalogPositions, value, t],
+  );
 
   function updateDropdownRect() {
     const input = inputRef.current;
@@ -175,16 +184,13 @@ export function EstimateLineItemNameField({
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [value, availableCatalogPositions]);
+  }, [value, sortedAvailableCatalogPositions]);
 
   function updateSuggestionsVisibility(nextValue: string) {
-    const nextSuggestions = getVisiblePositions(
-      availableCatalogPositions,
-      nextValue,
-      "all",
-      t,
+    setOpen(
+      filterPositionsByQuery(sortedAvailableCatalogPositions, nextValue, t)
+        .length > 0,
     );
-    setOpen(nextSuggestions.length > 0);
   }
 
   function handleInputChange(nextValue: string) {
@@ -309,7 +315,7 @@ export function EstimateLineItemNameField({
         onBlur={(event) => onNameBlur?.(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => {
-          if (availableCatalogPositions.length > 0 && suggestions.length > 0) {
+          if (sortedAvailableCatalogPositions.length > 0 && suggestions.length > 0) {
             setOpen(true);
           }
         }}

@@ -25,6 +25,7 @@ import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { formatDisplayPhone } from "@/app/lib/validation/contact-fields";
 import type { CompanySettings } from "@/app/lib/settings/types";
+import { getCurrencySymbol } from "@/app/lib/settings/currencies";
 import { formatCompanyDisplayLines } from "@/app/lib/settings/format-company-lines";
 import { parseOfferAdditionalInfoLines } from "@/app/lib/settings/offer-additional-info";
 import {
@@ -123,9 +124,9 @@ const s = StyleSheet.create({
   colTotal: { width: 72, flexShrink: 0, textAlign: "right" },
 });
 
-function fmtMoney(value: number): string {
+function fmtMoney(value: number, currency: string | null | undefined): string {
   if (!Number.isFinite(value) || value === 0) return "\u2014";
-  return `\u20AC ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
+  return `${getCurrencySymbol(currency)} ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
 }
 
 function resolveItemGrand(
@@ -182,6 +183,7 @@ function buildSubcategoryOfferRows(
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   plannedProfitPercent: number,
+  currency: string | null | undefined,
   t: Translate,
 ): SubcategoryPdfRowsResult {
   const displayItems = collectSubcategoryOfferLineItems(sub);
@@ -209,7 +211,7 @@ function buildSubcategoryOfferRows(
           {subTitle}
         </Text>
         <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
-          {fmtMoney(subGrand)}
+          {fmtMoney(subGrand, currency)}
         </Text>
       </View>,
     );
@@ -240,7 +242,7 @@ function buildSubcategoryOfferRows(
           {subTitle}
         </Text>
         <Text style={[s.cell, s.colTotal, { fontWeight: "bold" }]}>
-          {fmtMoney(subGrand)}
+          {fmtMoney(subGrand, currency)}
         </Text>
       </View>,
     );
@@ -272,7 +274,7 @@ function buildSubcategoryOfferRows(
         <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
           {resolveLineItemDisplayName(item)}
         </Text>
-        <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand)}</Text>
+        <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand, currency)}</Text>
       </View>,
     );
   }
@@ -343,6 +345,7 @@ export function EstimatePdfDocument({
   const offerNoteLines = parseOfferAdditionalInfoLines(company.offerAdditionalInfo);
   const showOfferNotes =
     offerNoteLines.length > 0 || company.offerValidityDays > 0;
+  const currencySymbol = getCurrencySymbol(company.currency);
 
   let rowNr = 0;
 
@@ -446,7 +449,9 @@ export function EstimatePdfDocument({
           <Text style={[s.tableHeaderCell, s.colNr]}>{tx("exports.pdf.nr", "Nr.")}</Text>
           <Text style={[s.tableHeaderCell, s.colName]}>{tx("common.name", "Nosaukums")}</Text>
           <Text style={[s.tableHeaderCell, s.colTotal]}>
-            {tx("estimate.column.total_eur", "Kopā €")}
+            {tx("estimate.column.total_eur", "Kopā {currency}", {
+              currency: currencySymbol,
+            })}
           </Text>
         </View>
 
@@ -462,7 +467,7 @@ export function EstimatePdfDocument({
             <View key={cat.id}>
               <View style={s.catRow}>
                 <Text style={s.catText}>{cat.title || tx("common.untitled", "Bez nosaukuma")}</Text>
-                <Text style={s.catTotal}>{fmtMoney(catTotals.grand)}</Text>
+                <Text style={s.catTotal}>{fmtMoney(catTotals.grand, company.currency)}</Text>
               </View>
 
               {cat.items.map((row) => {
@@ -487,7 +492,7 @@ export function EstimatePdfDocument({
                       {resolveLineItemDisplayName(lineItem)}
                     </Text>
                     <Text style={[s.cell, s.colTotal]}>
-                      {hidePrice ? "" : fmtMoney(grand)}
+                      {hidePrice ? "" : fmtMoney(grand, company.currency)}
                     </Text>
                   </View>
                 );
@@ -502,6 +507,7 @@ export function EstimatePdfDocument({
                     catalogPositions,
                     defaultHourlyRate,
                     plannedProfitPercent,
+                    company.currency,
                     tx,
                   );
                   subRowNr = result.nextRowNr;
@@ -521,7 +527,7 @@ export function EstimatePdfDocument({
               ? tx("exports.total_without_vat", "Summa bez PVN")
               : tx("exports.grand_total", "PAVISAM KOPĀ")}
           </Text>
-          <Text style={s.totalValue}>{fmtMoney(totals.grand)}</Text>
+          <Text style={s.totalValue}>{fmtMoney(totals.grand, company.currency)}</Text>
         </View>
 
         {vatBreakdown ? (
@@ -530,11 +536,11 @@ export function EstimatePdfDocument({
               <Text style={s.vatLabel}>
                 {`PVN ${vatBreakdown.ratePercent}%`}
               </Text>
-              <Text style={s.vatValue}>{fmtMoney(vatBreakdown.vatAmount)}</Text>
+              <Text style={s.vatValue}>{fmtMoney(vatBreakdown.vatAmount, company.currency)}</Text>
             </View>
             <View style={s.grossRow}>
               <Text style={s.grossLabel}>{tx("exports.total_with_vat", "KOPĀ AR PVN")}</Text>
-              <Text style={s.grossValue}>{fmtMoney(vatBreakdown.gross)}</Text>
+              <Text style={s.grossValue}>{fmtMoney(vatBreakdown.gross, company.currency)}</Text>
             </View>
           </>
         ) : null}

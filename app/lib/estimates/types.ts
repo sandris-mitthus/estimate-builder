@@ -35,6 +35,10 @@ export type EstimateLineItem = {
   moduleSizeAttachment?: LineItemModuleSizeAttachment;
   /** Laika norma (c/h) — stundas uz vienību; darbs = laika norma × stundas likme. */
   laborTimeNorm?: number;
+  /** Ja `true` — darba aprēķinam izmanto pozīcijas individuālo stundas likmi. */
+  customHourlyRateEnabled?: boolean;
+  /** Individuālā stundas likme, kad `customHourlyRateEnabled`. */
+  customHourlyRate?: number;
   /** @deprecated Izmanto `materials` (masīvs). Vecs datu formāts — migrācija notiek `hydrateCompositeLineItem`. */
   material?: LineItemCatalogRef | null;
   /** @deprecated Izmanto `mechanisms` (masīvs). Vecs datu formāts — migrācija notiek `hydrateCompositeLineItem`. */

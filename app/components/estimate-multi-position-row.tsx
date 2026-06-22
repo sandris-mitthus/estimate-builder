@@ -101,6 +101,7 @@ type EstimateMultiPositionRowProps = {
   onDelete: () => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   excludedSelectionKeys?: ReadonlySet<string>;
   dragHandle?: ReactNode;
   rowRef?: (element: HTMLTableSectionElement | null) => void;
@@ -460,6 +461,7 @@ export function EstimateMultiPositionRow({
   onDelete,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   excludedSelectionKeys = new Set(),
   dragHandle,
   rowRef,
@@ -835,6 +837,7 @@ export function EstimateMultiPositionRow({
           onSave={onChange}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           moduleSizeOptions={moduleSizeOptions}
         />
       ) : null}

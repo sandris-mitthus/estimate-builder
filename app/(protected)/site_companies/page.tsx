@@ -48,31 +48,42 @@ export default async function SiteCompaniesPage() {
                 {companies.map((company) => (
                   <tr key={company.id} className="align-top">
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-zinc-900">
-                        {formatCompanyName(company)}
-                      </p>
-                      <div className="mt-1 space-y-0.5 text-sm text-zinc-500">
-                        {company.registrationNumber.trim() ? (
-                          <p>
-                            {t("site_companies.registration_number", "Reģ. Nr.")}{" "}
-                            {company.registrationNumber}
-                          </p>
+                      <div className="flex items-start gap-3">
+                        {company.logoUrl ? (
+                          <img
+                            src={company.logoUrl}
+                            alt={t("settings.company_logo", "Uzņēmuma logotips")}
+                            className="size-12 shrink-0 rounded-xl object-contain ring-1 ring-zinc-200"
+                          />
                         ) : null}
-                        {company.address.trim() ? <p>{company.address}</p> : null}
-                        {company.email.trim() || company.phone.trim() ? (
-                          <p>
-                            {[company.email, company.phone]
-                              .filter((value) => value.trim().length > 0)
-                              .join(" · ")}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-zinc-900">
+                            {formatCompanyName(company)}
                           </p>
-                        ) : null}
+                          <div className="mt-1 space-y-0.5 text-xs text-zinc-500">
+                            {company.registrationNumber.trim() ? (
+                              <p>
+                                {t("site_companies.registration_number", "Reģ. Nr.")}{" "}
+                                {company.registrationNumber}
+                              </p>
+                            ) : null}
+                            {company.address.trim() ? <p>{company.address}</p> : null}
+                            {company.email.trim() || company.phone.trim() ? (
+                              <p>
+                                {[company.email, company.phone]
+                                  .filter((value) => value.trim().length > 0)
+                                  .join(" · ")}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4">
                       <p className="font-semibold text-zinc-900">
                         {formatCount(company.userCount)}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500">
                         {t("site_companies.active_users", "{count} aktīvi", {
                           count: formatCount(company.activeUserCount),
                         })}
@@ -83,7 +94,7 @@ export default async function SiteCompaniesPage() {
                         {t("common.registered", "Reģistrēts")}{" "}
                         {formatDisplayDateDdMmYy(company.createdAt) || "—"}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500">
                         {t("common.edited", "Labots")}{" "}
                         {formatDisplayDateDdMmYy(company.updatedAt) || "—"}
                       </p>

@@ -11,15 +11,18 @@ import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
+import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
 import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { useIsSystemAdmin } from "@/app/components/system-admin-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatAmountDisplay,
   roundToTwoDecimals,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
+import { getCurrencySymbol } from "@/app/lib/settings/currencies";
 import {
   deriveCompositeUnitPrice,
   resolveEffectiveMaterials,
@@ -45,6 +48,7 @@ type PositionModalProps = {
   onSave: (value: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   estimateUnits?: string[];
 };
@@ -68,6 +72,8 @@ function snapshot(item: EstimateLineItem): string {
   return JSON.stringify({
     name: item.name.trim(),
     laborTimeNorm: item.laborTimeNorm ?? 0,
+    customHourlyRateEnabled: item.customHourlyRateEnabled ?? false,
+    customHourlyRate: item.customHourlyRate ?? 0,
     materials: item.materials ?? [],
     mechanisms: item.mechanisms ?? [],
     moduleSizeAttachment: item.moduleSizeAttachment ?? null,
@@ -84,10 +90,13 @@ export function PositionModal({
   onSave,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
   estimateUnits = [],
 }: PositionModalProps) {
   const { t } = useTranslations();
+  const isSystemAdmin = useIsSystemAdmin();
+  const currencySymbol = getCurrencySymbol(currency);
   const [draft, setDraft] = useState<EstimateLineItem>(() => prepareDraft(value));
   const [initialSnapshot, setInitialSnapshot] = useState(() =>
     snapshot(prepareDraft(value)),
@@ -177,6 +186,11 @@ export function PositionModal({
           : (resolveLineItemDisplayUnitFromModuleSize(draft, moduleSizeOptions) ??
             "gab."),
       laborTimeNorm: roundToTwoDecimals(draft.laborTimeNorm ?? 0),
+      customHourlyRateEnabled: draft.customHourlyRateEnabled === true,
+      customHourlyRate:
+        draft.customHourlyRateEnabled === true
+          ? roundToTwoDecimals(draft.customHourlyRate ?? 0)
+          : undefined,
       materials: draft.materials ?? [],
       mechanisms: draft.mechanisms ?? [],
       material: undefined,
@@ -251,15 +265,43 @@ export function PositionModal({
               withStepper
               stepperButtonsAlwaysVisible
             />
-            {defaultHourlyRate != null ? (
+            {defaultHourlyRate != null || draft.customHourlyRateEnabled === true ? (
               <span className="mt-1 block text-xs text-zinc-500">
-                {t("estimate.labor_rate_display", "Darbs = {rate} €/h", {
-                  rate: formatAmountDisplay(defaultHourlyRate),
-                })}
+                {t(
+                  "estimate.labor_rate_display",
+                  "Darbs = {rate} {currency}/h",
+                  {
+                    rate: formatAmountDisplay(
+                      draft.customHourlyRateEnabled === true
+                        ? (draft.customHourlyRate ?? 0)
+                        : (defaultHourlyRate ?? 0),
+                    ),
+                    currency: currencySymbol,
+                  },
+                )}
               </span>
             ) : null}
           </label>
         </div>
+
+        {isSystemAdmin ? null : (
+          <PositionCustomHourlyRateField
+            id={`position-custom-hourly-rate-${draft.id}`}
+            enabled={draft.customHourlyRateEnabled ?? false}
+            rate={draft.customHourlyRate ?? 0}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            onEnabledChange={(customHourlyRateEnabled) =>
+              patch({
+                customHourlyRateEnabled,
+                customHourlyRate: customHourlyRateEnabled
+                  ? (draft.customHourlyRate ?? defaultHourlyRate ?? 0)
+                  : undefined,
+              })
+            }
+            onRateChange={(customHourlyRate) => patch({ customHourlyRate })}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           {/* Materiāli */}

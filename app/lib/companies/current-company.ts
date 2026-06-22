@@ -91,8 +91,6 @@ export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): P
     return null;
   }
 
-  await ensureUserProfile(user);
-
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("company_users")

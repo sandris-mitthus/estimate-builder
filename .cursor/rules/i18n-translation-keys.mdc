@@ -3,9 +3,32 @@ description: I18n translation key reuse and naming rules
 alwaysApply: true
 ---
 
-# Tulkojumu atslēgas — nedublēt
+# Tulkojumu atslēgas — jauns teksts vienmēr jāseedo DB
 
 UI tekstiem izmanto `site_translations` atslēgas un `t(key, fallback, params)`.
+Fallback teksts kodā nav pilns tulkojums — tas ir tikai drošības teksts, ja DB ieraksts nav atrasts.
+
+## Jauni vai mainīti UI teksti
+
+Kad pievieno vai maina jebkuru lietotājam redzamu tekstu:
+
+- kodā izmanto `t(key, fallback, params)`;
+- tajā pašā izmaiņā pievieno vai atjaunina `site_translations` SQL seed/migrāciju;
+- obligāti norādi vērtības vismaz `lv` un `en` valodām.
+- ja teksts ir jaunā komponentē/blokā, nedrīkst pabeigt uzdevumu, kamēr atslēgas nav DB migrācijā.
+
+## DB migrācija ir obligāta
+
+Ja tiek izveidota vai labota `supabase/migrations/*.sql` tulkojumu migrācija:
+
+- lieto nākamo secīgo migrācijas numuru;
+- migrācija ir idempotenta ar `on conflict (translation_key) do update`;
+- pēc migrācijas izveides palaid `npm run db:migrate`;
+- ja migrācija neizdodas, labo SQL un atkārto, līdz tā izpildās vai ir reāls env/savienojuma bloķeris.
+
+## Pirms pabeigšanas
+
+Pirms atbildes lietotājam pārbaudi, ka katrai jaunai `t("...")` atslēgai ir atbilstošs ieraksts migrācijā ar `lv` un `en` vērtību. Ja atrodi hardcoded UI tekstu bez `t(...)`, pārvieto to uz tulkojumu atslēgu un seed migrāciju.
 
 ## Nedublēt vienādas vērtības
 

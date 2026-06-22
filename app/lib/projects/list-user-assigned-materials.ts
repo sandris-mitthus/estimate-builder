@@ -8,7 +8,7 @@ import { parseEstimatePositionDocumentPayload } from "@/app/lib/estimate-positio
 import { normalizeUserId } from "@/app/lib/auth/normalize-person-name";
 import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
-import { getBuildingModule } from "@/app/lib/modules/repository";
+import { getBuildingModulesByIds } from "@/app/lib/modules/repository";
 import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -80,6 +80,20 @@ function prepareCategoriesForMaterials(
     categoriesWithVariableQty,
     moduleSizeOptions[0].projectDescription,
     catalogPositions,
+  );
+}
+
+function hasPendingAssignedMaterialsForUser(
+  meta: EstimateMeta,
+  matchingUserIds: Set<string>,
+): boolean {
+  const assignees = meta.materialAssigneeUserIds ?? {};
+  const orderedIds = new Set(meta.orderedMaterialPositionIds ?? []);
+
+  return Object.entries(assignees).some(
+    ([positionPriceId, assigneeUserId]) =>
+      !orderedIds.has(positionPriceId) &&
+      matchingUserIds.has(normalizeUserId(assigneeUserId)),
   );
 }
 
@@ -220,13 +234,28 @@ export async function listUserAssignedMaterialGroups(
     return [];
   }
 
-  const moduleCache = new Map<
-    string,
-    BuildingModuleDetail | null
-  >();
+  const rows = (data as EstimateAssignmentRow[]).filter((row) => {
+    const project = projectById.get(row.project_id);
+    if (!project) {
+      return false;
+    }
+
+    return hasPendingAssignedMaterialsForUser(
+      (row.meta ?? {}) as EstimateMeta,
+      matchingUserIds,
+    );
+  });
+  const moduleIds = Array.from(
+    new Set(
+      rows
+        .map((row) => projectById.get(row.project_id)?.buildingModuleId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const moduleCache = await getBuildingModulesByIds(moduleIds);
   const groups: UserAssignedMaterialsProjectGroup[] = [];
 
-  for (const row of data as EstimateAssignmentRow[]) {
+  for (const row of rows) {
     const project = projectById.get(row.project_id);
     if (!project) {
       continue;
@@ -237,12 +266,6 @@ export async function listUserAssignedMaterialGroups(
 
     let buildingModule: BuildingModuleDetail | null = null;
     if (project.buildingModuleId) {
-      if (!moduleCache.has(project.buildingModuleId)) {
-        moduleCache.set(
-          project.buildingModuleId,
-          await getBuildingModule(project.buildingModuleId),
-        );
-      }
       buildingModule = moduleCache.get(project.buildingModuleId) ?? null;
     }
 

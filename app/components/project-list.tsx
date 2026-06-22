@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { ListEntryGrid } from "@/app/components/list-entry-card";
 import { ProjectCard } from "@/app/components/project-card";
 import {
@@ -30,6 +31,10 @@ export function ProjectList({
   const displayProjects: ProjectSummary[] = optimisticProject
     ? [optimisticProject, ...projects]
     : projects;
+  const moduleNameById = useMemo(
+    () => new Map(modules.map((module) => [module.id, module.name])),
+    [modules],
+  );
 
   return (
     <ListEntryGrid>
@@ -38,6 +43,7 @@ export function ProjectList({
           key={project.id}
           project={project}
           modules={modules}
+          moduleNameById={moduleNameById}
           isCreating={isOptimisticProjectId(project.id)}
           hasStaleCatalogPrices={
             !isOptimisticProjectId(project.id) &&

@@ -111,6 +111,7 @@ export async function buildEstimateExcel(
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   vatNumber: string = "",
+  currency: string | null = null,
   t?: Translate,
 ): Promise<Buffer> {
   const tx: Translate = t ?? ((_key, fallback) => fallback ?? _key);
@@ -140,7 +141,7 @@ export async function buildEstimateExcel(
     { width: 13, style: { numFmt: NUM_FMT } },       // H  Apjoma Darbs
     { width: 13, style: { numFmt: NUM_FMT } },       // I  Apjoma Materiāli
     { width: 13, style: { numFmt: NUM_FMT } },       // J  Apjoma Mehānismi
-    { width: 14, style: { numFmt: NUM_FMT } },       // K  Kopā €
+    { width: 14, style: { numFmt: NUM_FMT } },       // K  Kopā
   ];
 
   // ── Info block ──────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ export async function buildEstimateExcel(
 
   // ── Two-row merged column header ─────────────────────────────────────
   //  Row 1: Nr | Nosaukums | Vienība | Daudzums | Vienības cena (E-G) | Apjoma cena (H-K)
-  //  Row 2:  ↕ |     ↕     |    ↕    |    ↕     | Darbs | Mat. | Meh. | Darbs | Mat. | Meh. | Kopā €
+  //  Row 2:  ↕ |     ↕     |    ↕    |    ↕     | Darbs | Mat. | Meh. | Darbs | Mat. | Meh. | Kopā
 
   const h1RowIdx = ws.rowCount + 1;
   const h2RowIdx = h1RowIdx + 1;
@@ -198,7 +199,9 @@ export async function buildEstimateExcel(
     tx("estimate.column.labor", "Darbs"),
     tx("estimate.column.materials", "Materiāli"),
     tx("estimate.column.mechanisms", "Mehānismi"),
-    tx("estimate.column.total_eur", "Kopā €"),
+    tx("estimate.column.total_eur", "Kopā {currency}", {
+      currency: currency ?? "EUR",
+    }),
   ]);
   h2.height = 18;
 

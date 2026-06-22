@@ -11,11 +11,14 @@ import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
+import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { DeleteButton } from "@/app/components/delete-button";
+import { useIsSystemAdmin } from "@/app/components/system-admin-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatAmountDisplay,
+  roundToTwoDecimals,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
 import {
@@ -40,6 +43,7 @@ type MultiPositionModalProps = {
   onSave: (value: EstimateMultiPosition) => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 };
 
@@ -48,6 +52,8 @@ type OptionDraft = {
   lineItemId: string;
   label: string;
   timeNorm: number;
+  customHourlyRateEnabled: boolean;
+  customHourlyRate: number;
   materials: LineItemCatalogRef[];
   mechanisms: LineItemCatalogRef[];
   materialAddKey: number;
@@ -65,6 +71,8 @@ function createOptionDraft(): OptionDraft {
     lineItemId: crypto.randomUUID(),
     label: "",
     timeNorm: 0,
+    customHourlyRateEnabled: false,
+    customHourlyRate: 0,
     materials: [],
     mechanisms: [],
     materialAddKey: 0,
@@ -84,6 +92,9 @@ function deriveSharedState(value: EstimateMultiPosition) {
             lineItemId: option.lineItem.id,
             label: option.lineItem.name,
             timeNorm: option.lineItem.laborTimeNorm ?? 0,
+            customHourlyRateEnabled:
+              option.lineItem.customHourlyRateEnabled ?? false,
+            customHourlyRate: option.lineItem.customHourlyRate ?? 0,
             materials: resolveEffectiveMaterials(option.lineItem),
             mechanisms: resolveEffectiveMechanisms(option.lineItem),
             materialAddKey: 0,
@@ -104,6 +115,8 @@ function snapshot(state: {
     options: state.options.map((option) => ({
       label: option.label.trim(),
       timeNorm: option.timeNorm,
+      customHourlyRateEnabled: option.customHourlyRateEnabled,
+      customHourlyRate: option.customHourlyRate,
       materials: option.materials,
       mechanisms: option.mechanisms,
     })),
@@ -117,9 +130,11 @@ export function MultiPositionModal({
   onSave,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions = [],
 }: MultiPositionModalProps) {
   const { t } = useTranslations();
+  const isSystemAdmin = useIsSystemAdmin();
   const [name, setName] = useState(value.name);
   const [attachment, setAttachment] =
     useState<LineItemModuleSizeAttachment | null>(null);
@@ -259,6 +274,8 @@ export function MultiPositionModal({
         quantity: 1,
         unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
         laborTimeNorm: option.timeNorm,
+        customHourlyRateEnabled: option.customHourlyRateEnabled,
+        customHourlyRate: option.customHourlyRate,
         materials: option.materials,
         mechanisms: option.mechanisms,
       },
@@ -271,6 +288,7 @@ export function MultiPositionModal({
     return Boolean(
       option.label.trim() ||
         option.timeNorm > 0 ||
+        option.customHourlyRateEnabled ||
         option.materials.length > 0 ||
         option.mechanisms.length > 0,
     );
@@ -290,6 +308,10 @@ export function MultiPositionModal({
         unit: "gab.",
         quantity: 1,
         laborTimeNorm: option.timeNorm,
+        customHourlyRateEnabled: option.customHourlyRateEnabled,
+        customHourlyRate: option.customHourlyRateEnabled
+          ? roundToTwoDecimals(option.customHourlyRate)
+          : undefined,
         materials: option.materials,
         mechanisms: option.mechanisms,
         moduleSizeAttachment: attachment ?? undefined,
@@ -451,6 +473,27 @@ export function MultiPositionModal({
                       />
                     </label>
                   </div>
+
+                  {isSystemAdmin ? null : (
+                    <PositionCustomHourlyRateField
+                      id={`multi-custom-hourly-rate-${option.optionId}`}
+                      enabled={option.customHourlyRateEnabled}
+                      rate={option.customHourlyRate}
+                      defaultHourlyRate={defaultHourlyRate}
+                      currency={currency}
+                      onEnabledChange={(customHourlyRateEnabled) =>
+                        updateOption(option.optionId, {
+                          customHourlyRateEnabled,
+                          customHourlyRate: customHourlyRateEnabled
+                            ? (option.customHourlyRate || defaultHourlyRate || 0)
+                            : 0,
+                        })
+                      }
+                      onRateChange={(customHourlyRate) =>
+                        updateOption(option.optionId, { customHourlyRate })
+                      }
+                    />
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     {/* Materiāli */}

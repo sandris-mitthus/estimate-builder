@@ -27,6 +27,7 @@ import type {
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { isMissingColumnError } from "@/app/lib/supabase/missing-column";
+import { cache } from "react";
 
 type BuildingModuleRow = {
   id: string;
@@ -112,7 +113,9 @@ function validateNote(note: string): string | null {
   return null;
 }
 
-export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
+export const listBuildingModules = cache(async function listBuildingModules(): Promise<
+  BuildingModuleSummary[]
+> {
   if (!isSupabaseAdminConfigured()) {
     return SAMPLE_BUILDING_MODULES;
   }
@@ -134,7 +137,7 @@ export async function listBuildingModules(): Promise<BuildingModuleSummary[]> {
   }
 
   return data.map((row) => mapBuildingModuleSummary(row as BuildingModuleRow));
-}
+});
 
 export async function listBuildingModuleSizeOptions(): Promise<
   BuildingModuleSizeOption[]
@@ -226,6 +229,68 @@ export async function getBuildingModule(
   }
 
   return getSampleBuildingModule(id);
+}
+
+export async function getBuildingModulesByIds(
+  ids: string[],
+): Promise<Map<string, BuildingModuleDetail | null>> {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+  const modules = new Map<string, BuildingModuleDetail | null>(
+    uniqueIds.map((id) => [id, null]),
+  );
+
+  if (uniqueIds.length === 0) {
+    return modules;
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    for (const id of uniqueIds) {
+      modules.set(id, getSampleBuildingModule(id));
+    }
+    return modules;
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    for (const id of uniqueIds) {
+      modules.set(id, getSampleBuildingModule(id));
+    }
+    return modules;
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("building_modules")
+    .select("id, name, note, outline, visualization_blocks, project_blocks, project_description")
+    .eq("company_id", companyId)
+    .in("id", uniqueIds);
+
+  if (!error && data) {
+    for (const row of data as BuildingModuleRow[]) {
+      modules.set(row.id, mapBuildingModuleDetail(row));
+    }
+    return modules;
+  }
+
+  if (error && isMissingColumnError(error, "project_description")) {
+    const legacy = await supabase
+      .from("building_modules")
+      .select("id, name, note, outline, visualization_blocks, project_blocks")
+      .eq("company_id", companyId)
+      .in("id", uniqueIds);
+
+    if (!legacy.error && legacy.data) {
+      for (const row of legacy.data as BuildingModuleRow[]) {
+        modules.set(row.id, mapBuildingModuleDetail(row));
+      }
+    } else if (legacy.error) {
+      console.error("getBuildingModulesByIds:", legacy.error.message);
+    }
+  } else if (error) {
+    console.error("getBuildingModulesByIds:", error.message);
+  }
+
+  return modules;
 }
 
 export async function createBuildingModule(

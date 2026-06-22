@@ -129,7 +129,7 @@ const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 const actionBtn =
   "inline-flex h-7 items-center rounded-md px-2 text-xs text-zinc-500 transition hover:bg-white hover:text-zinc-800";
 const rowActionCell =
-  "border-b border-zinc-100 px-1 py-0.5 text-center align-top";
+  "border-b border-zinc-100 px-1 py-0.5 text-right align-top";
 
 const hydrateCatalogPrices = { forceCatalogPrices: true } as const;
 
@@ -146,6 +146,7 @@ function LineItemRow({
   showDropLine,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
 }: {
   item: EstimateLineItem;
@@ -159,6 +160,7 @@ function LineItemRow({
   showDropLine?: boolean;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
   const { t } = useTranslations();
@@ -273,7 +275,7 @@ function LineItemRow({
         }
       />
       <td className={rowActionCell}>
-        <div className="flex items-center justify-center gap-0.5">
+        <div className="flex min-w-[5.75rem] items-center justify-end gap-0.5 whitespace-nowrap">
           {showOfferPriceToggle ? (
             <LineItemPriceVisibilityToggle
               hiddenPriceInOffer={item.hiddenPriceInOffer}
@@ -387,6 +389,7 @@ function SortableMultiPositionRow({
   optionLinkActions,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
 }: {
   sortId: string;
@@ -396,6 +399,7 @@ function SortableMultiPositionRow({
   optionLinkActions: MultiOptionLinkActions;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
 }) {
   const { t } = useTranslations();
@@ -414,6 +418,7 @@ function SortableMultiPositionRow({
       onDelete={() => optionLinkActions.onMultiDelete(value.id)}
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
+      currency={currency}
       moduleSizeOptions={moduleSizeOptions}
       optionLinkActions={optionLinkActions}
       indentName={subcategoryId != null}
@@ -585,6 +590,7 @@ function SubcategoryBlock({
   onDelete,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
   collapsed,
   collapsedSummary,
@@ -598,6 +604,7 @@ function SubcategoryBlock({
   onDelete: () => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   collapsed: boolean;
   collapsedSummary: string;
@@ -676,6 +683,7 @@ function SubcategoryBlock({
             subcategoryId={subcategory.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             optionLinkActions={optionLinkActions}
             value={row}
@@ -715,6 +723,7 @@ function SectionBlock({
   onDelete,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   moduleSizeOptions,
   collapsed,
   collapsedSummary,
@@ -730,6 +739,7 @@ function SectionBlock({
   onDelete: () => void;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   collapsed: boolean;
   collapsedSummary: string;
@@ -798,6 +808,7 @@ function SectionBlock({
           sectionId={section.id}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           collapsed={collapsedSectionIds.has(subcategory.id)}
           collapsedSummary={getCollapsedSubcategorySummary(subcategory, t)}
@@ -832,6 +843,7 @@ function SectionBlock({
             sectionId={section.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             optionLinkActions={optionLinkActions}
             value={row}
@@ -994,12 +1006,12 @@ function EstimatePositionDndTable({
     >
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
-          <col style={{ width: "35%" }} />
+          <col style={{ width: "31%" }} />
           <col style={{ width: "6%" }} />
           {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
             <col key={index} style={{ width: "8%" }} />
           ))}
-          <col style={{ width: "5%" }} />
+          <col style={{ width: "6.5rem" }} />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgb(228_228_231)]">
           <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -1040,6 +1052,7 @@ function EstimatePositionDndTable({
               key={section.id}
               catalogPositions={catalogPositions}
               defaultHourlyRate={defaultHourlyRate}
+              currency={currency}
               moduleSizeOptions={moduleSizeOptions}
               collapsed={collapsedSectionIds.has(section.id)}
               collapsedSummary={getCollapsedSectionSummary(section, t)}
@@ -1131,7 +1144,10 @@ export function EstimatePositionTable({
     ),
   );
 
-  const lineItemCount = collectSectionLineItems(sections).length;
+  const lineItemCount = useMemo(
+    () => collectSectionLineItems(sections).length,
+    [sections],
+  );
   const estimateUnits = useMemo(
     () => collectEstimateDocumentUnits(sections, moduleSizeOptions),
     [sections, moduleSizeOptions],
@@ -1279,6 +1295,7 @@ export function EstimatePositionTable({
           onSave={(next) => positionModalState.onSave(next)}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
         />

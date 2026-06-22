@@ -7,7 +7,9 @@ import { InputWithSuffix } from "@/app/components/input-with-suffix";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
+import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
 import { formatAmount } from "@/app/lib/estimates/calculate-line";
+import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guard";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { TranslationParams } from "@/app/lib/i18n/translations";
 import { CURRENCY_OPTIONS } from "@/app/lib/settings/currencies";
@@ -77,6 +79,16 @@ type Translate = (
   params?: TranslationParams,
 ) => string;
 
+function serializeSettingsDraft(
+  settings: CompanySettings,
+  hourlyRateInput: string,
+) {
+  return JSON.stringify({
+    ...settings,
+    defaultHourlyRateInput: hourlyRateInput,
+  });
+}
+
 function CompanyPreview({
   settings,
   t,
@@ -85,6 +97,10 @@ function CompanyPreview({
   t: Translate;
 }) {
   const lines = useMemo(() => formatCompanyDisplayLines(settings), [settings]);
+  const offerAdditionalInfoLines = useMemo(
+    () => parseOfferAdditionalInfoLines(settings.offerAdditionalInfo),
+    [settings.offerAdditionalInfo],
+  );
   const currencyLabel =
     CURRENCY_OPTIONS.find((option) => option.value === settings.currency)
       ?.label ?? settings.currency;
@@ -155,18 +171,15 @@ function CompanyPreview({
           )}
         </p>
       ) : null}
-      {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).length > 0 ||
-      settings.offerValidityDays > 0 ? (
+      {offerAdditionalInfoLines.length > 0 || settings.offerValidityDays > 0 ? (
         <div className="mt-5 border-t border-zinc-200/80 pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             {t("settings.preview.offer_notes", "Piedāvājuma piezīmes")}
           </p>
           <ul className="mt-2 space-y-1.5 text-sm text-zinc-600">
-            {parseOfferAdditionalInfoLines(settings.offerAdditionalInfo).map(
-              (line, index) => (
+            {offerAdditionalInfoLines.map((line, index) => (
                 <li key={`${index}-${line.slice(0, 24)}`}>{line}</li>
-              ),
-            )}
+              ))}
           </ul>
           {settings.offerValidityDays > 0 ? (
             <p className="mt-3 text-sm font-semibold text-zinc-800">
@@ -186,16 +199,39 @@ export function CompanySettingsForm({
 }: {
   initialSettings: CompanySettings;
 }) {
-  const [settings, setSettings] = useState(initialSettings);
+  const [settings, setSettings] = useState<CompanySettings>(() => ({
+    ...initialSettings,
+    offerValidityDays: initialSettings.estimateValidityDays,
+  }));
   const [hourlyRateInput, setHourlyRateInput] = useState(() =>
     initialSettings.defaultHourlyRate !== null
       ? formatAmount(initialSettings.defaultHourlyRate)
       : "",
   );
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
+    serializeSettingsDraft(
+      {
+        ...initialSettings,
+        offerValidityDays: initialSettings.estimateValidityDays,
+      },
+      initialSettings.defaultHourlyRate !== null
+        ? formatAmount(initialSettings.defaultHourlyRate)
+        : "",
+    ),
+  );
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const { t } = useTranslations();
   const canSave = useActionPermission("settings.save");
   const [isPending, startTransition] = useTransition();
+  const isDirty =
+    serializeSettingsDraft(settings, hourlyRateInput) !== savedSnapshot;
+  const { confirmOpen, stayOnPage, confirmLeave } = useUnsavedChangesGuard({
+    isDirty,
+    enabled: canSave,
+  });
+  const daysSuffix = t("common.days_count", "{count} dienas", {
+    count: "",
+  }).trim();
 
   function updateField<K extends keyof CompanySettings>(
     key: K,
@@ -222,23 +258,16 @@ export function CompanySettingsForm({
     event.preventDefault();
     clearFeedback();
 
+    if (!isDirty) {
+      return;
+    }
+
     if (settings.estimateValidityDays < 1) {
       showFeedback({
         type: "error",
         text: t(
           "settings.validation.estimate_validity_required",
           "Ievadi tāmes derīguma termiņu dienās.",
-        ),
-      });
-      return;
-    }
-
-    if (settings.offerValidityDays < 1) {
-      showFeedback({
-        type: "error",
-        text: t(
-          "settings.validation.offer_validity_required",
-          "Ievadi piedāvājuma derīguma termiņu dienās.",
         ),
       });
       return;
@@ -255,6 +284,7 @@ export function CompanySettingsForm({
 
     const settingsToSave = {
       ...settings,
+      offerValidityDays: settings.estimateValidityDays,
       defaultHourlyRate: parsedHourlyRate,
     };
 
@@ -263,6 +293,7 @@ export function CompanySettingsForm({
 
       if (result.ok) {
         setSettings(settingsToSave);
+        setSavedSnapshot(serializeSettingsDraft(settingsToSave, hourlyRateInput));
         showFeedback({
           type: "success",
           text: t("settings.feedback.saved", "Uzstādījumi saglabāti."),
@@ -277,7 +308,7 @@ export function CompanySettingsForm({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_386px] lg:items-start">
       <form onSubmit={handleSubmit} className="space-y-8">
-        <fieldset disabled={!canSave} className="space-y-8 disabled:opacity-80">
+        <fieldset disabled={!canSave || isPending} className="space-y-8 disabled:opacity-80">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title={t("settings.section.company", "Uzņēmums")}>
             <CompanyLogoDropzone
@@ -328,7 +359,7 @@ export function CompanySettingsForm({
                 label={t("settings.bank_account_number", "Bankas konta numurs")}
                 id="bankAccountNumber"
                 value={settings.bankAccountNumber}
-                placeholder="LV… IBAN"
+                placeholder={t("settings.bank_account_placeholder", "LV… IBAN")}
                 onChange={updateBankAccountNumber}
               />
             </div>
@@ -360,7 +391,7 @@ export function CompanySettingsForm({
               <InputWithSuffix
                 id="estimateValidityDays"
                 name="estimateValidityDays"
-                suffix="dienas"
+                suffix={daysSuffix}
                 inputMode="numeric"
                 autoComplete="off"
                 value={
@@ -372,10 +403,14 @@ export function CompanySettingsForm({
                   const digits = parseEstimateValidityDaysInput(
                     event.target.value,
                   );
-                  updateField(
-                    "estimateValidityDays",
-                    digits === "" ? 0 : Number.parseInt(digits, 10),
-                  );
+                  const validityDays =
+                    digits === "" ? 0 : Number.parseInt(digits, 10);
+                  setSettings((current) => ({
+                    ...current,
+                    estimateValidityDays: validityDays,
+                    offerValidityDays: validityDays,
+                  }));
+                  clearFeedback();
                 }}
               />
             </label>
@@ -400,43 +435,6 @@ export function CompanySettingsForm({
                     value.trim() === "" ? null : parsed,
                   );
                   clearFeedback();
-                }}
-              />
-            </label>
-          </SettingsSection>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
-          <SettingsSection title={t("settings.section.offer", "Piedāvājums")}>
-            <label htmlFor="offerValidityDays" className="block">
-              <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-                {t("settings.offer_validity_term", "Piedāvājuma derīguma termiņš")}
-              </span>
-              <span className="mb-2 block text-xs text-zinc-500">
-                {t(
-                  "settings.offer_validity_hint",
-                  "PDF rāda treknrakstā: „Piedāvājums spēkā X dienas”.",
-                )}
-              </span>
-              <InputWithSuffix
-                id="offerValidityDays"
-                name="offerValidityDays"
-                suffix="dienas"
-                inputMode="numeric"
-                autoComplete="off"
-                value={
-                  settings.offerValidityDays > 0
-                    ? String(settings.offerValidityDays)
-                    : ""
-                }
-                onChange={(event) => {
-                  const digits = parseEstimateValidityDaysInput(
-                    event.target.value,
-                  );
-                  updateField(
-                    "offerValidityDays",
-                    digits === "" ? 0 : Number.parseInt(digits, 10),
-                  );
                 }}
               />
             </label>
@@ -517,7 +515,7 @@ export function CompanySettingsForm({
           {canSave ? (
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || !isDirty}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
@@ -530,6 +528,12 @@ export function CompanySettingsForm({
       <div className="lg:sticky lg:top-[4.5rem]">
         <CompanyPreview settings={settings} t={t} />
       </div>
+
+      <UnsavedChangesConfirmModal
+        open={confirmOpen}
+        onStay={stayOnPage}
+        onLeave={confirmLeave}
+      />
     </div>
   );
 }

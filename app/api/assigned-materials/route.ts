@@ -13,10 +13,9 @@ export async function GET() {
   }
 
   const currentUserDisplay = mapUserDisplay(user);
-  const [allUsers, catalogPositions, companySettings] = await Promise.all([
+  const [allUsers, catalogPositions] = await Promise.all([
     listUsers(),
     listPositionPrices(),
-    getCompanySettings(),
   ]);
   const currentUserFromList = allUsers.find(
     (listedUser) => listedUser.id === user.id,
@@ -30,12 +29,14 @@ export async function GET() {
     allUsers,
     catalogPositions,
   });
+  const companySettings =
+    groups.length > 0 ? await getCompanySettings() : null;
 
   return Response.json(
     {
       groups,
-      catalogPositions,
-      currency: companySettings.currency,
+      catalogPositions: groups.length > 0 ? catalogPositions : [],
+      currency: companySettings?.currency ?? null,
       currentUser: {
         id: user.id,
         name: currentUserDisplay.name,

@@ -653,6 +653,7 @@ function SortableMultiPositionRow({
   optionLinkActions,
   catalogPositions,
   defaultHourlyRate,
+  currency = null,
   showQuantityColumn,
   allCategories,
   moduleSizeOptions = [],
@@ -667,6 +668,7 @@ function SortableMultiPositionRow({
   optionLinkActions: MultiOptionLinkActions;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
+  currency?: string | null;
   showQuantityColumn: boolean;
   allCategories: EstimateCategory[];
   moduleSizeOptions?: BuildingModuleSizeOption[];
@@ -697,6 +699,7 @@ function SortableMultiPositionRow({
       }
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
+      currency={currency}
       optionLinkActions={optionLinkActions}
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
@@ -996,6 +999,7 @@ function SubcategoryBlock({
             subcategoryId={subcategory.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             showQuantityColumn={showQuantityColumn}
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
@@ -1165,6 +1169,7 @@ function CategoryBlock({
             categoryId={category.id}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             showQuantityColumn={showQuantityColumn}
             allCategories={allCategories}
             optionLinkActions={optionLinkActions}
@@ -2023,7 +2028,10 @@ export function EstimateTable({
     ],
   );
 
-  const positionCount = collectEstimateLineItems(categories).length;
+  const positionCount = useMemo(
+    () => collectEstimateLineItems(categories).length,
+    [categories],
+  );
 
   const allDragIds = useMemo(
     () => collectAllDragIds(categories),
@@ -2123,6 +2131,7 @@ export function EstimateTable({
             }}
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             estimateUnits={estimateUnits}
           />
@@ -2474,6 +2483,7 @@ export function EstimateTable({
           }}
           catalogPositions={catalogPositions}
           defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
         />

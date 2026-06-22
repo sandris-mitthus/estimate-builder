@@ -22,8 +22,9 @@ export function resolveCompanyLogoDisplayUrl(storedUrl: string): string {
 
 export async function downloadCompanyLogoFile(
   supabase: ReturnType<typeof createAdminClient>,
+  companyIdOverride?: string,
 ): Promise<{ data: Blob; mimeType: string } | null> {
-  const companyId = await getCurrentCompanyId();
+  const companyId = companyIdOverride ?? (await getCurrentCompanyId());
   const pathPrefixes = companyId
     ? [`companies/${companyId}`, ...(companyId === BOOTSTRAP_COMPANY_ID ? ["company"] : [])]
     : ["company"];

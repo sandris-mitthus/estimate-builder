@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { resolveModuleBlockAssetUrl } from "@/app/lib/modules/resolve-block-asset";
 import type { ModuleContentBlock } from "@/app/lib/modules/types";
 import { ModuleVisualizationImage } from "@/app/components/module-visualization-image";
@@ -18,7 +19,10 @@ export function ModuleVisualizationGallery({
   className = "",
 }: ModuleVisualizationGalleryProps) {
   const { t } = useTranslations();
-  const imageBlocks = blocks.filter((block) => block.mimeType.startsWith("image/"));
+  const imageBlocks = useMemo(
+    () => blocks.filter((block) => block.mimeType.startsWith("image/")),
+    [blocks],
+  );
 
   return (
     <section className={`flex h-full min-h-[14rem] flex-col ${className}`.trim()}>

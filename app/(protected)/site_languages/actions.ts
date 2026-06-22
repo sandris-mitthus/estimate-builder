@@ -2,7 +2,10 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
-import { SITE_TRANSLATIONS_CACHE_TAG } from "@/app/lib/i18n/cache-tags";
+import {
+  SITE_LANGUAGES_CACHE_TAG,
+  SITE_TRANSLATIONS_CACHE_TAG,
+} from "@/app/lib/i18n/cache-tags";
 import {
   createSiteLanguage,
   deleteSiteLanguage,
@@ -19,6 +22,7 @@ export async function createSiteLanguageAction(input: SiteLanguageInput) {
   const result = await createSiteLanguage(input);
 
   if (result.ok) {
+    revalidateTag(SITE_LANGUAGES_CACHE_TAG, "max");
     revalidateTag(SITE_TRANSLATIONS_CACHE_TAG, "max");
     revalidatePath("/site_languages");
     revalidatePath("/", "layout");
@@ -36,6 +40,7 @@ export async function updateSiteLanguageActiveStatusAction(
   const result = await updateSiteLanguageActiveStatus(code, isActive);
 
   if (result.ok) {
+    revalidateTag(SITE_LANGUAGES_CACHE_TAG, "max");
     revalidateTag(SITE_TRANSLATIONS_CACHE_TAG, "max");
     revalidatePath("/site_languages");
     revalidatePath("/", "layout");
@@ -53,6 +58,7 @@ export async function updateSiteLanguageAction(
   const result = await updateSiteLanguage(currentCode, input);
 
   if (result.ok) {
+    revalidateTag(SITE_LANGUAGES_CACHE_TAG, "max");
     revalidateTag(SITE_TRANSLATIONS_CACHE_TAG, "max");
     revalidatePath("/site_languages");
     revalidatePath("/site_translations");
@@ -68,6 +74,7 @@ export async function deleteSiteLanguageAction(code: string) {
   const result = await deleteSiteLanguage(code);
 
   if (result.ok) {
+    revalidateTag(SITE_LANGUAGES_CACHE_TAG, "max");
     revalidateTag(SITE_TRANSLATIONS_CACHE_TAG, "max");
     revalidatePath("/site_languages");
     revalidatePath("/site_translations");
@@ -83,6 +90,7 @@ export async function setDefaultSiteLanguageAction(code: string) {
   const result = await setDefaultSiteLanguage(code);
 
   if (result.ok) {
+    revalidateTag(SITE_LANGUAGES_CACHE_TAG, "max");
     revalidateTag(SITE_TRANSLATIONS_CACHE_TAG, "max");
     revalidatePath("/site_languages");
     revalidatePath("/", "layout");

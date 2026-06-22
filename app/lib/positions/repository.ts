@@ -1,4 +1,5 @@
 import { todayIsoDate } from "@/app/lib/format-display-date";
+import { cache } from "react";
 import { SAMPLE_POSITION_PRICES } from "@/app/lib/positions/sample-prices";
 import type {
   CreatePositionInput,
@@ -50,7 +51,9 @@ function mapPositionPrice(row: PositionPriceRow): PositionPriceSummary {
   };
 }
 
-export async function listPositionPrices(): Promise<PositionPriceSummary[]> {
+export const listPositionPrices = cache(async function listPositionPrices(): Promise<
+  PositionPriceSummary[]
+> {
   if (!isSupabaseAdminConfigured()) {
     return SAMPLE_POSITION_PRICES;
   }
@@ -75,7 +78,7 @@ export async function listPositionPrices(): Promise<PositionPriceSummary[]> {
 
   const positions = data.map((row) => mapPositionPrice(row as PositionPriceRow));
   return enrichPositionPricesWithLatestHistory(positions);
-}
+});
 
 async function enrichPositionPricesWithLatestHistory(
   positions: PositionPriceSummary[],

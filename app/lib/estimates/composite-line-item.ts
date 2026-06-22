@@ -101,7 +101,9 @@ export function deriveCompositeUnitPrice(
   const timeNorm = Number.isFinite(item.laborTimeNorm)
     ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
     : 0;
-  const labor = roundToTwoDecimals(timeNorm * (defaultHourlyRate ?? 0));
+  const labor = roundToTwoDecimals(
+    timeNorm * resolveLineItemHourlyRate(item, defaultHourlyRate),
+  );
 
   const materials = roundToTwoDecimals(
     resolveEffectiveMaterials(item).reduce((sum, ref) => {
@@ -119,6 +121,21 @@ export function deriveCompositeUnitPrice(
   );
 
   return { labor, materials, mechanisms };
+}
+
+export function resolveLineItemHourlyRate(
+  item: EstimateLineItem | null | undefined,
+  defaultHourlyRate: number | null,
+): number {
+  if (
+    item?.customHourlyRateEnabled === true &&
+    Number.isFinite(item.customHourlyRate) &&
+    (item.customHourlyRate ?? 0) >= 0
+  ) {
+    return roundToTwoDecimals(item.customHourlyRate ?? 0);
+  }
+
+  return defaultHourlyRate ?? 0;
 }
 
 export function hydrateCompositeLineItem(
@@ -175,6 +192,7 @@ export function createCompositePosition(): EstimateLineItem {
     quantity: 1,
     unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
     laborTimeNorm: 0,
+    customHourlyRateEnabled: false,
     materials: [],
     mechanisms: [],
   };

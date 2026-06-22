@@ -46,10 +46,12 @@ export async function GET(
     catalogPositions,
     companySettings.defaultHourlyRate,
     companySettings.vatNumber,
+    companySettings.currency,
     t,
   );
 
-  const filename = `tame-${projectId.slice(0, 8)}.xlsx`;
+  const filenamePrefix = t("exports.filename.estimate", "tame");
+  const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.xlsx`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

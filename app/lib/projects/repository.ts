@@ -18,7 +18,10 @@ import {
   isProjectEstimateSaved,
 } from "@/app/lib/positions/stale-catalog-price";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
-import { getBuildingModule } from "@/app/lib/modules/repository";
+import {
+  getBuildingModule,
+  getBuildingModulesByIds,
+} from "@/app/lib/modules/repository";
 import {
   buildPendingMaterialsModuleSizeOptions,
   hasPendingProjectMaterials,
@@ -243,24 +246,42 @@ async function parseEstimateRow(
   };
 }
 
-export async function listProjectIdsWithStaleCatalogPrices(
+export type ProjectListBadges = {
+  staleCatalogPriceProjectIds: Set<string>;
+  newSagatavePositionProjectIds: Set<string>;
+  pendingMaterialsProjectIds: Set<string>;
+};
+
+export async function getProjectListBadges(
   projects: ProjectSummary[],
-): Promise<Set<string>> {
+): Promise<ProjectListBadges> {
+  const empty: ProjectListBadges = {
+    staleCatalogPriceProjectIds: new Set(),
+    newSagatavePositionProjectIds: new Set(),
+    pendingMaterialsProjectIds: new Set(),
+  };
+
   if (!isSupabaseAdminConfigured() || projects.length === 0) {
-    return new Set();
+    return empty;
   }
 
-  const [catalogPositions, companySettings] = await Promise.all([
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return empty;
+  }
+
+  const [catalogPositions, companySettings, sagatave] = await Promise.all([
     listPositionPrices(),
     getCompanySettings(),
+    ensureDefaultEstimatePosition(),
   ]);
   const defaultHourlyRate = companySettings.defaultHourlyRate;
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
-    return new Set();
-  }
-
+  const approvedProjectById = new Map(
+    projects
+      .filter((project) => project.status === "approved")
+      .map((project) => [project.id, project]),
+  );
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
@@ -272,156 +293,26 @@ export async function listProjectIdsWithStaleCatalogPrices(
     );
 
   if (error || !data) {
-    return new Set();
+    return empty;
   }
 
-  const staleProjectIds = new Set<string>();
-
-  for (const row of data) {
-    const project = projectById.get(row.project_id as string);
-    if (!project || !shouldShowStaleCatalogPriceWarnings(project.status)) {
-      continue;
-    }
-
-    const parsed = parseEstimatePositionDocumentPayload(
-      row.categories as EstimateCategory[],
-    );
-    if (parsed.sections.length === 0) {
-      continue;
-    }
-
-    const meta = estimateMetaForProject(
-      project,
-      companySettings.estimateValidityDays,
-      {
-        ...((row.meta ?? {}) as EstimateMeta),
-      },
-    );
-
-    if (
-      !isProjectEstimateSaved(meta, {
-        projectCreatedAt: project.createdAt,
-        estimateUpdatedAt: row.updated_at as string | undefined,
-      })
-    ) {
-      continue;
-    }
-
-    if (
-      estimateHasStaleCatalogPrices(
-        parsed.sections,
-        catalogPositions,
-        defaultHourlyRate,
-      )
-    ) {
-      staleProjectIds.add(project.id);
-    }
-  }
-
-  return staleProjectIds;
-}
-
-export async function listProjectIdsWithNewSagatavePositions(
-  projects: ProjectSummary[],
-): Promise<Set<string>> {
-  if (!isSupabaseAdminConfigured() || projects.length === 0) {
-    return new Set();
-  }
-
-  const sagatave = await ensureDefaultEstimatePosition();
-  if (sagatave.sections.length === 0) {
-    return new Set();
-  }
-
-  const projectById = new Map(projects.map((project) => [project.id, project]));
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
-    return new Set();
-  }
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("estimates")
-    .select("project_id, meta, categories")
-    .eq("company_id", companyId)
-    .in(
-      "project_id",
-      projects.map((project) => project.id),
-    );
-
-  if (error || !data) {
-    return new Set();
-  }
-
-  const projectIdsWithNewSagatavePositions = new Set<string>();
-
-  for (const row of data) {
-    const project = projectById.get(row.project_id as string);
-    if (!project || !shouldShowStaleCatalogPriceWarnings(project.status)) {
-      continue;
-    }
-
-    const meta = (row.meta ?? {}) as EstimateMeta;
-    if (meta.clonedFromProjectId) {
-      continue;
-    }
-
-    const parsed = parseEstimatePositionDocumentPayload(
-      row.categories as EstimateCategory[],
-    );
-
-    if (
-      sagataveHasNewPositionsForProject(sagatave.sections, parsed.sections)
-    ) {
-      projectIdsWithNewSagatavePositions.add(project.id);
-    }
-  }
-
-  return projectIdsWithNewSagatavePositions;
-}
-
-export async function listProjectIdsWithPendingMaterials(
-  projects: ProjectSummary[],
-): Promise<Set<string>> {
-  const approvedProjects = projects.filter(
-    (project) => project.status === "approved",
+  const staleCatalogPriceProjectIds = new Set<string>();
+  const newSagatavePositionProjectIds = new Set<string>();
+  const pendingMaterialsProjectIds = new Set<string>();
+  const moduleIds = Array.from(
+    new Set(
+      data
+        .map((row) =>
+          approvedProjectById.get(row.project_id as string)?.buildingModuleId,
+        )
+        .filter((id): id is string => Boolean(id)),
+    ),
   );
-
-  if (!isSupabaseAdminConfigured() || approvedProjects.length === 0) {
-    return new Set();
-  }
-
-  const catalogPositions = await listPositionPrices();
-  const projectById = new Map(
-    approvedProjects.map((project) => [project.id, project]),
-  );
-  const moduleCache = new Map<
-    string,
-    Awaited<ReturnType<typeof getBuildingModule>>
-  >();
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
-    return new Set();
-  }
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("estimates")
-    .select("project_id, meta, categories")
-    .eq("company_id", companyId)
-    .in(
-      "project_id",
-      approvedProjects.map((project) => project.id),
-    );
-
-  if (error || !data) {
-    return new Set();
-  }
-
-  const pendingProjectIds = new Set<string>();
+  const moduleCache = await getBuildingModulesByIds(moduleIds);
 
   for (const row of data) {
-    const project = projectById.get(row.project_id as string);
+    const projectId = row.project_id as string;
+    const project = projectById.get(projectId);
     if (!project) {
       continue;
     }
@@ -433,41 +324,94 @@ export async function listProjectIdsWithPendingMaterials(
       continue;
     }
 
-    const meta = (row.meta ?? {}) as EstimateMeta;
-    const orderedIds = meta.orderedMaterialPositionIds ?? [];
+    const rawMeta = (row.meta ?? {}) as EstimateMeta;
 
-    let buildingModule: Awaited<ReturnType<typeof getBuildingModule>> = null;
-    if (project.buildingModuleId) {
-      if (!moduleCache.has(project.buildingModuleId)) {
-        moduleCache.set(
-          project.buildingModuleId,
-          await getBuildingModule(project.buildingModuleId),
-        );
+    if (shouldShowStaleCatalogPriceWarnings(project.status)) {
+      const meta = estimateMetaForProject(
+        project,
+        companySettings.estimateValidityDays,
+        { ...rawMeta },
+      );
+
+      if (
+        isProjectEstimateSaved(meta, {
+          projectCreatedAt: project.createdAt,
+          estimateUpdatedAt: row.updated_at as string | undefined,
+        }) &&
+        estimateHasStaleCatalogPrices(
+          parsed.sections,
+          catalogPositions,
+          defaultHourlyRate,
+        )
+      ) {
+        staleCatalogPriceProjectIds.add(projectId);
       }
-      buildingModule = moduleCache.get(project.buildingModuleId) ?? null;
+
+      if (
+        sagatave.sections.length > 0 &&
+        !rawMeta.clonedFromProjectId &&
+        sagataveHasNewPositionsForProject(sagatave.sections, parsed.sections)
+      ) {
+        newSagatavePositionProjectIds.add(projectId);
+      }
     }
 
-    const moduleName = buildingModule?.name ?? "Individuāls projekts";
-    const moduleSizeOptions = buildPendingMaterialsModuleSizeOptions(
-      project,
-      buildingModule,
-      moduleName,
-      parsed.sections,
-    );
+    const approvedProject = approvedProjectById.get(projectId);
+    if (approvedProject) {
+      const orderedIds = rawMeta.orderedMaterialPositionIds ?? [];
 
-    if (
-      hasPendingProjectMaterials(
+      let buildingModule: Awaited<ReturnType<typeof getBuildingModule>> = null;
+      if (approvedProject.buildingModuleId) {
+        buildingModule = moduleCache.get(approvedProject.buildingModuleId) ?? null;
+      }
+
+      const moduleName = buildingModule?.name ?? "Individuāls projekts";
+      const moduleSizeOptions = buildPendingMaterialsModuleSizeOptions(
+        approvedProject,
+        buildingModule,
+        moduleName,
         parsed.sections,
-        catalogPositions,
-        moduleSizeOptions,
-        orderedIds,
-      )
-    ) {
-      pendingProjectIds.add(project.id);
+      );
+
+      if (
+        hasPendingProjectMaterials(
+          parsed.sections,
+          catalogPositions,
+          moduleSizeOptions,
+          orderedIds,
+        )
+      ) {
+        pendingMaterialsProjectIds.add(projectId);
+      }
     }
   }
 
-  return pendingProjectIds;
+  return {
+    staleCatalogPriceProjectIds,
+    newSagatavePositionProjectIds,
+    pendingMaterialsProjectIds,
+  };
+}
+
+export async function listProjectIdsWithStaleCatalogPrices(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  const badges = await getProjectListBadges(projects);
+  return badges.staleCatalogPriceProjectIds;
+}
+
+export async function listProjectIdsWithNewSagatavePositions(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  const badges = await getProjectListBadges(projects);
+  return badges.newSagatavePositionProjectIds;
+}
+
+export async function listProjectIdsWithPendingMaterials(
+  projects: ProjectSummary[],
+): Promise<Set<string>> {
+  const badges = await getProjectListBadges(projects);
+  return badges.pendingMaterialsProjectIds;
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {

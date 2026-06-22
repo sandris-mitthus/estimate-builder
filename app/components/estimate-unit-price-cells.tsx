@@ -9,6 +9,7 @@ import {
   isCompositeLineItem,
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
+  resolveLineItemHourlyRate,
 } from "@/app/lib/estimates/composite-line-item";
 import type { EstimateLineItem, PriceBreakdown } from "@/app/lib/estimates/types";
 import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
@@ -62,8 +63,8 @@ export function EstimateUnitPriceCells({
       ? formatTimeNormDisplay(item.laborTimeNorm)
       : null;
   const hourlyRateText =
-    showLaborBreakdown && defaultHourlyRate != null
-      ? formatAmountDisplay(defaultHourlyRate)
+    showLaborBreakdown
+      ? formatAmountDisplay(resolveLineItemHourlyRate(item, defaultHourlyRate))
       : null;
 
   return (

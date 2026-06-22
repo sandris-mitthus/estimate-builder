@@ -1,7 +1,11 @@
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import type { TranslationDictionary } from "@/app/lib/i18n/translations";
-import { SITE_TRANSLATIONS_CACHE_TAG } from "@/app/lib/i18n/cache-tags";
+import {
+  SITE_LANGUAGES_CACHE_TAG,
+  SITE_SETTINGS_CACHE_TAG,
+  SITE_TRANSLATIONS_CACHE_TAG,
+} from "@/app/lib/i18n/cache-tags";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import {
   DEFAULT_GROUP_DEFINITIONS,
@@ -26,10 +30,23 @@ type CompanyUserRow = {
   updated_at: string;
 };
 
+type CompanyGroupMemberRow = {
+  company_id: string;
+  user_id: string;
+  group_id: string;
+};
+
+type CompanyUserGroupRow = {
+  id: string;
+  company_id: string;
+  name: string;
+};
+
 type UserRow = {
   id: string;
   email: string;
   name: string;
+  avatar_url: string | null;
   is_admin: boolean;
   created_at: string;
   updated_at: string;
@@ -47,6 +64,7 @@ type CompanySettingsRow = {
   registration_number: string;
   phone: string;
   email: string;
+  logo_url: string;
   currency: string;
   estimate_validity_days: number | null;
   offer_validity_days: number | null;
@@ -90,6 +108,7 @@ type SiteTranslationRow = {
 export type SiteCompanySummary = {
   id: string;
   name: string;
+  logoUrl: string | null;
   createdAt: string;
   updatedAt: string;
   settingsCompanyName: string;
@@ -102,12 +121,15 @@ export type SiteCompanySummary = {
 };
 
 export type SiteCompanyUserSummary = {
-  companyId: string;
-  companyName: string;
+  companyId: string | null;
+  companyName: string | null;
+  companyLogoUrl: string | null;
   userId: string;
   userName: string;
   userEmail: string;
+  avatarUrl: string | null;
   role: string;
+  roleName: string | null;
   status: string;
   isSystemAdmin: boolean;
   createdAt: string;
@@ -343,7 +365,9 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
     supabase.from("company_users").select("company_id, status"),
     supabase
       .from("company_settings")
-      .select("company_id, company_name, registration_number, address, email, phone"),
+      .select(
+        "company_id, company_name, registration_number, address, email, phone, logo_url",
+      ),
   ]);
 
   if (companiesResult.error || !companiesResult.data) {
@@ -379,6 +403,7 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
       | "address"
       | "email"
       | "phone"
+      | "logo_url"
     >[]).map((settings) => [settings.company_id, settings]),
   );
 
@@ -392,6 +417,9 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
     return {
       id: company.id,
       name: company.name,
+      logoUrl: settings?.logo_url?.trim()
+        ? `/api/company/logo?companyId=${encodeURIComponent(company.id)}`
+        : null,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
       settingsCompanyName: settings?.company_name ?? "",
@@ -411,16 +439,29 @@ export async function listSiteCompanyUsers(): Promise<SiteCompanyUserSummary[]> 
   }
 
   const supabase = createAdminClient();
-  const [membershipsResult, companiesResult, usersResult, authUsersResult] =
+  const [
+    membershipsResult,
+    companiesResult,
+    companySettingsResult,
+    usersResult,
+    groupMembershipsResult,
+    groupsResult,
+    authUsersResult,
+  ] =
     await Promise.all([
-    supabase
-      .from("company_users")
-      .select("company_id, user_id, role, status, created_at, updated_at")
-      .order("created_at", { ascending: false }),
-    supabase.from("companies").select("id, name"),
-    supabase.from("users").select("id, email, name, is_admin, created_at, updated_at"),
-    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-  ]);
+      supabase
+        .from("company_users")
+        .select("company_id, user_id, role, status, created_at, updated_at")
+        .order("created_at", { ascending: false }),
+      supabase.from("companies").select("id, name"),
+      supabase.from("company_settings").select("company_id, logo_url"),
+      supabase
+        .from("users")
+        .select("id, email, name, avatar_url, is_admin, created_at, updated_at"),
+      supabase.from("company_group_members").select("company_id, user_id, group_id"),
+      supabase.from("company_user_groups").select("id, company_id, name"),
+      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    ]);
 
   if (membershipsResult.error || !membershipsResult.data) {
     return [];
@@ -431,8 +472,33 @@ export async function listSiteCompanyUsers(): Promise<SiteCompanyUserSummary[]> 
       (company) => [company.id, company.name],
     ),
   );
+  const companyLogoUrlById = new Map(
+    ((companySettingsResult.data ?? []) as Pick<
+      CompanySettingsRow,
+      "company_id" | "logo_url"
+    >[])
+      .filter((settings) => settings.logo_url.trim().length > 0)
+      .map((settings) => [
+        settings.company_id,
+        `/api/company/logo?companyId=${encodeURIComponent(settings.company_id)}`,
+      ]),
+  );
   const userById = new Map(
     ((usersResult.data ?? []) as UserRow[]).map((user) => [user.id, user]),
+  );
+  const groupNameByKey = new Map(
+    ((groupsResult.data ?? []) as CompanyUserGroupRow[]).map((group) => [
+      `${group.company_id}:${group.id}`,
+      group.name,
+    ]),
+  );
+  const groupNameByMembershipKey = new Map(
+    ((groupMembershipsResult.data ?? []) as CompanyGroupMemberRow[]).map(
+      (membership) => [
+        `${membership.company_id}:${membership.user_id}`,
+        groupNameByKey.get(`${membership.company_id}:${membership.group_id}`) ?? null,
+      ],
+    ),
   );
   const authActivityByUserId = new Map<string, AuthUserActivity>();
 
@@ -445,17 +511,24 @@ export async function listSiteCompanyUsers(): Promise<SiteCompanyUserSummary[]> 
     }
   }
 
-  return ((membershipsResult.data ?? []) as CompanyUserRow[]).map((membership) => {
+  const membershipRows: SiteCompanyUserSummary[] = (
+    (membershipsResult.data ?? []) as CompanyUserRow[]
+  ).map((membership) => {
     const user = userById.get(membership.user_id);
     const authActivity = authActivityByUserId.get(membership.user_id);
 
     return {
       companyId: membership.company_id,
       companyName: companyNameById.get(membership.company_id) ?? "—",
+      companyLogoUrl: companyLogoUrlById.get(membership.company_id) ?? null,
       userId: membership.user_id,
       userName: user?.name || user?.email || "—",
       userEmail: user?.email || "—",
+      avatarUrl: user?.avatar_url?.trim() || null,
       role: membership.role,
+      roleName:
+        groupNameByMembershipKey.get(`${membership.company_id}:${membership.user_id}`) ??
+        null,
       status: membership.status,
       isSystemAdmin: user?.is_admin === true,
       createdAt: membership.created_at,
@@ -465,6 +538,33 @@ export async function listSiteCompanyUsers(): Promise<SiteCompanyUserSummary[]> 
       lastSeenAt: authActivity?.lastSeenAt ?? null,
     };
   });
+
+  const systemAdminRows: SiteCompanyUserSummary[] = Array.from(userById.values())
+    .filter((user) => user.is_admin === true)
+    .map((user) => {
+      const authActivity = authActivityByUserId.get(user.id);
+
+      return {
+        companyId: null,
+        companyName: null,
+        companyLogoUrl: null,
+        userId: user.id,
+        userName: user.name || user.email || "—",
+        userEmail: user.email || "—",
+        avatarUrl: user.avatar_url?.trim() || null,
+        role: "system_admin",
+        roleName: null,
+        status: "active",
+        isSystemAdmin: true,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        registeredAt: authActivity?.createdAt ?? user.created_at,
+        editedAt: user.updated_at,
+        lastSeenAt: authActivity?.lastSeenAt ?? null,
+      };
+    });
+
+  return [...systemAdminRows, ...membershipRows];
 }
 
 export async function listSiteUserGroups(): Promise<SiteUserGroupSummary[]> {
@@ -600,35 +700,41 @@ export async function updateSiteUserGroupPermissions(
   return { ok: true };
 }
 
-export async function listSiteLanguages(
-  options: { activeOnly?: boolean } = {},
-): Promise<SiteLanguageSummary[]> {
+async function listAllSiteLanguagesUncached(): Promise<SiteLanguageSummary[]> {
   if (!isSupabaseAdminConfigured()) {
-    return options.activeOnly
-      ? DEFAULT_SITE_LANGUAGES.filter((language) => language.isActive)
-      : DEFAULT_SITE_LANGUAGES;
+    return DEFAULT_SITE_LANGUAGES;
   }
 
   const supabase = createAdminClient();
-  let query = supabase
+  const { data, error } = await supabase
     .from("site_languages")
     .select("code, name, is_active, is_default, sort_order")
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
-  if (options.activeOnly) {
-    query = query.eq("is_active", true);
-  }
-
-  const { data, error } = await query;
-
   if (error || !data) {
-    return options.activeOnly
-      ? DEFAULT_SITE_LANGUAGES.filter((language) => language.isActive)
-      : DEFAULT_SITE_LANGUAGES;
+    return DEFAULT_SITE_LANGUAGES;
   }
 
   return (data as SiteLanguageRow[]).map(mapSiteLanguageRow);
+}
+
+const getCachedAllSiteLanguages = unstable_cache(
+  listAllSiteLanguagesUncached,
+  ["site-languages"],
+  { tags: [SITE_LANGUAGES_CACHE_TAG] },
+);
+
+export async function listSiteLanguages(
+  options: { activeOnly?: boolean } = {},
+): Promise<SiteLanguageSummary[]> {
+  const languages = isSupabaseAdminConfigured()
+    ? await getCachedAllSiteLanguages()
+    : DEFAULT_SITE_LANGUAGES;
+
+  return options.activeOnly
+    ? languages.filter((language) => language.isActive)
+    : languages;
 }
 
 export async function createSiteLanguage(
@@ -953,6 +1059,7 @@ export async function listSiteTranslations(): Promise<SiteTranslationSummary[]> 
 
 async function getSiteTranslationDictionaryUncached(
   languageCode: string,
+  _cacheVersion?: string,
 ): Promise<TranslationDictionary> {
   if (!isSupabaseAdminConfigured()) {
     return {};
@@ -983,10 +1090,37 @@ const getCachedSiteTranslationDictionary = unstable_cache(
   { tags: [SITE_TRANSLATIONS_CACHE_TAG] },
 );
 
+async function getSiteTranslationsCacheVersionUncached(): Promise<string> {
+  if (!isSupabaseAdminConfigured()) {
+    return "unconfigured";
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_translations")
+    .select("updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return "empty";
+  }
+
+  return String(data.updated_at ?? "empty");
+}
+
+const getCachedSiteTranslationsCacheVersion = unstable_cache(
+  getSiteTranslationsCacheVersionUncached,
+  ["site-translations-cache-version"],
+  { tags: [SITE_TRANSLATIONS_CACHE_TAG], revalidate: 60 },
+);
+
 export async function getSiteTranslationDictionary(
   languageCode: string,
 ): Promise<TranslationDictionary> {
-  return getCachedSiteTranslationDictionary(languageCode);
+  const cacheVersion = await getCachedSiteTranslationsCacheVersion();
+  return getCachedSiteTranslationDictionary(languageCode, cacheVersion);
 }
 
 export async function createSiteTranslation(
@@ -1114,10 +1248,11 @@ export async function getUserActiveLanguageCode(
     return "lv";
   }
 
-  const [languages, defaultCode] = await Promise.all([
-    listSiteLanguages({ activeOnly: true }),
-    getDefaultSiteLanguageCode(),
-  ]);
+  const languages = await listSiteLanguages({ activeOnly: true });
+  const defaultCode =
+    languages.find((language) => language.isDefault)?.code ??
+    languages[0]?.code ??
+    "lv";
   const activeCodes = new Set(languages.map((language) => language.code));
 
   const supabase = createAdminClient();
@@ -1201,7 +1336,7 @@ function mapGlobalSiteSettingsRow(row: GlobalSiteSettingsRow): SiteSettingsSumma
   };
 }
 
-export async function getSiteSettings(): Promise<SiteSettingsSummary> {
+async function getSiteSettingsUncached(): Promise<SiteSettingsSummary> {
   if (!isSupabaseAdminConfigured()) {
     return DEFAULT_SITE_SETTINGS;
   }
@@ -1218,6 +1353,16 @@ export async function getSiteSettings(): Promise<SiteSettingsSummary> {
   }
 
   return mapGlobalSiteSettingsRow(data as GlobalSiteSettingsRow);
+}
+
+const getCachedSiteSettings = unstable_cache(
+  getSiteSettingsUncached,
+  ["site-settings"],
+  { tags: [SITE_SETTINGS_CACHE_TAG] },
+);
+
+export async function getSiteSettings(): Promise<SiteSettingsSummary> {
+  return getCachedSiteSettings();
 }
 
 export async function saveSiteSettings(

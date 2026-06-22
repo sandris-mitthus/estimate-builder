@@ -1,0 +1,26 @@
+---
+description: Saglabāšanas formām jāsargā nesaglabātas izmaiņas
+alwaysApply: true
+---
+
+# Nesaglabātas izmaiņas formās
+
+Ja lapā vai komponentē ir ievades forma ar **Saglabāt** darbību, lietotājam nedrīkst ļaut klusi aiziet prom ar nesaglabātām izmaiņām.
+
+## Lapas līmeņa formas
+
+- Uzturi `isDirty` / `hasChanges` stāvokli, salīdzinot draftu ar pēdējo saglabāto snapshotu.
+- **Saglabāt** poga ir `disabled`, kamēr `isDirty === false`, un kļūst aktīva tikai pēc izmaiņām.
+- Ja `isDirty === true`, izmanto `useUnsavedChangesGuard()` un renderē `UnsavedChangesConfirmModal`.
+- Pēc veiksmīgas saglabāšanas atjauno saglabāto snapshotu, lai poga atkal kļūst neaktīva un guard izslēdzas.
+
+## Modāļu formas
+
+- `AppModal` ar ievades laukiem vienmēr saņem `dirty={...}`.
+- `dirty` ir `true`, ja lietotājs mainījis lauku salīdzinājumā ar modāļa atvēršanas brīdi.
+
+## Ko nedarīt
+
+- ❌ Aktīva **Saglabāt** poga bez izmaiņām.
+- ❌ Navigācija uz citu lapu bez apstiprinājuma, ja forma ir netīra.
+- ❌ `window.confirm()` — izmanto projekta modāli/guard hooku.

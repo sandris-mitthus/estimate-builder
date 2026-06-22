@@ -99,7 +99,8 @@ export async function GET(
     }),
   );
 
-  const filename = `piedavajums-${projectId.slice(0, 8)}.pdf`;
+  const filenamePrefix = t("exports.filename.offer", "piedavajums");
+  const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

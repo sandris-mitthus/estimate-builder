@@ -1,4 +1,5 @@
 import { DEFAULT_COMPANY_SETTINGS } from "@/app/lib/settings/defaults";
+import { cache } from "react";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { resolveCompanyLogoDisplayUrl } from "@/app/lib/settings/logo-storage";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "@/app/lib/settings/currencies";
@@ -65,7 +66,9 @@ function sanitizeLogoUrl(url: string): string {
   return "";
 }
 
-export async function getCompanySettings(): Promise<CompanySettings> {
+export const getCompanySettings = cache(async function getCompanySettings(): Promise<
+  CompanySettings
+> {
   if (!isSupabaseAdminConfigured()) {
     return DEFAULT_COMPANY_SETTINGS;
   }
@@ -89,11 +92,16 @@ export async function getCompanySettings(): Promise<CompanySettings> {
   }
 
   return mapRow(data as CompanySettingsRow);
-}
+});
 
 export async function getCompanyDisplayName(): Promise<string> {
   if (!isSupabaseAdminConfigured()) {
     return DEFAULT_COMPANY_SETTINGS.companyName;
+  }
+
+  const settings = await getCompanySettings();
+  if (settings.companyName.trim()) {
+    return settings.companyName.trim();
   }
 
   const companyId = await getCurrentCompanyId();
@@ -102,17 +110,13 @@ export async function getCompanyDisplayName(): Promise<string> {
   }
 
   const supabase = createAdminClient();
-  const [{ data: settings }, { data: company }] = await Promise.all([
-    supabase
-      .from("company_settings")
-      .select("company_name")
-      .eq("company_id", companyId)
-      .maybeSingle(),
-    supabase.from("companies").select("name").eq("id", companyId).maybeSingle(),
-  ]);
+  const { data: company } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .maybeSingle();
 
   return (
-    (typeof settings?.company_name === "string" && settings.company_name.trim()) ||
     (typeof company?.name === "string" && company.name.trim()) ||
     ""
   );

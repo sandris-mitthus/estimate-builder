@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
+import { SITE_SETTINGS_CACHE_TAG } from "@/app/lib/i18n/cache-tags";
 import {
   saveSiteSettings,
   type SiteSettingsInput,
@@ -13,6 +14,7 @@ export async function saveSiteSettingsAction(settings: SiteSettingsInput) {
   const result = await saveSiteSettings(settings);
 
   if (result.ok) {
+    revalidateTag(SITE_SETTINGS_CACHE_TAG, "max");
     revalidatePath("/site_settings");
     revalidatePath("/", "layout");
   }

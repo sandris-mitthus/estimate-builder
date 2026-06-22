@@ -153,7 +153,10 @@ export function CompanyLogoDropzone({
               </button>
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              PNG, JPG, WEBP vai SVG · max 2 MB
+              {t(
+                "settings.logo_formats_hint",
+                "PNG, JPG, WEBP vai SVG · max 2 MB",
+              )}
             </p>
 
             {logoUrl ? (
