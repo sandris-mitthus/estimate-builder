@@ -13,6 +13,9 @@ import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 import type { UserDisplay } from "@/app/lib/auth/map-user-display";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 import { signOut } from "@/app/lib/auth/sign-out";
+import { writeCookie } from "@/app/lib/client/cookies";
+import type { NavCountMap } from "@/app/lib/navigation/nav-counts";
+import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
 
 type NavItem = {
   key: NavPermissionKey | `system_admin:${string}`;
@@ -27,6 +30,13 @@ type PermissionNavItem = NavItem & {
 };
 
 const NAV_TEXT_MEDIA_QUERY = "(min-width: 1280px)";
+const TODO_STORAGE_KEY = "estimate-builder-system-admin-todo-list";
+const TODO_COUNT_CHANGE_EVENT = "estimate-builder-todo-count-change";
+const DEFAULT_TODO_COUNT = 3;
+const SYSTEM_ADMIN_BOTTOM_NAV_KEYS = new Set<NavItem["key"]>([
+  "system_admin:site_settings",
+]);
+const USER_BOTTOM_NAV_KEYS = new Set<NavItem["key"]>(["users", "settings"]);
 
 const ALL_NAV_ITEMS: PermissionNavItem[] = [
   {
@@ -96,18 +106,25 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "Lietotāji",
   },
   {
-    key: "system_admin:site_settings",
-    href: "/site_settings",
-    icon: "fas fa-sliders",
-    labelKey: "nav.system_admin.site_settings",
-    fallbackLabel: "Sistēmas uzstādījumi",
-  },
-  {
     key: "system_admin:site_user_groups",
     href: "/site_user_groups",
     icon: "fas fa-shield-halved",
     labelKey: "nav.system_admin.site_user_groups",
     fallbackLabel: "Grupas",
+  },
+  {
+    key: "system_admin:site_docs",
+    href: "/site_docs",
+    icon: "fas fa-book-open",
+    labelKey: "nav.system_admin.site_docs",
+    fallbackLabel: "Docs",
+  },
+  {
+    key: "system_admin:todo",
+    href: "/todo",
+    icon: "fas fa-clipboard-list",
+    labelKey: "nav.system_admin.todo",
+    fallbackLabel: "Todo",
   },
   {
     key: "system_admin:site_languages",
@@ -122,6 +139,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     icon: "fas fa-globe",
     labelKey: "nav.system_admin.site_translations",
     fallbackLabel: "Tulkojumi",
+  },
+  {
+    key: "system_admin:site_settings",
+    href: "/site_settings",
+    icon: "fas fa-sliders",
+    labelKey: "nav.system_admin.site_settings",
+    fallbackLabel: "Sistēmas uzstādījumi",
   },
 ];
 
@@ -144,6 +168,71 @@ function getNavTextVisibilitySnapshot() {
 
 function getServerNavTextVisibilitySnapshot() {
   return false;
+}
+
+function readTodoCountFromStorage(): number {
+  try {
+    const value = window.localStorage.getItem(TODO_STORAGE_KEY);
+    if (!value) {
+      return DEFAULT_TODO_COUNT;
+    }
+
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_TODO_COUNT;
+    }
+
+    return parsed.filter((item) => {
+      if (typeof item !== "object" || item === null) return false;
+      if (!("id" in item) || !("title" in item) || !("status" in item)) return false;
+
+      const title = String(item.title).trim();
+      const status = String(item.status);
+      return title && (status === "todo" || status === "in_progress");
+    }).length;
+  } catch {
+    return DEFAULT_TODO_COUNT;
+  }
+}
+
+function formatNavCount(count: number): string {
+  return count > 999 ? "999+" : String(count);
+}
+
+function NavCountBadge({
+  count,
+  active,
+  expanded,
+}: {
+  count: number;
+  active: boolean;
+  expanded: boolean;
+}) {
+  if (count < 0) {
+    return null;
+  }
+
+  const baseClassName =
+    "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-5";
+  const toneClassName = active
+    ? "bg-white/20 text-white ring-1 ring-white/25"
+    : "bg-zinc-200/80 text-zinc-500";
+
+  if (expanded) {
+    return (
+      <span className={`${baseClassName} ${toneClassName} ml-auto`}>
+        {formatNavCount(count)}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`absolute -right-1 -top-1 ${baseClassName} ${toneClassName} shadow-sm`}
+    >
+      {formatNavCount(count)}
+    </span>
+  );
 }
 
 function LanguageLoadingOverlay() {
@@ -461,6 +550,8 @@ type AppNavProps = {
   isSystemAdmin?: boolean;
   languages?: SiteLanguageSummary[];
   activeLanguageCode?: string;
+  initialSidebarCollapsed?: boolean;
+  navCounts?: NavCountMap;
 };
 
 type PendingNavigation = {
@@ -476,12 +567,15 @@ export function AppNav({
   isSystemAdmin = false,
   languages = [],
   activeLanguageCode = "lv",
+  initialSidebarCollapsed = false,
+  navCounts = {},
 }: AppNavProps) {
   const pathname = usePathname();
   const { t } = useTranslations();
   const [pendingNavigation, setPendingNavigation] =
     useState<PendingNavigation | null>(null);
-  const [manualCollapsed, setManualCollapsed] = useState(false);
+  const [manualCollapsed, setManualCollapsed] = useState(initialSidebarCollapsed);
+  const [todoCount, setTodoCount] = useState<number | null>(null);
   const navTextVisible = useSyncExternalStore(
     subscribeToNavTextVisibility,
     getNavTextVisibilitySnapshot,
@@ -498,6 +592,117 @@ export function AppNav({
       ? ALL_NAV_ITEMS
       : ALL_NAV_ITEMS.filter((item) => allowedNavKeys.includes(item.key));
   const navItems = isSystemAdmin ? SYSTEM_ADMIN_NAV_ITEMS : permittedNavItems;
+  const bottomNavKeys = isSystemAdmin
+    ? SYSTEM_ADMIN_BOTTOM_NAV_KEYS
+    : USER_BOTTOM_NAV_KEYS;
+  const topNavItems = navItems.filter((item) => !bottomNavKeys.has(item.key));
+  const bottomNavItems = navItems.filter((item) => bottomNavKeys.has(item.key));
+
+  useEffect(() => {
+    if (!isSystemAdmin) {
+      setTodoCount(null);
+      return;
+    }
+
+    const updateTodoCount = () => setTodoCount(readTodoCountFromStorage());
+    updateTodoCount();
+
+    window.addEventListener("storage", updateTodoCount);
+    window.addEventListener("focus", updateTodoCount);
+    window.addEventListener(TODO_COUNT_CHANGE_EVENT, updateTodoCount);
+    return () => {
+      window.removeEventListener("storage", updateTodoCount);
+      window.removeEventListener("focus", updateTodoCount);
+      window.removeEventListener(TODO_COUNT_CHANGE_EVENT, updateTodoCount);
+    };
+  }, [isSystemAdmin]);
+
+  function updateManualCollapsed(collapsed: boolean) {
+    setManualCollapsed(collapsed);
+    writeCookie(SIDEBAR_COLLAPSED_COOKIE, collapsed ? "1" : "0");
+  }
+
+  function renderNavItem(item: NavItem) {
+    const isActive =
+      item.href === "/"
+        ? isProjectsNavActive(pathname)
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const isPending =
+      pendingNavigation?.href === item.href &&
+      pendingNavigation.pathname === pathname;
+    const label = t(item.labelKey, item.fallbackLabel);
+    const count =
+      item.key === "system_admin:todo"
+        ? todoCount
+        : (navCounts[item.key] ?? null);
+
+    const navLink = (
+      <Link
+        href={item.href}
+        onClick={(event) => {
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+
+          if (isActive || isPending) {
+            event.preventDefault();
+            return;
+          }
+
+          setPendingNavigation({ href: item.href, pathname });
+        }}
+        aria-disabled={isPending}
+        aria-label={label}
+        className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl text-[13px] transition-all duration-200 ${
+          isActive
+            ? "bg-blue-700 font-semibold text-white shadow-sm shadow-blue-900/20"
+            : "text-zinc-500 hover:bg-white hover:text-zinc-900 hover:shadow-sm"
+        } ${
+          menuExpanded
+            ? "h-11 w-full justify-start px-4"
+            : "size-11 justify-center p-0"
+        } ${
+          isPending ? "pointer-events-none opacity-70" : ""
+        }`}
+      >
+        {isPending ? (
+          <i
+            className="fas fa-spinner animate-spin text-[13px]"
+            aria-hidden="true"
+          />
+        ) : (
+          <i
+            className={`${item.icon} w-4 text-center text-[14px]`}
+            aria-hidden="true"
+          />
+        )}
+        {menuExpanded ? <span>{label}</span> : null}
+        {typeof count === "number" ? (
+          <NavCountBadge
+            count={count}
+            active={isActive}
+            expanded={menuExpanded}
+          />
+        ) : null}
+      </Link>
+    );
+
+    return showNavTooltips ? (
+      <Tooltip key={item.href} label={label} className="shrink-0">
+        {navLink}
+      </Tooltip>
+    ) : (
+      <span key={item.href} className="inline-flex w-full shrink-0">
+        {navLink}
+      </span>
+    );
+  }
 
   return (
     <aside
@@ -519,7 +724,7 @@ export function AppNav({
             <Tooltip label={toggleMenuLabel} align="end">
               <button
                 type="button"
-                onClick={() => setManualCollapsed(true)}
+                onClick={() => updateManualCollapsed(true)}
                 aria-label={toggleMenuLabel}
                 className="inline-flex size-9 items-center justify-center rounded-xl bg-white text-zinc-500 shadow-sm ring-1 ring-zinc-200 transition hover:bg-zinc-100 hover:text-zinc-900"
               >
@@ -531,7 +736,7 @@ export function AppNav({
           <Tooltip label={toggleMenuLabel}>
             <button
               type="button"
-              onClick={() => setManualCollapsed(false)}
+              onClick={() => updateManualCollapsed(false)}
               aria-label={toggleMenuLabel}
               className="inline-flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-white to-zinc-50 text-zinc-500 shadow-sm ring-1 ring-zinc-200/80 transition hover:scale-[1.03] hover:text-zinc-900"
             >
@@ -541,84 +746,24 @@ export function AppNav({
         )}
 
         <nav
-          className={`flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-[1.35rem] bg-zinc-50/80 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          className={`flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-[1.35rem] p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
             menuExpanded ? "w-full" : "w-[52px] items-center"
           }`}
         >
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? isProjectsNavActive(pathname)
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
-            const isPending =
-              pendingNavigation?.href === item.href &&
-              pendingNavigation.pathname === pathname;
-            const label = t(item.labelKey, item.fallbackLabel);
-
-            const navLink = (
-              <Link
-                href={item.href}
-                onClick={(event) => {
-                  if (
-                    event.button !== 0 ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  ) {
-                    return;
-                  }
-
-                  if (isActive || isPending) {
-                    event.preventDefault();
-                    return;
-                  }
-
-                  setPendingNavigation({ href: item.href, pathname });
-                }}
-                aria-disabled={isPending}
-                aria-label={label}
-                className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl text-[13px] transition-all duration-200 ${
-                  isActive
-                    ? "bg-blue-700 font-semibold text-white shadow-sm shadow-blue-900/20"
-                    : "text-zinc-500 hover:bg-white hover:text-zinc-900 hover:shadow-sm"
-                } ${
-                  menuExpanded
-                    ? "h-11 w-full justify-start px-4"
-                    : "size-11 justify-center p-0"
-                } ${
-                  isPending ? "pointer-events-none opacity-70" : ""
-                }`}
-              >
-                {isPending ? (
-                  <i
-                    className="fas fa-spinner animate-spin text-[13px]"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <i
-                    className={`${item.icon} w-4 text-center text-[14px]`}
-                    aria-hidden="true"
-                  />
-                )}
-                {menuExpanded ? <span>{label}</span> : null}
-              </Link>
-            );
-
-            return showNavTooltips ? (
-              <Tooltip key={item.href} label={label} className="shrink-0">
-                {navLink}
-              </Tooltip>
-            ) : (
-              <span key={item.href} className="inline-flex w-full shrink-0">
-                {navLink}
-              </span>
-            );
-          })}
+          {topNavItems.map((item) => renderNavItem(item))}
         </nav>
 
         <div className="mt-auto flex w-full shrink-0 flex-col items-center gap-2">
+          {bottomNavItems.length > 0 ? (
+            <nav
+              className={`flex flex-col gap-1 rounded-[1.35rem] p-1 ${
+                menuExpanded ? "w-full" : "w-[52px] items-center"
+              }`}
+            >
+              {bottomNavItems.map((item) => renderNavItem(item))}
+            </nav>
+          ) : null}
+
           <SidebarLanguageSelector
             languages={languages}
             activeLanguageCode={activeLanguageCode}

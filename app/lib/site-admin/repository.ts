@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import type { TranslationDictionary } from "@/app/lib/i18n/translations";
 import {
+  SITE_DOCS_CACHE_TAG,
   SITE_LANGUAGES_CACHE_TAG,
   SITE_SETTINGS_CACHE_TAG,
   SITE_TRANSLATIONS_CACHE_TAG,
@@ -105,6 +106,22 @@ type SiteTranslationRow = {
   updated_at: string;
 };
 
+type SiteDocCategoryRow = {
+  id: string;
+  title: string;
+  sort_order: number;
+  updated_at: string;
+};
+
+type SiteDocRow = {
+  id: string;
+  category_id: string;
+  title: string;
+  description: string;
+  sort_order: number;
+  updated_at: string;
+};
+
 export type SiteCompanySummary = {
   id: string;
   name: string;
@@ -194,6 +211,39 @@ export type SiteTranslationInput = {
   values: Record<string, string>;
 };
 
+export type SiteDocSummary = {
+  id: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+  updatedAt: string;
+};
+
+export type SiteDocCategorySummary = {
+  id: string;
+  title: string;
+  sortOrder: number;
+  updatedAt: string;
+  docs: SiteDocSummary[];
+};
+
+export type SiteDocCategoryInput = {
+  title: string;
+};
+
+export type SiteDocInput = {
+  categoryId: string;
+  title: string;
+  description: string;
+};
+
+export type SiteDocReorderItem = {
+  id: string;
+  categoryId: string;
+  sortOrder: number;
+};
+
 export const DEFAULT_SITE_SETTINGS: SiteSettingsSummary = {
   systemName: "Estimate Builder",
   slogan: "Tāmes piedāvājumu veidošana",
@@ -214,6 +264,43 @@ export const DEFAULT_SITE_LANGUAGES: SiteLanguageSummary[] = [
     isActive: true,
     isDefault: false,
     sortOrder: 20,
+  },
+];
+
+const DEFAULT_SITE_DOC_CATEGORIES: SiteDocCategorySummary[] = [
+  {
+    id: "default-docs-overview",
+    title: "Kopskats",
+    sortOrder: 10,
+    updatedAt: "",
+    docs: [
+      {
+        id: "default-docs-daily-work",
+        categoryId: "default-docs-overview",
+        title: "Ko sistēmā dara ikdienā?",
+        description:
+          "Estimate Builder ir darba vide, kur no sagatavēm un kataloga datiem tiek izveidots konkrēta projekta aprēķins.",
+        sortOrder: 10,
+        updatedAt: "",
+      },
+    ],
+  },
+  {
+    id: "default-docs-projects",
+    title: "Projekti",
+    sortOrder: 20,
+    updatedAt: "",
+    docs: [
+      {
+        id: "default-docs-project-lifecycle",
+        categoryId: "default-docs-projects",
+        title: "Projekta dzīves cikls",
+        description:
+          "Projektā glabā klienta kontaktus, projekta statusu, piesaistīto ēkas moduli un sagatavoto tāmi.",
+        sortOrder: 10,
+        updatedAt: "",
+      },
+    ],
   },
 ];
 
@@ -1410,4 +1497,310 @@ export async function saveSiteSettings(
 export async function listSiteSettings(): Promise<SiteSettingsSummary[]> {
   const settings = await getSiteSettings();
   return [settings];
+}
+
+function mapSiteDocRow(row: SiteDocRow): SiteDocSummary {
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    title: row.title,
+    description: row.description,
+    sortOrder: row.sort_order,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSiteDocCategoryRow(
+  row: SiteDocCategoryRow,
+  docs: SiteDocSummary[],
+): SiteDocCategorySummary {
+  return {
+    id: row.id,
+    title: row.title,
+    sortOrder: row.sort_order,
+    updatedAt: row.updated_at,
+    docs,
+  };
+}
+
+async function listSiteDocsUncached(): Promise<SiteDocCategorySummary[]> {
+  if (!isSupabaseAdminConfigured()) {
+    return DEFAULT_SITE_DOC_CATEGORIES;
+  }
+
+  const supabase = createAdminClient();
+  const [categoriesResult, docsResult] = await Promise.all([
+    supabase
+      .from("site_doc_categories")
+      .select("id, title, sort_order, updated_at")
+      .order("sort_order", { ascending: true })
+      .order("title", { ascending: true }),
+    supabase
+      .from("site_docs")
+      .select("id, category_id, title, description, sort_order, updated_at")
+      .order("sort_order", { ascending: true })
+      .order("title", { ascending: true }),
+  ]);
+
+  if (categoriesResult.error || docsResult.error || !categoriesResult.data || !docsResult.data) {
+    return DEFAULT_SITE_DOC_CATEGORIES;
+  }
+
+  const docs = (docsResult.data as SiteDocRow[]).map(mapSiteDocRow);
+  const docsByCategory = new Map<string, SiteDocSummary[]>();
+  docs.forEach((doc) => {
+    const categoryDocs = docsByCategory.get(doc.categoryId) ?? [];
+    categoryDocs.push(doc);
+    docsByCategory.set(doc.categoryId, categoryDocs);
+  });
+
+  return (categoriesResult.data as SiteDocCategoryRow[]).map((category) =>
+    mapSiteDocCategoryRow(category, docsByCategory.get(category.id) ?? []),
+  );
+}
+
+const getCachedSiteDocs = unstable_cache(
+  listSiteDocsUncached,
+  ["site-docs"],
+  { tags: [SITE_DOCS_CACHE_TAG] },
+);
+
+export async function listSiteDocs(): Promise<SiteDocCategorySummary[]> {
+  return getCachedSiteDocs();
+}
+
+export async function createSiteDocCategory(
+  input: SiteDocCategoryInput,
+): Promise<{ ok: true; category: SiteDocCategorySummary } | { ok: false; error: string }> {
+  const title = input.title.trim();
+  if (!title) {
+    return { ok: false, error: "Ievadi kategorijas nosaukumu." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const existingCategories = await listSiteDocsUncached();
+  const nextSortOrder =
+    Math.max(0, ...existingCategories.map((category) => category.sortOrder)) + 10;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_doc_categories")
+    .insert({ title, sort_order: nextSortOrder })
+    .select("id, title, sort_order, updated_at")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās izveidot dokumentācijas kategoriju." };
+  }
+
+  return {
+    ok: true,
+    category: mapSiteDocCategoryRow(data as SiteDocCategoryRow, []),
+  };
+}
+
+export async function updateSiteDocCategory(
+  categoryId: string,
+  input: SiteDocCategoryInput,
+): Promise<{ ok: true; category: SiteDocCategorySummary } | { ok: false; error: string }> {
+  const id = categoryId.trim();
+  const title = input.title.trim();
+  if (!id) {
+    return { ok: false, error: "Kategorija nav norādīta." };
+  }
+  if (!title) {
+    return { ok: false, error: "Ievadi kategorijas nosaukumu." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_doc_categories")
+    .update({ title })
+    .eq("id", id)
+    .select("id, title, sort_order, updated_at")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās saglabāt dokumentācijas kategoriju." };
+  }
+
+  return {
+    ok: true,
+    category: mapSiteDocCategoryRow(data as SiteDocCategoryRow, []),
+  };
+}
+
+export async function deleteSiteDocCategory(
+  categoryId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = categoryId.trim();
+  if (!id) {
+    return { ok: false, error: "Kategorija nav norādīta." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("site_doc_categories")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās dzēst dokumentācijas kategoriju." };
+  }
+
+  return { ok: true };
+}
+
+export async function createSiteDoc(
+  input: SiteDocInput,
+): Promise<{ ok: true; doc: SiteDocSummary } | { ok: false; error: string }> {
+  const categoryId = input.categoryId.trim();
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (!categoryId) {
+    return { ok: false, error: "Kategorija nav norādīta." };
+  }
+  if (!title) {
+    return { ok: false, error: "Ievadi dokumenta nosaukumu." };
+  }
+  if (!description) {
+    return { ok: false, error: "Ievadi dokumenta aprakstu." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const existingCategories = await listSiteDocsUncached();
+  const category = existingCategories.find((item) => item.id === categoryId);
+  if (!category) {
+    return { ok: false, error: "Kategorija nav atrasta." };
+  }
+
+  const nextSortOrder = Math.max(0, ...category.docs.map((doc) => doc.sortOrder)) + 10;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_docs")
+    .insert({
+      category_id: categoryId,
+      title,
+      description,
+      sort_order: nextSortOrder,
+    })
+    .select("id, category_id, title, description, sort_order, updated_at")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās izveidot dokumentu." };
+  }
+
+  return { ok: true, doc: mapSiteDocRow(data as SiteDocRow) };
+}
+
+export async function updateSiteDoc(
+  docId: string,
+  input: SiteDocInput,
+): Promise<{ ok: true; doc: SiteDocSummary } | { ok: false; error: string }> {
+  const id = docId.trim();
+  const categoryId = input.categoryId.trim();
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (!id) {
+    return { ok: false, error: "Dokuments nav norādīts." };
+  }
+  if (!categoryId) {
+    return { ok: false, error: "Kategorija nav norādīta." };
+  }
+  if (!title) {
+    return { ok: false, error: "Ievadi dokumenta nosaukumu." };
+  }
+  if (!description) {
+    return { ok: false, error: "Ievadi dokumenta aprakstu." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_docs")
+    .update({ category_id: categoryId, title, description })
+    .eq("id", id)
+    .select("id, category_id, title, description, sort_order, updated_at")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās saglabāt dokumentu." };
+  }
+
+  return { ok: true, doc: mapSiteDocRow(data as SiteDocRow) };
+}
+
+export async function deleteSiteDoc(
+  docId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = docId.trim();
+  if (!id) {
+    return { ok: false, error: "Dokuments nav norādīts." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("site_docs").delete().eq("id", id);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās dzēst dokumentu." };
+  }
+
+  return { ok: true };
+}
+
+export async function reorderSiteDocs(
+  items: SiteDocReorderItem[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const normalizedItems = items
+    .map((item) => ({
+      id: item.id.trim(),
+      categoryId: item.categoryId.trim(),
+      sortOrder: Number.isFinite(item.sortOrder) ? Math.trunc(item.sortOrder) : 0,
+    }))
+    .filter((item) => item.id && item.categoryId && item.sortOrder > 0);
+
+  if (normalizedItems.length !== items.length) {
+    return { ok: false, error: "Dokumentu secība nav derīga." };
+  }
+
+  const supabase = createAdminClient();
+  const updates = await Promise.all(
+    normalizedItems.map((item) =>
+      supabase
+        .from("site_docs")
+        .update({ category_id: item.categoryId, sort_order: item.sortOrder })
+        .eq("id", item.id),
+    ),
+  );
+
+  if (updates.some((result) => result.error)) {
+    return { ok: false, error: "Neizdevās saglabāt dokumentu secību." };
+  }
+
+  return { ok: true };
 }

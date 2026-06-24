@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { signInWithGoogle } from "@/app/lib/auth/sign-in-with-google";
@@ -89,6 +90,12 @@ export function LoginGate({
             ? t("auth.signing_in", "Signing in...")
             : t("auth.google_sign_in", "Continue with Google")}
         </button>
+        <Link
+          href="/docs"
+          className="mt-5 inline-flex items-center justify-center text-sm font-semibold text-zinc-500 transition hover:text-zinc-900"
+        >
+          {t("auth.login.view_system_docs", "Dokumentācija")}
+        </Link>
       </section>
     </main>
   );

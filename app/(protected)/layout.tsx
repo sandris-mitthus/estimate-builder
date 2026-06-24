@@ -18,6 +18,8 @@ import {
   listSiteLanguages,
 } from "@/app/lib/site-admin/repository";
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
+import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-counts";
+import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
 import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
@@ -54,6 +56,8 @@ export default async function ProtectedLayout({
   let languages = DEFAULT_SITE_LANGUAGES.filter((language) => language.isActive);
   let activeLanguageCode = "lv";
   let translations = {};
+  let initialSidebarCollapsed = false;
+  let navCounts: NavCountMap = {};
 
   const [siteSettings, user] = await Promise.all([
     getSiteSettings(),
@@ -96,12 +100,16 @@ export default async function ProtectedLayout({
     languages = languagesResult;
     activeLanguageCode = activeLanguageCodeResult;
 
-    const [translationsResult, companyNameResult] = await Promise.all([
+    const [translationsResult, companyNameResult, navCountsResult] = await Promise.all([
       getSiteTranslationDictionary(activeLanguageCode),
       isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
+      getNavigationCounts({ isSystemAdmin, activeLanguageCode }),
     ]);
     translations = translationsResult;
     companyName = companyNameResult;
+    navCounts = navCountsResult;
+    initialSidebarCollapsed =
+      (await cookies()).get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
 
     if (session) {
       actionPermissions = session.access.permissions.actions;
@@ -145,6 +153,8 @@ export default async function ProtectedLayout({
               isSystemAdmin={isSystemAdmin}
               languages={languages}
               activeLanguageCode={activeLanguageCode}
+              initialSidebarCollapsed={initialSidebarCollapsed}
+              navCounts={navCounts}
             />
             <div className="min-w-0 pl-[86px] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[284px]">
               {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
