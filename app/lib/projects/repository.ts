@@ -31,6 +31,10 @@ import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { isMissingColumnError } from "@/app/lib/supabase/missing-column";
 import {
+  deleteDelegatedMaterialTodoTask,
+  upsertDelegatedMaterialTodoTask,
+} from "@/app/lib/todo/repository";
+import {
   getProjectById as getSampleProjectById,
   SAMPLE_PROJECTS,
 } from "@/app/lib/projects/sample-projects";
@@ -1053,6 +1057,16 @@ export async function markProjectMaterialOrdered(
     return { ok: false, error: "Neizdevās atzīmēt materiālu kā pasūtītu." };
   }
 
+  const assignedUserId = currentMeta.materialAssigneeUserIds?.[trimmedId]?.trim();
+  if (assignedUserId) {
+    await deleteDelegatedMaterialTodoTask({
+      companyId,
+      userId: assignedUserId,
+      projectId,
+      positionPriceId: trimmedId,
+    });
+  }
+
   return { ok: true, orderedIds };
 }
 
@@ -1128,6 +1142,19 @@ export async function assignProjectMaterialUser(
   if (updateError) {
     return { ok: false, error: "Neizdevās piešķirt materiālu lietotājam." };
   }
+
+  const catalogPositions = await listPositionPrices();
+  const materialName =
+    catalogPositions.find((position) => position.id === trimmedMaterialId)?.name ?? "";
+  await upsertDelegatedMaterialTodoTask({
+    companyId,
+    userId: trimmedUserId,
+    projectId,
+    projectName: project.name,
+    projectAddress: project.address,
+    positionPriceId: trimmedMaterialId,
+    materialName,
+  });
 
   return { ok: true, materialAssigneeUserIds };
 }

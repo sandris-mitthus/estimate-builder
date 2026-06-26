@@ -56,6 +56,7 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
     "estimate",
     "positions",
     "excluded_positions",
+    "todo",
     "users",
     "settings",
   ];
@@ -66,6 +67,7 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
     estimate: "/estimate",
     positions: "/positions",
     excluded_positions: "/excluded-positions",
+    todo: "/tasks",
     users: "/users",
     user_groups: "/users/groups",
     settings: "/settings",

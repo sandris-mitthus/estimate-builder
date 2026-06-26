@@ -183,6 +183,7 @@ export async function markProjectMaterialOrderedAction(
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);
+    revalidatePath("/tasks");
     revalidatePath("/positions");
     revalidatePath("/", "layout");
     revalidatePath("/");
@@ -207,6 +208,7 @@ export async function assignProjectMaterialUserAction(
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);
+    revalidatePath("/tasks");
     revalidatePath("/", "layout");
     revalidatePath("/");
   }

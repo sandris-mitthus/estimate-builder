@@ -84,6 +84,7 @@ const NAV_PERMISSION_KEYS_FOR_MENU: Exclude<NavPermissionKey, "user_groups">[] =
   "estimate",
   "positions",
   "excluded_positions",
+  "todo",
   "users",
   "settings",
 ];
@@ -121,6 +122,10 @@ export function pathnameToNavKey(pathname: string): NavPermissionKey | null {
 
   if (pathname === "/excluded-positions") {
     return "excluded_positions";
+  }
+
+  if (pathname === "/tasks") {
+    return "todo";
   }
 
   if (pathname === "/" || /^\/[^/]+$/.test(pathname)) {

@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.49` (see [Changelog](#changelog))
+**Current version:** `1.3.50` (see [Changelog](#changelog))
 
 ---
 
@@ -25,6 +25,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - **Sistēmas administrators** — globāls profils `public.users.is_admin`; sidebar pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Grupas**, **Docs**, **Todo**, **Valodas**, **Tulkojumi**, apakšā **Sistēmas uzstādījumi**) un slēpj uzņēmuma izvēlni
 - **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown sidebar apakšā; `/site_docs` pārvalda publiskās docs kategorijas un rakstus ar drag-and-drop pārvietošanu starp kategorijām un secības maiņu; `/todo` ir lokāli saglabāts divu kolonnu darba dēlis ar drag-and-drop pārvietošanu un prioritizētu dzēšanas drop zonu; `/site_companies` rāda uzņēmuma logo un kompaktu rekvizītu bloku, `/site_companies_users` rāda arī sistēmas administratorus bez uzņēmuma piesaistes, lietotāju avatarus, uzņēmumu logo un konkrētā uzņēmuma grupu/lomu; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
+- **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem; katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju, horizontālu Kanban rindu, drag-and-drop prioritizēšanu starp kategorijām, biezu drop indikatoru un dzēšanas drop zonu; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
 - **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
@@ -44,6 +45,7 @@ English routes, Latvian labels:
 | Sagatave | `/estimate` |
 | Pozicijas | `/positions` |
 | Neiekļautās pozīcijas | `/excluded-positions` |
+| Darāmo darbu saraksts | `/tasks` |
 | Lietotāji | `/users` (apakšlapa **Grupas un tiesības**: `/users/groups`) |
 | Uzstādījumi | `/settings` |
 | System admin | `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings` |
@@ -108,7 +110,7 @@ English routes, Latvian labels:
 - Falls back to in-memory sample data only when Supabase is **not** configured (configured DB with zero projects shows empty list, not seed cards)
 - **Multi-company scoping** — projects, estimates, settings, modules, position prices/history, sagatave, excluded positions and private storage assets are scoped by active `company_id`
 - **Company access** — `public.users.is_admin` marks system admins; `company_users` controls company membership/status; `company_user_groups` + `company_group_members` control per-company permissions
-- **System admin data and performance** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits; `site_doc_categories` + `site_docs` store public documentation; `/todo` stores its board state in browser `localStorage`; site settings/languages/docs use tag-based server caches; request-level caches prevent duplicate translation/admin/settings/module/catalog checks during one SSR render; project-list warning badges share one estimates read instead of three separate scans
+- **System admin data and performance** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits; `site_doc_categories` + `site_docs` store public documentation; `/todo` stores its board state in browser `localStorage`; user `/tasks` boards use `todo_categories` + `todo_tasks` scoped by `company_id` and `user_id`; site settings/languages/docs use tag-based server caches; request-level caches prevent duplicate translation/admin/settings/module/catalog checks during one SSR render; project-list warning badges share one estimates read instead of three separate scans
 - Estimate **full state** (title, meta, categories with baked-in prices) persisted via **Saglabāt tāmi** server action; dates also auto-saved on change
 - `npm run db:migrate` applies only **pending** migrations (tracked in `public.schema_migrations`)
 - App tables use **service-role server access** with RLS deny policies for browser clients
@@ -234,6 +236,7 @@ app/
 │   ├── modules/        # list + [id] detail; actions (CRUD, blocks, uploads, project description)
 │   ├── estimate/            # Sagatave editor + saveEstimatePositionDocumentAction
 │   ├── positions/      # page + CRUD / price-update / history / catalog sync actions
+│   ├── tasks/          # User-scoped todo board with categories, task DnD, delegated material tasks
 │   ├── users/          # page, groups/, inviteUserAction, assignUserGroupAction, create/update/delete group actions, updateUserGroupPermissionsAction, setCompanyUserAccessAction, removeCompanyUserAction
 │   ├── site_companies/ # System admin company overview
 │   ├── site_companies_users/ # System admin company-user overview
@@ -273,6 +276,7 @@ app/
 │   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
 │   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation, IBAN bank resolve, currencies
 │   ├── site-admin/     # system admin access, site settings, docs, languages, translations, default groups
+│   ├── todo/           # User-scoped todo repository, default category, delegated material task helpers
 │   ├── users/          # Auth user list, public.users sync, company membership status, invite, groups-repository (company membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone
 │   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
@@ -280,7 +284,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–078 (038–042 = system admin tables; 043–078 = UI/docs translation seeds and follow-ups; 077 = site docs tables)
+supabase/migrations/    # 001–084 (038–042 = system admin tables; 043–078 = UI/docs translation seeds and follow-ups; 077 = site docs tables; 079–084 = user todo board + translations)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -317,6 +321,7 @@ supabase/migrations/    # 001–078 (038–042 = system admin tables; 043–078 
 - [x] Neiekļautās pozīcijas — globālais saraksts (`/excluded-positions`); projekta lapā bloks zem tāmes ar projekta līmeņa noņemšanu; PDF sadaļa
 - [x] Materiālu saraksts — apstiprinātiem projektiem **virs tāmes**; agregēts apjoms un budžets; **Pasūtīts** + **Atjaunot cenu**; brīdinājums sarakstā un projekta lapā, kamēr nav visi pasūtīti
 - [x] Materiālu delegācija — drag lietotāju uz materiālu (`materialAssigneeUserIds`); globālais baneris zem nav ar animāciju un cookie
+- [x] Lietotāja darāmo darbu saraksts — `/tasks` ar personīgām kategorijām, drag-and-drop prioritizēšanu un automātiskiem materiālu delegācijas uzdevumiem
 - [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
 - [x] System admin sadaļas — uzņēmumi, lietotāji, default grupas, Docs pārvaldība, Todo dēlis, valodas, tulkojumi un sistēmas uzstādījumi
 - [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm audit` 0)
@@ -377,6 +382,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.50
+
+**User todo board and delegated material tasks**
+
+- Added `/tasks` for non-system-admin users with personal categories, task drag-and-drop, thick drop indicators, delete drop zone, and live feedback while creating or saving
+- Scoped todo categories/tasks per user with default **Uzdevumi** category, legacy board recovery, navigation counts, and seeded `lv`/`en` translations
+- Integrated material delegation so assigned material ordering creates an idempotent user todo task and removes it when the material is marked ordered
 
 ### v1.3.49
 

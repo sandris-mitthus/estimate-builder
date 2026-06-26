@@ -75,6 +75,13 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     fallbackLabel: "Neiekļautās pozīcijas",
   },
   {
+    key: "todo",
+    href: "/tasks",
+    icon: "fas fa-clipboard-list",
+    labelKey: "nav.todo",
+    fallbackLabel: "Darāmo darbu saraksts",
+  },
+  {
     key: "users",
     href: "/users",
     icon: "fas fa-users",

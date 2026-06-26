@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { normalizeProjectStatus, isProjectVisibleInList } from "@/app/lib/projects/project-status";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -32,6 +33,24 @@ async function countCompanyRows(tableName: string, companyId: string): Promise<n
     .from(tableName)
     .select("*", { count: "exact", head: true })
     .eq("company_id", companyId)) as CountQuery;
+  return result.error ? 0 : (result.count ?? 0);
+}
+
+async function countCompanyUserRows(
+  tableName: string,
+  companyId: string,
+  userId: string,
+): Promise<number> {
+  if (!isSupabaseAdminConfigured()) {
+    return 0;
+  }
+
+  const supabase = createAdminClient();
+  const result = (await supabase
+    .from(tableName)
+    .select("*", { count: "exact", head: true })
+    .eq("company_id", companyId)
+    .eq("user_id", userId)) as CountQuery;
   return result.error ? 0 : (result.count ?? 0);
 }
 
@@ -118,17 +137,18 @@ export async function getNavigationCounts({
     };
   }
 
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
+  const [companyId, user] = await Promise.all([getCurrentCompanyId(), getCurrentUser()]);
+  if (!companyId || !user) {
     return {};
   }
 
-  const [projects, modules, positions, excludedPositions, users] =
+  const [projects, modules, positions, excludedPositions, todo, users] =
     await Promise.all([
       countVisibleProjects(companyId),
       countCompanyRows("building_modules", companyId),
       countCompanyRows("position_prices", companyId),
       countCompanyRows("excluded_positions", companyId),
+      countCompanyUserRows("todo_tasks", companyId, user.id),
       countCompanyRows("company_users", companyId),
     ]);
 
@@ -137,6 +157,7 @@ export async function getNavigationCounts({
     modules,
     positions,
     excluded_positions: excludedPositions,
+    todo,
     users,
   };
 }
