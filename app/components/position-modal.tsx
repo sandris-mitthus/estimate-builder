@@ -71,6 +71,7 @@ function prepareDraft(item: EstimateLineItem): EstimateLineItem {
 function snapshot(item: EstimateLineItem): string {
   return JSON.stringify({
     name: item.name.trim(),
+    note: item.note?.trim() ?? "",
     laborTimeNorm: item.laborTimeNorm ?? 0,
     customHourlyRateEnabled: item.customHourlyRateEnabled ?? false,
     customHourlyRate: item.customHourlyRate ?? 0,
@@ -103,6 +104,7 @@ export function PositionModal({
   );
   const [materialAddKey, setMaterialAddKey] = useState(0);
   const [mechanismAddKey, setMechanismAddKey] = useState(0);
+  const [noteError, setNoteError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!open) {
@@ -113,6 +115,7 @@ export function PositionModal({
     setInitialSnapshot(snapshot(prepared));
     setMaterialAddKey((k) => k + 1);
     setMechanismAddKey((k) => k + 1);
+    setNoteError(undefined);
   }, [open, value]);
 
   const materialPositions = useMemo(
@@ -169,6 +172,18 @@ export function PositionModal({
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
+    const trimmedNote = draft.note?.trim() ?? "";
+    if (trimmedNote.length > 255) {
+      setNoteError(
+        t(
+          "positions.validation.note_too_long",
+          "Piezīme nedrīkst būt garāka par 255 zīmēm.",
+        ),
+      );
+      return;
+    }
+    setNoteError(undefined);
+
     // Kad variableQuantity = true, mērvienība no pirmā materiāla (ja ir), citādi draft.unit vai "gab."
     const resolvedVariableUnit = (() => {
       const firstMaterial = (draft.materials ?? [])[0];
@@ -179,6 +194,7 @@ export function PositionModal({
     const normalized: EstimateLineItem = {
       ...draft,
       name: draft.name.trim(),
+      note: trimmedNote || undefined,
       unit: draft.variableQuantity
         ? resolvedVariableUnit
         : draft.manualUnitEnabled && draft.manualUnit?.trim()
@@ -246,17 +262,46 @@ export function PositionModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-[minmax(0,1fr)_10rem] gap-3">
-          <label className="block">
-            <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(event) => patch({ name: event.target.value })}
-              className={inputClassName}
-              placeholder={t("positions.modal.name_placeholder", "piem. Sienas mūrēšana")}
-              autoFocus
-            />
-          </label>
+          <div className="space-y-3">
+            <label className="block">
+              <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
+              <input
+                type="text"
+                value={draft.name}
+                onChange={(event) => patch({ name: event.target.value })}
+                className={inputClassName}
+                placeholder={t("positions.modal.name_placeholder", "piem. Sienas mūrēšana")}
+                autoFocus
+              />
+            </label>
+            <label className="block">
+              <span className={labelClassName}>{t("common.note", "Piezīme")}</span>
+              <textarea
+                value={draft.note ?? ""}
+                onChange={(event) => {
+                  patch({ note: event.target.value });
+                  setNoteError(undefined);
+                }}
+                rows={2}
+                placeholder={t(
+                  "positions.note.placeholder",
+                  "Papildu informācija par pozīciju",
+                )}
+                className={`${inputClassName} resize-y`}
+                aria-invalid={Boolean(noteError)}
+                aria-describedby={noteError ? "position-note-error" : undefined}
+              />
+              {noteError ? (
+                <p
+                  id="position-note-error"
+                  className="mt-1 text-sm text-red-600"
+                  role="alert"
+                >
+                  {noteError}
+                </p>
+              ) : null}
+            </label>
+          </div>
           <label className="block">
             <span className={labelClassName}>{t("estimate.time_norm", "Laika norma (c/h)")}</span>
             <LaborTimeNormInput

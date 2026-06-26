@@ -27,6 +27,8 @@ export type LineItemCatalogRef = {
 export type EstimateLineItem = {
   id: string;
   name: string;
+  /** Īsa piezīme — redzama tāmes web skatā zem nosaukuma. */
+  note?: string;
   unit: string;
   quantity: number;
   unitPrice: PriceBreakdown;

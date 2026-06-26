@@ -10,6 +10,7 @@ import {
 import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { MultiPositionLinkHandle } from "@/app/components/multi-position-link-handle";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
@@ -360,6 +361,7 @@ function MultiOptionSubRow({
                     />
                   ) : null}
                 </div>
+                <EstimateLineItemNote note={option.lineItem.note} />
                 {missingModuleSize ? (
                   <span className="text-xs text-red-500">
                     {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
@@ -587,7 +589,7 @@ export function EstimateMultiPositionRow({
               <div
                 className={`flex items-start gap-1 py-1 pl-3 ${indentName ? subcategoryItemNameIndent : ""}`}
               >
-                <span className="flex h-7 w-6 shrink-0 items-center justify-center self-center">
+                <span className="flex h-7 w-6 shrink-0 items-center justify-center self-start">
                   {dragHandle}
                 </span>
                 <div className="min-w-0 flex-1 space-y-1.5">
@@ -725,7 +727,7 @@ export function EstimateMultiPositionRow({
             <tr className="hover:bg-violet-50/30">
               <td className="border-b border-zinc-100 py-1 pr-2 align-top">
                 <div className="flex items-start gap-1 pl-3">
-                  <span className="flex h-7 w-6 shrink-0 items-center justify-center self-center">
+                  <span className="flex h-7 w-6 shrink-0 items-center justify-center self-start">
                     {dragHandle}
                   </span>
                   <span

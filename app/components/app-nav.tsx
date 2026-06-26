@@ -708,7 +708,7 @@ export function AppNav({
       : "relative inline-flex shrink-0";
 
     return showNavTooltips ? (
-      <Tooltip key={item.href} label={label} className={itemWrapperClassName}>
+      <Tooltip key={item.href} label={label} className={itemWrapperClassName} align="start">
         {navLink}
       </Tooltip>
     ) : (

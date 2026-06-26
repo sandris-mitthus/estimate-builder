@@ -34,6 +34,11 @@ import { useActionPermission } from "@/app/components/action-permissions-context
 import { useTranslations } from "@/app/components/translations-provider";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
+import {
+  SectionTitleFocusProvider,
+  useSectionTitleFocus,
+  AddEstimateSectionButton,
+} from "@/app/components/section-title-focus-context";
 import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guard";
 import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
@@ -75,6 +80,7 @@ import type {
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { LineItemPriceVisibilityToggle } from "@/app/components/line-item-price-visibility-toggle";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
@@ -122,7 +128,7 @@ const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
 const rowLead = "pl-3";
 const dragHandleColumn =
-  "flex h-7 w-6 shrink-0 items-center justify-center self-center";
+  "flex h-7 w-6 shrink-0 items-center justify-center self-start";
 const subcategoryNameIndent = "ml-[10px]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
@@ -229,6 +235,7 @@ function LineItemRow({
                 </button>
                 <PositionVariableQuantityIcon enabled={item.variableQuantity ?? false} />
               </div>
+              <EstimateLineItemNote note={item.note} />
               {missingModuleSize ? (
                 <span className="text-xs text-red-500">
                   {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
@@ -437,6 +444,7 @@ function SortableMultiPositionRow({
 }
 
 function SectionRow({
+  sectionRowId,
   kind,
   placeholder,
   value,
@@ -451,6 +459,7 @@ function SectionRow({
   onToggleCollapse,
   nameTrailing,
 }: {
+  sectionRowId: string;
   kind: "category" | "subcategory";
   placeholder: string;
   value: string;
@@ -466,12 +475,29 @@ function SectionRow({
   nameTrailing?: ReactNode;
 }) {
   const { t } = useTranslations();
+  const focusCtx = useSectionTitleFocus();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldFocus = focusCtx?.focusRowId === sectionRowId;
   const isCategory = kind === "category";
   const topBorderClass = showDropLine
     ? "border-t-4 border-t-zinc-900"
     : isCategory
       ? ""
       : "border-t border-t-zinc-300";
+
+  useEffect(() => {
+    if (!shouldFocus) {
+      return;
+    }
+
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus({ preventScroll: false });
+    focusCtx?.clearFocus();
+  }, [shouldFocus, focusCtx]);
 
   return (
     <tbody
@@ -489,7 +515,7 @@ function SectionRow({
         }`}
       >
         <div
-          className={`flex min-h-[3.25rem] items-center gap-2 py-2 pr-3 ${rowLead} ${topBorderClass}`}
+          className={`flex min-h-[3.25rem] items-start gap-2 py-2 pr-3 ${rowLead} ${topBorderClass}`}
         >
           <span className={dragHandleColumn}>{dragHandle}</span>
           {onToggleCollapse ? (
@@ -519,6 +545,7 @@ function SectionRow({
           >
             <div className="flex min-w-0 items-center gap-2">
               <input
+                ref={inputRef}
                 type="text"
                 className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
                 value={value}
@@ -545,10 +572,12 @@ function SectionRow({
 
 function SortableSectionRow({
   sortId,
+  sectionRowId,
   dragLabel,
   ...props
 }: {
   sortId: string;
+  sectionRowId: string;
   dragLabel: string;
   kind: "category" | "subcategory";
   placeholder: string;
@@ -569,6 +598,7 @@ function SortableSectionRow({
   return (
     <SectionRow
       {...props}
+      sectionRowId={sectionRowId}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
@@ -635,6 +665,7 @@ function SubcategoryBlock({
     <>
       <SortableSectionRow
         sortId={subcategoryDragId(subcategory.id)}
+        sectionRowId={subcategory.id}
         dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         kind="subcategory"
         placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
@@ -752,6 +783,7 @@ function SectionBlock({
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
+  const { requestFocus } = useSectionTitleFocus() ?? {};
 
   function withExpandedContent(
     updater: (current: EstimatePositionSection) => EstimatePositionSection,
@@ -773,6 +805,7 @@ function SectionBlock({
     <>
       <SortableSectionRow
         sortId={categoryDragId(section.id)}
+        sectionRowId={section.id}
         dragLabel={t("estimate.drag.section", "Pārvietot tāmes pozīciju")}
         kind="category"
         placeholder={t("estimate.placeholder.section", "Tāmes pozīcijas grupas nosaukums")}
@@ -784,12 +817,14 @@ function SectionBlock({
         actions={
           <RowActions
             deleteLabel={t("estimate.delete.section", "Dzēst tāmes pozīciju")}
-            onAddSub={() =>
+            onAddSub={() => {
+              const subcategory = createSubcategory();
+              requestFocus?.(subcategory.id);
               withExpandedContent((current) => ({
                 ...current,
-                subcategories: [...current.subcategories, createSubcategory()],
-              }))
-            }
+                subcategories: [...current.subcategories, subcategory],
+              }));
+            }}
             onAddMulti={() =>
               withExpandedContent((current) => ({
                 ...current,
@@ -1230,6 +1265,7 @@ export function EstimatePositionTable({
   return (
     <div className="max-w-full space-y-4">
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
+        <SectionTitleFocusProvider>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
           {readOnly && title.trim() ? (
             <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
@@ -1245,15 +1281,9 @@ export function EstimatePositionTable({
             })}
           </p>
           {!readOnly ? (
-          <button
-            type="button"
-            onClick={() =>
-              setSections([...sections, createEstimatePositionSection()])
-            }
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
-          >
-            {t("estimate.actions.add_section", "+ Tāmes pozīcija")}
-          </button>
+            <AddEstimateSectionButton
+              onAdd={(section) => setSections([...sections, section])}
+            />
           ) : null}
         </div>
 
@@ -1281,6 +1311,7 @@ export function EstimatePositionTable({
             </DropIndicatorProvider>
           </PositionModalProvider>
         </div>
+        </SectionTitleFocusProvider>
       </div>
 
       {positionModalState ? (

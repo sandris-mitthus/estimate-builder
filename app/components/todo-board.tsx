@@ -43,6 +43,7 @@ import { ConfirmModal } from "@/app/components/confirm-modal";
 import { DragHandle } from "@/app/components/drag-handle";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { Tooltip } from "@/app/components/tooltip";
+import { TruncatedText } from "@/app/components/truncated-text";
 import { SectionPage } from "@/app/components/section-page";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -373,7 +374,11 @@ function TodoTaskCard({
             hasDescription ? "" : "flex min-h-8 items-center"
           }`}
         >
-          <h3 className="text-sm font-semibold leading-5 text-zinc-950">{task.title}</h3>
+          <TruncatedText
+            as="h3"
+            text={task.title}
+            className="text-sm font-semibold leading-5 text-zinc-950"
+          />
           {hasDescription ? (
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500">
               {task.description}
@@ -529,10 +534,13 @@ function TodoCategoryColumn({
               />
             </span>
           )}
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold tracking-[-0.03em] text-zinc-950">
-              {category.title}
-            </h2>
+          <div className="min-w-0 flex-1">
+            <TruncatedText
+              as="h2"
+              text={category.title}
+              tooltipAlign="start"
+              className="text-base font-semibold tracking-[-0.03em] text-zinc-950"
+            />
             <p className="mt-1 text-xs text-zinc-400">
               {t("todo.category.task_count", "{count} darbi", {
                 count: String(category.tasks.length),

@@ -19,6 +19,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type CSSProperties,
@@ -94,10 +95,16 @@ import {
   getUnitPriceSubheaderLabels,
 } from "@/app/lib/estimates/unit-price-columns";
 import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-name-field";
+import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { PositionModal } from "@/app/components/position-modal";
 import { PositionModalProvider, usePositionModal } from "@/app/components/position-modal-context";
+import {
+  SectionTitleFocusProvider,
+  useSectionTitleFocus,
+  AddEstimateSectionButton,
+} from "@/app/components/section-title-focus-context";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { Tooltip } from "@/app/components/tooltip";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
@@ -285,7 +292,7 @@ const footerCell =
 /** Shared left gutter + fixed drag column so handles align across all row types. */
 const rowLead = "pl-3";
 const dragHandleColumn =
-  "flex h-7 w-6 shrink-0 items-center justify-center self-center";
+  "flex h-7 w-6 shrink-0 items-center justify-center self-start";
 const subcategoryNameIndent = "ml-[10px]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
@@ -407,7 +414,7 @@ function LineItemRow({
       }`}
     >
       <td className={nameCell}>
-        <div className={`flex items-center gap-1 ${rowLead}`}>
+        <div className={`flex items-start gap-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
           <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
             <span className="min-w-0 flex-1">
@@ -424,6 +431,7 @@ function LineItemRow({
                   >
                     {displayName.trim() || t("positions.unnamed", "Nenosaukta pozīcija")}
                   </button>
+                  <EstimateLineItemNote note={item.note} />
                   <AttachedModuleSizeLabel
                     attachment={item.moduleSizeAttachment}
                     moduleSizeOptions={moduleSizeOptions ?? []}
@@ -438,11 +446,16 @@ function LineItemRow({
                 currency={currency}
                 className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
                 footer={
-                  isComposite ? (
-                    <AttachedModuleSizeLabel
-                      attachment={item.moduleSizeAttachment}
-                      moduleSizeOptions={moduleSizeOptions ?? []}
-                    />
+                  isComposite || item.note?.trim() ? (
+                    <>
+                      <EstimateLineItemNote note={item.note} />
+                      {isComposite ? (
+                        <AttachedModuleSizeLabel
+                          attachment={item.moduleSizeAttachment}
+                          moduleSizeOptions={moduleSizeOptions ?? []}
+                        />
+                      ) : null}
+                    </>
                   ) : undefined
                 }
                 onNameChange={(name) => {
@@ -781,6 +794,7 @@ function SortableLineItemRow({
 }
 
 function SectionRow({
+  sectionRowId,
   kind,
   placeholder,
   value,
@@ -794,6 +808,7 @@ function SectionRow({
   estimateLocked = false,
   highlightMergedSagatave = false,
 }: {
+  sectionRowId: string;
   kind: "category" | "subcategory";
   placeholder: string;
   value: string;
@@ -807,12 +822,29 @@ function SectionRow({
   estimateLocked?: boolean;
   highlightMergedSagatave?: boolean;
 }) {
+  const focusCtx = useSectionTitleFocus();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldFocus = focusCtx?.focusRowId === sectionRowId;
   const isCategory = kind === "category";
   const topBorderClass = showDropLine
     ? "border-t-4 border-t-zinc-900"
     : isCategory
       ? ""
       : "border-t border-t-zinc-300";
+
+  useEffect(() => {
+    if (!shouldFocus || estimateLocked) {
+      return;
+    }
+
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus({ preventScroll: false });
+    focusCtx?.clearFocus();
+  }, [shouldFocus, estimateLocked, focusCtx]);
 
   return (
     <tbody
@@ -834,7 +866,7 @@ function SectionRow({
         }`}
       >
         <div
-          className={`flex min-h-[3.25rem] items-center gap-2 py-2 pr-3 ${rowLead} ${topBorderClass}`}
+          className={`flex min-h-[3.25rem] items-start gap-2 py-2 pr-3 ${rowLead} ${topBorderClass}`}
         >
           <span className={dragHandleColumn}>
             {estimateLocked ? null : dragHandle}
@@ -852,6 +884,7 @@ function SectionRow({
               </span>
             ) : (
               <input
+                ref={inputRef}
                 type="text"
                 className={`w-full border-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none ${
                   isCategory ? "font-semibold" : "font-normal"
@@ -872,11 +905,13 @@ function SectionRow({
 
 function SortableSectionRow({
   sortId,
+  sectionRowId,
   dragLabel,
   estimateLocked = false,
   ...props
 }: {
   sortId: string;
+  sectionRowId: string;
   dragLabel: string;
   kind: "category" | "subcategory";
   placeholder: string;
@@ -897,6 +932,7 @@ function SortableSectionRow({
   return (
     <SectionRow
       {...props}
+      sectionRowId={sectionRowId}
       estimateLocked={estimateLocked}
       colSpan={props.colSpan}
       showDropLine={showDropLine}
@@ -958,6 +994,7 @@ function SubcategoryBlock({
     <>
       <SortableSectionRow
         sortId={subcategoryDragId(subcategory.id)}
+        sectionRowId={subcategory.id}
         dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         colSpan={colSpan}
         kind="subcategory"
@@ -1081,11 +1118,13 @@ function CategoryBlock({
   estimateLocked?: boolean;
 }) {
   const { t } = useTranslations();
+  const { requestFocus } = useSectionTitleFocus() ?? {};
 
   return (
     <>
       <SortableSectionRow
         sortId={categoryDragId(category.id)}
+        sectionRowId={category.id}
         dragLabel={t("estimate.drag.category", "Pārvietot kategoriju")}
         colSpan={colSpan}
         kind="category"
@@ -1098,12 +1137,14 @@ function CategoryBlock({
           <RowActions
             deleteLabel={t("estimate.delete.category", "Dzēst kategoriju")}
             estimateLocked={estimateLocked}
-            onAddSub={() =>
+            onAddSub={() => {
+              const subcategory = createSubcategory();
+              requestFocus?.(subcategory.id);
               onChange({
                 ...category,
-                subcategories: [...category.subcategories, createSubcategory()],
-              })
-            }
+                subcategories: [...category.subcategories, subcategory],
+              });
+            }}
             onAddMulti={
               showQuantityColumn
                 ? undefined
@@ -2050,6 +2091,7 @@ export function EstimateTable({
 
   const tablePanel = (
     <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
+      <SectionTitleFocusProvider>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
         {variant === "tableOnly" ? (
           editorLocked ? (
@@ -2073,15 +2115,9 @@ export function EstimateTable({
           })}
         </p>
         {!editorLocked ? (
-          <button
-            type="button"
-            onClick={() =>
-              setCategories([...categories, createEstimatePositionSection()])
-            }
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700"
-          >
-            {t("estimate.actions.add_section", "+ Tāmes pozīcija")}
-          </button>
+          <AddEstimateSectionButton
+            onAdd={(section) => setCategories([...categories, section])}
+          />
         ) : null}
       </div>
 
@@ -2109,6 +2145,7 @@ export function EstimateTable({
           </PositionModalProvider>
         </EstimatePlannedProfitProvider>
       </div>
+      </SectionTitleFocusProvider>
     </div>
   );
 

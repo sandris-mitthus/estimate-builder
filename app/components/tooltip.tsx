@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -21,38 +22,48 @@ type TooltipProps = {
   elevated?: boolean;
 };
 
-type TooltipCoords = {
+type TooltipPosition = {
   top: number;
   left: number;
-  placement: "top" | "bottom";
 };
 
 const GAP_PX = 6;
+const VIEWPORT_PADDING_PX = 12;
 
-function computeCoords(
-  rect: DOMRect,
+function computeTooltipPosition(
+  triggerRect: DOMRect,
+  tooltipSize: { width: number; height: number },
   align: "center" | "start" | "end",
-): TooltipCoords {
-  const placement = rect.top >= 56 ? "top" : "bottom";
-  const top =
-    placement === "top" ? rect.top - GAP_PX : rect.bottom + GAP_PX;
+): TooltipPosition {
+  const preferTop =
+    triggerRect.top >= tooltipSize.height + GAP_PX + VIEWPORT_PADDING_PX;
 
-  let left = rect.left + rect.width / 2;
-  if (align === "start") left = rect.left;
-  if (align === "end") left = rect.right;
+  let top = preferTop
+    ? triggerRect.top - GAP_PX - tooltipSize.height
+    : triggerRect.bottom + GAP_PX;
 
-  return { top, left, placement };
-}
+  let left: number;
+  if (align === "start") {
+    left = triggerRect.left;
+  } else if (align === "end") {
+    left = triggerRect.right - tooltipSize.width;
+  } else {
+    left = triggerRect.left + triggerRect.width / 2 - tooltipSize.width / 2;
+  }
 
-function transformForCoords(
-  coords: TooltipCoords,
-  align: "center" | "start" | "end",
-): string {
-  const y = coords.placement === "top" ? "-100%" : "0";
+  const maxLeft = Math.max(
+    VIEWPORT_PADDING_PX,
+    window.innerWidth - VIEWPORT_PADDING_PX - tooltipSize.width,
+  );
+  const maxTop = Math.max(
+    VIEWPORT_PADDING_PX,
+    window.innerHeight - VIEWPORT_PADDING_PX - tooltipSize.height,
+  );
 
-  if (align === "start") return `translate(0, ${y})`;
-  if (align === "end") return `translate(-100%, ${y})`;
-  return `translate(-50%, ${y})`;
+  return {
+    top: Math.min(Math.max(VIEWPORT_PADDING_PX, top), maxTop),
+    left: Math.min(Math.max(VIEWPORT_PADDING_PX, left), maxLeft),
+  };
 }
 
 export function Tooltip({
@@ -65,8 +76,10 @@ export function Tooltip({
 }: TooltipProps) {
   const tooltipId = useId();
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
-  const [coords, setCoords] = useState<TooltipCoords | null>(null);
+  const [position, setPosition] = useState<TooltipPosition | null>(null);
+  const [isPositioned, setIsPositioned] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -75,23 +88,37 @@ export function Tooltip({
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
-    if (!trigger) return;
-    setCoords(computeCoords(trigger.getBoundingClientRect(), align));
+    const tooltip = tooltipRef.current;
+    if (!trigger || !tooltip) return;
+
+    setPosition(
+      computeTooltipPosition(
+        trigger.getBoundingClientRect(),
+        { width: tooltip.offsetWidth, height: tooltip.offsetHeight },
+        align,
+      ),
+    );
+    setIsPositioned(true);
   }, [align]);
 
   const show = useCallback(() => {
-    updatePosition();
+    setIsPositioned(false);
     setVisible(true);
-  }, [updatePosition]);
+  }, []);
 
   const hide = useCallback(() => {
     setVisible(false);
+    setIsPositioned(false);
+    setPosition(null);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!visible || !mounted) return;
+    updatePosition();
+  }, [visible, mounted, label, align, updatePosition]);
 
   useEffect(() => {
     if (!visible) return;
-
-    updatePosition();
 
     function handleReposition() {
       updatePosition();
@@ -110,19 +137,21 @@ export function Tooltip({
     align === "start" ? "text-left" : align === "end" ? "text-right" : "text-center";
 
   const tooltipNode =
-    visible && coords && mounted
+    visible && mounted
       ? createPortal(
           <span
+            ref={tooltipRef}
             id={tooltipId}
             role="tooltip"
             style={{
               position: "fixed",
-              top: coords.top,
-              left: coords.left,
-              transform: transformForCoords(coords, align),
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
               zIndex: elevated ? 120 : 50,
+              opacity: isPositioned ? 1 : 0,
+              pointerEvents: "none",
             }}
-            className={`pointer-events-none w-max max-w-[min(18rem,calc(100vw-1.5rem))] whitespace-normal rounded-md bg-black px-3 py-1.5 text-[11px] font-medium leading-snug text-white shadow-lg ${textAlignClass} ${labelClassName}`.trim()}
+            className={`w-max max-w-[min(18rem,calc(100vw-1.5rem))] whitespace-normal rounded-md bg-black px-3 py-1.5 text-[11px] font-medium leading-snug text-white shadow-lg ${textAlignClass} ${labelClassName}`.trim()}
           >
             {label}
           </span>,
