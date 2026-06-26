@@ -259,7 +259,6 @@ function TodoTaskCard({
   style,
   dragging = false,
   onEdit,
-  onDelete,
 }: {
   task: TodoTaskSummary;
   dragLabel: string;
@@ -269,7 +268,6 @@ function TodoTaskCard({
   style?: CSSProperties;
   dragging?: boolean;
   onEdit?: (task: TodoTaskSummary) => void;
-  onDelete?: (task: TodoTaskSummary) => void;
 }) {
   const { t } = useTranslations();
   const hasDescription = task.description.trim().length > 0;
@@ -278,11 +276,11 @@ function TodoTaskCard({
     <article
       ref={setNodeRef}
       style={style}
-      className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition ${
+      className={`group/task rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition ${
         dragging ? "opacity-50 ring-2 ring-blue-200" : "hover:border-blue-200"
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         {attributes ? (
           <span className="inline-flex shrink-0 self-start">
             <DragHandle label={dragLabel} attributes={attributes} listeners={listeners} />
@@ -297,26 +295,20 @@ function TodoTaskCard({
             hasDescription ? "" : "flex min-h-8 items-center"
           }`}
         >
-          <h3 className="text-sm font-semibold text-zinc-950">{task.title}</h3>
+          <h3 className="text-sm font-semibold leading-5 text-zinc-950">{task.title}</h3>
           {hasDescription ? (
-            <p className="mt-1 line-clamp-3 text-sm leading-6 text-zinc-500">
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500">
               {task.description}
             </p>
           ) : null}
         </div>
-        {onEdit && onDelete ? (
-          <div className="flex shrink-0 items-center gap-1">
+        {onEdit ? (
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover/task:opacity-100 focus-within:opacity-100">
             <IconActionButton
               label={t("actions.edit", "Labot")}
               icon="fas fa-pen"
               onClick={() => onEdit(task)}
               variant="edit"
-            />
-            <IconActionButton
-              label={t("actions.delete", "Dzēst")}
-              icon="fas fa-trash"
-              onClick={() => onDelete(task)}
-              variant="delete"
             />
           </div>
         ) : null}
@@ -341,13 +333,13 @@ function DeleteDropZone() {
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-3xl border border-dashed px-5 py-5 text-center transition ${
+      className={`flex items-center justify-center gap-2 rounded-3xl border border-dashed px-5 py-5 text-center transition ${
         isOver
           ? "border-red-300 bg-red-50 text-red-800 shadow-sm ring-4 ring-red-100"
           : "border-zinc-300 bg-white text-zinc-500"
       }`}
     >
-      <i className="fas fa-trash-can mb-2 text-lg" aria-hidden="true" />
+      <i className="fas fa-trash-can text-sm" aria-hidden="true" />
       <p className="text-sm font-semibold">
         {t("todo.delete_zone.title", "Ievelc uzdevumu šeit, lai to izdzēstu")}
       </p>
@@ -359,12 +351,10 @@ function SortableTodoTaskCard({
   task,
   dragLabel,
   onEdit,
-  onDelete,
 }: {
   task: TodoTaskSummary;
   dragLabel: string;
   onEdit: (task: TodoTaskSummary) => void;
-  onDelete: (task: TodoTaskSummary) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, animateLayoutChanges: () => false });
@@ -384,7 +374,6 @@ function SortableTodoTaskCard({
       style={style}
       dragging={isDragging}
       onEdit={onEdit}
-      onDelete={onDelete}
     />
   );
 }
@@ -398,7 +387,6 @@ function TodoCategoryColumn({
   onEditCategory,
   onDeleteCategory,
   onEditTask,
-  onDeleteTask,
 }: {
   category: TodoCategorySummary;
   dragLabel: (name: string) => string;
@@ -408,7 +396,6 @@ function TodoCategoryColumn({
   onEditCategory: (category: TodoCategorySummary) => void;
   onDeleteCategory: (category: TodoCategorySummary) => void;
   onEditTask: (task: TodoTaskSummary) => void;
-  onDeleteTask: (task: TodoTaskSummary) => void;
 }) {
   const { t } = useTranslations();
   const { setNodeRef, isOver } = useDroppable({
@@ -418,13 +405,13 @@ function TodoCategoryColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`flex min-h-72 flex-col rounded-3xl border bg-white/90 p-4 shadow-sm transition ${
+      className={`group/category flex min-h-64 flex-col rounded-3xl border bg-white/90 p-3 shadow-sm transition ${
         isOver ? "border-blue-300 ring-4 ring-blue-100" : "border-zinc-200"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-[-0.03em] text-zinc-950">
+          <h2 className="text-base font-semibold tracking-[-0.03em] text-zinc-950">
             {category.title}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
@@ -433,7 +420,7 @@ function TodoCategoryColumn({
             })}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/category:opacity-100 focus-within:opacity-100">
           <IconActionButton
             label={t("todo.category.edit", "Labot kategoriju")}
             icon="fas fa-pen"
@@ -453,7 +440,7 @@ function TodoCategoryColumn({
         items={category.tasks.map((task) => task.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="mt-4 flex flex-1 flex-col gap-3">
+        <div className="mt-3 flex flex-1 flex-col gap-2.5">
           {category.tasks.map((task) => (
             <div key={task.id} className="flex flex-col gap-3">
               {dropIndicator?.categoryId === category.id &&
@@ -464,7 +451,6 @@ function TodoCategoryColumn({
                 task={task}
                 dragLabel={dragLabel(task.title)}
                 onEdit={onEditTask}
-                onDelete={onDeleteTask}
               />
             </div>
           ))}
@@ -483,7 +469,7 @@ function TodoCategoryColumn({
       <button
         type="button"
         onClick={() => onCreateTask(category.id)}
-        className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+        className="mt-3 inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
       >
         <i className="fas fa-plus text-xs" aria-hidden="true" />
         {t("todo.task.add", "Pievienot darbu")}
@@ -519,7 +505,6 @@ export function TodoBoard({
   );
   const [deleteCategoryTarget, setDeleteCategoryTarget] =
     useState<TodoCategorySummary | null>(null);
-  const [deleteTaskTarget, setDeleteTaskTarget] = useState<TodoTaskSummary | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -709,32 +694,6 @@ export function TodoBoard({
     });
   }
 
-  function handleDeleteTask() {
-    if (!deleteTaskTarget) return;
-
-    startTransition(async () => {
-      const result = await deleteTodoTaskAction(deleteTaskTarget.id);
-
-      if (!result.ok) {
-        showFeedback({ type: "error", text: translateActionError(t, result) });
-        return;
-      }
-
-      setDeleteTaskTarget(null);
-      setCategories((current) =>
-        current.map((category) => ({
-          ...category,
-          tasks: category.tasks.filter((task) => task.id !== deleteTaskTarget.id),
-        })),
-      );
-      showFeedback({
-        type: "success",
-        text: t("todo.feedback.task_deleted", "Darbs dzēsts."),
-      });
-      router.refresh();
-    });
-  }
-
   function handleDragStart(event: DragStartEvent) {
     setActiveTaskId(String(event.active.id));
   }
@@ -845,9 +804,9 @@ export function TodoBoard({
           >
             <DeleteDropZone />
 
-            <div className="flex gap-4 overflow-x-auto pb-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {categories.map((category) => (
-                <div key={category.id} className="min-w-[320px] flex-1 basis-[360px]">
+                <div key={category.id} className="min-w-0">
                   <TodoCategoryColumn
                     category={category}
                     dragLabel={(name) =>
@@ -862,7 +821,6 @@ export function TodoBoard({
                     onEditCategory={openEditCategoryModal}
                     onDeleteCategory={setDeleteCategoryTarget}
                     onEditTask={openEditTaskModal}
-                    onDeleteTask={setDeleteTaskTarget}
                   />
                 </div>
               ))}
@@ -1043,22 +1001,6 @@ export function TodoBoard({
           confirmVariant="danger"
           blocking={isPending}
           onConfirm={handleDeleteCategory}
-        />
-
-        <ConfirmModal
-          open={deleteTaskTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setDeleteTaskTarget(null);
-          }}
-          title={t("todo.delete_task.title", "Dzēst darbu?")}
-          description={t(
-            "todo.delete_task.description",
-            "Darbs tiks dzēsts no darāmo darbu saraksta.",
-          )}
-          confirmLabel={t("actions.delete", "Dzēst")}
-          confirmVariant="danger"
-          blocking={isPending}
-          onConfirm={handleDeleteTask}
         />
       </div>
     </SectionPage>
