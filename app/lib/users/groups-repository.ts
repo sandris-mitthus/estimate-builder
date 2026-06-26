@@ -185,7 +185,7 @@ async function ensureDefaultGroups(
 
 export async function listUserGroups(): Promise<UserGroupSummary[]> {
   if (!isSupabaseAdminConfigured()) {
-    return DEFAULT_GROUP_DEFINITIONS.map((group, index) => ({
+    return DEFAULT_GROUP_DEFINITIONS.map((group) => ({
       id: `sample-${group.slug}`,
       slug: group.slug,
       name: group.name,

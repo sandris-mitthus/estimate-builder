@@ -30,16 +30,11 @@ import {
   type LinkedOptionSummary,
   type MultiOptionLinkActions,
 } from "@/app/lib/estimates/multi-position-links";
-import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import {
   resolveFrozenEstimateDisplayUnitPrice,
   resolveLiveDisplayUnitPrice,
   resolveStaleCatalogPriceHints,
 } from "@/app/lib/positions/stale-catalog-price";
-import {
-  findCatalogPositionForLineItem,
-  isMaterialsOrMechanismsLineItem,
-} from "@/app/lib/positions/sync-from-estimate-line-items";
 import {
   deriveCompositeUnitPrice,
   isCompositeLineItem,
@@ -227,10 +222,6 @@ function MultiOptionSubRow({
     option.lineItem,
     catalogPositions,
     defaultHourlyRate,
-  );
-  const isMaterialsOrMechanisms = isMaterialsOrMechanismsLineItem(
-    option.lineItem,
-    catalogPositions,
   );
   const missingTimeNorm =
     isCompositeLineItem(option.lineItem) &&

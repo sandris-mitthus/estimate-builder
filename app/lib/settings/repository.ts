@@ -5,7 +5,6 @@ import { resolveCompanyLogoDisplayUrl } from "@/app/lib/settings/logo-storage";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "@/app/lib/settings/currencies";
 import { normalizeDefaultHourlyRate } from "@/app/lib/settings/default-hourly-rate";
 import {
-  DEFAULT_ESTIMATE_VALIDITY_DAYS,
   normalizeEstimateValidityDays,
 } from "@/app/lib/settings/estimate-validity-days";
 import type {

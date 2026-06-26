@@ -6,7 +6,9 @@ import {
   NAV_PERMISSION_LABELS,
 } from "@/app/lib/auth/permissions";
 import { getCurrentUserAccess } from "@/app/lib/auth/require-permission";
+import { isNavAllowedByFrontendModules } from "@/app/lib/frontend-modules/access";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
+import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import {
   canAccessNav,
   canPerformAction,
@@ -54,6 +56,13 @@ export async function assertNavAccess(
   }
 
   if (!canAccessNav(session.access, navKey)) {
+    redirect("/");
+  }
+
+  const shouldCheckFrontendModule =
+    !session.user || !(await isSystemAdminUser(session.user));
+
+  if (shouldCheckFrontendModule && !(await isNavAllowedByFrontendModules(navKey))) {
     redirect("/");
   }
 

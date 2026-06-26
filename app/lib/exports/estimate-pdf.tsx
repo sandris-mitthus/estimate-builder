@@ -366,6 +366,7 @@ export function EstimatePdfDocument({
               )
             )}
           </View>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
           {logo ? <Image src={logo.dataUrl} style={s.logo} /> : null}
         </View>
 
@@ -436,8 +437,14 @@ export function EstimatePdfDocument({
             <Text style={s.imgSectionTitle}>{tx("exports.pdf.visualization", "Vizualizācija")}</Text>
             {imagePairs.map(([left, right], i) => (
               <View key={i} style={s.imgRow} wrap={false}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
                 <Image src={left.dataUrl} style={[s.imgItem, right ? { marginRight: 8 } : {}]} />
-                {right ? <Image src={right.dataUrl} style={s.imgItem} /> : null}
+                {right ? (
+                  <>
+                    {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image has no alt prop */}
+                    <Image src={right.dataUrl} style={s.imgItem} />
+                  </>
+                ) : null}
               </View>
             ))}
             <View style={[s.divider, { marginTop: 6 }]} />

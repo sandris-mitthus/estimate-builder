@@ -61,9 +61,13 @@ function ModuleCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAttachedModule, attachment?.itemKey]);
 
-  const adjustments = isAttachedModule
-    ? (attachment?.adjustments ?? {})
-    : localAdjustments;
+  const adjustments = useMemo(
+    () =>
+      isAttachedModule
+        ? (attachment?.adjustments ?? {})
+        : localAdjustments,
+    [attachment?.adjustments, isAttachedModule, localAdjustments],
+  );
 
   const displaySections = useMemo(() => {
     if (Object.keys(adjustments).length === 0) {

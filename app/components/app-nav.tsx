@@ -134,6 +134,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "Todo",
   },
   {
+    key: "system_admin:site_frontend_modules",
+    href: "/site_frontend_modules",
+    icon: "fas fa-puzzle-piece",
+    labelKey: "nav.system_admin.site_frontend_modules",
+    fallbackLabel: "Frontend moduļi",
+  },
+  {
     key: "system_admin:site_languages",
     href: "/site_languages",
     icon: "fas fa-language",

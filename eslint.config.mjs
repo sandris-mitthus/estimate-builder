@@ -8,13 +8,22 @@ const eslintConfig = defineConfig([
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "public/**"]),
   {
     rules: {
-      // Calling setState synchronously in effects is a legitimate pattern
-      // for syncing state from props (controlled inputs, modal resets, etc.).
-      "react-hooks/set-state-in-effect": "warn",
-      // Updating ref.current during render is valid for stable callback refs.
-      "react-hooks/refs": "warn",
-      // Local counter variables in PDF render functions are not React state.
-      "react-hooks/immutability": "warn",
+      // Syncing local state from props (modal drafts, controlled inputs) is intentional.
+      "react-hooks/set-state-in-effect": "off",
+      // Ref forwarding via createElement / callback refs is valid in this codebase.
+      "react-hooks/refs": "off",
+      // PDF row counters are render-local, not React state.
+      "react-hooks/immutability": "off",
+      // Logos and module assets use dynamic / blob / API URLs — plain img is intentional.
+      "@next/next/no-img-element": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);

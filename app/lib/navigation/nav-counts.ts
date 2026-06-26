@@ -116,6 +116,7 @@ export async function getNavigationCounts({
       companies,
       companyUsers,
       groups,
+      frontendModules,
       languages,
       translations,
     ] = await Promise.all([
@@ -123,6 +124,7 @@ export async function getNavigationCounts({
       countRows("companies"),
       countRows("company_users"),
       countRows("site_user_groups"),
+      countRows("site_frontend_modules"),
       countRows("site_languages"),
       countActiveLanguageTranslations(activeLanguageCode),
     ]);
@@ -132,6 +134,7 @@ export async function getNavigationCounts({
       "system_admin:site_companies": companies,
       "system_admin:site_companies_users": companyUsers,
       "system_admin:site_user_groups": groups,
+      "system_admin:site_frontend_modules": frontendModules,
       "system_admin:site_languages": languages,
       "system_admin:site_translations": translations,
     };

@@ -380,7 +380,7 @@ function TodoTaskCard({
             className="text-sm font-semibold leading-5 text-zinc-950"
           />
           {hasDescription ? (
-            <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500">
+            <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-zinc-500">
               {task.description}
             </p>
           ) : null}

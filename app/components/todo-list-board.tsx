@@ -222,7 +222,7 @@ function TodoTaskCardShell({
       <p className="min-w-0 flex-1 text-sm font-medium leading-5 text-zinc-900">
         <span>{item.title}</span>
         {item.description.trim() ? (
-          <span className="mt-1 line-clamp-2 block text-xs font-normal leading-5 text-zinc-500">
+          <span className="mt-1 line-clamp-2 block whitespace-pre-wrap text-xs font-normal leading-5 text-zinc-500">
             {item.description}
           </span>
         ) : null}

@@ -1,7 +1,5 @@
 import { cache } from "react";
-import type { User } from "@supabase/supabase-js";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
-import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -11,73 +9,6 @@ type CompanyMembershipRow = {
   company_id: string;
   status?: string;
 };
-
-function mapAuthUserProfile(user: User) {
-  const { name } = mapUserDisplay(user);
-
-  return {
-    id: user.id,
-    email: user.email ?? "",
-    name,
-    avatar_url: resolveAvatarUrl(user) ?? "",
-  };
-}
-
-async function ensureUserProfile(user: User): Promise<void> {
-  if (!isSupabaseAdminConfigured()) {
-    return;
-  }
-
-  const supabase = createAdminClient();
-  const profile = mapAuthUserProfile(user);
-  const { error } = await supabase.from("users").insert({
-    ...profile,
-    is_admin: false,
-  });
-
-  if (error) {
-    await supabase.from("users").update(profile).eq("id", user.id);
-  }
-}
-
-async function ensureBootstrapCompanyMembership(user: User): Promise<string | null> {
-  const supabase = createAdminClient();
-  await ensureUserProfile(user);
-
-  const { error } = await supabase.from("company_users").upsert(
-    {
-      company_id: BOOTSTRAP_COMPANY_ID,
-      user_id: user.id,
-      role: "member",
-      status: "active",
-    },
-    { onConflict: "company_id,user_id" },
-  );
-
-  if (error) {
-    return null;
-  }
-
-  const { data: viewerGroup } = await supabase
-    .from("company_user_groups")
-    .select("id")
-    .eq("company_id", BOOTSTRAP_COMPANY_ID)
-    .eq("slug", "viewer")
-    .maybeSingle();
-
-  if (viewerGroup?.id) {
-    await supabase.from("company_group_members").upsert(
-      {
-        company_id: BOOTSTRAP_COMPANY_ID,
-        user_id: user.id,
-        group_id: viewerGroup.id as string,
-      },
-      { onConflict: "company_id,user_id" },
-    );
-  }
-
-  return BOOTSTRAP_COMPANY_ID;
-}
 
 export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): Promise<
   string | null

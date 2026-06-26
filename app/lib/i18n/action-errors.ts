@@ -43,6 +43,14 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Izvēlies izmaksu veidu.": "validation.cost_type_required",
   "Izvēlētais modulis vairs neeksistē.": "errors.module_not_found",
   "Ievadi valodas nosaukumu.": "errors.language_name_required",
+  "Ievadi moduļa atslēgu.": "frontend_modules.feedback.key_required",
+  "Atslēgai jābūt formātā ar mazajiem burtiem, cipariem, punktiem, svītrām, apakšsvītrām un kolu.":
+    "errors.frontend_module_key_invalid",
+  "Modulis ar šo atslēgu jau eksistē.": "errors.frontend_module_key_exists",
+  "Frontend modulis nav atrasts.": "errors.frontend_module_not_found",
+  "Neizdevās izveidot frontend moduli.": "errors.frontend_module_create_failed",
+  "Neizdevās dzēst frontend moduli.": "errors.frontend_module_delete_failed",
+  "Neizdevās saglabāt moduļa statusu.": "errors.frontend_module_status_save_failed",
   "Key drīkst saturēt burtus, ciparus, punktus, svītras, apakšsvītras un kolus.":
     "errors.translation_key_invalid",
   "Nav autorizācijas.": "errors.unauthorized",

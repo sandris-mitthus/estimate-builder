@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import type { PriceBreakdown } from "@/app/lib/estimates/types";
 import { formatMoney } from "@/app/lib/estimates/format-money";
 import {
   getCatalogHintPrice,
@@ -97,7 +96,7 @@ export function EstimateLineItemNameField({
         catalogPositions,
         excludedCatalogKeys,
       ),
-    // excludedCatalogKeys content is captured by excludedKeysFingerprint
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- excludedKeysFingerprint hashes Set content
     [catalogPositions, excludedKeysFingerprint],
   );
   const sortedAvailableCatalogPositions = useMemo(

@@ -38,7 +38,7 @@ function computeTooltipPosition(
   const preferTop =
     triggerRect.top >= tooltipSize.height + GAP_PX + VIEWPORT_PADDING_PX;
 
-  let top = preferTop
+  const top = preferTop
     ? triggerRect.top - GAP_PX - tooltipSize.height
     : triggerRect.bottom + GAP_PX;
 

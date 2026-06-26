@@ -20,6 +20,7 @@ import {
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
 import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-counts";
 import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
+import { filterNavKeysByFrontendModules } from "@/app/lib/frontend-modules/access";
 import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
@@ -113,10 +114,13 @@ export default async function ProtectedLayout({
 
     if (session) {
       actionPermissions = session.access.permissions.actions;
-      const navKeys = Object.entries(session.access.permissions.nav)
+      let navKeys = Object.entries(session.access.permissions.nav)
         .filter(([, enabled]) => enabled)
         .map(([key]) => key as NavPermissionKey);
-      allowedNavKeys = navKeys.length > 0 ? navKeys : null;
+      if (!isSystemAdmin) {
+        navKeys = await filterNavKeysByFrontendModules(navKeys);
+      }
+      allowedNavKeys = navKeys;
     }
   } else if (process.env.NODE_ENV === "production") {
     activeLanguageCode = await getAnonymousActiveLanguageCode(languages);

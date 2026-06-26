@@ -30,7 +30,6 @@ import {
 import {
   saveProjectEstimateAction,
   updateProjectEstimateDatesAction,
-  updateProjectEstimatePlannedProfitAction,
 } from "@/app/(protected)/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useActionPermission } from "@/app/components/action-permissions-context";
@@ -57,7 +56,6 @@ import {
   createLineItem,
   createSubcategory,
 } from "@/app/lib/estimates/create-empty";
-import { createEstimatePositionSection } from "@/app/lib/estimate-positions/create-empty";
 import { formatMoneyDisplay } from "@/app/lib/estimates/format-money";
 import {
   createSampleCategories,
@@ -68,7 +66,6 @@ import {
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
-import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
 import {
   EstimatePlannedProfitProvider,
   useEstimatePlannedProfitPercent,
@@ -125,7 +122,6 @@ import {
   applyLineItemCatalogEdit,
   findCatalogPositionForLineItem,
   hydrateLineItemWithCatalog,
-  isMaterialsOrMechanismsLineItem,
 } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -177,7 +173,6 @@ import type {
   EstimateMultiPosition,
   EstimateRowItem,
   EstimateSubcategory,
-  PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import type {
   BuildingModuleSizeOption,
@@ -348,10 +343,6 @@ function LineItemRow({
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
-  const isMaterialsOrMechanisms = isMaterialsOrMechanismsLineItem(
-    item,
-    catalogPositions,
-  );
   const displayName = catalogPosition?.name ?? item.name;
   const moduleSizeUnit =
     isComposite && !item.variableQuantity
@@ -668,7 +659,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate,
   currency = null,
   showQuantityColumn,
-  allCategories,
+  allCategories: _allCategories,
   moduleSizeOptions = [],
   highlightStaleCatalogPrices = false,
   highlightMergedSagatave = false,

@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.54` (see [Changelog](#changelog))
+**Current version:** `1.3.57` (see [Changelog](#changelog))
 
 ---
 
@@ -22,10 +22,10 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 
 ### Multi-company users, groups and permissions
 
-- **Sistēmas administrators** — globāls profils `public.users.is_admin`; sidebar pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Grupas**, **Docs**, **Todo**, **Valodas**, **Tulkojumi**, apakšā **Sistēmas uzstādījumi**) un slēpj uzņēmuma izvēlni
-- **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown sidebar apakšā; `/site_docs` pārvalda publiskās docs kategorijas un rakstus ar drag-and-drop pārvietošanu starp kategorijām un secības maiņu; `/todo` ir lokāli saglabāts divu kolonnu darba dēlis ar drag-and-drop pārvietošanu un prioritizētu dzēšanas drop zonu; `/site_companies` rāda uzņēmuma logo un kompaktu rekvizītu bloku, `/site_companies_users` rāda arī sistēmas administratorus bez uzņēmuma piesaistes, lietotāju avatarus, uzņēmumu logo un konkrētā uzņēmuma grupu/lomu; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
+- **Sistēmas administrators** — globāls profils `public.users.is_admin`; sidebar pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Grupas**, **Docs**, **Todo**, **Frontend moduļi**, **Valodas**, **Tulkojumi**, apakšā **Sistēmas uzstādījumi**) un slēpj uzņēmuma izvēlni
+- **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_frontend_modules`, `/site_languages`, `/site_translations`, `/site_settings`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown sidebar apakšā; `/site_frontend_modules` — frontend moduļu atslēgas ar ieslēgšanas slēdzi (live saglabāšana bez lapas pārlādes); `module_todo_list` kontrolē parasto lietotāju `/tasks` piekļuvi un sidebar linku; `/site_docs` pārvalda publiskās docs kategorijas un rakstus ar drag-and-drop pārvietošanu starp kategorijām un secības maiņu; `/todo` ir lokāli saglabāts divu kolonnu darba dēlis ar drag-and-drop pārvietošanu un prioritizētu dzēšanas drop zonu; uzdevumu apraksti kartītēs saglabā textarea rindas pārtraukumus; `/site_companies` rāda uzņēmuma logo un kompaktu rekvizītu bloku, `/site_companies_users` rāda arī sistēmas administratorus bez uzņēmuma piesaistes, lietotāju avatarus, uzņēmumu logo un konkrētā uzņēmuma grupu/lomu; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
-- **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem; katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju (vienmēr pirmā, nepārvietojama), horizontālu Kanban rindu, drag-and-drop kategoriju secības maiņu un uzdevumu prioritizēšanu starp kategorijām, biezu drop indikatoru, dzēšanas drop zonu un **+** pogu kategorijas galvenē; saīsinātiem kategoriju/uzdevumu nosaukumiem hover rāda pilno tekstu tooltip; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
+- **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem (redzams un pieejams tikai ja `module_todo_list` frontend modulis ir ieslēgts un grupai ir `todo` tiesība); katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju (vienmēr pirmā, nepārvietojama), horizontālu Kanban rindu, drag-and-drop kategoriju secības maiņu un uzdevumu prioritizēšanu starp kategorijām, biezu drop indikatoru, dzēšanas drop zonu un **+** pogu kategorijas galvenē; saīsinātiem kategoriju/uzdevumu nosaukumiem hover rāda pilno tekstu tooltip; uzdevumu apraksti kartītēs saglabā textarea rindas pārtraukumus; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
 - **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
@@ -48,7 +48,7 @@ English routes, Latvian labels:
 | Darāmo darbu saraksts | `/tasks` |
 | Lietotāji | `/users` (apakšlapa **Grupas un tiesības**: `/users/groups`) |
 | Uzstādījumi | `/settings` |
-| System admin | `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings` |
+| System admin | `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_frontend_modules`, `/site_languages`, `/site_translations`, `/site_settings` |
 
 - **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms); sidebar augšā ir poga manuālai sakļaušanai/izvēršanai, saturs automātiski pielāgo kreiso atkāpi, nav linkiem ir count badge (sakļautā izvēlnē iekš ikonas augšējā labā stūra) un viewport iekšēji tooltipi, apakšā piesprausti uzstādījumu/pārvaldības linki, un valodas dropdown apakšējā zonā atveras uz augšu, lai paliktu redzams
 - **Publiskā dokumentācija** — `/docs` (`/wiki` alias) ir publiski pieejams dokumentācijas portāls ar fixed sidebar kategorijām, animēti atveramiem rakstu linkiem, noklusējuma kategoriju/rakstu kartīšu sarakstu un raksta content skatu; login kartē ir tieša saite uz dokumentāciju
@@ -110,7 +110,7 @@ English routes, Latvian labels:
 - Falls back to in-memory sample data only when Supabase is **not** configured (configured DB with zero projects shows empty list, not seed cards)
 - **Multi-company scoping** — projects, estimates, settings, modules, position prices/history, sagatave, excluded positions and private storage assets are scoped by active `company_id`
 - **Company access** — `public.users.is_admin` marks system admins; `company_users` controls company membership/status; `company_user_groups` + `company_group_members` control per-company permissions
-- **System admin data and performance** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits; `site_doc_categories` + `site_docs` store public documentation; `/todo` stores its board state in browser `localStorage`; user `/tasks` boards use `todo_categories` + `todo_tasks` scoped by `company_id` and `user_id`; site settings/languages/docs use tag-based server caches; request-level caches prevent duplicate translation/admin/settings/module/catalog checks during one SSR render; project-list warning badges share one estimates read instead of three separate scans
+- **System admin data and performance** — `site_settings` controls app metadata; `site_user_groups` controls global default profiles; `site_frontend_modules` stores feature flags (`module_key` + `is_enabled`) that gate selected company nav routes (currently `module_todo_list` → `/tasks`); `site_languages` + `users.active_language_code` control signed-in UI language selection; anonymous login language uses `eb_language` cookie; `site_translations` stores seeded and custom translation values per key/language, served through a per-language server cache invalidated on translation/language edits; `site_doc_categories` + `site_docs` store public documentation; `/todo` stores its board state in browser `localStorage`; user `/tasks` boards use `todo_categories` + `todo_tasks` scoped by `company_id` and `user_id`; site settings/languages/docs use tag-based server caches; request-level caches prevent duplicate translation/admin/settings/module/catalog checks during one SSR render; project-list warning badges share one estimates read instead of three separate scans
 - Estimate **full state** (title, meta, categories with baked-in prices) persisted via **Saglabāt tāmi** server action; dates also auto-saved on change
 - `npm run db:migrate` applies only **pending** migrations (tracked in `public.schema_migrations`)
 - App tables use **service-role server access** with RLS deny policies for browser clients
@@ -215,7 +215,7 @@ npm run db:test
 4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
 5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
-**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`; `041`, active language), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), system admin tables (`038` site settings, `040` site user groups, `041` site languages, `042` site translations), system/company UI translation normalization and seed coverage (`043`–`076`), legacy group cleanup (`039`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
+**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`; `041`, active language), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), system admin tables (`038` site settings, `040` site user groups, `041` site languages, `042` site translations, `087` site frontend modules), system/company UI translation normalization and seed coverage (`043`–`076`, `088`), legacy group cleanup (`039`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
 
 ---
 
@@ -243,6 +243,7 @@ app/
 │   ├── site_settings/  # Global system name/slogan metadata settings
 │   ├── site_user_groups/ # Global default group permissions
 │   ├── site_docs/      # System admin public docs category/article manager
+│   ├── site_frontend_modules/ # System admin frontend module keys + enabled toggles
 │   ├── site_languages/ # System languages and default/active toggles
 │   ├── site_translations/ # Translation key CRUD and live search
 │   ├── todo/          # System admin local todo board (two columns + DnD)
@@ -265,6 +266,7 @@ app/
 │   ├── client/         # cookie read/write helpers
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, sagatave-has-new-positions, project-estimate-base, sync-subcategory-offer-visibility, labor-time-norm-sync, default sagatave
 │   ├── excluded-positions/  # repository, resolve-project-excluded-positions (global list + per-project omissions)
+│   ├── frontend-modules/  # site_frontend_modules CRUD, nav gating helpers, module_todo_list flag
 │   ├── estimates/      # calculate-totals (resolveEstimateLineItemPrices), planned-profit, aggregate-project-materials, collect-estimate-document-units, calculate-line (addThousandSeparators), format-money, multi-position, composite-line-item, sync-module-size-quantities, …
 │   ├── exports/        # estimate-pdf.tsx, estimate-excel.ts (exceljs), pdf-image-fetch.ts
 │   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-collapsed-estimate-sections, use-assigned-materials-banner-expanded
@@ -284,7 +286,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–084 (038–042 = system admin tables; 043–078 = UI/docs translation seeds and follow-ups; 077 = site docs tables; 079–084 = user todo board + translations)
+supabase/migrations/    # 001–090 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -382,6 +384,27 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.57
+
+**Lint and CI**
+
+- ESLint rules aligned with intentional patterns (modal prop sync, dynamic images, PDF counters); `npm run lint` exits with zero warnings
+- Removed dead imports and unused bootstrap company helper; small `useMemo` / `prefer-const` fixes
+
+### v1.3.56
+
+**Frontend module flags**
+
+- System admin **Frontend moduļi** at `/site_frontend_modules` — define `module_key` values with on/off toggles (live UI, no full page reload)
+- `module_todo_list` gates company-user `/tasks` sidebar link and route access when disabled (`assertNavAccess`, layout nav filter)
+- Migrations `087`–`090` (`site_frontend_modules`, translations, `module_todo_list` seed)
+
+### v1.3.55
+
+**Todo description line breaks**
+
+- `/tasks` and system-admin `/todo` cards now preserve textarea line breaks in task descriptions (`whitespace-pre-wrap`)
 
 ### v1.3.54
 

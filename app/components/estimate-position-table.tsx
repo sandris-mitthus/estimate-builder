@@ -43,7 +43,6 @@ import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guar
 import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
 import {
-  createEstimatePositionSection,
   createSubcategory,
   ensureSectionHasLineItem,
 } from "@/app/lib/estimate-positions/create-empty";
@@ -77,7 +76,6 @@ import type {
   EstimateMultiPosition,
   EstimateSubcategory,
   MultiOptionLinkGroup,
-  PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
@@ -104,7 +102,6 @@ import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
-import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import {
   UNIT_PRICE_COLUMN_COUNT,
   getUnitPriceSubheaderLabels,
@@ -152,7 +149,7 @@ function LineItemRow({
   showDropLine,
   catalogPositions,
   defaultHourlyRate,
-  currency = null,
+  currency: _currency = null,
   moduleSizeOptions,
 }: {
   item: EstimateLineItem;
