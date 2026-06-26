@@ -8,9 +8,11 @@ import {
   createTodoTask,
   deleteTodoCategory,
   deleteTodoTask,
+  reorderTodoCategories,
   reorderTodoTasks,
   updateTodoCategory,
   updateTodoTask,
+  type TodoCategoryReorderItem,
   type TodoCategoryInput,
   type TodoTaskInput,
   type TodoTaskReorderItem,
@@ -64,6 +66,18 @@ export async function deleteTodoCategoryAction(categoryId: string) {
   if (denied) return denied;
 
   const result = await deleteTodoCategory(categoryId);
+  if (result.ok) {
+    revalidateTodoList();
+  }
+
+  return result;
+}
+
+export async function reorderTodoCategoriesAction(items: TodoCategoryReorderItem[]) {
+  const denied = await assertTodoActionAccess();
+  if (denied) return denied;
+
+  const result = await reorderTodoCategories(items);
   if (result.ok) {
     revalidateTodoList();
   }

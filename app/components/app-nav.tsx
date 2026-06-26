@@ -221,13 +221,16 @@ function NavCountBadge({
 
   const baseClassName =
     "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-5";
-  const toneClassName = active
+  const expandedToneClassName = active
     ? "bg-white/20 text-white ring-1 ring-white/25"
     : "bg-zinc-200/80 text-zinc-500";
+  const collapsedToneClassName = active
+    ? "bg-white text-blue-700 shadow-sm ring-1 ring-white/80"
+    : "bg-zinc-700 text-white shadow-sm";
 
   if (expanded) {
     return (
-      <span className={`${baseClassName} ${toneClassName} ml-auto`}>
+      <span className={`${baseClassName} ${expandedToneClassName} ml-auto`}>
         {formatNavCount(count)}
       </span>
     );
@@ -235,7 +238,7 @@ function NavCountBadge({
 
   return (
     <span
-      className={`absolute -right-1 -top-1 ${baseClassName} ${toneClassName} shadow-sm`}
+      className={`pointer-events-none absolute right-1 top-1 z-10 min-h-[18px] min-w-[18px] px-1 text-[9px] leading-[18px] ${baseClassName} ${collapsedToneClassName}`}
     >
       {formatNavCount(count)}
     </span>
@@ -700,12 +703,16 @@ export function AppNav({
       </Link>
     );
 
+    const itemWrapperClassName = menuExpanded
+      ? "inline-flex w-full shrink-0"
+      : "relative inline-flex shrink-0";
+
     return showNavTooltips ? (
-      <Tooltip key={item.href} label={label} className="shrink-0">
+      <Tooltip key={item.href} label={label} className={itemWrapperClassName}>
         {navLink}
       </Tooltip>
     ) : (
-      <span key={item.href} className="inline-flex w-full shrink-0">
+      <span key={item.href} className={itemWrapperClassName}>
         {navLink}
       </span>
     );
@@ -753,8 +760,10 @@ export function AppNav({
         )}
 
         <nav
-          className={`flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-[1.35rem] p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-            menuExpanded ? "w-full" : "w-[52px] items-center"
+          className={`flex min-h-0 flex-1 flex-col gap-1.5 rounded-[1.35rem] p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            menuExpanded
+              ? "w-full overflow-y-auto"
+              : "w-[52px] items-center overflow-y-auto overflow-x-visible py-0.5"
           }`}
         >
           {topNavItems.map((item) => renderNavItem(item))}
@@ -763,8 +772,8 @@ export function AppNav({
         <div className="mt-auto flex w-full shrink-0 flex-col items-center gap-2">
           {bottomNavItems.length > 0 ? (
             <nav
-              className={`flex flex-col gap-1 rounded-[1.35rem] p-1 ${
-                menuExpanded ? "w-full" : "w-[52px] items-center"
+              className={`flex flex-col gap-1.5 rounded-[1.35rem] p-1 ${
+                menuExpanded ? "w-full" : "w-[52px] items-center overflow-x-visible py-0.5"
               }`}
             >
               {bottomNavItems.map((item) => renderNavItem(item))}

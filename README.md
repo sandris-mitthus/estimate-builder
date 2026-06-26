@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, and configurable excluded-offer positions. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.52` (see [Changelog](#changelog))
+**Current version:** `1.3.53` (see [Changelog](#changelog))
 
 ---
 
@@ -25,7 +25,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - **Sistēmas administrators** — globāls profils `public.users.is_admin`; sidebar pārslēdzas uz system admin sadaļām (**Uzņēmumi**, **Lietotāji**, **Grupas**, **Docs**, **Todo**, **Valodas**, **Tulkojumi**, apakšā **Sistēmas uzstādījumi**) un slēpj uzņēmuma izvēlni
 - **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown sidebar apakšā; `/site_docs` pārvalda publiskās docs kategorijas un rakstus ar drag-and-drop pārvietošanu starp kategorijām un secības maiņu; `/todo` ir lokāli saglabāts divu kolonnu darba dēlis ar drag-and-drop pārvietošanu un prioritizētu dzēšanas drop zonu; `/site_companies` rāda uzņēmuma logo un kompaktu rekvizītu bloku, `/site_companies_users` rāda arī sistēmas administratorus bez uzņēmuma piesaistes, lietotāju avatarus, uzņēmumu logo un konkrētā uzņēmuma grupu/lomu; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
-- **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem; katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju, horizontālu Kanban rindu, drag-and-drop prioritizēšanu starp kategorijām, biezu drop indikatoru un dzēšanas drop zonu; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
+- **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem; katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju (vienmēr pirmā, nepārvietojama), horizontālu Kanban rindu, drag-and-drop kategoriju secības maiņu un uzdevumu prioritizēšanu starp kategorijām, biezu drop indikatoru, dzēšanas drop zonu un **+** pogu kategorijas galvenē; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
 - **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
@@ -50,7 +50,7 @@ English routes, Latvian labels:
 | Uzstādījumi | `/settings` |
 | System admin | `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_languages`, `/site_translations`, `/site_settings` |
 
-- **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms); sidebar augšā ir poga manuālai sakļaušanai/izvēršanai, saturs automātiski pielāgo kreiso atkāpi, nav linkiem ir count badge, apakšā piesprausti uzstādījumu/pārvaldības linki, un valodas dropdown apakšējā zonā atveras uz augšu, lai paliktu redzams
+- **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms); sidebar augšā ir poga manuālai sakļaušanai/izvēršanai, saturs automātiski pielāgo kreiso atkāpi, nav linkiem ir count badge (sakļautā izvēlnē iekš ikonas augšējā labā stūra), apakšā piesprausti uzstādījumu/pārvaldības linki, un valodas dropdown apakšējā zonā atveras uz augšu, lai paliktu redzams
 - **Publiskā dokumentācija** — `/docs` (`/wiki` alias) ir publiski pieejams dokumentācijas portāls ar fixed sidebar kategorijām, animēti atveramiem rakstu linkiem, noklusējuma kategoriju/rakstu kartīšu sarakstu un raksta content skatu; login kartē ir tieša saite uz dokumentāciju
 - **Kartes → detaļa** — projekta un moduļa kartēm pilnekrāna blur + modālis (**Ielādē projektu…** / **Ielādē moduli…**) līdz navigācija pabeigta (`navigation-loading-context.tsx`)
 - **Projekti** — project cards (module name above client name, email, phone, address); galvenē **Jauns projekts** + **Arhīvs** (`fa-archive`, `/?archive=1`); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; pēc **Izveidot** — optimistiska karte sarakstā (blur + spinner) un automātiska navigācija uz projektu; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt** (vienmēr redzama), **Labot**, **Dzēst** (tikai `active`), **Apstiprināts**, **Noraidīts** (tikai `active`), **Pabeigts** (`fa-check-double`, tikai `approved`; `ConfirmModal`); **`approved` kartes** — visa karte zaļā tonī (`bg-green-50`, `text-green-800`, `border-green-200`), bez atsevišķas statusa birkas; **`approved` ar nepasūtītiem materiāliem** — izteikts oranžs bloks kartē **Visi materiāli vēl nav pasūtīti!** (`listProjectIdsWithPendingMaterials`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos** tikai `active` projektiem ar novecojušām kataloga cenām; **dzeltena apmale** + **Sagatavē ir pozīcijas, kuras nav šajā tāmē** tikai `active` projektiem, kuru tāmē trūkst sagataves struktūras (izņemot **Kopēt** no cita projekta); list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); sarakstā tikai `active` un `approved`; **Arhīvs** rāda visus statusus ar radio filtru (**Visi**, **Aktīvie**, **Procesā**, **Pabeigtie**, **Noraidītie**); **noraidītie** un **pabeigtie** paslēpti no galvenā saraksta, bet netiek dzēsti no DB
@@ -382,6 +382,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.53
+
+**Todo board and collapsed nav badges**
+
+- `/tasks` categories can be reordered with drag-and-drop while the default **Uzdevumi** column stays fixed first
+- Moved **Pievienot darbu** to a top-right **+** icon with a blue tooltip on each category header
+- Collapsed sidebar count badges stay inside nav icons so numbers remain visible
 
 ### v1.3.52
 

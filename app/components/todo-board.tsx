@@ -19,6 +19,7 @@ import {
 import {
   SortableContext,
   arrayMove,
+  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -32,6 +33,7 @@ import {
   createTodoTaskAction,
   deleteTodoCategoryAction,
   deleteTodoTaskAction,
+  reorderTodoCategoriesAction,
   reorderTodoTasksAction,
   updateTodoCategoryAction,
   updateTodoTaskAction,
@@ -40,6 +42,7 @@ import { AppModal, appModalWidePanelMaxWidthClassName } from "@/app/components/a
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { DragHandle } from "@/app/components/drag-handle";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { Tooltip } from "@/app/components/tooltip";
 import { SectionPage } from "@/app/components/section-page";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -59,6 +62,8 @@ type DropIndicator = {
 };
 
 const categoryContainerId = (categoryId: string) => `todo-category:${categoryId}`;
+const categorySortId = (categoryId: string) => `todo-category-sort:${categoryId}`;
+const DEFAULT_TODO_CATEGORY_SOURCE_KEY = "default:tasks";
 const TODO_DELETE_ZONE_ID = "todo-delete-zone";
 
 const todoCollisionDetection: CollisionDetection = (args) => {
@@ -79,6 +84,17 @@ function getCategoryIdFromContainerId(id: UniqueIdentifier | null | undefined) {
   return value.startsWith("todo-category:")
     ? value.slice("todo-category:".length)
     : null;
+}
+
+function getCategoryIdFromSortId(id: UniqueIdentifier | null | undefined) {
+  const value = id == null ? "" : String(id);
+  return value.startsWith("todo-category-sort:")
+    ? value.slice("todo-category-sort:".length)
+    : null;
+}
+
+function isDefaultCategory(category: TodoCategorySummary) {
+  return category.sourceKey === DEFAULT_TODO_CATEGORY_SOURCE_KEY;
 }
 
 function createEmptyCategoryDraft(): CategoryDraft {
@@ -119,6 +135,11 @@ function findTaskCategoryId(
   const categoryId = getCategoryIdFromContainerId(id);
   if (categoryId) {
     return categoryId;
+  }
+
+  const sortableCategoryId = getCategoryIdFromSortId(id);
+  if (sortableCategoryId) {
+    return sortableCategoryId;
   }
 
   const taskId = id == null ? "" : String(id);
@@ -201,6 +222,63 @@ function createReorderPayload(categories: TodoCategorySummary[]) {
       sortOrder: (index + 1) * 10,
     })),
   );
+}
+
+function normalizeCategorySort(categories: TodoCategorySummary[]) {
+  const defaultCategory = categories.find(isDefaultCategory) ?? null;
+  const otherCategories = categories.filter((category) => !isDefaultCategory(category));
+  const normalizedOtherCategories = otherCategories.map((category, index) => ({
+    ...category,
+    sortOrder: (index + 1) * 10,
+  }));
+
+  return defaultCategory
+    ? [{ ...defaultCategory, sortOrder: 0 }, ...normalizedOtherCategories]
+    : normalizedOtherCategories;
+}
+
+function moveCategory(
+  categories: TodoCategorySummary[],
+  activeCategoryId: string,
+  overId: UniqueIdentifier | null | undefined,
+) {
+  const overCategoryId = getCategoryIdFromSortId(overId);
+  if (!overCategoryId || activeCategoryId === overCategoryId) {
+    return categories;
+  }
+
+  const activeCategory = categories.find((category) => category.id === activeCategoryId);
+  if (!activeCategory || isDefaultCategory(activeCategory)) {
+    return categories;
+  }
+
+  const otherCategories = categories.filter((category) => !isDefaultCategory(category));
+  const oldIndex = otherCategories.findIndex((category) => category.id === activeCategoryId);
+  const overCategory = categories.find((category) => category.id === overCategoryId);
+  const newIndex = overCategory
+    ? isDefaultCategory(overCategory)
+      ? 0
+      : otherCategories.findIndex((category) => category.id === overCategoryId)
+    : -1;
+
+  if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
+    return categories;
+  }
+
+  const reorderedOtherCategories = arrayMove(otherCategories, oldIndex, newIndex);
+  return normalizeCategorySort([
+    ...categories.filter(isDefaultCategory),
+    ...reorderedOtherCategories,
+  ]);
+}
+
+function createCategoryReorderPayload(categories: TodoCategorySummary[]) {
+  return categories
+    .filter((category) => !isDefaultCategory(category))
+    .map((category, index) => ({
+      id: category.id,
+      sortOrder: (index + 1) * 10,
+    }));
 }
 
 function addCategoryToBoard(
@@ -357,7 +435,11 @@ function SortableTodoTaskCard({
   onEdit: (task: TodoTaskSummary) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id, animateLayoutChanges: () => false });
+    useSortable({
+      id: task.id,
+      animateLayoutChanges: () => false,
+      data: { type: "task" },
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -381,6 +463,7 @@ function SortableTodoTaskCard({
 function TodoCategoryColumn({
   category,
   dragLabel,
+  categoryDragLabel,
   emptyLabel,
   dropIndicator,
   onCreateTask,
@@ -390,6 +473,7 @@ function TodoCategoryColumn({
 }: {
   category: TodoCategorySummary;
   dragLabel: (name: string) => string;
+  categoryDragLabel: string;
   emptyLabel: string;
   dropIndicator: DropIndicator | null;
   onCreateTask: (categoryId: string) => void;
@@ -398,41 +482,93 @@ function TodoCategoryColumn({
   onEditTask: (task: TodoTaskSummary) => void;
 }) {
   const { t } = useTranslations();
-  const { setNodeRef, isOver } = useDroppable({
+  const defaultCategory = isDefaultCategory(category);
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: categorySortId(category.id),
+    disabled: defaultCategory,
+    animateLayoutChanges: () => false,
+    data: { type: "category", categoryId: category.id },
+  });
+  const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
     id: categoryContainerId(category.id),
   });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : undefined,
+  };
+
+  function setNodeRef(node: HTMLElement | null) {
+    setSortableNodeRef(node);
+    setDroppableNodeRef(node);
+  }
 
   return (
     <section
       ref={setNodeRef}
+      style={style}
       className={`group/category flex min-h-64 flex-col rounded-3xl border bg-white/90 p-3 shadow-sm transition ${
         isOver ? "border-blue-300 ring-4 ring-blue-100" : "border-zinc-200"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold tracking-[-0.03em] text-zinc-950">
-            {category.title}
-          </h2>
-          <p className="mt-1 text-xs text-zinc-400">
-            {t("todo.category.task_count", "{count} darbi", {
-              count: String(category.tasks.length),
-            })}
-          </p>
+        <div className="flex min-w-0 items-start gap-2">
+          {defaultCategory ? null : (
+            <span className="inline-flex shrink-0 self-start">
+              <DragHandle
+                label={categoryDragLabel}
+                attributes={attributes}
+                listeners={listeners}
+              />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold tracking-[-0.03em] text-zinc-950">
+              {category.title}
+            </h2>
+            <p className="mt-1 text-xs text-zinc-400">
+              {t("todo.category.task_count", "{count} darbi", {
+                count: String(category.tasks.length),
+              })}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/category:opacity-100 focus-within:opacity-100">
-          <IconActionButton
-            label={t("todo.category.edit", "Labot kategoriju")}
-            icon="fas fa-pen"
-            onClick={() => onEditCategory(category)}
-            variant="edit"
-          />
-          <IconActionButton
-            label={t("todo.category.delete_action", "Dzēst kategoriju")}
-            icon="fas fa-trash"
-            onClick={() => onDeleteCategory(category)}
-            variant="delete"
-          />
+        <div className="flex shrink-0 items-center gap-1">
+          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/category:opacity-100 focus-within:opacity-100">
+            <IconActionButton
+              label={t("todo.category.edit", "Labot kategoriju")}
+              icon="fas fa-pen"
+              onClick={() => onEditCategory(category)}
+              variant="edit"
+            />
+            <IconActionButton
+              label={t("todo.category.delete_action", "Dzēst kategoriju")}
+              icon="fas fa-trash"
+              onClick={() => onDeleteCategory(category)}
+              variant="delete"
+            />
+          </div>
+          <Tooltip
+            label={t("todo.task.add", "Pievienot darbu")}
+            align="end"
+            labelClassName="!bg-blue-600"
+          >
+            <button
+              type="button"
+              onClick={() => onCreateTask(category.id)}
+              aria-label={t("todo.task.add", "Pievienot darbu")}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50 hover:text-blue-700"
+            >
+              <i className="fas fa-plus text-sm" aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -465,15 +601,6 @@ function TodoCategoryColumn({
           ) : null}
         </div>
       </SortableContext>
-
-      <button
-        type="button"
-        onClick={() => onCreateTask(category.id)}
-        className="mt-3 inline-flex min-h-9 items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
-      >
-        <i className="fas fa-plus text-xs" aria-hidden="true" />
-        {t("todo.task.add", "Pievienot darbu")}
-      </button>
     </section>
   );
 }
@@ -695,10 +822,16 @@ export function TodoBoard({
   }
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveTaskId(String(event.active.id));
+    const activeType = event.active.data.current?.type;
+    setActiveTaskId(activeType === "task" ? String(event.active.id) : null);
   }
 
   function handleDragOver(event: DragOverEvent) {
+    if (event.active.data.current?.type !== "task") {
+      setDropIndicator(null);
+      return;
+    }
+
     const activeId = String(event.active.id);
     const overId = event.over?.id;
     if (!overId || String(overId) === activeId || String(overId) === TODO_DELETE_ZONE_ID) {
@@ -714,15 +847,50 @@ export function TodoBoard({
 
     setDropIndicator({
       categoryId: targetCategoryId,
-      beforeTaskId: getCategoryIdFromContainerId(overId) ? null : String(overId),
+      beforeTaskId:
+        getCategoryIdFromContainerId(overId) || getCategoryIdFromSortId(overId)
+          ? null
+          : String(overId),
     });
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const activeType = event.active.data.current?.type;
     const activeId = String(event.active.id);
     const overId = event.over?.id;
     setActiveTaskId(null);
     setDropIndicator(null);
+
+    if (activeType === "category") {
+      const activeCategoryId = String(event.active.data.current?.categoryId ?? "");
+      const nextCategories = moveCategory(categories, activeCategoryId, overId);
+      if (nextCategories === categories) {
+        return;
+      }
+
+      setCategories(nextCategories);
+      startTransition(async () => {
+        const result = await reorderTodoCategoriesAction(
+          createCategoryReorderPayload(nextCategories),
+        );
+        if (!result.ok) {
+          setCategories(categories);
+          showFeedback({ type: "error", text: translateActionError(t, result) });
+          return;
+        }
+
+        showFeedback({
+          type: "success",
+          text: t("todo.feedback.category_order_saved", "Kategoriju secība saglabāta."),
+        });
+        router.refresh();
+      });
+      return;
+    }
+
+    if (activeType !== "task") {
+      return;
+    }
 
     if (String(overId) === TODO_DELETE_ZONE_ID) {
       const previousCategories = categories;
@@ -804,27 +972,37 @@ export function TodoBoard({
           >
             <DeleteDropZone />
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {categories.map((category) => (
-                <div key={category.id} className="min-w-0">
-                  <TodoCategoryColumn
-                    category={category}
-                    dragLabel={(name) =>
-                      t("todo.task.drag", "Pārvietot darbu: {name}", { name })
-                    }
-                    dropIndicator={dropIndicator}
-                    emptyLabel={t(
-                      "todo.category.empty",
-                      "Šajā kategorijā vēl nav darbu. Ievelc darbu šeit vai pievieno jaunu.",
-                    )}
-                    onCreateTask={openCreateTaskModal}
-                    onEditCategory={openEditCategoryModal}
-                    onDeleteCategory={setDeleteCategoryTarget}
-                    onEditTask={openEditTaskModal}
-                  />
-                </div>
-              ))}
-            </div>
+            <SortableContext
+              items={categories.map((category) => categorySortId(category.id))}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+                {categories.map((category) => (
+                  <div key={category.id} className="min-w-0">
+                    <TodoCategoryColumn
+                      category={category}
+                      dragLabel={(name) =>
+                        t("todo.task.drag", "Pārvietot darbu: {name}", { name })
+                      }
+                      categoryDragLabel={t(
+                        "todo.category.drag",
+                        "Pārvietot kategoriju: {name}",
+                        { name: category.title },
+                      )}
+                      dropIndicator={dropIndicator}
+                      emptyLabel={t(
+                        "todo.category.empty",
+                        "Šajā kategorijā vēl nav darbu. Ievelc darbu šeit vai pievieno jaunu.",
+                      )}
+                      onCreateTask={openCreateTaskModal}
+                      onEditCategory={openEditCategoryModal}
+                      onDeleteCategory={setDeleteCategoryTarget}
+                      onEditTask={openEditTaskModal}
+                    />
+                  </div>
+                ))}
+              </div>
+            </SortableContext>
 
             <DragOverlay>
               {activeTask ? (

@@ -6,6 +6,7 @@ import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 type TodoCategoryRow = {
   id: string;
   title: string;
+  source_key: string | null;
   sort_order: number;
   updated_at: string;
 };
@@ -31,6 +32,7 @@ export type TodoTaskSummary = {
 export type TodoCategorySummary = {
   id: string;
   title: string;
+  sourceKey: string | null;
   sortOrder: number;
   updatedAt: string;
   tasks: TodoTaskSummary[];
@@ -52,6 +54,11 @@ export type TodoTaskReorderItem = {
   sortOrder: number;
 };
 
+export type TodoCategoryReorderItem = {
+  id: string;
+  sortOrder: number;
+};
+
 type TodoScope = {
   companyId: string;
   userId: string;
@@ -65,6 +72,7 @@ const DEFAULT_TODO_CATEGORIES: TodoCategorySummary[] = [
   {
     id: "default-materials",
     title: "Materiālu pasūtīšana",
+    sourceKey: null,
     sortOrder: 10,
     updatedAt: DEFAULT_UPDATED_AT,
     tasks: [
@@ -81,6 +89,7 @@ const DEFAULT_TODO_CATEGORIES: TodoCategorySummary[] = [
   {
     id: "default-invoices",
     title: "Rēķinu apmaksas",
+    sourceKey: null,
     sortOrder: 20,
     updatedAt: DEFAULT_UPDATED_AT,
     tasks: [
@@ -114,6 +123,7 @@ function mapTodoCategoryRow(
   return {
     id: row.id,
     title: row.title,
+    sourceKey: row.source_key,
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
     tasks,
@@ -142,7 +152,7 @@ async function ensureDefaultTodoCategoryForScope(
   const supabase = createAdminClient();
   const { data: existing } = await supabase
     .from("todo_categories")
-    .select("id, title, sort_order, updated_at")
+    .select("id, title, source_key, sort_order, updated_at")
     .eq("company_id", scope.companyId)
     .eq("user_id", scope.userId)
     .eq("source_key", DEFAULT_TODO_CATEGORY_SOURCE_KEY)
@@ -164,7 +174,7 @@ async function ensureDefaultTodoCategoryForScope(
       },
       { onConflict: "company_id,user_id,source_key" },
     )
-    .select("id, title, sort_order, updated_at")
+    .select("id, title, source_key, sort_order, updated_at")
     .single();
 
   if (error || !data) {
@@ -181,7 +191,7 @@ async function listTodoCategoriesForScope(
   const [categoriesResult, tasksResult] = await Promise.all([
     supabase
       .from("todo_categories")
-      .select("id, title, sort_order, updated_at")
+      .select("id, title, source_key, sort_order, updated_at")
       .eq("company_id", scope.companyId)
       .eq("user_id", scope.userId)
       .order("sort_order", { ascending: true })
@@ -226,6 +236,7 @@ export async function listTodoCategories(): Promise<TodoCategorySummary[]> {
         sortOrder: 0,
         updatedAt: DEFAULT_UPDATED_AT,
         tasks: [],
+    sourceKey: DEFAULT_TODO_CATEGORY_SOURCE_KEY,
       },
       ...DEFAULT_TODO_CATEGORIES,
     ];
@@ -266,7 +277,7 @@ export async function createTodoCategory(
       title,
       sort_order: nextSortOrder,
     })
-    .select("id, title, sort_order, updated_at")
+    .select("id, title, source_key, sort_order, updated_at")
     .single();
 
   if (error || !data) {
@@ -304,7 +315,7 @@ export async function updateTodoCategory(
     .eq("company_id", scope.companyId)
     .eq("user_id", scope.userId)
     .eq("id", id)
-    .select("id, title, sort_order, updated_at")
+    .select("id, title, source_key, sort_order, updated_at")
     .single();
 
   if (error || !data) {
@@ -340,6 +351,61 @@ export async function deleteTodoCategory(
 
   if (error) {
     return { ok: false, error: "Neizdevās dzēst kategoriju." };
+  }
+
+  return { ok: true };
+}
+
+export async function reorderTodoCategories(
+  items: TodoCategoryReorderItem[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const scope = await getRequiredTodoScope();
+  if (!scope) {
+    return { ok: false, error: "Lietotājs vai uzņēmums nav atrasts." };
+  }
+
+  const normalizedItems = items
+    .map((item) => ({
+      id: item.id.trim(),
+      sortOrder: Number.isFinite(item.sortOrder) ? Math.trunc(item.sortOrder) : 0,
+    }))
+    .filter((item) => item.id && item.sortOrder > 0);
+
+  if (normalizedItems.length !== items.length) {
+    return { ok: false, error: "Kategoriju secība nav derīga." };
+  }
+
+  const categories = await listTodoCategories();
+  const reorderableCategoryIds = new Set(
+    categories
+      .filter((category) => category.sourceKey !== DEFAULT_TODO_CATEGORY_SOURCE_KEY)
+      .map((category) => category.id),
+  );
+
+  if (normalizedItems.some((item) => !reorderableCategoryIds.has(item.id))) {
+    return { ok: false, error: "Noklusējuma kategoriju nevar pārvietot." };
+  }
+
+  const supabase = createAdminClient();
+  const updates = await Promise.all([
+    supabase
+      .from("todo_categories")
+      .update({ sort_order: 0 })
+      .eq("company_id", scope.companyId)
+      .eq("user_id", scope.userId)
+      .eq("source_key", DEFAULT_TODO_CATEGORY_SOURCE_KEY),
+    ...normalizedItems.map((item) =>
+      supabase
+        .from("todo_categories")
+        .update({ sort_order: item.sortOrder })
+        .eq("company_id", scope.companyId)
+        .eq("user_id", scope.userId)
+        .eq("id", item.id),
+    ),
+  ]);
+
+  if (updates.some((result) => result.error)) {
+    return { ok: false, error: "Neizdevās saglabāt kategoriju secību." };
   }
 
   return { ok: true };
