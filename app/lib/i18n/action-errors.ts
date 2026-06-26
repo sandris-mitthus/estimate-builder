@@ -172,6 +172,20 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Projektu nevar atzīmēt kā pabeigtu šajā statusā.":
     "errors.project_complete_status_invalid",
   "Pārāk daudz pieprasījumu. Mēģini vēlāk.": "errors.rate_limit",
+  "Ievadi vārdu.": "workers.validation.first_name_required",
+  "Ievadi uzvārdu.": "workers.validation.last_name_required",
+  "Ievadi instrumenta numuru.": "tools.validation.number_required",
+  "Ievadi instrumenta nosaukumu.": "tools.validation.name_required",
+  "Instruments ar šo numuru jau eksistē.": "errors.tool_number_exists",
+  "Beigu datumam jābūt pēc sākuma datuma.": "timeline.validation.date_order",
+  "Foto nedrīkst būt lielāks par 5 MB.": "errors.worker_photo_too_large",
+  "Neizdevās pievienot darbinieku.": "errors.worker_create_failed",
+  "Neizdevās saglabāt darbinieku.": "errors.worker_save_failed",
+  "Neizdevās dzēst darbinieku.": "errors.worker_delete_failed",
+  "Neizdevās pievienot instrumentu.": "errors.tool_create_failed",
+  "Neizdevās saglabāt instrumentu.": "errors.tool_save_failed",
+  "Neizdevās dzēst instrumentu.": "errors.tool_delete_failed",
+  "Neizdevās saglabāt laika grafiku.": "errors.timeline_save_failed",
 };
 
 export function translateActionError(

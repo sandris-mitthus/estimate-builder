@@ -5,6 +5,9 @@ export const NAV_PERMISSION_KEYS = [
   "positions",
   "excluded_positions",
   "todo",
+  "workers",
+  "tools",
+  "timeline",
   "users",
   "user_groups",
   "settings",
@@ -34,6 +37,9 @@ export const ACTION_PERMISSION_KEYS = [
   "settings.save",
   "materials.assign",
   "materials.order",
+  "workers.manage",
+  "tools.manage",
+  "timeline.manage",
 ] as const;
 
 export type ActionPermissionKey = (typeof ACTION_PERMISSION_KEYS)[number];
@@ -58,6 +64,9 @@ export const NAV_PERMISSION_LABELS: Record<NavPermissionKey, string> = {
   positions: "Pozīcijas",
   excluded_positions: "Neiekļautās pozīcijas",
   todo: "Darāmo darbu saraksts",
+  workers: "Darbinieki",
+  tools: "Instrumenti",
+  timeline: "Laika grafiks",
   users: "Lietotāji",
   user_groups: "Grupas un tiesības",
   settings: "Uzstādījumi",
@@ -70,6 +79,9 @@ export const NAV_PERMISSION_HREFS: Record<NavPermissionKey, string> = {
   positions: "/positions",
   excluded_positions: "/excluded-positions",
   todo: "/tasks",
+  workers: "/workers",
+  tools: "/tools",
+  timeline: "/timeline",
   users: "/users",
   user_groups: "/users/groups",
   settings: "/settings",
@@ -116,6 +128,11 @@ export const ACTION_PERMISSION_GROUPS: {
     keys: ["materials.assign", "materials.order"],
   },
   {
+    titleKey: "permissions.groups.workforce",
+    title: "Darbinieki un instrumenti",
+    keys: ["workers.manage", "tools.manage", "timeline.manage"],
+  },
+  {
     titleKey: "permissions.groups.users_groups",
     title: "Lietotāji un grupas",
     keys: [
@@ -154,6 +171,9 @@ export const ACTION_PERMISSION_LABELS: Record<ActionPermissionKey, string> = {
   "settings.save": "Saglabāt uzstādījumus",
   "materials.assign": "Piešķirt materiālus lietotājiem",
   "materials.order": "Atzīmēt materiālus kā pasūtītus",
+  "workers.manage": "Pārvaldīt darbiniekus",
+  "tools.manage": "Pārvaldīt instrumentus",
+  "timeline.manage": "Pārvaldīt laika grafiku",
 };
 
 export function createFullPermissions(enabled = true): PermissionSet {
@@ -228,6 +248,9 @@ export const DEFAULT_GROUP_DEFINITIONS: {
         positions: true,
         excluded_positions: true,
         todo: true,
+        workers: true,
+        tools: true,
+        timeline: true,
         users: false,
         user_groups: false,
         settings: false,
@@ -254,6 +277,9 @@ export const DEFAULT_GROUP_DEFINITIONS: {
         "settings.save": false,
         "materials.assign": false,
         "materials.order": false,
+        "workers.manage": false,
+        "tools.manage": false,
+        "timeline.manage": false,
       },
     },
   },

@@ -20,6 +20,9 @@ function revalidateFrontendModulePaths(moduleKey: string) {
   if (NAV_LINKED_MODULE_KEYS.has(moduleKey.trim().toLowerCase())) {
     revalidatePath("/", "layout");
     revalidatePath("/tasks");
+    revalidatePath("/workers");
+    revalidatePath("/tools");
+    revalidatePath("/timeline");
   }
 }
 

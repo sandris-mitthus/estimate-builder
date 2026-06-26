@@ -82,6 +82,27 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     fallbackLabel: "Darāmo darbu saraksts",
   },
   {
+    key: "workers",
+    href: "/workers",
+    icon: "fas fa-id-card",
+    labelKey: "nav.workers",
+    fallbackLabel: "Darbinieki",
+  },
+  {
+    key: "tools",
+    href: "/tools",
+    icon: "fas fa-screwdriver-wrench",
+    labelKey: "nav.tools",
+    fallbackLabel: "Instrumenti",
+  },
+  {
+    key: "timeline",
+    href: "/timeline",
+    icon: "fas fa-chart-gantt",
+    labelKey: "nav.timeline",
+    fallbackLabel: "Laika grafiks",
+  },
+  {
     key: "users",
     href: "/users",
     icon: "fas fa-users",
