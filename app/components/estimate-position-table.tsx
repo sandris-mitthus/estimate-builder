@@ -86,6 +86,7 @@ import { SubcategoryPriceVisibilityToggle } from "@/app/components/subcategory-p
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
+import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { PositionModal } from "@/app/components/position-modal";
 import {
   PositionModalProvider,
@@ -136,6 +137,10 @@ const rowActionCell =
 
 const hydrateCatalogPrices = { forceCatalogPrices: true } as const;
 
+type OpenMultiPositionModal = (
+  value: EstimateMultiPosition,
+  onSave: (next: EstimateMultiPosition) => void,
+) => void;
 
 function LineItemRow({
   item,
@@ -624,6 +629,7 @@ function SubcategoryBlock({
   onToggleCollapse,
   onEnsureExpanded,
   optionLinkActions,
+  openMultiPositionModal,
 }: {
   sectionId: string;
   subcategory: EstimateSubcategory;
@@ -638,6 +644,7 @@ function SubcategoryBlock({
   onToggleCollapse: () => void;
   onEnsureExpanded: () => void;
   optionLinkActions: MultiOptionLinkActions;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
@@ -651,6 +658,15 @@ function SubcategoryBlock({
 
   function handleAddItem() {
     openPositionModal(createCompositePosition(), (saved) =>
+      withExpandedContent((current) => ({
+        ...current,
+        items: [...current.items, saved],
+      })),
+    );
+  }
+
+  function handleAddMulti() {
+    openMultiPositionModal(createMultiPosition(), (saved) =>
       withExpandedContent((current) => ({
         ...current,
         items: [...current.items, saved],
@@ -691,12 +707,7 @@ function SubcategoryBlock({
           <RowActions
             showSub={false}
             deleteLabel={t("estimate.delete.subcategory", "Dzēst subkategoriju")}
-            onAddMulti={() =>
-              withExpandedContent((current) => ({
-                ...current,
-                items: [...current.items, createMultiPosition()],
-              }))
-            }
+            onAddMulti={handleAddMulti}
             onAddItem={handleAddItem}
             onDelete={onDelete}
           />
@@ -761,6 +772,7 @@ function SectionBlock({
   toggleSectionCollapsed,
   expandSection,
   optionLinkActions,
+  openMultiPositionModal,
 }: {
   section: EstimatePositionSection;
   onChange: (section: EstimatePositionSection) => void;
@@ -777,6 +789,7 @@ function SectionBlock({
   toggleSectionCollapsed: (rowId: string) => void;
   expandSection: (rowId: string) => void;
   optionLinkActions: MultiOptionLinkActions;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
@@ -791,6 +804,15 @@ function SectionBlock({
 
   function handleAddItem() {
     openPositionModal(createCompositePosition(), (saved) =>
+      withExpandedContent((current) => ({
+        ...current,
+        items: [...current.items, saved],
+      })),
+    );
+  }
+
+  function handleAddMulti() {
+    openMultiPositionModal(createMultiPosition(), (saved) =>
       withExpandedContent((current) => ({
         ...current,
         items: [...current.items, saved],
@@ -822,12 +844,7 @@ function SectionBlock({
                 subcategories: [...current.subcategories, subcategory],
               }));
             }}
-            onAddMulti={() =>
-              withExpandedContent((current) => ({
-                ...current,
-                items: [...current.items, createMultiPosition()],
-              }))
-            }
+            onAddMulti={handleAddMulti}
             onAddItem={handleAddItem}
             onDelete={onDelete}
           />
@@ -847,6 +864,7 @@ function SectionBlock({
           onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
           onEnsureExpanded={() => expandSection(subcategory.id)}
           optionLinkActions={optionLinkActions}
+          openMultiPositionModal={openMultiPositionModal}
           subcategory={subcategory}
           onChange={(next) =>
             onChange({
@@ -921,6 +939,7 @@ function EstimatePositionDndTable({
   collapsedSectionIds,
   toggleSectionCollapsed,
   expandSection,
+  openMultiPositionModal,
 }: {
   sections: EstimatePositionSection[];
   allDragIds: string[];
@@ -934,6 +953,7 @@ function EstimatePositionDndTable({
   collapsedSectionIds: ReadonlySet<string>;
   toggleSectionCollapsed: (sectionId: string) => void;
   expandSection: (sectionId: string) => void;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1089,6 +1109,7 @@ function EstimatePositionDndTable({
               collapsed={collapsedSectionIds.has(section.id)}
               collapsedSummary={getCollapsedSectionSummary(section, t)}
               optionLinkActions={optionLinkActions}
+              openMultiPositionModal={openMultiPositionModal}
                 onToggleCollapse={() => toggleSectionCollapsed(section.id)}
                 onEnsureExpanded={() => expandSection(section.id)}
                 collapsedSectionIds={collapsedSectionIds}
@@ -1206,12 +1227,25 @@ export function EstimatePositionTable({
     item: EstimateLineItem;
     onSave: (next: EstimateLineItem) => void;
   } | null>(null);
+  const [multiPositionModalState, setMultiPositionModalState] = useState<{
+    value: EstimateMultiPosition;
+    onSave: (next: EstimateMultiPosition) => void;
+  } | null>(null);
 
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       setPositionModalState({ item, onSave });
     },
     [setPositionModalState],
+  );
+  const openMultiPositionModal = useCallback(
+    (
+      value: EstimateMultiPosition,
+      onSave: (next: EstimateMultiPosition) => void,
+    ) => {
+      setMultiPositionModalState({ value, onSave });
+    },
+    [setMultiPositionModalState],
   );
 
   function handleSave() {
@@ -1304,6 +1338,7 @@ export function EstimatePositionTable({
                 collapsedSectionIds={collapsedSectionIds}
                 toggleSectionCollapsed={toggleSectionCollapsed}
                 expandSection={expandSection}
+                openMultiPositionModal={openMultiPositionModal}
               />
             </DropIndicatorProvider>
           </PositionModalProvider>
@@ -1326,6 +1361,23 @@ export function EstimatePositionTable({
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
+        />
+      ) : null}
+
+      {multiPositionModalState ? (
+        <MultiPositionModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMultiPositionModalState(null);
+            }
+          }}
+          value={multiPositionModalState.value}
+          onSave={(next) => multiPositionModalState.onSave(next)}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
+          moduleSizeOptions={moduleSizeOptions}
         />
       ) : null}
 

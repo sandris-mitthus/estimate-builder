@@ -104,6 +104,7 @@ import {
 } from "@/app/components/section-title-focus-context";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { Tooltip } from "@/app/components/tooltip";
+import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import {
@@ -295,6 +296,11 @@ const mergedSagataveRowClass = "bg-emerald-50/80 hover:bg-emerald-50";
 const mergedSagataveCategoryRowClass = "bg-emerald-100/90";
 const mergedSagataveSubcategoryRowClass =
   "border-b border-b-zinc-200 bg-emerald-50/90";
+
+type OpenMultiPositionModal = (
+  value: EstimateMultiPosition,
+  onSave: (next: EstimateMultiPosition) => void,
+) => void;
 
 function LineItemRow({
   item,
@@ -960,6 +966,7 @@ function SubcategoryBlock({
   highlightStaleCatalogPrices = false,
   mergedSagataveHighlightIds,
   estimateLocked = false,
+  openMultiPositionModal,
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
@@ -978,8 +985,18 @@ function SubcategoryBlock({
   highlightStaleCatalogPrices?: boolean;
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
+
+  function handleAddMulti() {
+    openMultiPositionModal(createMultiPosition(), (saved) =>
+      onChange({
+        ...subcategory,
+        items: [...subcategory.items, saved],
+      }),
+    );
+  }
 
   return (
     <>
@@ -1002,11 +1019,7 @@ function SubcategoryBlock({
             onAddMulti={
               showQuantityColumn
                 ? undefined
-                : () =>
-                    onChange({
-                      ...subcategory,
-                      items: [...subcategory.items, createMultiPosition()],
-                    })
+                : handleAddMulti
             }
             onAddItem={() =>
               onChange({
@@ -1090,6 +1103,7 @@ function CategoryBlock({
   highlightStaleCatalogPrices = false,
   mergedSagataveHighlightIds,
   estimateLocked = false,
+  openMultiPositionModal,
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
@@ -1107,9 +1121,19 @@ function CategoryBlock({
   highlightStaleCatalogPrices?: boolean;
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
   const { requestFocus } = useSectionTitleFocus() ?? {};
+
+  function handleAddMulti() {
+    openMultiPositionModal(createMultiPosition(), (saved) =>
+      onChange({
+        ...category,
+        items: [...category.items, saved],
+      }),
+    );
+  }
 
   return (
     <>
@@ -1139,11 +1163,7 @@ function CategoryBlock({
             onAddMulti={
               showQuantityColumn
                 ? undefined
-                : () =>
-                    onChange({
-                      ...category,
-                      items: [...category.items, createMultiPosition()],
-                    })
+                : handleAddMulti
             }
             onAddItem={() =>
               onChange({
@@ -1174,6 +1194,7 @@ function CategoryBlock({
           onSyncCatalogPosition={onSyncCatalogPosition}
           onScheduleCatalogSync={onScheduleCatalogSync}
           subcategory={subcategory}
+          openMultiPositionModal={openMultiPositionModal}
           onChange={(next) =>
             onChange({
               ...category,
@@ -1263,6 +1284,7 @@ function EstimateDndTable({
   highlightStaleCatalogPrices = false,
   mergedSagataveHighlightIds,
   estimateLocked = false,
+  openMultiPositionModal,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1285,6 +1307,7 @@ function EstimateDndTable({
   highlightStaleCatalogPrices?: boolean;
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const colSpan = getEstimateTableColCount(showQuantityColumn);
 
@@ -1307,6 +1330,7 @@ function EstimateDndTable({
         highlightStaleCatalogPrices={highlightStaleCatalogPrices}
         mergedSagataveHighlightIds={mergedSagataveHighlightIds}
         estimateLocked={estimateLocked}
+        openMultiPositionModal={openMultiPositionModal}
         colSpan={colSpan}
       />
     </DropIndicatorProvider>
@@ -1331,6 +1355,7 @@ function EstimateDndTableInner({
   mergedSagataveHighlightIds,
   estimateLocked = false,
   colSpan,
+  openMultiPositionModal,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1354,6 +1379,7 @@ function EstimateDndTableInner({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
   colSpan: number;
+  openMultiPositionModal: OpenMultiPositionModal;
 }) {
   const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1554,6 +1580,7 @@ function EstimateDndTableInner({
               highlightStaleCatalogPrices={highlightStaleCatalogPrices}
               mergedSagataveHighlightIds={mergedSagataveHighlightIds}
               estimateLocked={estimateLocked}
+              openMultiPositionModal={openMultiPositionModal}
               colSpan={colSpan}
               allCategories={categories}
               optionLinkActions={optionLinkActions}
@@ -1792,6 +1819,10 @@ export function EstimateTable({
     item: EstimateLineItem;
     onSave: (next: EstimateLineItem) => void;
   } | null>(null);
+  const [multiPositionModalState, setMultiPositionModalState] = useState<{
+    value: EstimateMultiPosition;
+    onSave: (next: EstimateMultiPosition) => void;
+  } | null>(null);
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const canSaveEstimate = useActionPermission("estimate.save");
   const canExportEstimate = useActionPermission("estimate.export");
@@ -1807,6 +1838,15 @@ export function EstimateTable({
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       setPositionModalState({ item, onSave });
+    },
+    [],
+  );
+  const openMultiPositionModal = useCallback(
+    (
+      value: EstimateMultiPosition,
+      onSave: (next: EstimateMultiPosition) => void,
+    ) => {
+      setMultiPositionModalState({ value, onSave });
     },
     [],
   );
@@ -2121,6 +2161,7 @@ export function EstimateTable({
               highlightStaleCatalogPrices={highlightStaleCatalogPrices}
               mergedSagataveHighlightIds={mergedSagataveHighlightIds}
               estimateLocked={editorLocked}
+              openMultiPositionModal={openMultiPositionModal}
             />
           </PositionModalProvider>
         </EstimatePlannedProfitProvider>
@@ -2151,6 +2192,22 @@ export function EstimateTable({
             currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             estimateUnits={estimateUnits}
+          />
+        ) : null}
+        {multiPositionModalState ? (
+          <MultiPositionModal
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setMultiPositionModalState(null);
+              }
+            }}
+            value={multiPositionModalState.value}
+            onSave={(next) => multiPositionModalState.onSave(next)}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            moduleSizeOptions={moduleSizeOptions}
           />
         ) : null}
       </div>
@@ -2501,6 +2558,22 @@ export function EstimateTable({
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
+        />
+      ) : null}
+      {multiPositionModalState ? (
+        <MultiPositionModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMultiPositionModalState(null);
+            }
+          }}
+          value={multiPositionModalState.value}
+          onSave={(next) => multiPositionModalState.onSave(next)}
+          catalogPositions={catalogPositions}
+          defaultHourlyRate={defaultHourlyRate}
+          currency={currency}
+          moduleSizeOptions={moduleSizeOptions}
         />
       ) : null}
     </>
