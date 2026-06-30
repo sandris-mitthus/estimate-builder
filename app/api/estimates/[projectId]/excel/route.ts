@@ -9,6 +9,16 @@ import { getProjectEstimate } from "@/app/lib/projects/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 
+function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
+  const sanitized = value
+    .normalize("NFKD")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+  return sanitized || fallback;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ projectId: string }> },
@@ -50,13 +60,16 @@ export async function GET(
     t,
   );
 
-  const filenamePrefix = t("exports.filename.estimate", "tame");
+  const filenamePrefix = sanitizeDownloadFilenamePart(
+    t("exports.filename.estimate", "tame"),
+    "tame",
+  );
   const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.xlsx`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "no-store",
     },
   });

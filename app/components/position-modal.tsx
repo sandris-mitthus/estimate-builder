@@ -133,7 +133,8 @@ export function PositionModal({
     [draft, catalogPositions, defaultHourlyRate],
   );
   const unitTotal = sumBreakdown(unitPrice);
-  const dirty = snapshot(draft) !== initialSnapshot;
+  const draftSnapshot = useMemo(() => snapshot(draft), [draft]);
+  const dirty = draftSnapshot !== initialSnapshot;
 
   function patch(updates: Partial<EstimateLineItem>) {
     setDraft((current) => ({ ...current, ...updates }));

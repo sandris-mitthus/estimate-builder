@@ -162,8 +162,11 @@ export function MultiPositionModal({
     [catalogPositions],
   );
 
-  const dirty =
-    snapshot({ name, attachment, options }) !== initialSnapshot;
+  const currentSnapshot = useMemo(
+    () => snapshot({ name, attachment, options }),
+    [name, attachment, options],
+  );
+  const dirty = currentSnapshot !== initialSnapshot;
 
   // Pozīcijas mērvienība no vienotā moduļa apjoma (piem. m²). Tikai tad var ievadīt patēriņu.
   const positionUnit = useMemo(

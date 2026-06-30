@@ -14,6 +14,7 @@ import {
   getProject,
   getProjectEstimateForProject,
 } from "@/app/lib/projects/repository";
+import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { listUsers } from "@/app/lib/users/repository";
@@ -38,7 +39,6 @@ export default async function ProjectDetailPage({
     catalogPositions,
     sagatave,
     globalExcludedPositions,
-    users,
   ] = await Promise.all([
     getProject(id),
     listBuildingModules(),
@@ -46,7 +46,6 @@ export default async function ProjectDetailPage({
     listPositionPrices(),
     ensureDefaultEstimatePosition(),
     listExcludedPositions(),
-    listUsers(),
   ]);
 
   if (!project) {
@@ -62,9 +61,10 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const buildingModule = project.buildingModuleId
-    ? await getBuildingModule(project.buildingModuleId)
-    : null;
+  const [buildingModule, users] = await Promise.all([
+    project.buildingModuleId ? getBuildingModule(project.buildingModuleId) : null,
+    isProjectEstimateLocked(project.status) ? listUsers() : [],
+  ]);
 
   const moduleVisualizations = buildingModule
     ? buildingModule.visualizationBlocks

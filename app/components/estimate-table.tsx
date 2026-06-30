@@ -1888,32 +1888,19 @@ export function EstimateTable({
     setMergedSagataveHighlightIds(new Set(merged.addedNodeIds));
   }
 
-  async function handleFileDownload(
-    url: string,
-    filename: string,
-    setLoading: (v: boolean) => void,
-  ) {
+  function handleFileDownload(url: string, setLoading: (v: boolean) => void) {
     setLoading(true);
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      showFeedback({
-        type: "error",
-        text: t("estimate.download.failed", "Lejupielāde neizdevās. Mēģiniet vēlreiz."),
-      });
-    } finally {
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    window.setTimeout(() => {
       setLoading(false);
-    }
+    }, 1500);
   }
 
   async function handleSave() {
@@ -1982,9 +1969,11 @@ export function EstimateTable({
     }
   }
 
-  const isDirty =
-    serializeEstimatePositionDocument(title, categories, multiOptionLinks) !==
-    savedSnapshot;
+  const currentSnapshot = useMemo(
+    () => serializeEstimatePositionDocument(title, categories, multiOptionLinks),
+    [title, categories, multiOptionLinks],
+  );
+  const isDirty = currentSnapshot !== savedSnapshot;
 
   const showQuantityColumn = Boolean(project);
   const isEstimateSaved = isProjectEstimateSaved(meta, {
@@ -2428,7 +2417,6 @@ export function EstimateTable({
                 onClick={() =>
                   handleFileDownload(
                     `/api/estimates/${project.id}/pdf`,
-                    `piedavajums-${project.id.slice(0, 8)}.pdf`,
                     setIsPdfDownloading,
                   )
                 }
@@ -2450,7 +2438,6 @@ export function EstimateTable({
                 onClick={() =>
                   handleFileDownload(
                     `/api/estimates/${project.id}/excel`,
-                    `tame-${project.id.slice(0, 8)}.xlsx`,
                     setIsExcelDownloading,
                   )
                 }

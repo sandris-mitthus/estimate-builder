@@ -13,7 +13,7 @@ import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
-import { listAllProjects } from "@/app/lib/projects/repository";
+import { getProjectsByIds } from "@/app/lib/projects/repository";
 import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -36,6 +36,12 @@ type EstimateAssignmentRow = {
   project_id: string;
   meta: EstimateMeta | null;
   categories: unknown;
+};
+
+type MaterialAssignmentRow = {
+  project_id: string;
+  position_price_id: string;
+  assignee_user_id: string;
 };
 
 type ListUserAssignedMaterialGroupsOptions = {
@@ -80,20 +86,6 @@ function prepareCategoriesForMaterials(
     categoriesWithVariableQty,
     moduleSizeOptions[0].projectDescription,
     catalogPositions,
-  );
-}
-
-function hasPendingAssignedMaterialsForUser(
-  meta: EstimateMeta,
-  matchingUserIds: Set<string>,
-): boolean {
-  const assignees = meta.materialAssigneeUserIds ?? {};
-  const orderedIds = new Set(meta.orderedMaterialPositionIds ?? []);
-
-  return Object.entries(assignees).some(
-    ([positionPriceId, assigneeUserId]) =>
-      !orderedIds.has(positionPriceId) &&
-      matchingUserIds.has(normalizeUserId(assigneeUserId)),
   );
 }
 
@@ -194,8 +186,38 @@ export async function listUserAssignedMaterialGroups(
     relatedUserIds,
   );
 
+  if (!isSupabaseAdminConfigured()) {
+    return [];
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
+  const supabase = createAdminClient();
+  const { data: assignmentData, error: assignmentError } = await supabase
+    .from("project_material_assignments")
+    .select("project_id, position_price_id, assignee_user_id")
+    .eq("company_id", companyId)
+    .in("assignee_user_id", Array.from(matchingUserIds));
+
+  if (assignmentError || !assignmentData || assignmentData.length === 0) {
+    return [];
+  }
+
+  const assignments = assignmentData as MaterialAssignmentRow[];
+  const assignmentsByProjectId = new Map<string, MaterialAssignmentRow[]>();
+  for (const assignment of assignments) {
+    const existing = assignmentsByProjectId.get(assignment.project_id) ?? [];
+    existing.push(assignment);
+    assignmentsByProjectId.set(assignment.project_id, existing);
+  }
+
+  const projectIds = Array.from(assignmentsByProjectId.keys());
+
   const [projects, catalogPositions, sagatave] = await Promise.all([
-    listAllProjects(),
+    getProjectsByIds(projectIds),
     options.catalogPositions
       ? Promise.resolve(options.catalogPositions)
       : listPositionPrices(),
@@ -214,16 +236,6 @@ export async function listUserAssignedMaterialGroups(
     lockedProjects.map((project) => [project.id, project]),
   );
 
-  if (!isSupabaseAdminConfigured()) {
-    return [];
-  }
-
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
-    return [];
-  }
-
-  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
     .select("project_id, meta, categories")
@@ -240,10 +252,7 @@ export async function listUserAssignedMaterialGroups(
       return false;
     }
 
-    return hasPendingAssignedMaterialsForUser(
-      (row.meta ?? {}) as EstimateMeta,
-      matchingUserIds,
-    );
+    return assignmentsByProjectId.has(row.project_id);
   });
   const moduleIds = Array.from(
     new Set(
@@ -262,6 +271,20 @@ export async function listUserAssignedMaterialGroups(
     }
 
     const meta = (row.meta ?? {}) as EstimateMeta;
+    const projectAssignments = assignmentsByProjectId.get(row.project_id) ?? [];
+    const materialAssigneeUserIds = {
+      ...(meta.materialAssigneeUserIds ?? {}),
+      ...Object.fromEntries(
+        projectAssignments.map((assignment) => [
+          assignment.position_price_id,
+          assignment.assignee_user_id,
+        ]),
+      ),
+    };
+    const metaWithAssignments: EstimateMeta = {
+      ...meta,
+      materialAssigneeUserIds,
+    };
     const parsed = parseEstimatePositionDocumentPayload(row.categories);
 
     let buildingModule: BuildingModuleDetail | null = null;
@@ -271,7 +294,7 @@ export async function listUserAssignedMaterialGroups(
 
     const group = await resolveProjectGroup(
       project,
-      meta,
+      metaWithAssignments,
       parsed.sections,
       catalogPositions,
       sagatave.sections,

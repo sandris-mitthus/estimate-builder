@@ -10,12 +10,25 @@ import { fetchLogoAsset, fetchVisualizationImages } from "@/app/lib/exports/pdf-
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { resolveProjectExcludedPositions } from "@/app/lib/excluded-positions/resolve-project-excluded-positions";
 import { listPositionPrices } from "@/app/lib/positions/repository";
-import { getProject, getProjectEstimate } from "@/app/lib/projects/repository";
+import {
+  getProject,
+  getProjectEstimateForProject,
+} from "@/app/lib/projects/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { syncSubcategoryOfferVisibilityFromSagatave } from "@/app/lib/estimate-positions/sync-subcategory-offer-visibility";
 import { getServerTranslations } from "@/app/lib/i18n/server";
+
+function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
+  const sanitized = value
+    .normalize("NFKD")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+  return sanitized || fallback;
+}
 
 export async function GET(
   _request: Request,
@@ -37,17 +50,25 @@ export async function GET(
 
   const { projectId } = await params;
 
-  const [{ t }, project, estimate, catalogPositions, companySettings, globalExcludedPositions] =
+  const [{ t }, project, catalogPositions, companySettings, globalExcludedPositions] =
     await Promise.all([
       getServerTranslations(),
       getProject(projectId),
-      getProjectEstimate(projectId),
       listPositionPrices(),
       getCompanySettings(),
       listExcludedPositions(),
     ]);
 
-  if (!project || !estimate) {
+  if (!project) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const estimate = await getProjectEstimateForProject(
+    project,
+    companySettings.estimateValidityDays,
+  );
+
+  if (!estimate) {
     return new Response("Not found", { status: 404 });
   }
 
@@ -99,13 +120,16 @@ export async function GET(
     }),
   );
 
-  const filenamePrefix = t("exports.filename.offer", "piedavajums");
+  const filenamePrefix = sanitizeDownloadFilenamePart(
+    t("exports.filename.offer", "piedavajums"),
+    "piedavajums",
+  );
   const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "no-store",
     },
   });

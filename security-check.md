@@ -2,8 +2,48 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-06-23 (**v1.3.44**) — **9.5 / 10**
-**Iepriekšējā pilnā pārbaude:** 2026-06-21 (v1.3.32) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-06-30 (**v1.3.63**) — **9.5 / 10**
+**Iepriekšējā pilnā pārbaude:** 2026-06-23 (v1.3.44) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.3.63 (2026-06-30)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` / `assertSystemAdminAccess()` / `getCurrentUser()` | ✅ 19 action faili; 84 exportētas actions; mutācijas aiz `requireAction()` vai `assertSystemAdminAccess()`, valodas/pašapkalpošanās darbības aiz `getCurrentUser()` |
+| Protected lapas | ✅ 24 `page.tsx` faili; uzņēmuma sadaļas aiz `assertNavAccess()`, system admin sadaļas aiz `assertSystemAdminAccess()` |
+| System admin sadaļas | ✅ 9 system admin lapas (`site_*` + `/todo`) paliek aiz `public.users.is_admin = true` pārbaudes |
+| API maršruti (`app/api/**`) | ✅ 7 maršruti; visi sāk ar `getCurrentUser()`; PDF/Excel un module asset proxy papildus izmanto rate limit |
+| Jaunā `project_material_assignments` tabula | ✅ Migrācija `103_project_material_assignments.sql`; RLS enabled + restrictive deny policy anon/authenticated klientiem; backfill no esošā `estimates.meta` |
+| Storage / proxy | ✅ Privātie bucketi; `logo`, `asset`, `workers/photo` proxy prasa auth; module asset proxy pārbauda company path prefix un tagad ir rate limit |
+| PDF/Excel eksports | ✅ Auth + `estimate.export`; rate limit; `Content-Disposition` filename sanitizēts; PDF attēlu ielādei ir skaita/izmēra/kopējā apjoma/concurrency limiti |
+| Timeline / materiālu performance izmaiņas | ✅ Drošības robežas nemainās: timeline ieraksti tiek veidoti server-side statusa maiņā; materiālu piešķīrumi paliek service-role repository slānī ar RLS deny tabulu |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
+| Hardcoded secrets | ✅ Nav atrasti `sk_live_`, `sk_test_`, service-role JWT, `password="..."` vai `secret="..."` patterni `app/` kodā |
+| npm audit (moderate+) | ✅ **0 vulnerabilities** (`npm audit --audit-level=moderate`) |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| typecheck + lint + build | ✅ `npm run typecheck`, `npm run lint`, `npm run build` OK |
+| DB migrācijas | ✅ `npm run db:migrate` OK — `No pending migrations.` |
+
+### Izmaiņas kopš v1.3.44 → v1.3.63 (pārskatīts, bez regresijas)
+
+| Apgabals | Drošības secinājums |
+|----------|---------------------|
+| Ātrdarbības optimizācijas | ✅ Samazina SSR/JSON slodzi, nepaplašinot klienta DB piekļuvi; service-role repository modelis saglabāts |
+| `project_material_assignments` | ✅ Jauna normalizēta tabula ar RLS deny; dati tiek rakstīti tikai server-side action/repository ceļos |
+| Module asset proxy | ✅ Saglabāta auth + company path validācija; pievienots rate limit un `Content-Length` |
+| PDF/Excel eksporti | ✅ Saglabāta `estimate.export` tiesība un rate limit; failu nosaukumi sanitizēti; PDF attēlu resursu limiti mazina DoS risku |
+| Timeline sync pārvietošana | ✅ Mutācija pārvietota no lapas lasīšanas uz projekta statusa maiņas ceļu, kas jau ir aiz `statusActionPermission(status)` |
+
+### Atlikušās piezīmes (nebloķējošas)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | `ALLOWED_EMAIL_DOMAIN`, Supabase invite-only un Upstash Redis multi-instance rate limit — atkarīgs no production ENV |
+| L27 | ℹ️ ARHITEKTŪRA | Service role repository slānis apzināti apiet RLS serverī; klientiem tabulas paliek deny |
+
+**Atzīme:** **9.5 / 10** — recheck pēc ātrdarbības izmaiņām neatrada jaunu auth/API/RLS regresiju; atlikušais ir production konfigurācija un apzināta server-side service-role arhitektūra.
 
 ---
 

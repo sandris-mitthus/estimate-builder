@@ -48,6 +48,7 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
     let cancelled = false;
     let objectUrl: string | null = null;
     let renderTask: { cancel?: () => void } | null = null;
+    let previewBlob: Blob | null = null;
 
     async function renderPreview() {
       setStatus("loading");
@@ -63,7 +64,8 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
           throw new Error("Failed to load PDF");
         }
 
-        const data = await response.arrayBuffer();
+        previewBlob = await response.blob();
+        const data = await previewBlob.arrayBuffer();
         if (cancelled) return;
 
         const pdfjs = await loadPdfJs();
@@ -115,17 +117,20 @@ export function ModulePdfThumbnail({ storagePath }: ModulePdfThumbnailProps) {
         if (cancelled) return;
 
         try {
-          const response = await fetch(
-            `/api/modules/asset?path=${encodeURIComponent(storagePath)}`,
-            { credentials: "include" },
-          );
+          if (!previewBlob) {
+            const response = await fetch(
+              `/api/modules/asset?path=${encodeURIComponent(storagePath)}`,
+              { credentials: "include" },
+            );
 
-          if (!response.ok) {
-            throw new Error("Failed to load PDF");
+            if (!response.ok) {
+              throw new Error("Failed to load PDF");
+            }
+
+            previewBlob = await response.blob();
           }
 
-          const blob = await response.blob();
-          objectUrl = URL.createObjectURL(blob);
+          objectUrl = URL.createObjectURL(previewBlob);
 
           if (!cancelled) {
             setEmbedUrl(objectUrl);

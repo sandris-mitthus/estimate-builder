@@ -46,6 +46,23 @@ type EstimateLineItemNameFieldProps = {
 };
 
 const EMPTY_EXCLUDED_CATALOG_KEYS = new Set<string>();
+const sortedCatalogCache = new WeakMap<
+  PositionPriceSummary[],
+  PositionPriceSummary[]
+>();
+
+function getSortedCatalogPositions(
+  positions: PositionPriceSummary[],
+): PositionPriceSummary[] {
+  const cached = sortedCatalogCache.get(positions);
+  if (cached) {
+    return cached;
+  }
+
+  const sorted = sortPositionsByName(positions);
+  sortedCatalogCache.set(positions, sorted);
+  return sorted;
+}
 
 function filterCatalogPositionsByExcludedKeys(
   positions: PositionPriceSummary[],
@@ -100,8 +117,11 @@ export function EstimateLineItemNameField({
     [catalogPositions, excludedKeysFingerprint],
   );
   const sortedAvailableCatalogPositions = useMemo(
-    () => sortPositionsByName(availableCatalogPositions),
-    [availableCatalogPositions],
+    () =>
+      availableCatalogPositions === catalogPositions
+        ? getSortedCatalogPositions(catalogPositions)
+        : sortPositionsByName(availableCatalogPositions),
+    [availableCatalogPositions, catalogPositions],
   );
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -185,16 +205,9 @@ export function EstimateLineItemNameField({
     setActiveIndex(0);
   }, [value, sortedAvailableCatalogPositions]);
 
-  function updateSuggestionsVisibility(nextValue: string) {
-    setOpen(
-      filterPositionsByQuery(sortedAvailableCatalogPositions, nextValue, t)
-        .length > 0,
-    );
-  }
-
   function handleInputChange(nextValue: string) {
     onNameChange(nextValue);
-    updateSuggestionsVisibility(nextValue);
+    setOpen(nextValue.trim().length > 0);
   }
 
   function selectSuggestion(position: PositionPriceSummary) {

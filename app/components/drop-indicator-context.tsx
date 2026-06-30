@@ -1,9 +1,12 @@
 "use client";
 
 import {
+  useCallback,
   createContext,
+  useEffect,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -24,19 +27,65 @@ const DropIndicatorContext = createContext<DropIndicatorContextValue | null>(
 export function DropIndicatorProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const overIdRef = useRef<string | null>(null);
+  const pendingOverIdRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
+
+  const setThrottledOverId = useCallback((id: string | null) => {
+    if (pendingOverIdRef.current === id || overIdRef.current === id) {
+      return;
+    }
+
+    pendingOverIdRef.current = id;
+
+    if (frameRef.current != null) {
+      return;
+    }
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      const nextId = pendingOverIdRef.current;
+      pendingOverIdRef.current = null;
+
+      if (overIdRef.current === nextId) {
+        return;
+      }
+
+      overIdRef.current = nextId;
+      setOverId(nextId);
+    });
+  }, []);
+
+  const clear = useCallback(() => {
+    if (frameRef.current != null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+
+    pendingOverIdRef.current = null;
+    overIdRef.current = null;
+    setActiveId(null);
+    setOverId(null);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (frameRef.current != null) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+    },
+    [],
+  );
 
   const value = useMemo(
     () => ({
       activeId,
       overId,
       setActiveId,
-      setOverId,
-      clear: () => {
-        setActiveId(null);
-        setOverId(null);
-      },
+      setOverId: setThrottledOverId,
+      clear,
     }),
-    [activeId, overId],
+    [activeId, clear, overId, setThrottledOverId],
   );
 
   return (

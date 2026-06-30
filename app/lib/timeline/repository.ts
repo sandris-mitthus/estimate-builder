@@ -47,67 +47,54 @@ function resolveProjectDates(
   return { startDate, endDate };
 }
 
-async function syncApprovedProjects(companyId: string) {
+export async function ensureTimelineEntryForProject({
+  companyId,
+  projectId,
+  projectCreatedAt,
+}: {
+  companyId: string;
+  projectId: string;
+  projectCreatedAt: string;
+}): Promise<void> {
   const supabase = createAdminClient();
-  const [settings, projectsResult, existingResult] = await Promise.all([
+  const [settings, existingResult, estimateResult] = await Promise.all([
     getCompanySettings(),
-    supabase
-      .from("projects")
-      .select("id, name, created_at, status")
-      .eq("company_id", companyId)
-      .in("status", ["approved", "completed"]),
     supabase
       .from("company_timeline_entries")
       .select("project_id")
-      .eq("company_id", companyId),
+      .eq("company_id", companyId)
+      .eq("project_id", projectId)
+      .maybeSingle(),
+    supabase
+      .from("estimates")
+      .select("meta")
+      .eq("company_id", companyId)
+      .eq("project_id", projectId)
+      .maybeSingle(),
   ]);
 
-  const projects = projectsResult.data ?? [];
-  const existingProjectIds = new Set(
-    (existingResult.data ?? []).map((row) => row.project_id as string),
-  );
-
-  const missingProjects = projects.filter(
-    (project) => !existingProjectIds.has(project.id as string),
-  );
-
-  if (missingProjects.length === 0) {
+  if (!existingResult.error && existingResult.data) {
     return;
   }
 
-  const projectIds = missingProjects.map((project) => project.id as string);
-  const { data: estimates } = await supabase
-    .from("estimates")
-    .select("project_id, meta")
-    .in("project_id", projectIds);
+  const meta = (estimateResult.data?.meta as Partial<EstimateMeta> | null) ?? {};
+  const dates = resolveProjectDates(
+    projectCreatedAt,
+    meta,
+    settings.offerValidityDays,
+  );
 
-  const metaByProjectId = new Map<string, Partial<EstimateMeta>>();
-  for (const row of estimates ?? []) {
-    metaByProjectId.set(
-      row.project_id as string,
-      (row.meta as Partial<EstimateMeta>) ?? {},
-    );
-  }
-
-  const inserts = missingProjects.map((project) => {
-    const meta = metaByProjectId.get(project.id as string) ?? {};
-    const dates = resolveProjectDates(
-      (project.created_at as string) ?? new Date().toISOString(),
-      meta,
-      settings.offerValidityDays,
-    );
-
-    return {
+  await supabase
+    .from("company_timeline_entries")
+    .upsert(
+      {
       company_id: companyId,
-      project_id: project.id,
+        project_id: projectId,
       start_date: dates.startDate,
       end_date: dates.endDate,
-    };
-  });
-
-  if (inserts.length > 0) {
-    await supabase.from("company_timeline_entries").insert(inserts);
-  }
+      },
+      { onConflict: "company_id,project_id" },
+    );
 }
 
 export const listTimelineEntries = cache(async function listTimelineEntries(): Promise<
@@ -121,8 +108,6 @@ export const listTimelineEntries = cache(async function listTimelineEntries(): P
   if (!companyId) {
     return [];
   }
-
-  await syncApprovedProjects(companyId);
 
   const supabase = createAdminClient();
   const { data, error } = await supabase

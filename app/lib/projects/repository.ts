@@ -34,6 +34,7 @@ import {
   deleteDelegatedMaterialTodoTask,
   upsertDelegatedMaterialTodoTask,
 } from "@/app/lib/todo/repository";
+import { ensureTimelineEntryForProject } from "@/app/lib/timeline/repository";
 import {
   getProjectById as getSampleProjectById,
   SAMPLE_PROJECTS,
@@ -463,6 +464,37 @@ export async function getProject(id: string): Promise<ProjectSummary | null> {
   return mapProject(row);
 }
 
+export async function getProjectsByIds(ids: string[]): Promise<ProjectSummary[]> {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return uniqueIds
+      .map((id) => getSampleProjectById(id))
+      .filter((project): project is ProjectSummary => project != null);
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT_VARIANTS[0])
+    .eq("company_id", companyId)
+    .in("id", uniqueIds);
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as unknown as ProjectRow[]).map(mapProject);
+}
+
 export async function getProjectEstimate(id: string): Promise<ProjectEstimate | null> {
   const project = await getProject(id);
   if (!project) return null;
@@ -821,6 +853,14 @@ export async function updateProjectStatus(
     return { ok: false, error: "Neizdevās atjaunināt projekta statusu." };
   }
 
+  if (status === "approved" || status === "completed") {
+    await ensureTimelineEntryForProject({
+      companyId,
+      projectId,
+      projectCreatedAt: project.createdAt,
+    });
+  }
+
   return { ok: true };
 }
 
@@ -1057,6 +1097,13 @@ export async function markProjectMaterialOrdered(
     return { ok: false, error: "Neizdevās atzīmēt materiālu kā pasūtītu." };
   }
 
+  await supabase
+    .from("project_material_assignments")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("project_id", projectId)
+    .eq("position_price_id", trimmedId);
+
   const assignedUserId = currentMeta.materialAssigneeUserIds?.[trimmedId]?.trim();
   if (assignedUserId) {
     await deleteDelegatedMaterialTodoTask({
@@ -1142,6 +1189,16 @@ export async function assignProjectMaterialUser(
   if (updateError) {
     return { ok: false, error: "Neizdevās piešķirt materiālu lietotājam." };
   }
+
+  await supabase.from("project_material_assignments").upsert(
+    {
+      company_id: companyId,
+      project_id: projectId,
+      position_price_id: trimmedMaterialId,
+      assignee_user_id: trimmedUserId,
+    },
+    { onConflict: "company_id,project_id,position_price_id" },
+  );
 
   const catalogPositions = await listPositionPrices();
   const materialName =

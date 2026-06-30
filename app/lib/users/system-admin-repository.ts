@@ -34,7 +34,6 @@ export const isSystemAdminUser = cache(async function isSystemAdminUser(
     .maybeSingle();
 
   if (!error && data) {
-    await supabase.from("users").update(mapAuthUserProfile(user)).eq("id", user.id);
     return (data as UserAdminRow).is_admin === true;
   }
 

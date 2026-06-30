@@ -4,6 +4,7 @@ import {
   getCurrentCompanyId,
 } from "@/app/lib/companies/current-company";
 import { MODULE_ASSETS_BUCKET } from "@/app/lib/modules/file-storage";
+import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -16,6 +17,10 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  if (!(await checkRateLimit(`module-asset:${user.id}`, 120, 60_000))) {
+    return rateLimitResponse();
   }
 
   if (!isSupabaseAdminConfigured()) {
@@ -53,6 +58,7 @@ export async function GET(request: Request) {
   return new Response(buffer, {
     headers: {
       "Content-Type": data.type || "application/pdf",
+      "Content-Length": String(data.size),
       "Cache-Control": "private, max-age=3600",
     },
   });

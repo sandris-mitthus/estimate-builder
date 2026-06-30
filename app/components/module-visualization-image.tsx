@@ -9,46 +9,13 @@ type ModuleVisualizationImageProps = {
 };
 
 export function ModuleVisualizationImage({ block }: ModuleVisualizationImageProps) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const assetUrl = resolveModuleBlockAssetUrl(block);
 
   useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-
-    setSrc(null);
+    setLoaded(false);
     setFailed(false);
-
-    async function loadImage() {
-      try {
-        const response = await fetch(assetUrl, { credentials: "include" });
-        if (!response.ok) {
-          throw new Error("Failed to load image");
-        }
-
-        const blob = await response.blob();
-        if (cancelled) {
-          return;
-        }
-
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      } catch {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      }
-    }
-
-    void loadImage();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
   }, [assetUrl]);
 
   if (failed) {
@@ -59,19 +26,23 @@ export function ModuleVisualizationImage({ block }: ModuleVisualizationImageProp
     );
   }
 
-  if (!src) {
-    return (
-      <div className="flex size-full items-center justify-center bg-zinc-100 text-zinc-400">
-        <i className="fas fa-spinner animate-spin text-lg" aria-hidden="true" />
-      </div>
-    );
-  }
-
   return (
-    <img
-      src={src}
-      alt=""
-      className="size-full object-cover transition hover:opacity-95"
-    />
+    <div className="relative size-full bg-zinc-100">
+      {!loaded ? (
+        <div className="absolute inset-0 flex items-center justify-center text-zinc-400">
+          <i className="fas fa-spinner animate-spin text-lg" aria-hidden="true" />
+        </div>
+      ) : null}
+      <img
+        src={assetUrl}
+        alt=""
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+        className={`size-full object-cover transition hover:opacity-95 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
   );
 }

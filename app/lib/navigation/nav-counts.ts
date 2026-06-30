@@ -1,6 +1,5 @@
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
-import { normalizeProjectStatus, isProjectVisibleInList } from "@/app/lib/projects/project-status";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -60,18 +59,12 @@ async function countVisibleProjects(companyId: string): Promise<number> {
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const result = (await supabase
     .from("projects")
-    .select("status")
-    .eq("company_id", companyId);
-
-  if (error || !data) {
-    return 0;
-  }
-
-  return data.filter((row) =>
-    isProjectVisibleInList(normalizeProjectStatus(row.status)),
-  ).length;
+    .select("*", { count: "exact", head: true })
+    .eq("company_id", companyId)
+    .in("status", ["active", "approved"])) as CountQuery;
+  return result.error ? 0 : (result.count ?? 0);
 }
 
 async function countActiveLanguageTranslations(languageCode: string): Promise<number> {
@@ -80,23 +73,16 @@ async function countActiveLanguageTranslations(languageCode: string): Promise<nu
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const safeLanguageCode = /^[a-z]{2,10}(-[a-z0-9]{2,10})?$/i.test(languageCode)
+    ? languageCode
+    : "lv";
+  const valuePath = `values->>${safeLanguageCode}`;
+  const result = (await supabase
     .from("site_translations")
-    .select("values");
-
-  if (error || !data) {
-    return 0;
-  }
-
-  return data.filter((row) => {
-    const values = row.values;
-    if (typeof values !== "object" || values === null || Array.isArray(values)) {
-      return false;
-    }
-
-    const value = (values as Record<string, unknown>)[languageCode];
-    return typeof value === "string" && value.trim().length > 0;
-  }).length;
+    .select("*", { count: "exact", head: true })
+    .not(valuePath, "is", null)
+    .neq(valuePath, "")) as CountQuery;
+  return result.error ? 0 : (result.count ?? 0);
 }
 
 export async function getNavigationCounts({
