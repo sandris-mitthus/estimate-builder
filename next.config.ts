@@ -29,6 +29,11 @@ const csp = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
+  },
   turbopack: {
     root: workspaceRoot,
   },

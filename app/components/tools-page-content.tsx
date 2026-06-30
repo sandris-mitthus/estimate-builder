@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddToolButton } from "@/app/components/add-tool-button";
 import { SectionPage } from "@/app/components/section-page";
 import { ToolRowActions } from "@/app/components/tool-row-actions";
@@ -17,27 +17,45 @@ import type { WorkerSummary } from "@/app/lib/workers/types";
 type ToolsPageContentProps = {
   initialTools: ToolSummary[];
   workers: WorkerSummary[];
+  workersModuleEnabled: boolean;
 };
 
-export function ToolsPageContent({ initialTools, workers }: ToolsPageContentProps) {
+export function ToolsPageContent({
+  initialTools,
+  workers,
+  workersModuleEnabled,
+}: ToolsPageContentProps) {
   const { t } = useTranslations();
+  const [tools, setTools] = useState(initialTools);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setTools(initialTools);
+  }, [initialTools]);
+
+  function handleToolUpdated(updatedTool: ToolSummary) {
+    setTools((currentTools) =>
+      currentTools.map((tool) =>
+        tool.id === updatedTool.id ? updatedTool : tool,
+      ),
+    );
+  }
 
   const visibleTools = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return initialTools;
+    if (!query) return tools;
 
-    return initialTools.filter((tool) => {
+    return tools.filter((tool) => {
       const haystack = [
         tool.toolNumber,
         tool.name,
-        tool.assignedWorkerName ?? "",
+        workersModuleEnabled ? tool.assignedWorkerName ?? "" : "",
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [initialTools, searchQuery]);
+  }, [searchQuery, tools, workersModuleEnabled]);
 
   return (
     <SectionPage
@@ -80,7 +98,9 @@ export function ToolsPageContent({ initialTools, workers }: ToolsPageContentProp
                   <th className="px-3 py-3">{t("tools.field.name", "Nosaukums")}</th>
                   <th className="px-3 py-3">{t("tools.field.purchase_date", "Iegādes datums")}</th>
                   <th className="px-3 py-3">{t("tools.field.price", "Cena")}</th>
-                  <th className="px-3 py-3">{t("tools.column.worker", "Darbinieks")}</th>
+                  {workersModuleEnabled ? (
+                    <th className="px-3 py-3">{t("tools.column.worker", "Darbinieks")}</th>
+                  ) : null}
                   <th className="px-3 py-3 text-right">{t("common.actions", "Darbības")}</th>
                 </tr>
               </thead>
@@ -95,26 +115,20 @@ export function ToolsPageContent({ initialTools, workers }: ToolsPageContentProp
                         : "—"}
                     </td>
                     <td className="px-3 py-3 text-zinc-600">
-                      {tool.price !== null ? (
-                        <span>
-                          {formatMoney(tool.price)}
-                          <span className="ml-1 text-xs text-zinc-400">
-                            (
-                            {tool.priceType === "amortization"
-                              ? t("tools.price_type.amortization", "Amortizācijas")
-                              : t("tools.price_type.purchase", "Pirkšanas")}
-                            )
-                          </span>
-                        </span>
-                      ) : (
-                        "—"
-                      )}
+                      {tool.price !== null ? formatMoney(tool.price) : "—"}
                     </td>
-                    <td className="px-3 py-3 text-zinc-600">
-                      {tool.assignedWorkerName ?? "—"}
-                    </td>
+                    {workersModuleEnabled ? (
+                      <td className="px-3 py-3 text-zinc-600">
+                        {tool.assignedWorkerName ?? "—"}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-3">
-                      <ToolRowActions tool={tool} workers={workers} />
+                      <ToolRowActions
+                        tool={tool}
+                        workers={workers}
+                        workersModuleEnabled={workersModuleEnabled}
+                        onToolUpdated={handleToolUpdated}
+                      />
                     </td>
                   </tr>
                 ))}

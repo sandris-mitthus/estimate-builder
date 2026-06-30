@@ -17,7 +17,7 @@ export function ModalFormActions({
   const { t } = useTranslations();
 
   return (
-    <div className="flex justify-end gap-3 pt-2">
+    <div className="flex flex-wrap items-center justify-end gap-3 pt-2 [&>button]:min-w-32 [&>button]:shrink-0 [&>button]:justify-center [&>button]:whitespace-nowrap">
       <button
         type="button"
         onClick={onCancel}

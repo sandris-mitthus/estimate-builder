@@ -9,6 +9,7 @@ export type ToolSummary = {
   priceType: ToolPriceType;
   assignedWorkerId: string | null;
   assignedWorkerName: string | null;
+  assignmentHistory: ToolAssignmentHistoryEntry[];
   sortOrder: number;
 };
 
@@ -41,4 +42,25 @@ export type CreateToolInput = {
 
 export type UpdateToolInput = CreateToolInput & {
   id: string;
+};
+
+export type AssignToolWorkerInput = {
+  toolId: string;
+  workerId: string;
+};
+
+export type ToolAssignmentHistoryRow = {
+  id: string;
+  tool_id: string;
+  worker_id: string | null;
+  worker_name: string;
+  assigned_at: string;
+};
+
+export type ToolAssignmentHistoryEntry = {
+  id: string;
+  toolId: string;
+  workerId: string | null;
+  workerName: string;
+  assignedAt: string;
 };

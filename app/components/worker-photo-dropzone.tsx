@@ -5,7 +5,9 @@ import {
   removeWorkerPhotoAction,
   uploadWorkerPhotoAction,
 } from "@/app/(protected)/workers/actions";
+import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
+import { WorkerPhotoUploadModal } from "@/app/components/worker-photo-upload-modal";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { validateWorkerPhotoFile } from "@/app/lib/workers/photo-validation";
 
@@ -13,7 +15,6 @@ type WorkerPhotoDropzoneProps = {
   workerId: string;
   photoUrl: string;
   onPhotoChange: (photoUrl: string) => void;
-  onError: (message: string | null) => void;
   disabled?: boolean;
 };
 
@@ -21,15 +22,16 @@ export function WorkerPhotoDropzone({
   workerId,
   photoUrl,
   onPhotoChange,
-  onError,
   disabled = false,
 }: WorkerPhotoDropzoneProps) {
+  const { showFeedback } = useFeedbackToast();
   const { t } = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const isBlocked = disabled || isPending;
+  const isBlocked = disabled || isPending || isUploadingPhoto;
 
   function openFilePicker() {
     inputRef.current?.click();
@@ -41,34 +43,37 @@ export function WorkerPhotoDropzone({
 
     const validation = validateWorkerPhotoFile(file);
     if (!validation.ok) {
-      onError(translateActionError(t, validation));
+      showFeedback({ type: "error", text: translateActionError(t, validation) });
       return;
     }
 
-    onError(null);
     const formData = new FormData();
     formData.set("photo", file);
+    setIsUploadingPhoto(true);
 
     startTransition(async () => {
-      const result = await uploadWorkerPhotoAction(workerId, formData);
+      try {
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+        const result = await uploadWorkerPhotoAction(workerId, formData);
 
-      if (!result.ok) {
-        onError(translateActionError(t, result));
-        return;
+        if (!result.ok) {
+          showFeedback({ type: "error", text: translateActionError(t, result) });
+          return;
+        }
+
+        onPhotoChange(result.photoUrl);
+      } finally {
+        setIsUploadingPhoto(false);
       }
-
-      onPhotoChange(result.photoUrl);
     });
   }
 
   function handleRemove() {
-    onError(null);
-
     startTransition(async () => {
       const result = await removeWorkerPhotoAction(workerId);
 
       if (!result.ok) {
-        onError(translateActionError(t, result));
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
@@ -78,6 +83,8 @@ export function WorkerPhotoDropzone({
 
   return (
     <div>
+      <WorkerPhotoUploadModal open={isUploadingPhoto} />
+
       <p className="mb-1.5 text-sm font-medium text-zinc-700">
         {t("workers.field.photo", "Foto")}
       </p>
@@ -165,16 +172,15 @@ export function WorkerPhotoDropzone({
 type PendingWorkerPhotoDropzoneProps = {
   previewUrl: string;
   onFileSelect: (file: File | null) => void;
-  onError: (message: string | null) => void;
   disabled?: boolean;
 };
 
 export function PendingWorkerPhotoDropzone({
   previewUrl,
   onFileSelect,
-  onError,
   disabled = false,
 }: PendingWorkerPhotoDropzoneProps) {
+  const { showFeedback } = useFeedbackToast();
   const { t } = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -189,11 +195,10 @@ export function PendingWorkerPhotoDropzone({
 
     const validation = validateWorkerPhotoFile(file);
     if (!validation.ok) {
-      onError(translateActionError(t, validation));
+      showFeedback({ type: "error", text: translateActionError(t, validation) });
       return;
     }
 
-    onError(null);
     onFileSelect(file);
   }
 

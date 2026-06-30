@@ -55,7 +55,6 @@ export function ToolFormModal({
     toolNumber?: string;
     name?: string;
   }>({});
-  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -69,7 +68,6 @@ export function ToolFormModal({
     setPriceType(tool?.priceType ?? "purchase");
     setAssignedWorkerId(tool?.assignedWorkerId ?? "");
     setFieldErrors({});
-    setError(null);
   }, [open, tool]);
 
   const initialSnapshot = useMemo(
@@ -96,14 +94,12 @@ export function ToolFormModal({
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && !isPending) {
       setFieldErrors({});
-      setError(null);
     }
     onOpenChange(nextOpen);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setFieldErrors({});
 
     const trimmedNumber = toolNumber.trim();
@@ -128,8 +124,8 @@ export function ToolFormModal({
       name: trimmedName,
       purchaseDate,
       price,
-      priceType,
-      assignedWorkerId: assignedWorkerId || null,
+      priceType: isEdit ? priceType : "purchase",
+      assignedWorkerId: isEdit ? assignedWorkerId || null : null,
     };
 
     startTransition(async () => {
@@ -138,7 +134,7 @@ export function ToolFormModal({
         : await createToolAction(payload);
 
       if (!result.ok) {
-        setError(translateActionError(t, result));
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
 
@@ -180,7 +176,6 @@ export function ToolFormModal({
               onChange={(event) => {
                 setToolNumber(event.target.value);
                 setFieldErrors((current) => ({ ...current, toolNumber: undefined }));
-                setError(null);
               }}
               autoFocus
               className={`${formInputClassName(Boolean(fieldErrors.toolNumber))} ${formInputFullWidthClass}`}
@@ -203,7 +198,6 @@ export function ToolFormModal({
               onChange={(event) => {
                 setName(event.target.value);
                 setFieldErrors((current) => ({ ...current, name: undefined }));
-                setError(null);
               }}
               className={`${formInputClassName(Boolean(fieldErrors.name))} ${formInputFullWidthClass}`}
             />
@@ -244,52 +238,48 @@ export function ToolFormModal({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="tool-price-type" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              {t("tools.field.price_type", "Cenas veids")}
-            </label>
-            <select
-              id="tool-price-type"
-              value={priceType}
-              onChange={(event) => setPriceType(event.target.value as ToolPriceType)}
-              className={`${formInputClassName()} ${formInputFullWidthClass}`}
-            >
-              <option value="purchase">
-                {t("tools.price_type.purchase", "Pirkšanas")}
-              </option>
-              <option value="amortization">
-                {t("tools.price_type.amortization", "Amortizācijas")}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="tool-assigned-worker" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              {t("tools.field.assigned_worker", "Pie darbinieka")}
-            </label>
-            <select
-              id="tool-assigned-worker"
-              value={assignedWorkerId}
-              onChange={(event) => setAssignedWorkerId(event.target.value)}
-              className={`${formInputClassName()} ${formInputFullWidthClass}`}
-            >
-              <option value="">
-                {t("tools.assigned_worker.none", "Nav piesaistīts")}
-              </option>
-              {workers.map((worker) => (
-                <option key={worker.id} value={worker.id}>
-                  {formatWorkerName(worker)}
+        {isEdit ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="tool-price-type" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                {t("tools.field.price_type", "Cenas veids")}
+              </label>
+              <select
+                id="tool-price-type"
+                value={priceType}
+                onChange={(event) => setPriceType(event.target.value as ToolPriceType)}
+                className={`${formInputClassName()} ${formInputFullWidthClass}`}
+              >
+                <option value="purchase">
+                  {t("tools.price_type.purchase", "Pirkšanas")}
                 </option>
-              ))}
-            </select>
-          </div>
-        </div>
+                <option value="amortization">
+                  {t("tools.price_type.amortization", "Amortizācijas")}
+                </option>
+              </select>
+            </div>
 
-        {error ? (
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
+            <div>
+              <label htmlFor="tool-assigned-worker" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                {t("tools.field.assigned_worker", "Pie darbinieka")}
+              </label>
+              <select
+                id="tool-assigned-worker"
+                value={assignedWorkerId}
+                onChange={(event) => setAssignedWorkerId(event.target.value)}
+                className={`${formInputClassName()} ${formInputFullWidthClass}`}
+              >
+                <option value="">
+                  {t("tools.assigned_worker.none", "Nav piesaistīts")}
+                </option>
+                {workers.map((worker) => (
+                  <option key={worker.id} value={worker.id}>
+                    {formatWorkerName(worker)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         ) : null}
 
         <ModalFormActions

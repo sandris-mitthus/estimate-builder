@@ -185,6 +185,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās pievienot instrumentu.": "errors.tool_create_failed",
   "Neizdevās saglabāt instrumentu.": "errors.tool_save_failed",
   "Neizdevās dzēst instrumentu.": "errors.tool_delete_failed",
+  "Neizdevās ielādēt instrumenta vēsturi.":
+    "errors.tool_history_load_failed",
   "Neizdevās saglabāt laika grafiku.": "errors.timeline_save_failed",
 };
 

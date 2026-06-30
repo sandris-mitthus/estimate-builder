@@ -3,7 +3,10 @@ import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import type {
+  AssignToolWorkerInput,
   CreateToolInput,
+  ToolAssignmentHistoryEntry,
+  ToolAssignmentHistoryRow,
   ToolPriceType,
   ToolRow,
   ToolSummary,
@@ -40,6 +43,7 @@ function mapTool(row: ToolRow): ToolSummary {
     priceType: normalizePriceType(row.price_type),
     assignedWorkerId: row.assigned_worker_id,
     assignedWorkerName: resolveAssignedWorkerName(row.company_workers),
+    assignmentHistory: [],
     sortOrder: row.sort_order,
   };
 }
@@ -72,6 +76,63 @@ function parsePrice(value: string): number | null {
 const TOOL_SELECT =
   "id, tool_number, name, purchase_date, price, price_type, assigned_worker_id, sort_order, company_workers (first_name, last_name)";
 
+function mapToolAssignmentHistory(
+  row: ToolAssignmentHistoryRow,
+): ToolAssignmentHistoryEntry {
+  return {
+    id: row.id,
+    toolId: row.tool_id,
+    workerId: row.worker_id,
+    workerName: row.worker_name,
+    assignedAt: row.assigned_at,
+  };
+}
+
+async function getWorkerName(
+  supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  workerId: string,
+) {
+  const { data } = await supabase
+    .from("company_workers")
+    .select("first_name, last_name")
+    .eq("company_id", companyId)
+    .eq("id", workerId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const worker = data as { first_name: string; last_name: string };
+  return `${worker.first_name} ${worker.last_name}`.trim();
+}
+
+async function recordToolAssignmentHistory(
+  supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  toolId: string,
+  workerId: string | null,
+): Promise<ToolAssignmentHistoryEntry | null> {
+  if (!workerId) return null;
+
+  const workerName = await getWorkerName(supabase, companyId, workerId);
+  if (!workerName) return null;
+
+  const { data } = await supabase
+    .from("company_tool_assignment_history")
+    .insert({
+      company_id: companyId,
+      tool_id: toolId,
+      worker_id: workerId,
+      worker_name: workerName,
+    })
+    .select("id, tool_id, worker_id, worker_name, assigned_at")
+    .single();
+
+  if (!data) return null;
+
+  return mapToolAssignmentHistory(data as unknown as ToolAssignmentHistoryRow);
+}
+
 export const listTools = cache(async function listTools(): Promise<ToolSummary[]> {
   if (!isSupabaseAdminConfigured()) {
     return [];
@@ -94,7 +155,40 @@ export const listTools = cache(async function listTools(): Promise<ToolSummary[]
     return [];
   }
 
-  return data.map((row) => mapTool(row as unknown as ToolRow));
+  const tools = data.map((row) => mapTool(row as unknown as ToolRow));
+  const toolIds = tools.map((tool) => tool.id);
+
+  if (toolIds.length === 0) {
+    return tools;
+  }
+
+  const { data: historyData } = await supabase
+    .from("company_tool_assignment_history")
+    .select("id, tool_id, worker_id, worker_name, assigned_at")
+    .eq("company_id", companyId)
+    .in("tool_id", toolIds)
+    .order("assigned_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (!historyData?.length) {
+    return tools;
+  }
+
+  const historyByToolId = new Map<string, ToolAssignmentHistoryEntry[]>();
+  for (const row of historyData) {
+    const entry = mapToolAssignmentHistory(
+      row as unknown as ToolAssignmentHistoryRow,
+    );
+    historyByToolId.set(entry.toolId, [
+      ...(historyByToolId.get(entry.toolId) ?? []),
+      entry,
+    ]);
+  }
+
+  return tools.map((tool) => ({
+    ...tool,
+    assignmentHistory: historyByToolId.get(tool.id) ?? [],
+  }));
 });
 
 export async function createTool(
@@ -184,6 +278,16 @@ export async function updateTool(
 
   const supabase = createAdminClient();
   const purchaseDate = input.purchaseDate.trim() || null;
+  const { data: existingTool } = await supabase
+    .from("company_tools")
+    .select("assigned_worker_id")
+    .eq("id", input.id)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  const previousWorkerId =
+    (existingTool as { assigned_worker_id?: string | null } | null)
+      ?.assigned_worker_id ?? null;
 
   const { error } = await supabase
     .from("company_tools")
@@ -205,7 +309,109 @@ export async function updateTool(
     return { ok: false, error: "Neizdevās saglabāt instrumentu." };
   }
 
+  if (input.assignedWorkerId !== previousWorkerId) {
+    await recordToolAssignmentHistory(
+      supabase,
+      companyId,
+      input.id,
+      input.assignedWorkerId,
+    );
+  }
+
   return { ok: true };
+}
+
+export async function assignToolWorker(
+  input: AssignToolWorkerInput,
+): Promise<
+  | { ok: true; historyEntry: ToolAssignmentHistoryEntry | null }
+  | { ok: false; error: string }
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return {
+      ok: false,
+      error: "Datubāze nav konfigurēta. Pievieno SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { data: existingTool } = await supabase
+    .from("company_tools")
+    .select("assigned_worker_id")
+    .eq("id", input.toolId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  const previousWorkerId =
+    (existingTool as { assigned_worker_id?: string | null } | null)
+      ?.assigned_worker_id ?? null;
+
+  if (previousWorkerId === input.workerId) {
+    return { ok: true, historyEntry: null };
+  }
+
+  const { error } = await supabase
+    .from("company_tools")
+    .update({ assigned_worker_id: input.workerId })
+    .eq("id", input.toolId)
+    .eq("company_id", companyId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt instrumentu." };
+  }
+
+  const historyEntry = await recordToolAssignmentHistory(
+    supabase,
+    companyId,
+    input.toolId,
+    input.workerId,
+  );
+
+  return { ok: true, historyEntry };
+}
+
+export async function listToolAssignmentHistory(
+  toolId: string,
+): Promise<
+  | { ok: true; history: ToolAssignmentHistoryEntry[] }
+  | { ok: false; error: string }
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return {
+      ok: false,
+      error: "Datubāze nav konfigurēta. Pievieno SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("company_tool_assignment_history")
+    .select("id, tool_id, worker_id, worker_name, assigned_at")
+    .eq("company_id", companyId)
+    .eq("tool_id", toolId)
+    .order("assigned_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return { ok: false, error: "Neizdevās ielādēt instrumenta vēsturi." };
+  }
+
+  return {
+    ok: true,
+    history: data.map((row) =>
+      mapToolAssignmentHistory(row as unknown as ToolAssignmentHistoryRow),
+    ),
+  };
 }
 
 export async function deleteTool(

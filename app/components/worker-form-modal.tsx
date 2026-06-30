@@ -17,6 +17,7 @@ import {
   PendingWorkerPhotoDropzone,
   WorkerPhotoDropzone,
 } from "@/app/components/worker-photo-dropzone";
+import { WorkerPhotoUploadModal } from "@/app/components/worker-photo-upload-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
@@ -57,8 +58,7 @@ export function WorkerFormModal({
     lastName?: string;
     phone?: string;
   }>({});
-  const [error, setError] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -71,8 +71,7 @@ export function WorkerFormModal({
     setPendingPhoto(null);
     setPendingPreviewUrl("");
     setFieldErrors({});
-    setError(null);
-    setPhotoError(null);
+    setIsUploadingPhoto(false);
   }, [open, worker]);
 
   useEffect(() => {
@@ -104,10 +103,8 @@ export function WorkerFormModal({
     pendingPhoto !== null;
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen && !isPending) {
+    if (!nextOpen && !isPending && !isUploadingPhoto) {
       setFieldErrors({});
-      setError(null);
-      setPhotoError(null);
       setPendingPhoto(null);
     }
     onOpenChange(nextOpen);
@@ -115,7 +112,6 @@ export function WorkerFormModal({
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setFieldErrors({});
 
     const trimmedFirst = firstName.trim();
@@ -147,7 +143,7 @@ export function WorkerFormModal({
         const result = await updateWorkerAction({ id: worker.id, ...payload });
 
         if (!result.ok) {
-          setError(translateActionError(t, result));
+          showFeedback({ type: "error", text: translateActionError(t, result) });
           return;
         }
 
@@ -163,27 +159,37 @@ export function WorkerFormModal({
       const result = await createWorkerAction(payload);
 
       if (!result.ok) {
-        setError(translateActionError(t, result));
+        showFeedback({ type: "error", text: translateActionError(t, result) });
         return;
       }
+
+      let photoUploadFailed = false;
 
       if (pendingPhoto) {
         const formData = new FormData();
         formData.set("photo", pendingPhoto);
-        const uploadResult = await uploadWorkerPhotoAction(result.worker.id, formData);
-        if (!uploadResult.ok) {
-          showFeedback({
-            type: "info",
-            text: translateActionError(t, uploadResult),
-          });
+        setIsUploadingPhoto(true);
+        try {
+          const uploadResult = await uploadWorkerPhotoAction(result.worker.id, formData);
+          if (!uploadResult.ok) {
+            photoUploadFailed = true;
+            showFeedback({
+              type: "error",
+              text: translateActionError(t, uploadResult),
+            });
+          }
+        } finally {
+          setIsUploadingPhoto(false);
         }
       }
 
       handleOpenChange(false);
-      showFeedback({
-        type: "success",
-        text: t("workers.feedback.created", "Darbinieks pievienots."),
-      });
+      if (!photoUploadFailed) {
+        showFeedback({
+          type: "success",
+          text: t("workers.feedback.created", "Darbinieks pievienots."),
+        });
+      }
       router.refresh();
     });
   }
@@ -202,10 +208,12 @@ export function WorkerFormModal({
           ? formatWorkerName(worker)
           : undefined
       }
-      blocking={isPending}
+      blocking={isPending || isUploadingPhoto}
       dirty={isDirty}
       panelMaxWidthClassName={appModalWidePanelMaxWidthClassName}
     >
+      <WorkerPhotoUploadModal open={isUploadingPhoto} />
+
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -219,7 +227,6 @@ export function WorkerFormModal({
               onChange={(event) => {
                 setFirstName(event.target.value);
                 setFieldErrors((current) => ({ ...current, firstName: undefined }));
-                setError(null);
               }}
               autoFocus
               className={`${formInputClassName(Boolean(fieldErrors.firstName))} ${formInputFullWidthClass}`}
@@ -242,7 +249,6 @@ export function WorkerFormModal({
               onChange={(event) => {
                 setLastName(event.target.value);
                 setFieldErrors((current) => ({ ...current, lastName: undefined }));
-                setError(null);
               }}
               className={`${formInputClassName(Boolean(fieldErrors.lastName))} ${formInputFullWidthClass}`}
             />
@@ -260,7 +266,6 @@ export function WorkerFormModal({
           onChange={(value) => {
             setPhone(value);
             setFieldErrors((current) => ({ ...current, phone: undefined }));
-            setError(null);
           }}
           callingCode={phoneCallingCode}
           onCallingCodeChange={setPhoneCallingCode}
@@ -272,37 +277,23 @@ export function WorkerFormModal({
             workerId={worker.id}
             photoUrl={photoUrl}
             onPhotoChange={setPhotoUrl}
-            onError={setPhotoError}
-            disabled={isPending}
+            disabled={isPending || isUploadingPhoto}
           />
         ) : (
           <PendingWorkerPhotoDropzone
             previewUrl={pendingPreviewUrl}
             onFileSelect={setPendingPhoto}
-            onError={setPhotoError}
-            disabled={isPending}
+            disabled={isPending || isUploadingPhoto}
           />
         )}
 
-        {photoError ? (
-          <p className="text-sm text-red-600" role="alert">
-            {photoError}
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        ) : null}
-
         <ModalFormActions
           onCancel={() => handleOpenChange(false)}
-          cancelDisabled={isPending}
+          cancelDisabled={isPending || isUploadingPhoto}
         >
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || isUploadingPhoto}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}

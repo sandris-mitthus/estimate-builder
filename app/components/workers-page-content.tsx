@@ -9,16 +9,35 @@ import {
   formInputClassName,
   formInputFullWidthClass,
 } from "@/app/lib/form/input-styles";
+import type { ToolSummary } from "@/app/lib/tools/types";
 import type { WorkerSummary } from "@/app/lib/workers/types";
 import { formatWorkerName } from "@/app/lib/workers/types";
 
 type WorkersPageContentProps = {
   initialWorkers: WorkerSummary[];
+  tools: ToolSummary[];
+  toolsModuleEnabled: boolean;
 };
 
-export function WorkersPageContent({ initialWorkers }: WorkersPageContentProps) {
+export function WorkersPageContent({
+  initialWorkers,
+  tools,
+  toolsModuleEnabled,
+}: WorkersPageContentProps) {
   const { t } = useTranslations();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const toolsByWorkerId = useMemo(() => {
+    const groupedTools = new Map<string, ToolSummary[]>();
+    for (const tool of tools) {
+      if (!tool.assignedWorkerId) continue;
+      groupedTools.set(tool.assignedWorkerId, [
+        ...(groupedTools.get(tool.assignedWorkerId) ?? []),
+        tool,
+      ]);
+    }
+    return groupedTools;
+  }, [tools]);
 
   const visibleWorkers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -83,7 +102,7 @@ export function WorkersPageContent({ initialWorkers }: WorkersPageContentProps) 
                 {visibleWorkers.map((worker) => (
                   <tr key={worker.id} className="border-b border-zinc-100 last:border-b-0">
                     <td className="px-3 py-3">
-                      <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border border-zinc-200 bg-zinc-50">
+                      <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
                         {worker.photoUrl ? (
                           <img
                             src={worker.photoUrl}
@@ -104,7 +123,11 @@ export function WorkersPageContent({ initialWorkers }: WorkersPageContentProps) 
                         : "—"}
                     </td>
                     <td className="px-3 py-3">
-                      <WorkerRowActions worker={worker} />
+                      <WorkerRowActions
+                        worker={worker}
+                        assignedTools={toolsByWorkerId.get(worker.id) ?? []}
+                        toolsModuleEnabled={toolsModuleEnabled}
+                      />
                     </td>
                   </tr>
                 ))}

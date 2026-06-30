@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, configurable excluded-offer positions, workers, tools, and approved-project timeline planning. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, workers, tools, timeline, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.58` (see [Changelog](#changelog))
+**Current version:** `1.3.62` (see [Changelog](#changelog))
 
 ---
 
@@ -26,7 +26,7 @@ Construction estimate editor for Latvian tenders — hierarchical categories, su
 - **System admin pārvaldība** — `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_frontend_modules`, `/site_languages`, `/site_translations`, `/site_settings`; globālie nosaukuma/slogana metadati, default grupas, valodas, seedoti UI tulkojumi un lietotāja aktīvās valodas dropdown sidebar apakšā; `/site_frontend_modules` — frontend moduļu atslēgas ar ieslēgšanas slēdzi (live saglabāšana bez lapas pārlādes); `module_todo_list`, `module_workers`, `module_tools` un `module_timeline` kontrolē parasto lietotāju moduļu piekļuvi un sidebar linkus; `/site_docs` pārvalda publiskās docs kategorijas un rakstus ar drag-and-drop pārvietošanu starp kategorijām un secības maiņu; `/todo` ir lokāli saglabāts divu kolonnu darba dēlis ar drag-and-drop pārvietošanu un prioritizētu dzēšanas drop zonu; uzdevumu apraksti kartītēs saglabā textarea rindas pārtraukumus; `/site_companies` rāda uzņēmuma logo un kompaktu rekvizītu bloku, `/site_companies_users` rāda arī sistēmas administratorus bez uzņēmuma piesaistes, lietotāju avatarus, uzņēmumu logo un konkrētā uzņēmuma grupu/lomu; lietotāji bez `public.users.is_admin = true` no šīm lapām tiek novirzīti uz `/`
 - **Uzņēmuma konteksts** — `companies`, `company_users`, `company_user_groups`, `company_group_members`; aktīvais uzņēmums tiek noteikts serverī un visi galvenie repozitoriji lasa/raksta ar `company_id`
 - **Lietotāja darāmo darbu saraksts** — `/tasks` parastajiem lietotājiem (redzams un pieejams tikai ja `module_todo_list` frontend modulis ir ieslēgts un grupai ir `todo` tiesība); katram lietotājam savas kategorijas un uzdevumi ar default **Uzdevumi** kategoriju (vienmēr pirmā, nepārvietojama), horizontālu Kanban rindu, drag-and-drop kategoriju secības maiņu un uzdevumu prioritizēšanu starp kategorijām, biezu drop indikatoru, dzēšanas drop zonu un **+** pogu kategorijas galvenē; saīsinātiem kategoriju/uzdevumu nosaukumiem hover rāda pilno tekstu tooltip; uzdevumu apraksti kartītēs saglabā textarea rindas pārtraukumus; materiālu delegācija automātiski izveido idempotentu uzdevumu piešķirtajam lietotājam
-- **Darbinieki, instrumenti un laika grafiks** — `/workers`, `/tools`, `/timeline` parastajiem lietotājiem (katrs gated ar atsevišķu frontend moduli un grupas `nav` tiesību); darbiniekiem vārds/uzvārds/telefons un drag-and-drop foto; instrumentiem numurs, nosaukums, iegādes datums, pirkšanas/amortizācijas cena un piesaiste darbiniekam; laika grafikā apstiprinātie projekti automātiski parādās sarkanā joslā ar rediģējamiem datumiem
+- **Darbinieki, instrumenti un laika grafiks** — `/workers`, `/tools`, `/timeline` parastajiem lietotājiem (katrs gated ar atsevišķu frontend moduli un grupas `nav` tiesību); darbiniekiem vārds/uzvārds/telefons, drag-and-drop foto ar upload gaidīšanas modāli un `fa-tools` modālis piesaistīto instrumentu apskatei, kad `module_tools` ir ieslēgts; instrumentiem numurs, nosaukums, iegādes datums un cena, ātra piesaiste darbiniekam no rindas darbības, kompaktā piesaistes vēsture un lokāli atjaunināta tabula bez pilnas lapas pārlādes, bet darbinieka kolonna/piesaistes darbības paslēpjas, kad `module_workers` ir izslēgts; laika grafikā apstiprinātie projekti automātiski parādās sarkanā joslā ar rediģējamiem datumiem
 - **2 sistēmas default profili** (`company_user_groups`): **Administrators** un **Skatītājs**; tos uzņēmuma lietotāji var apskatīt, bet pieejas maina tikai `public.users.is_admin = true`
 - **Uzņēmuma profili** — uzņēmuma administratori var veidot, pārsaukt, dzēst tukšus profilus un mainīt pieejas tikai sava uzņēmuma izveidotajiem profiliem (`037_company_custom_user_groups.sql`)
 - **`/users`** — uzņēmuma lietotāju saraksts ar grupas izvēli, uzaicināšanu, pieejas liegšanu/atjaunošanu (`fa-lock-open` / `fa-lock`) un noņemšanu/pamešanu (`fa-times`) ar `ConfirmModal`
@@ -63,8 +63,8 @@ English routes, Latvian labels:
 - **Sagatave** (`/estimate`) — single company-wide estimate template in Supabase (`estimate_positions`); opens editor table directly (`ensureDefaultEstimatePosition()` creates row if missing); hierarchy like project estimates: **tāmes pozīcija** (category) with **+ Sub** / **+ Multi** / **+ Pozīcija**, optional **subkategorijas**, line items and **multi-pozīcijas** under either level; jaunas kategorijas / subkategorijas — nosaukuma lauks uzreiz saņem fokusu; subkategorijā **acs** `fa-eye` / `fa-eye-slash` (tooltip piedāvājuma redzamas / paslēptas pozīcijas; `hiddenInOffer` JSON) un **fa-stream** (dzeltens ieslēgts — paslēpt pozīciju cenas piedāvājumā; `hiddenPricesInOffer` JSON); **pozīcijām tieši zem kategorijas** (ne sub) — **acs** darbību zonā (`hiddenPriceInOffer`; dzeltens `eye-slash` ieslēgts; acs vienmēr redzama kad cena paslēpta, labot/dzēst tikai hover); **collapse** chevron on category and subcategory rows (state in cookie `eb_estimate_collapsed_{documentId}`); table columns **Nosaukums**, **Mērv.** (automātiski no `moduleSizeAttachment`), **Vienības cena** (6 kolonnas: **Laika norma** · **Darba samaksas likme** · Darbs · Materiāli · Mehānismi · Kopā); **kompozīts modelis** — pozīcija ar `laborTimeNorm`, `materials[]`, `mechanisms[]` (kataloga atsauces masīvi; vairāki materiāli summējas, vairāki mehānismi summējas × laika norma); Darbs = laika norma × stundas likme; **Piezīme** pozīcijas modālī (līdz 255 zīmēm) — redzama web tabulā zem nosaukuma; **Laika norma** tieši rediģējama tabulā (`LaborTimeNormInput` — vienkāršs input, live pārrēķins); pozīciju / multi modāļos — `−`/`+` stepper (0,01, centrēts skaitlis); line-item name **catalog hints** from `/positions`; **darba pozīcijām** — treknraksts + `fa-clipboard-list` **Piesaisīt moduļa lielumu**: modālis ar ēku moduļu `project_description` lielumiem; strukturēts teksts zem nosaukuma (sadaļa · apzīmējums · vērtība); Materiāli/Mehānismi šūnās tooltip ar kataloga nosaukumu (ja vairāki — komatu atdalīti); rinda **sarkanā tonī** + `fa-exclamation-triangle` + teksts **Nav pievienots moduļa apjoms** pozīcijām bez `moduleSizeAttachment`, kad moduļu lielumi definēti; pozīciju modālī slēdzis **Manuāli norādīta mērvienība** (`manualUnitEnabled` / `manualUnit`) ar select no tāmē jau lietotajām mērvienībām — materiāliem ar citu mērvienību rāda patēriņu uz izvēlēto; **multi-pozīcija** — modal editor, drag-reorder options, auto-adds next empty option, duplicate catalog positions blocked **within one multi** only; katras opcijas apakšā cenu kopsāvilkums (Darbs / Materiāli / Mehānismi / Vienības cena); **multi opciju saites** — `fa-link`, velc uz opciju citā multi; saglabā `multiOptionLinks` JSON; drag-and-drop reorder (drag ikona augšpusē garās rindās); **Saglabāt** persists structure + syncs catalog names/units; **unsaved-changes** guard on leave; no footer **Kopā** totals row
 - **Pozicijas** (`/positions`) — **materiālu un mehānismu** unit-price katalogs Supabase (`position_prices`; **Darbs** — no **Uzstādījumi** stundas likmes, ne šeit); searchable sortable table; kompakts **Veids** filtrs zem meklēšanas (**Visi** / **Materiāls** / **Mehānismi**); columns **Nosaukums**, **Veids**, **Cena** (`2.91 EUR / gab.` + update date; bez cenas `- EUR / gab.`), **Darbības**; **Pievienot pozīciju** / **Labot** modals (tikai Materiāls / Mehānismi — cost-type radio above name + unit with hints, 80/20; optional **mainīgs apjoms** toggle — enables editable **Apj.** cell in project estimates for linked rows); **Atjaunot cenu** modal (direct unit price or volume × total calc, supplier store/contact/email/phone, company currency suffixes); **Vēsture** row action opens extra-wide modal with price log (date, amount, “No …” delta, supplier on two lines with phone/email icons); ielādes stāvoklī spinneris pirms **Ielādē vēsturi…**; row zebra striping + muted green hover; supplier **tooltip** on price (`cursor: help`); **Atcelt** on all form modals via `ModalFormActions`; **nosaukums / mērvienība** atjaunināti arī no sagataves vai projekta tāmes, ja rinda saistīta ar katalogu (`positionPriceId` vai unikāla nosaukuma atbilstība)
 - **Neiekļautās pozīcijas** (`/excluded-positions`) — uzņēmuma līmeņa saraksts pozīcijām, kas **nav iekļautas piedāvājumā**; pievienošana pa vienai (nosaukums); drag-and-drop secība; labošana / dzēšana; glabājas `excluded_positions` ar `company_id` (`031`, multi-company scope `035`)
-- **Darbinieki** (`/workers`) — uzņēmuma darbinieku katalogs (`company_workers`) ar vārdu, uzvārdu, telefona lauku un privātu foto caur drag-and-drop (`company-assets` bucket, `/api/workers/photo` proxy); CRUD darbības prasa `workers.manage`
-- **Instrumenti** (`/tools`) — uzņēmuma instrumentu katalogs (`company_tools`) ar unikālu instrumenta numuru, nosaukumu, iegādes datumu, cenu (`purchase` / `amortization`) un piesaisti darbiniekam; CRUD darbības prasa `tools.manage`
+- **Darbinieki** (`/workers`) — uzņēmuma darbinieku katalogs (`company_workers`) ar vārdu, uzvārdu, telefona lauku un privātu foto caur drag-and-drop (`company-assets` bucket, `/api/workers/photo` proxy); foto uploads rāda bloķējošu gaidīšanas modāli un kļūdas caur toast; ja `module_tools` ir ieslēgts, rindā redzama `fa-tools` darbība ar piesaistīto instrumentu tabulu; CRUD darbības prasa `workers.manage`
+- **Instrumenti** (`/tools`) — uzņēmuma instrumentu katalogs (`company_tools`) ar unikālu instrumenta numuru, nosaukumu, iegādes datumu un cenu; izveides modālis nerāda cenas veidu/darbinieku, piesaiste notiek ar `fa-user-plus` darbību un live darbinieku hintiem, vēsture (`company_tool_assignment_history`) redzama kompaktā tabulā ar jaunākajiem ierakstiem augšā; ja `module_workers` ir izslēgts, netiek ielādēti darbinieki un paslēpjas **Darbinieks** kolonna, piesaistes poga un vēstures poga; CRUD darbības prasa `tools.manage`
 - **Laika grafiks** (`/timeline`) — apstiprinātie un pabeigtie projekti tiek sinhronizēti uz `company_timeline_entries` un rādīti sarkanā grafika joslā; sākuma/beigu datumi nāk no tāmes datuma/termiņa un ir labojami ar `timeline.manage`
 - **Lietotāji** — Supabase Auth users + `public.users` profils; uzņēmuma membership, grupas, bloķēšana un noņemšana — skat. **Multi-company users, groups and permissions** augstāk
 - **Uzstādījumi** — company profile (name, address, reg/VAT, bank, contacts, currency, logo, piedāvājuma derīgums un piezīmes)
@@ -222,7 +222,7 @@ npm run db:test
 4. In Supabase → **Authentication → URL Configuration**, set **Site URL** and add **Redirect URLs** for the Vercel domain (see step 5 above)
 5. Run `npm run db:migrate` locally against the production Supabase DB when you add new migrations
 
-**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`; `041`, active language), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), system admin tables (`038` site settings, `040` site user groups, `041` site languages, `042` site translations, `087` site frontend modules), system/company UI translation normalization and seed coverage (`043`–`076`, `088`, `095`–`096`), legacy group cleanup (`039`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, `company_workers`, `company_tools`, `company_timeline_entries`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
+**Schema:** `supabase/migrations/` — `users` (`034`, global `is_admin`; `041`, active language), `companies` / `company_users` / `company_user_groups` / `company_group_members` (`035`), `users.manage_company_access` backfill (`036`), custom company profiles (`037`), system admin tables (`038` site settings, `040` site user groups, `041` site languages, `042` site translations, `087` site frontend modules), system/company UI translation normalization and seed coverage (`043`–`076`, `088`, `095`–`096`, `097`, `099`, `101`–`102`), legacy group cleanup (`039`), `projects` + `estimates` (`company_id`), `estimate_positions`, `position_prices` + `position_price_history`, `excluded_positions`, `building_modules`, `company_settings`, `company_workers`, `company_tools`, `company_tool_assignment_history`, `company_timeline_entries`, legacy `user_groups` + `user_group_members` (`032`–`033`), `schema_migrations`, Storage `company-assets` / `module-assets` (private, company-scoped paths)
 
 ---
 
@@ -300,7 +300,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–096 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules)
+supabase/migrations/    # 001–102 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–102 = worker photo/tool assignment/history translations and limits)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -399,6 +399,35 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.62
+
+**Workers/tools documentation sync**
+
+- README now reflects the completed worker photo upload, worker tools modal, tool assignment, assignment history, and module-flag behavior across Features, schema notes, and project structure
+- `package.json` version bumped for the release documentation pass
+
+### v1.3.61
+
+**Tools respects workers module flag**
+
+- `/tools` now hides the worker column, worker assignment action, and tool history action when `module_workers` is disabled
+- The tools page skips loading workers when the workers module is off, keeping the module boundaries consistent
+
+### v1.3.60
+
+**Worker assigned tools modal**
+
+- `/workers` now shows a `fa-tools` row action when `module_tools` is enabled, opening a compact table of tools assigned to that worker
+- Worker tools UI reuses the tools catalog data on the server and adds seeded translations in migration `102`
+
+### v1.3.59
+
+**Worker photo and tool assignment UX**
+
+- Worker photo uploads now support the 5 MB Server Action/storage limit, show a blocking upload modal, and route upload feedback through toast notifications
+- `/tools` adds fast worker assignment from the row action, optimistic live table updates, compact assignment history, and storage-backed history migrations `100`–`101`
+- Tool create/edit and shared modal footers were tightened: create hides deferred assignment fields, price display is cleaner, avatars are rounded-square, and loading buttons keep stable widths
 
 ### v1.3.58
 
