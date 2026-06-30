@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, configurable excluded-offer positions, workers, tools, and approved-project timeline planning. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, workers, tools, timeline, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.63` (see [Changelog](#changelog))
+**Current version:** `1.3.64` (see [Changelog](#changelog))
 
 ---
 
@@ -141,7 +141,7 @@ English routes, Latvian labels:
 
 ### Requirements
 
-- Node.js 20+
+- Node.js 22.13.0+ (required by `pdfjs-dist@6`)
 - npm
 
 ### Install & run
@@ -399,6 +399,13 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.64
+
+**CI Node engine alignment**
+
+- GitHub Actions now run `npm ci` on Node `22.13.0`, matching `pdfjs-dist@6` engine requirements
+- `package.json`, `package-lock.json`, and README now declare Node `22.13.0+` as the supported runtime
 
 ### v1.3.63
 
