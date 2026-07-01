@@ -15,14 +15,12 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useRouter } from "next/navigation";
 import {
   useCallback,
   useMemo,
   useState,
   useEffect,
   useRef,
-  useTransition,
   type CSSProperties,
   type Dispatch,
   type ReactNode,
@@ -1163,12 +1161,11 @@ export function EstimatePositionTable({
   currency = null,
   moduleSizeOptions = [],
 }: EstimatePositionTableProps) {
-  const router = useRouter();
   const { t } = useTranslations();
   const canSaveSagatave = useActionPermission("sagatave.save");
   const readOnly = !canSaveSagatave;
   const { showFeedback, clearFeedback } = useFeedbackToast();
-  const [isSaving, startSaveTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -1260,19 +1257,14 @@ export function EstimatePositionTable({
     }
 
     clearFeedback();
-    startSaveTransition(async () => {
-      try {
-        const linkedSections = hydrateSectionsWithCatalogLinks(
-          sections,
-          catalogPositions,
-          defaultHourlyRate,
-          buildHydrateCatalogOptions(moduleSizeOptions),
-        );
+    setIsSaving(true);
 
+    void (async () => {
+      try {
         const result = await saveEstimatePositionDocumentAction({
           id: estimatePositionId,
           title,
-          sections: linkedSections,
+          sections,
           multiOptionLinks,
         });
 
@@ -1285,18 +1277,19 @@ export function EstimatePositionTable({
           return;
         }
 
-        setSections(linkedSections);
         const nextSnapshot = serializeEstimatePositionDocument(
           title,
-          linkedSections,
+          result.sections,
           multiOptionLinks,
         );
-        setSavedSnapshot(nextSnapshot);
-        router.refresh();
+
+        setIsSaving(false);
         showFeedback({
           type: "success",
           text: t("estimate_position.feedback.saved", "Tāmes pozīcija saglabāta."),
         });
+        setSections(result.sections);
+        setSavedSnapshot(nextSnapshot);
       } catch (error) {
         console.error("Sagatave save failed:", error);
         if (!mountedRef.current) {
@@ -1309,8 +1302,12 @@ export function EstimatePositionTable({
             "Neizdevās saglabāt tāmes pozīciju.",
           ),
         });
+      } finally {
+        if (mountedRef.current) {
+          setIsSaving(false);
+        }
       }
-    });
+    })();
   }
 
   return (

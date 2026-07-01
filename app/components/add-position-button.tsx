@@ -25,6 +25,7 @@ import {
   DEFAULT_CATALOG_POSITION_COST_TYPE,
   type CatalogPositionCostType,
 } from "@/app/lib/positions/position-cost-type";
+import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 
 
@@ -41,9 +42,8 @@ type FieldErrors = {
 
 
 type AddPositionButtonProps = {
-
   knownUnits: string[];
-
+  onPositionCreated?: (position: PositionPriceSummary) => void;
 };
 
 
@@ -64,7 +64,10 @@ const emptyForm: {
 
 
 
-export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
+export function AddPositionButton({
+  knownUnits,
+  onPositionCreated,
+}: AddPositionButtonProps) {
 
   const router = useRouter();
   const canManage = useActionPermission("positions.manage");
@@ -203,6 +206,14 @@ export function AddPositionButton({ knownUnits }: AddPositionButtonProps) {
       }
 
 
+
+      onPositionCreated?.({
+        id: result.id,
+        name: form.name.trim(),
+        unit: form.unit.trim(),
+        costType: form.costType,
+        variableQuantity: false,
+      });
 
       handleOpenChange(false);
 

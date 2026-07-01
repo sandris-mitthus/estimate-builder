@@ -136,14 +136,28 @@ export function deriveCompositeUnitPrice(
   const mechanisms = roundToTwoDecimals(
     resolveEffectiveMechanisms(item).reduce((sum, ref) => {
       const rate = resolveCatalogRefUnitPrice(ref, catalogPositions);
-      const quantity = ref.consumption ?? 1;
-      const effectiveQuantity =
-        ref.fixedQuantity === true ? quantity : timeNorm * quantity;
-      return sum + roundToTwoDecimals(rate * effectiveQuantity);
+      return (
+        sum + resolveMechanismUnitPriceContribution(ref, item, rate)
+      );
     }, 0),
   );
 
   return { labor, materials, mechanisms };
+}
+
+/** Mehānisma cenas daļa kompozīta vienības cenā (uz 1 pozīcijas mērvienību). */
+export function resolveMechanismUnitPriceContribution(
+  ref: LineItemCatalogRef,
+  item: EstimateLineItem,
+  catalogPrice: number,
+): number {
+  const timeNorm = Number.isFinite(item.laborTimeNorm)
+    ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
+    : 0;
+  const quantity = ref.consumption ?? 1;
+  const effectiveQuantity =
+    ref.fixedQuantity === true ? quantity : timeNorm * quantity;
+  return roundToTwoDecimals(catalogPrice * effectiveQuantity);
 }
 
 export function resolveLineItemHourlyRate(

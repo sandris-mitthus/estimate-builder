@@ -2,7 +2,7 @@
 
 
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AddPositionButton } from "@/app/components/add-position-button";
 
@@ -56,13 +56,22 @@ export function PositionsPageContent({
 }: PositionsPageContentProps) {
   const { t } = useTranslations();
 
+  const [positions, setPositions] = useState(initialPositions);
   const [searchQuery, setSearchQuery] = useState("");
   const [costTypeFilter, setCostTypeFilter] =
     useState<PositionCostTypeFilter>("all");
 
+  useEffect(() => {
+    setPositions(initialPositions);
+  }, [initialPositions]);
+
+  function handlePositionCreated(position: PositionPriceSummary) {
+    setPositions((current) => [...current, position]);
+  }
+
   const catalogPositions = useMemo(
-    () => filterCatalogPositions(initialPositions),
-    [initialPositions],
+    () => filterCatalogPositions(positions),
+    [positions],
   );
 
   const knownUnits = collectKnownUnits(catalogPositions);
@@ -102,7 +111,12 @@ export function PositionsPageContent({
 
       }
 
-      actions={<AddPositionButton knownUnits={knownUnits} />}
+      actions={
+        <AddPositionButton
+          knownUnits={knownUnits}
+          onPositionCreated={handlePositionCreated}
+        />
+      }
 
     >
 

@@ -6,11 +6,10 @@ import {
   appModalExtraWidePanelMaxWidthClassName,
 } from "@/app/components/app-modal";
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
-import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { LineItemCatalogRefSortableList } from "@/app/components/line-item-catalog-ref-sortable-list";
 import { MaterialConsumptionBasisControl } from "@/app/components/material-consumption-basis-control";
-import { MechanismQuantityControl } from "@/app/components/mechanism-quantity-control";
+import { MechanismBasisControl } from "@/app/components/mechanism-basis-control";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
@@ -489,28 +488,20 @@ export function PositionModal({
                   })
                 }
                 renderItem={(mech, index) => (
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
-                    <span className="min-w-0 flex-1 truncate text-zinc-800">
-                      {mech.name}
-                    </span>
-                    <MechanismQuantityControl
-                      quantity={mech.consumption ?? 1}
-                      fixedQuantity={mech.fixedQuantity === true}
-                      unit={mech.unit}
-                      onQuantityChange={(consumption) =>
-                        updateMechanismQuantity(index, consumption)
-                      }
-                      onFixedQuantityChange={(fixedQuantity) =>
-                        updateMechanismFixedQuantity(index, fixedQuantity)
-                      }
-                    />
-                    <IconActionButton
-                      label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
-                      icon="fas fa-times"
-                      variant="delete"
-                      onClick={() => removeMechanism(index)}
-                    />
-                  </div>
+                  <MechanismBasisControl
+                    mechanism={mech}
+                    item={draft}
+                    moduleSizeOptions={moduleSizeOptions}
+                    catalogPositions={catalogPositions}
+                    currency={currency}
+                    onQuantityChange={(consumption) =>
+                      updateMechanismQuantity(index, consumption)
+                    }
+                    onFixedQuantityChange={(fixedQuantity) =>
+                      updateMechanismFixedQuantity(index, fixedQuantity)
+                    }
+                    onRemove={() => removeMechanism(index)}
+                  />
                 )}
               />
               <CatalogHintField

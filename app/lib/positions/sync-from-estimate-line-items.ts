@@ -19,13 +19,43 @@ function normalizeCatalogText(value: string): string {
   return value.trim().toLocaleLowerCase("lv-LV");
 }
 
+export type CatalogLookup = {
+  byId: Map<string, PositionPriceSummary>;
+  byNormalizedName: Map<string, PositionPriceSummary[]>;
+};
+
+export function buildCatalogLookup(
+  catalogPositions: PositionPriceSummary[],
+): CatalogLookup {
+  const byId = new Map<string, PositionPriceSummary>();
+  const byNormalizedName = new Map<string, PositionPriceSummary[]>();
+
+  for (const position of catalogPositions) {
+    byId.set(position.id, position);
+    const key = normalizeCatalogText(position.name);
+    const matches = byNormalizedName.get(key);
+    if (matches) {
+      matches.push(position);
+    } else {
+      byNormalizedName.set(key, [position]);
+    }
+  }
+
+  return { byId, byNormalizedName };
+}
+
 function findCatalogMatchesByName(
   name: string,
   catalogPositions: PositionPriceSummary[],
+  lookup?: CatalogLookup,
 ): PositionPriceSummary[] {
   const normalizedName = normalizeCatalogText(name);
   if (!normalizedName) {
     return [];
+  }
+
+  if (lookup) {
+    return lookup.byNormalizedName.get(normalizedName) ?? [];
   }
 
   return catalogPositions.filter(
@@ -36,17 +66,17 @@ function findCatalogMatchesByName(
 export function resolveLineItemPositionPriceId(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
+  lookup?: CatalogLookup,
 ): string | undefined {
+  const catalogLookup = lookup ?? buildCatalogLookup(catalogPositions);
+
   if (item.positionPriceId) {
-    const linked = catalogPositions.find(
-      (position) => position.id === item.positionPriceId,
-    );
-    if (linked) {
+    if (catalogLookup.byId.has(item.positionPriceId)) {
       return item.positionPriceId;
     }
   }
 
-  const nameMatches = findCatalogMatchesByName(item.name, catalogPositions);
+  const nameMatches = findCatalogMatchesByName(item.name, catalogPositions, catalogLookup);
   if (nameMatches.length === 0) {
     return undefined;
   }
@@ -66,13 +96,19 @@ export function resolveLineItemPositionPriceId(
 export function findCatalogPositionForLineItem(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
+  lookup?: CatalogLookup,
 ): PositionPriceSummary | undefined {
-  const positionPriceId = resolveLineItemPositionPriceId(item, catalogPositions);
+  const positionPriceId = resolveLineItemPositionPriceId(
+    item,
+    catalogPositions,
+    lookup,
+  );
   if (!positionPriceId) {
     return undefined;
   }
 
-  return catalogPositions.find((position) => position.id === positionPriceId);
+  const catalogLookup = lookup ?? buildCatalogLookup(catalogPositions);
+  return catalogLookup.byId.get(positionPriceId);
 }
 
 export function isMaterialsOrMechanismsLineItem(
@@ -115,7 +151,7 @@ export function hydrateLineItemWithCatalog(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
-  options?: { forceCatalogPrices?: boolean },
+  options?: HydrateCatalogLinksOptions,
 ): EstimateLineItem {
   if (isCompositeLineItem(item)) {
     return hydrateCompositeLineItem(
@@ -126,7 +162,11 @@ export function hydrateLineItemWithCatalog(
     );
   }
 
-  const position = findCatalogPositionForLineItem(item, catalogPositions);
+  const position = findCatalogPositionForLineItem(
+    item,
+    catalogPositions,
+    options?.catalogLookup,
+  );
   if (!position) {
     return item;
   }
@@ -174,6 +214,7 @@ export type HydrateCatalogLinksOptions = {
   /** Sagatavē cenas vienmēr no kataloga / iestatījumiem, nevis no saglabātā dokumenta. */
   forceCatalogPrices?: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  catalogLookup?: CatalogLookup;
 };
 
 function hydrateRowsWithCatalog(
@@ -182,6 +223,13 @@ function hydrateRowsWithCatalog(
   defaultHourlyRate: number | null,
   options?: HydrateCatalogLinksOptions,
 ): EstimateRowItem[] {
+  const hydrateOptions = options?.catalogLookup
+    ? options
+    : {
+        ...options,
+        catalogLookup: buildCatalogLookup(catalogPositions),
+      };
+
   return rows.map((row) => {
     if (isEstimateMultiPosition(row)) {
       return {
@@ -192,7 +240,7 @@ function hydrateRowsWithCatalog(
             option.lineItem,
             catalogPositions,
             defaultHourlyRate,
-            options,
+            hydrateOptions,
           ),
         })),
       };
@@ -202,7 +250,7 @@ function hydrateRowsWithCatalog(
       row,
       catalogPositions,
       defaultHourlyRate,
-      options,
+      hydrateOptions,
     );
   });
 }
@@ -218,13 +266,19 @@ export function hydrateSectionsWithCatalogLinks<
   defaultHourlyRate: number | null = null,
   options?: HydrateCatalogLinksOptions,
 ): T[] {
+  const hydrateOptions: HydrateCatalogLinksOptions = {
+    ...options,
+    catalogLookup:
+      options?.catalogLookup ?? buildCatalogLookup(catalogPositions),
+  };
+
   return sections.map((section) => ({
     ...section,
     items: hydrateRowsWithCatalog(
       section.items,
       catalogPositions,
       defaultHourlyRate,
-      options,
+      hydrateOptions,
     ),
     subcategories: (section.subcategories ?? []).map((subcategory) => ({
       ...subcategory,
@@ -232,7 +286,7 @@ export function hydrateSectionsWithCatalogLinks<
         subcategory.items,
         catalogPositions,
         defaultHourlyRate,
-        options,
+        hydrateOptions,
       ),
     })),
   }));

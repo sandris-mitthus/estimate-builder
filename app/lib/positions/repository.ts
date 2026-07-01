@@ -80,6 +80,33 @@ export const listPositionPrices = cache(async function listPositionPrices(): Pro
   return enrichPositionPricesWithLatestHistory(positions);
 });
 
+/** Katalogs sagataves saglabāšanai / hidratācijai — bez vēstures vaicājuma. */
+export const listPositionPricesForHydration = cache(
+  async function listPositionPricesForHydration(): Promise<PositionPriceSummary[]> {
+    if (!isSupabaseAdminConfigured()) {
+      return SAMPLE_POSITION_PRICES;
+    }
+
+    const companyId = await getCurrentCompanyId();
+    if (!companyId) {
+      return SAMPLE_POSITION_PRICES;
+    }
+
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("position_prices")
+      .select("id, name, unit, cost_type, unit_price, variable_quantity")
+      .eq("company_id", companyId)
+      .order("name", { ascending: true });
+
+    if (error || !data) {
+      return SAMPLE_POSITION_PRICES;
+    }
+
+    return data.map((row) => mapPositionPrice(row as PositionPriceRow));
+  },
+);
+
 async function enrichPositionPricesWithLatestHistory(
   positions: PositionPriceSummary[],
 ): Promise<PositionPriceSummary[]> {
@@ -268,6 +295,54 @@ export async function updatePositionNameAndUnit(input: {
   }
 
   return { ok: true };
+}
+
+export async function batchUpdatePositionNamesAndUnits(
+  updates: ReadonlyArray<{ id: string; name: string; unit: string }>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (updates.length === 0) {
+    return { ok: true };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const results = await Promise.all(
+    updates.map(async (update) => {
+      const name = update.name.trim();
+      const unit = update.unit.trim();
+
+      if (!name) {
+        return { ok: false as const, error: "Ievadi nosaukumu." };
+      }
+
+      if (!unit) {
+        return { ok: false as const, error: "Ievadi mērvienību." };
+      }
+
+      const { error } = await supabase
+        .from("position_prices")
+        .update({ name, unit })
+        .eq("id", update.id)
+        .eq("company_id", companyId);
+
+      if (error) {
+        return { ok: false as const, error: "Neizdevās saglabāt pozīciju." };
+      }
+
+      return { ok: true as const };
+    }),
+  );
+
+  const failed = results.find((result) => !result.ok);
+  return failed ?? { ok: true };
 }
 
 export async function updatePositionPrice(
