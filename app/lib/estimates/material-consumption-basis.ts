@@ -215,12 +215,12 @@ export function defaultMaterialConsumptionVolumeAttachment(
 export function flattenModuleSizeSelectOptions(
   moduleSizeOptions: BuildingModuleSizeOption[],
 ) {
-  const module = moduleSizeOptions[0];
-  if (!module) {
+  const firstModuleOption = moduleSizeOptions[0];
+  if (!firstModuleOption) {
     return [];
   }
 
-  return module.sections.flatMap((section) =>
+  return firstModuleOption.sections.flatMap((section) =>
     section.items.map((entry) => ({
       key: entry.key,
       label: entry.label,

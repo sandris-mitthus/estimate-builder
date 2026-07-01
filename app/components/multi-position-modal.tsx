@@ -190,25 +190,6 @@ export function MultiPositionModal({
   );
   const dirty = currentSnapshot !== initialSnapshot;
 
-  // Pozīcijas mērvienība no vienotā moduļa apjoma (piem. m²). Tikai tad var ievadīt patēriņu.
-  const positionUnit = useMemo(
-    () =>
-      attachment
-        ? resolveLineItemDisplayUnitFromModuleSize(
-            {
-              id: "preview",
-              name: "",
-              unit: "gab.",
-              quantity: 1,
-              unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
-              moduleSizeAttachment: attachment,
-            },
-            moduleSizeOptions,
-          )
-        : null,
-    [attachment, moduleSizeOptions],
-  );
-
   function updateOption(optionId: string, updates: Partial<OptionDraft>) {
     setOptions((current) =>
       current.map((entry) =>

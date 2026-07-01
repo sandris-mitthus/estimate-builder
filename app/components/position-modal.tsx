@@ -33,7 +33,6 @@ import {
 } from "@/app/lib/estimates/composite-line-item";
 import { buildManualUnitSelectOptions } from "@/app/lib/estimates/collect-estimate-document-units";
 import {
-  resolveCompositeLineItemDisplayUnit,
   resolveLineItemDisplayUnitFromModuleSize,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
@@ -289,7 +288,6 @@ export function PositionModal({
     () => buildExcludedCatalogKeysFromRefs(draftMechanisms),
     [draftMechanisms],
   );
-  const positionUnit = resolveCompositeLineItemDisplayUnit(draft, moduleSizeOptions);
   const manualUnitOptions = useMemo(
     () => buildManualUnitSelectOptions(estimateUnits),
     [estimateUnits],

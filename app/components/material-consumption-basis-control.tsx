@@ -116,7 +116,7 @@ export function MaterialConsumptionBasisControl({
 
   useEffect(() => {
     setCustomVolumeActive(hasMaterialCustomConsumptionVolume(material));
-  }, [material.consumptionVolumeAttachment, material.positionPriceId]);
+  }, [material]);
 
   function handleCustomVolumeToggle(enabled: boolean) {
     if (!enabled) {
