@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
-import { addThousandSeparators, roundToTwoDecimals, sumBreakdown } from "@/app/lib/estimates/calculate-line";
+import { formatDecimalDisplay, roundToTwoDecimals, sumBreakdown } from "@/app/lib/estimates/calculate-line";
 import {
   calculateEstimateTotals,
   resolveEstimateLineItemPrices,
@@ -126,7 +126,7 @@ const s = StyleSheet.create({
 
 function fmtMoney(value: number, currency: string | null | undefined): string {
   if (!Number.isFinite(value) || value === 0) return "\u2014";
-  return `${getCurrencySymbol(currency)} ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
+  return `${getCurrencySymbol(currency)} ${formatDecimalDisplay(value)}`;
 }
 
 function resolveItemGrand(

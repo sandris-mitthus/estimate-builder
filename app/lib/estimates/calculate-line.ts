@@ -13,6 +13,13 @@ export function addThousandSeparators(formatted: string): string {
   return intFormatted + decPart;
 }
 
+export function formatDecimalDisplay(value: number): string {
+  return addThousandSeparators(roundToTwoDecimals(value).toFixed(2)).replace(
+    ".",
+    ",",
+  );
+}
+
 export function sumBreakdown(values: PriceBreakdown): number {
   return values.labor + values.materials + values.mechanisms;
 }
@@ -39,8 +46,8 @@ export function roundToTwoDecimals(value: number): number {
 }
 
 export function formatAmount(value: number): string {
-  if (!Number.isFinite(value)) return "0.00";
-  return addThousandSeparators(roundToTwoDecimals(value).toFixed(2));
+  if (!Number.isFinite(value)) return "0,00";
+  return formatDecimalDisplay(value);
 }
 
 export function isAmountDisplayEmpty(value: number): boolean {
@@ -53,5 +60,5 @@ export function formatAmountDisplay(value: number): string {
     return "—";
   }
 
-  return addThousandSeparators(roundToTwoDecimals(value).toFixed(2));
+  return formatDecimalDisplay(value);
 }

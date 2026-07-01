@@ -135,7 +135,11 @@ const actionBtn =
 const rowActionCell =
   "border-b border-zinc-100 px-1 py-0.5 text-right align-top";
 
-const hydrateCatalogPrices = { forceCatalogPrices: true } as const;
+function buildHydrateCatalogOptions(
+  moduleSizeOptions: BuildingModuleSizeOption[],
+) {
+  return { forceCatalogPrices: true as const, moduleSizeOptions };
+}
 
 type OpenMultiPositionModal = (
   value: EstimateMultiPosition,
@@ -271,6 +275,7 @@ function LineItemRow({
           item,
           catalogPositions,
           defaultHourlyRate,
+          moduleSizeOptions,
         )}
         onTimeNormChange={(laborTimeNorm) =>
           onChange(
@@ -279,6 +284,7 @@ function LineItemRow({
               laborTimeNorm,
               catalogPositions,
               defaultHourlyRate,
+              moduleSizeOptions,
             ),
           )
         }
@@ -1177,7 +1183,7 @@ export function EstimatePositionTable({
         initialSections.map(ensureSectionHasLineItem),
         catalogPositions,
         defaultHourlyRate,
-        hydrateCatalogPrices,
+        buildHydrateCatalogOptions(moduleSizeOptions),
       ),
     // Sagataves sākuma stāvoklis — tikai pirmā mount vērtība no servera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1255,41 +1261,55 @@ export function EstimatePositionTable({
 
     clearFeedback();
     startSaveTransition(async () => {
-      const linkedSections = hydrateSectionsWithCatalogLinks(
-        sections,
-        catalogPositions,
-        defaultHourlyRate,
-        hydrateCatalogPrices,
-      );
+      try {
+        const linkedSections = hydrateSectionsWithCatalogLinks(
+          sections,
+          catalogPositions,
+          defaultHourlyRate,
+          buildHydrateCatalogOptions(moduleSizeOptions),
+        );
 
-      const result = await saveEstimatePositionDocumentAction({
-        id: estimatePositionId,
-        title,
-        sections: linkedSections,
-        multiOptionLinks,
-      });
+        const result = await saveEstimatePositionDocumentAction({
+          id: estimatePositionId,
+          title,
+          sections: linkedSections,
+          multiOptionLinks,
+        });
 
-      if (!mountedRef.current) {
-        return;
+        if (!mountedRef.current) {
+          return;
+        }
+
+        if (!result.ok) {
+          showFeedback({ type: "error", text: translateActionError(t, result) });
+          return;
+        }
+
+        setSections(linkedSections);
+        const nextSnapshot = serializeEstimatePositionDocument(
+          title,
+          linkedSections,
+          multiOptionLinks,
+        );
+        setSavedSnapshot(nextSnapshot);
+        router.refresh();
+        showFeedback({
+          type: "success",
+          text: t("estimate_position.feedback.saved", "Tāmes pozīcija saglabāta."),
+        });
+      } catch (error) {
+        console.error("Sagatave save failed:", error);
+        if (!mountedRef.current) {
+          return;
+        }
+        showFeedback({
+          type: "error",
+          text: t(
+            "errors.estimate_position_save_failed",
+            "Neizdevās saglabāt tāmes pozīciju.",
+          ),
+        });
       }
-
-      if (!result.ok) {
-        showFeedback({ type: "error", text: translateActionError(t, result) });
-        return;
-      }
-
-      setSections(linkedSections);
-      const nextSnapshot = serializeEstimatePositionDocument(
-        title,
-        linkedSections,
-        multiOptionLinks,
-      );
-      setSavedSnapshot(nextSnapshot);
-      router.refresh();
-      showFeedback({
-        type: "success",
-        text: t("estimate_position.feedback.saved", "Tāmes pozīcija saglabāta."),
-      });
     });
   }
 

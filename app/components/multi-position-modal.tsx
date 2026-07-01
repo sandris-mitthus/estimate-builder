@@ -8,7 +8,9 @@ import {
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
-import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
+import { LineItemCatalogRefSortableList } from "@/app/components/line-item-catalog-ref-sortable-list";
+import { MaterialConsumptionBasisControl } from "@/app/components/material-consumption-basis-control";
+import { MechanismQuantityControl } from "@/app/components/mechanism-quantity-control";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
@@ -22,6 +24,7 @@ import {
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
 import {
+  buildExcludedCatalogKeysFromRefs,
   deriveCompositeUnitPrice,
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
@@ -121,6 +124,25 @@ function snapshot(state: {
       mechanisms: option.mechanisms,
     })),
   });
+}
+
+function buildOptionPreviewLineItem(
+  option: OptionDraft,
+  sharedAttachment: LineItemModuleSizeAttachment | null,
+): EstimateLineItem {
+  return {
+    id: option.lineItemId,
+    name: option.label,
+    unit: "gab.",
+    quantity: 1,
+    unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
+    laborTimeNorm: option.timeNorm,
+    customHourlyRateEnabled: option.customHourlyRateEnabled,
+    customHourlyRate: option.customHourlyRate,
+    materials: option.materials,
+    mechanisms: option.mechanisms,
+    moduleSizeAttachment: sharedAttachment ?? undefined,
+  };
 }
 
 export function MultiPositionModal({
@@ -241,6 +263,30 @@ export function MultiPositionModal({
     );
   }
 
+  function updateMaterialVolumeAttachment(
+    optionId: string,
+    index: number,
+    volumeAttachment: LineItemModuleSizeAttachment | null,
+  ) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              materials: entry.materials.map((mat, i) =>
+                i === index
+                  ? {
+                      ...mat,
+                      consumptionVolumeAttachment: volumeAttachment ?? undefined,
+                    }
+                  : mat,
+              ),
+            }
+          : entry,
+      ),
+    );
+  }
+
   function addMechanism(optionId: string, ref: LineItemCatalogRef) {
     setOptions((current) =>
       current.map((entry) =>
@@ -268,22 +314,52 @@ export function MultiPositionModal({
     );
   }
 
+  function updateMechanismQuantity(
+    optionId: string,
+    index: number,
+    consumption: number,
+  ) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              mechanisms: entry.mechanisms.map((mech, i) =>
+                i === index ? { ...mech, consumption } : mech,
+              ),
+            }
+          : entry,
+      ),
+    );
+  }
+
+  function updateMechanismFixedQuantity(
+    optionId: string,
+    index: number,
+    fixedQuantity: boolean,
+  ) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              mechanisms: entry.mechanisms.map((mech, i) =>
+                i === index
+                  ? { ...mech, fixedQuantity: fixedQuantity || undefined }
+                  : mech,
+              ),
+            }
+          : entry,
+      ),
+    );
+  }
+
   function optionUnitPrice(option: OptionDraft) {
     return deriveCompositeUnitPrice(
-      {
-        id: "preview",
-        name: "",
-        unit: "gab.",
-        quantity: 1,
-        unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
-        laborTimeNorm: option.timeNorm,
-        customHourlyRateEnabled: option.customHourlyRateEnabled,
-        customHourlyRate: option.customHourlyRate,
-        materials: option.materials,
-        mechanisms: option.mechanisms,
-      },
+      buildOptionPreviewLineItem(option, attachment),
       catalogPositions,
       defaultHourlyRate,
+      moduleSizeOptions,
     );
   }
 
@@ -336,6 +412,7 @@ export function MultiPositionModal({
             lineItem,
             catalogPositions,
             defaultHourlyRate,
+            moduleSizeOptions,
           ),
         },
       };
@@ -503,58 +580,43 @@ export function MultiPositionModal({
                     <div>
                       <span className={subLabelClassName}>{t("estimate.column.materials", "Materiāli")}</span>
                       <div className="space-y-1.5">
-                        {option.materials.map((mat, matIdx) => {
-                          const showConsumption =
-                            positionUnit != null &&
-                            mat.unit.trim() !== positionUnit;
-                          return (
-                            <div
-                              key={`${mat.positionPriceId}-${matIdx}`}
-                              className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                            >
-                              <span className="min-w-0 flex-1 truncate text-zinc-800">
-                                {mat.name}
-                              </span>
-                              {showConsumption ? (
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <MaterialConsumptionInput
-                                    value={mat.consumption ?? 1}
-                                    onChange={(consumption) =>
-                                      updateMaterialConsumption(
-                                        option.optionId,
-                                        matIdx,
-                                        consumption,
-                                      )
-                                    }
-                                    aria-label={t(
-                                      "estimate.material_consumption.aria",
-                                      "Patēriņš {unit} uz {positionUnit}",
-                                      {
-                                        unit: mat.unit,
-                                        positionUnit: positionUnit ?? "",
-                                      },
-                                    )}
-                                  />
-                                  <span className="text-xs text-zinc-400">
-                                    {mat.unit}/{positionUnit}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="shrink-0 text-xs text-zinc-400">
-                                  {mat.unit}
-                                </span>
-                              )}
-                              <IconActionButton
-                                label={t("estimate.materials.remove", "Noņemt materiālu")}
-                                icon="fas fa-times"
-                                variant="delete"
-                                onClick={() =>
-                                  removeMaterial(option.optionId, matIdx)
-                                }
-                              />
-                            </div>
-                          );
-                        })}
+                        <LineItemCatalogRefSortableList
+                          items={option.materials}
+                          onReorder={(materials) =>
+                            updateOption(option.optionId, { materials })
+                          }
+                          getDragLabel={(mat) =>
+                            t("estimate.drag.material", "Pārvietot materiālu: {name}", {
+                              name: mat.name,
+                            })
+                          }
+                          renderItem={(mat, matIdx) => (
+                            <MaterialConsumptionBasisControl
+                              material={mat}
+                              item={buildOptionPreviewLineItem(option, attachment)}
+                              moduleSizeOptions={moduleSizeOptions}
+                              catalogPositions={catalogPositions}
+                              currency={currency}
+                              onConsumptionChange={(consumption) =>
+                                updateMaterialConsumption(
+                                  option.optionId,
+                                  matIdx,
+                                  consumption,
+                                )
+                              }
+                              onVolumeAttachmentChange={(volumeAttachment) =>
+                                updateMaterialVolumeAttachment(
+                                  option.optionId,
+                                  matIdx,
+                                  volumeAttachment,
+                                )
+                              }
+                              onRemove={() =>
+                                removeMaterial(option.optionId, matIdx)
+                              }
+                            />
+                          )}
+                        />
                         <CatalogHintField
                           key={`${option.optionId}-mat-${option.materialAddKey}`}
                           value={null}
@@ -562,6 +624,9 @@ export function MultiPositionModal({
                             if (ref) addMaterial(option.optionId, ref);
                           }}
                           catalogPositions={materialPositions}
+                          excludedCatalogKeys={buildExcludedCatalogKeysFromRefs(
+                            option.materials,
+                          )}
                           defaultHourlyRate={defaultHourlyRate}
                           placeholder={t("estimate.materials.add_placeholder", "Pievienot materiālu...")}
                         />
@@ -572,27 +637,51 @@ export function MultiPositionModal({
                     <div>
                       <span className={subLabelClassName}>{t("estimate.column.mechanisms", "Mehānismi")}</span>
                       <div className="space-y-1.5">
-                        {option.mechanisms.map((mech, mechIdx) => (
-                          <div
-                            key={`${mech.positionPriceId}-${mechIdx}`}
-                            className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                          >
-                            <span className="min-w-0 flex-1 truncate text-zinc-800">
-                              {mech.name}
-                            </span>
-                            <span className="shrink-0 text-xs text-zinc-400">
-                              {mech.unit}
-                            </span>
-                            <IconActionButton
-                              label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
-                              icon="fas fa-times"
-                              variant="delete"
-                              onClick={() =>
-                                removeMechanism(option.optionId, mechIdx)
-                              }
-                            />
-                          </div>
-                        ))}
+                        <LineItemCatalogRefSortableList
+                          items={option.mechanisms}
+                          onReorder={(mechanisms) =>
+                            updateOption(option.optionId, { mechanisms })
+                          }
+                          getDragLabel={(mech) =>
+                            t("estimate.drag.mechanism", "Pārvietot mehānismu: {name}", {
+                              name: mech.name,
+                            })
+                          }
+                          renderItem={(mech, mechIdx) => (
+                            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
+                              <span className="min-w-0 flex-1 truncate text-zinc-800">
+                                {mech.name}
+                              </span>
+                              <MechanismQuantityControl
+                                quantity={mech.consumption ?? 1}
+                                fixedQuantity={mech.fixedQuantity === true}
+                                unit={mech.unit}
+                                onQuantityChange={(consumption) =>
+                                  updateMechanismQuantity(
+                                    option.optionId,
+                                    mechIdx,
+                                    consumption,
+                                  )
+                                }
+                                onFixedQuantityChange={(fixedQuantity) =>
+                                  updateMechanismFixedQuantity(
+                                    option.optionId,
+                                    mechIdx,
+                                    fixedQuantity,
+                                  )
+                                }
+                              />
+                              <IconActionButton
+                                label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
+                                icon="fas fa-times"
+                                variant="delete"
+                                onClick={() =>
+                                  removeMechanism(option.optionId, mechIdx)
+                                }
+                              />
+                            </div>
+                          )}
+                        />
                         <CatalogHintField
                           key={`${option.optionId}-mech-${option.mechanismAddKey}`}
                           value={null}
@@ -600,6 +689,9 @@ export function MultiPositionModal({
                             if (ref) addMechanism(option.optionId, ref);
                           }}
                           catalogPositions={mechanismPositions}
+                          excludedCatalogKeys={buildExcludedCatalogKeysFromRefs(
+                            option.mechanisms,
+                          )}
                           defaultHourlyRate={defaultHourlyRate}
                           placeholder={t("estimate.mechanisms.add_placeholder", "Pievienot mehānismu...")}
                         />

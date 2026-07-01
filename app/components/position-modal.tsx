@@ -8,7 +8,9 @@ import {
 import { CatalogHintField } from "@/app/components/catalog-hint-field";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
-import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
+import { LineItemCatalogRefSortableList } from "@/app/components/line-item-catalog-ref-sortable-list";
+import { MaterialConsumptionBasisControl } from "@/app/components/material-consumption-basis-control";
+import { MechanismQuantityControl } from "@/app/components/mechanism-quantity-control";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
@@ -24,6 +26,7 @@ import {
 } from "@/app/lib/estimates/calculate-line";
 import { getCurrencySymbol } from "@/app/lib/settings/currencies";
 import {
+  buildExcludedCatalogKeysFromRefs,
   deriveCompositeUnitPrice,
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
@@ -129,8 +132,14 @@ export function PositionModal({
   );
 
   const unitPrice = useMemo(
-    () => deriveCompositeUnitPrice(draft, catalogPositions, defaultHourlyRate),
-    [draft, catalogPositions, defaultHourlyRate],
+    () =>
+      deriveCompositeUnitPrice(
+        draft,
+        catalogPositions,
+        defaultHourlyRate,
+        moduleSizeOptions,
+      ),
+    [draft, catalogPositions, defaultHourlyRate, moduleSizeOptions],
   );
   const unitTotal = sumBreakdown(unitPrice);
   const draftSnapshot = useMemo(() => snapshot(draft), [draft]);
@@ -141,33 +150,79 @@ export function PositionModal({
   }
 
   function removeMaterial(index: number) {
-    patch({
-      materials: (draft.materials ?? []).filter((_, i) => i !== index),
-    });
+    setDraft((current) => ({
+      ...current,
+      materials: (current.materials ?? []).filter((_, i) => i !== index),
+    }));
   }
 
   function addMaterial(ref: LineItemCatalogRef) {
-    patch({ materials: [...(draft.materials ?? []), ref] });
+    setDraft((current) => ({
+      ...current,
+      materials: [...(current.materials ?? []), ref],
+    }));
     setMaterialAddKey((k) => k + 1);
   }
 
   function updateMaterialConsumption(index: number, consumption: number) {
-    patch({
-      materials: (draft.materials ?? []).map((mat, i) =>
+    setDraft((current) => ({
+      ...current,
+      materials: (current.materials ?? []).map((mat, i) =>
         i === index ? { ...mat, consumption } : mat,
       ),
-    });
+    }));
+  }
+
+  function updateMaterialVolumeAttachment(
+    index: number,
+    attachment: LineItemModuleSizeAttachment | null,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      materials: (current.materials ?? []).map((mat, i) =>
+        i === index
+          ? {
+              ...mat,
+              consumptionVolumeAttachment: attachment ?? undefined,
+            }
+          : mat,
+      ),
+    }));
   }
 
   function removeMechanism(index: number) {
-    patch({
-      mechanisms: (draft.mechanisms ?? []).filter((_, i) => i !== index),
-    });
+    setDraft((current) => ({
+      ...current,
+      mechanisms: (current.mechanisms ?? []).filter((_, i) => i !== index),
+    }));
   }
 
   function addMechanism(ref: LineItemCatalogRef) {
-    patch({ mechanisms: [...(draft.mechanisms ?? []), ref] });
+    setDraft((current) => ({
+      ...current,
+      mechanisms: [...(current.mechanisms ?? []), ref],
+    }));
     setMechanismAddKey((k) => k + 1);
+  }
+
+  function updateMechanismQuantity(index: number, consumption: number) {
+    setDraft((current) => ({
+      ...current,
+      mechanisms: (current.mechanisms ?? []).map((mech, i) =>
+        i === index ? { ...mech, consumption } : mech,
+      ),
+    }));
+  }
+
+  function updateMechanismFixedQuantity(index: number, fixedQuantity: boolean) {
+    setDraft((current) => ({
+      ...current,
+      mechanisms: (current.mechanisms ?? []).map((mech, i) =>
+        i === index
+          ? { ...mech, fixedQuantity: fixedQuantity || undefined }
+          : mech,
+      ),
+    }));
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -216,6 +271,7 @@ export function PositionModal({
         draft,
         catalogPositions,
         defaultHourlyRate,
+        moduleSizeOptions,
       ),
     };
 
@@ -225,10 +281,18 @@ export function PositionModal({
 
   const draftMaterials = resolveEffectiveMaterials(draft);
   const draftMechanisms = resolveEffectiveMechanisms(draft);
+  const excludedMaterialCatalogKeys = useMemo(
+    () => buildExcludedCatalogKeysFromRefs(draftMaterials),
+    [draftMaterials],
+  );
+  const excludedMechanismCatalogKeys = useMemo(
+    () => buildExcludedCatalogKeysFromRefs(draftMechanisms),
+    [draftMechanisms],
+  );
   const positionUnit = resolveCompositeLineItemDisplayUnit(draft, moduleSizeOptions);
   const manualUnitOptions = useMemo(
-    () => buildManualUnitSelectOptions(estimateUnits, draft.manualUnit ?? ""),
-    [estimateUnits, draft.manualUnit],
+    () => buildManualUnitSelectOptions(estimateUnits),
+    [estimateUnits],
   );
 
   function handleManualUnitEnabledChange(manualUnitEnabled: boolean) {
@@ -354,48 +418,31 @@ export function PositionModal({
           <div>
             <span className={labelClassName}>{t("estimate.column.materials", "Materiāli")}</span>
             <div className="space-y-1.5">
-              {draftMaterials.map((mat, index) => {
-                const showConsumption =
-                  positionUnit != null &&
-                  mat.unit.trim() !== positionUnit;
-                return (
-                  <div
-                    key={`${mat.positionPriceId}-${index}`}
-                    className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-zinc-800">
-                      {mat.name}
-                    </span>
-                    {showConsumption ? (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <MaterialConsumptionInput
-                          value={mat.consumption ?? 1}
-                          onChange={(consumption) =>
-                            updateMaterialConsumption(index, consumption)
-                          }
-                          aria-label={t("estimate.material_consumption.aria", "Patēriņš {unit} uz {positionUnit}", {
-                            unit: mat.unit,
-                            positionUnit: positionUnit ?? "",
-                          })}
-                        />
-                        <span className="text-xs text-zinc-400">
-                          {mat.unit}/{positionUnit}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="shrink-0 text-xs text-zinc-400">
-                        {mat.unit}
-                      </span>
-                    )}
-                    <IconActionButton
-                      label={t("estimate.materials.remove", "Noņemt materiālu")}
-                      icon="fas fa-times"
-                      variant="delete"
-                      onClick={() => removeMaterial(index)}
-                    />
-                  </div>
-                );
-              })}
+              <LineItemCatalogRefSortableList
+                items={draftMaterials}
+                onReorder={(materials) => patch({ materials })}
+                getDragLabel={(mat) =>
+                  t("estimate.drag.material", "Pārvietot materiālu: {name}", {
+                    name: mat.name,
+                  })
+                }
+                renderItem={(mat, index) => (
+                  <MaterialConsumptionBasisControl
+                    material={mat}
+                    item={draft}
+                    moduleSizeOptions={moduleSizeOptions}
+                    catalogPositions={catalogPositions}
+                    currency={currency}
+                    onConsumptionChange={(consumption) =>
+                      updateMaterialConsumption(index, consumption)
+                    }
+                    onVolumeAttachmentChange={(attachment) =>
+                      updateMaterialVolumeAttachment(index, attachment)
+                    }
+                    onRemove={() => removeMaterial(index)}
+                  />
+                )}
+              />
               <CatalogHintField
                 key={materialAddKey}
                 value={null}
@@ -403,6 +450,7 @@ export function PositionModal({
                   if (ref) addMaterial(ref);
                 }}
                 catalogPositions={materialPositions}
+                excludedCatalogKeys={excludedMaterialCatalogKeys}
                 defaultHourlyRate={defaultHourlyRate}
                 placeholder={t("estimate.materials.add_placeholder", "Pievienot materiālu...")}
               />
@@ -413,25 +461,39 @@ export function PositionModal({
           <div>
             <span className={labelClassName}>{t("estimate.column.mechanisms", "Mehānismi")}</span>
             <div className="space-y-1.5">
-              {draftMechanisms.map((mech, index) => (
-                <div
-                  key={`${mech.positionPriceId}-${index}`}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate text-zinc-800">
-                    {mech.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-zinc-400">
-                    {mech.unit}
-                  </span>
-                  <IconActionButton
-                    label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
-                    icon="fas fa-times"
-                    variant="delete"
-                    onClick={() => removeMechanism(index)}
-                  />
-                </div>
-              ))}
+              <LineItemCatalogRefSortableList
+                items={draftMechanisms}
+                onReorder={(mechanisms) => patch({ mechanisms })}
+                getDragLabel={(mech) =>
+                  t("estimate.drag.mechanism", "Pārvietot mehānismu: {name}", {
+                    name: mech.name,
+                  })
+                }
+                renderItem={(mech, index) => (
+                  <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-zinc-800">
+                      {mech.name}
+                    </span>
+                    <MechanismQuantityControl
+                      quantity={mech.consumption ?? 1}
+                      fixedQuantity={mech.fixedQuantity === true}
+                      unit={mech.unit}
+                      onQuantityChange={(consumption) =>
+                        updateMechanismQuantity(index, consumption)
+                      }
+                      onFixedQuantityChange={(fixedQuantity) =>
+                        updateMechanismFixedQuantity(index, fixedQuantity)
+                      }
+                    />
+                    <IconActionButton
+                      label={t("estimate.mechanisms.remove", "Noņemt mehānismu")}
+                      icon="fas fa-times"
+                      variant="delete"
+                      onClick={() => removeMechanism(index)}
+                    />
+                  </div>
+                )}
+              />
               <CatalogHintField
                 key={mechanismAddKey}
                 value={null}
@@ -439,6 +501,7 @@ export function PositionModal({
                   if (ref) addMechanism(ref);
                 }}
                 catalogPositions={mechanismPositions}
+                excludedCatalogKeys={excludedMechanismCatalogKeys}
                 defaultHourlyRate={defaultHourlyRate}
                 placeholder={t("estimate.mechanisms.add_placeholder", "Pievienot mehānismu...")}
               />

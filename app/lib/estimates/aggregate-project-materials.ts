@@ -7,6 +7,7 @@ import {
   resolveCatalogRefUnitPrice,
   resolveEffectiveMaterials,
 } from "@/app/lib/estimates/composite-line-item";
+import { resolveMaterialTotalQuantity } from "@/app/lib/estimates/material-consumption-basis";
 import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
 import { resolveLineItemDisplayQuantityFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
@@ -91,15 +92,21 @@ function addContribution(
 
 function contributionFromCatalogRef(
   ref: LineItemCatalogRef,
+  item: EstimateLineItem,
   positionQuantity: number,
   unitPrice: number,
+  moduleSizeOptions: BuildingModuleSizeOption[],
 ): MaterialContribution | null {
   if (unitPrice <= 0) {
     return null;
   }
 
-  const consumption = ref.consumption ?? 1;
-  const quantity = roundQuantity(positionQuantity * consumption);
+  const quantity = resolveMaterialTotalQuantity(
+    ref,
+    item,
+    positionQuantity,
+    moduleSizeOptions,
+  );
   const budgetTotal = roundToTwoDecimals(quantity * unitPrice);
 
   return {
@@ -166,7 +173,13 @@ function collectCompositeMaterialContributions(
         ? resolveFrozenCompositeMaterialUnitPrice(ref, item, catalogPositions)
         : resolveCatalogRefUnitPrice(ref, catalogPositions);
 
-      return contributionFromCatalogRef(ref, positionQuantity, unitPrice);
+      return contributionFromCatalogRef(
+        ref,
+        item,
+        positionQuantity,
+        unitPrice,
+        moduleSizeOptions,
+      );
     })
     .filter((entry): entry is MaterialContribution => entry != null);
 }

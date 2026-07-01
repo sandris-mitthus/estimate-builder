@@ -8,6 +8,7 @@ import { requireAction } from "@/app/lib/auth/require-permission";
 import { collectSectionLineItems } from "@/app/lib/estimate-positions/collect-section-items";
 import { saveEstimatePositionDocument } from "@/app/lib/estimate-positions/repository";
 import type { SaveEstimatePositionDocumentInput } from "@/app/lib/estimate-positions/types";
+import { listBuildingModuleSizeOptions } from "@/app/lib/modules/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { syncEstimateLineItemsToCatalog } from "@/app/lib/positions/sync-estimate-line-items-to-catalog";
 import { hydrateSectionsWithCatalogLinks } from "@/app/lib/positions/sync-from-estimate-line-items";
@@ -28,40 +29,47 @@ export async function saveEstimatePositionDocumentAction(
   input: SaveEstimatePositionDocumentInput,
 
 ) {
-  const { denied } = await requireAction("sagatave.save");
-  if (denied) return denied;
+  try {
+    const { denied } = await requireAction("sagatave.save");
+    if (denied) return denied;
 
-  const [catalogPositions, companySettings] = await Promise.all([
-    listPositionPrices(),
-    getCompanySettings(),
-  ]);
-  const sections = hydrateSectionsWithCatalogLinks(
-    input.sections,
-    catalogPositions,
-    companySettings.defaultHourlyRate,
-    { forceCatalogPrices: true },
-  );
-  const result = await saveEstimatePositionDocument({
-    ...input,
-    sections,
-  });
-
-  if (result.ok) {
-    const syncResult = await syncEstimateLineItemsToCatalog(
-      collectSectionLineItems(sections),
+    const [catalogPositions, companySettings, moduleSizeOptions] =
+      await Promise.all([
+        listPositionPrices(),
+        getCompanySettings(),
+        listBuildingModuleSizeOptions(),
+      ]);
+    const sections = hydrateSectionsWithCatalogLinks(
+      input.sections,
       catalogPositions,
+      companySettings.defaultHourlyRate,
+      { forceCatalogPrices: true, moduleSizeOptions },
     );
+    const result = await saveEstimatePositionDocument({
+      ...input,
+      sections,
+    });
 
-    if (!syncResult.ok) {
-      return syncResult;
+    if (result.ok) {
+      const syncResult = await syncEstimateLineItemsToCatalog(
+        collectSectionLineItems(sections),
+        catalogPositions,
+      );
+
+      if (!syncResult.ok) {
+        return syncResult;
+      }
+
+      revalidateSagatave();
     }
 
-    revalidateSagatave();
+    return result;
+  } catch (error) {
+    console.error("saveEstimatePositionDocumentAction failed:", error);
+    return {
+      ok: false as const,
+      error: "Neizdevās saglabāt tāmes pozīciju.",
+    };
   }
-
-
-
-  return result;
-
 }
 

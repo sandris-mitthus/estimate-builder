@@ -12,6 +12,7 @@ import {
   getMaterialsOrMechanismsUnitPrice,
   isMaterialsOrMechanismsCostType,
 } from "@/app/lib/positions/apply-catalog-to-line-item";
+import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
 function normalizeCatalogText(value: string): string {
@@ -172,6 +173,7 @@ export function applyLineItemCatalogEdit(
 export type HydrateCatalogLinksOptions = {
   /** Sagatavē cenas vienmēr no kataloga / iestatījumiem, nevis no saglabātā dokumenta. */
   forceCatalogPrices?: boolean;
+  moduleSizeOptions?: BuildingModuleSizeOption[];
 };
 
 function hydrateRowsWithCatalog(

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
-  formatQuantityDisplay,
-  parseQuantityInput,
-  sanitizeQuantityInputString,
+  formatConsumptionDisplay,
+  parseConsumptionInput,
+  sanitizeConsumptionInputString,
 } from "@/app/lib/positions/variable-quantity";
 
 type MaterialConsumptionInputProps = {
@@ -24,12 +24,12 @@ export function MaterialConsumptionInput({
   "aria-label": ariaLabel,
 }: MaterialConsumptionInputProps) {
   const { t } = useTranslations();
-  const [draft, setDraft] = useState(() => formatQuantityDisplay(value));
+  const [draft, setDraft] = useState(() => formatConsumptionDisplay(value));
   const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (!focused) {
-      setDraft(formatQuantityDisplay(value));
+      setDraft(formatConsumptionDisplay(value));
     }
   }, [value, focused]);
 
@@ -38,22 +38,22 @@ export function MaterialConsumptionInput({
       type="text"
       inputMode="decimal"
       pattern="[0-9.,]*"
-      className="w-16 shrink-0 rounded-md border border-zinc-200 px-2 py-1 text-right text-xs tabular-nums text-zinc-900 focus:border-zinc-400 focus:outline-none"
+      className="w-[4.75rem] shrink-0 rounded-md border border-zinc-200 px-2 py-1 text-right text-xs tabular-nums text-zinc-900 focus:border-zinc-400 focus:outline-none"
       value={draft}
       aria-label={ariaLabel ?? t("estimate.material_consumption.label", "Patēriņš")}
-      placeholder="1,00"
+      placeholder="1"
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);
-        const parsed = parseQuantityInput(draft);
+        const parsed = parseConsumptionInput(draft);
         onChange(parsed);
-        setDraft(formatQuantityDisplay(parsed));
+        setDraft(formatConsumptionDisplay(parsed));
       }}
       onChange={(event) => {
-        const next = sanitizeQuantityInputString(event.target.value);
+        const next = sanitizeConsumptionInputString(event.target.value);
         setDraft(next);
         if (next.trim()) {
-          onChange(parseQuantityInput(next));
+          onChange(parseConsumptionInput(next));
         } else {
           onChange(1);
         }

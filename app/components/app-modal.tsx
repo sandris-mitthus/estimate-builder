@@ -4,19 +4,24 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  ModalStackProvider,
+  useModalStack,
+} from "@/app/components/modal-stack-context";
 import { useTranslations } from "@/app/components/translations-provider";
 
-const overlayClassName =
-  "fixed inset-0 z-50 flex items-center justify-center p-4";
+const overlayBaseClassName =
+  "fixed inset-0 flex items-center justify-center p-4";
 
-const confirmOverlayClassName =
-  "fixed inset-0 z-[60] flex items-center justify-center p-4";
+const confirmOverlayBaseClassName =
+  "fixed inset-0 flex items-center justify-center p-4";
 
 const backdropClassName = "absolute inset-0 bg-zinc-900/40";
 
@@ -74,11 +79,44 @@ export function AppModal({
   const confirmPanelRef = useRef<HTMLDivElement>(null);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [childNestedOpenCount, setChildNestedOpenCount] = useState(0);
   const { t } = useTranslations();
+  const parentStack = useModalStack();
+  const overlayZIndex = 50 + parentStack.depth * 10;
+  const confirmZIndex = overlayZIndex + 10;
+  const parentNotifyNestedOpenRef = useRef(parentStack.notifyNestedOpen);
+  parentNotifyNestedOpenRef.current = parentStack.notifyNestedOpen;
+
+  const notifyChildNestedOpen = useCallback((delta: number) => {
+    setChildNestedOpenCount((current) => Math.max(0, current + delta));
+    parentNotifyNestedOpenRef.current(delta);
+  }, []);
+
+  const childStackValue = useMemo(
+    () => ({
+      depth: open ? parentStack.depth + 1 : parentStack.depth,
+      notifyNestedOpen: notifyChildNestedOpen,
+    }),
+    [open, parentStack.depth, notifyChildNestedOpen],
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setChildNestedOpenCount(0);
+      return;
+    }
+
+    if (parentStack.depth === 0) {
+      return;
+    }
+
+    notifyChildNestedOpen(1);
+    return () => notifyChildNestedOpen(-1);
+  }, [open, parentStack.depth, notifyChildNestedOpen]);
 
   const closeDirectly = useCallback(() => {
     if (blocking) return;
@@ -116,6 +154,7 @@ export function AppModal({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (blocking) return;
+      if (childNestedOpenCount > 0) return;
 
       if (event.key === "Escape") {
         if (confirmExitOpen) {
@@ -148,7 +187,7 @@ export function AppModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, blocking, confirmExitOpen, closeDirectly]);
+  }, [open, blocking, confirmExitOpen, closeDirectly, childNestedOpenCount]);
 
   useEffect(() => {
     if (!open) return;
@@ -176,6 +215,7 @@ export function AppModal({
 
   function handleBackdropClick(event: MouseEvent<HTMLDivElement>) {
     if (blocking || confirmExitOpen) return;
+    if (childNestedOpenCount > 0) return;
     if (!isBackdropDismissTarget(event.target as Node, panelRef.current)) return;
     if (dirty) {
       requestBackdropConfirm();
@@ -196,7 +236,9 @@ export function AppModal({
   return createPortal(
     <>
       <div
-        className={overlayClassName}
+        className={overlayBaseClassName}
+        style={{ zIndex: overlayZIndex }}
+        data-app-modal-overlay=""
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -231,14 +273,18 @@ export function AppModal({
               </button>
             </div>
 
-            <div className="mt-6">{children}</div>
+            <ModalStackProvider value={childStackValue}>
+              <div className="mt-6">{children}</div>
+            </ModalStackProvider>
           </div>
         </div>
       </div>
 
       {confirmExitOpen ? (
         <div
-          className={confirmOverlayClassName}
+          className={confirmOverlayBaseClassName}
+          style={{ zIndex: confirmZIndex }}
+          data-app-modal-overlay=""
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="confirm-exit-title"

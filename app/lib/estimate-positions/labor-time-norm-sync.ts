@@ -406,12 +406,7 @@ export async function propagateLaborTimeNormsFromProject(
     return { ok: true };
   }
 
-  const [sagatave, catalogPositions, companySettings] = await Promise.all([
-    ensureDefaultEstimatePosition(),
-    listPositionPrices(),
-    getCompanySettings(),
-  ]);
-  const defaultHourlyRate = companySettings.defaultHourlyRate;
+  const sagatave = await ensureDefaultEstimatePosition();
 
   const patches = collectLaborTimeNormPatches(
     projectCategories,
@@ -421,6 +416,12 @@ export async function propagateLaborTimeNormsFromProject(
   if (patches.length === 0) {
     return { ok: true };
   }
+
+  const [catalogPositions, companySettings] = await Promise.all([
+    listPositionPrices(),
+    getCompanySettings(),
+  ]);
+  const defaultHourlyRate = companySettings.defaultHourlyRate;
 
   const nextSagataveSections = applyLaborTimeNormPatchesToCategories(
     sagatave.sections,

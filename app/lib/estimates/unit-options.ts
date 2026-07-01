@@ -1,4 +1,4 @@
-import { ESTIMATE_UNITS } from "@/app/lib/estimates/units";
+import { ESTIMATE_UNITS, normalizeEstimateUnit } from "@/app/lib/estimates/units";
 
 export function getEstimateUnitOptions(unit: string): string[] {
   const trimmed = unit.trim();
@@ -6,7 +6,12 @@ export function getEstimateUnitOptions(unit: string): string[] {
     return [...ESTIMATE_UNITS];
   }
 
-  if ((ESTIMATE_UNITS as readonly string[]).includes(trimmed)) {
+  const normalized = normalizeEstimateUnit(trimmed);
+  if (
+    (ESTIMATE_UNITS as readonly string[]).some(
+      (unit) => normalizeEstimateUnit(unit) === normalized,
+    )
+  ) {
     return [...ESTIMATE_UNITS];
   }
 

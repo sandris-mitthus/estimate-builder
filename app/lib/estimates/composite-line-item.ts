@@ -1,4 +1,5 @@
 import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
+import { resolveMaterialUnitPriceContribution } from "@/app/lib/estimates/material-consumption-basis";
 import type {
   EstimateLineItem,
   LineItemCatalogRef,
@@ -6,13 +7,14 @@ import type {
 } from "@/app/lib/estimates/types";
 import { resolvePositionCatalogUnitPrice } from "@/app/lib/positions/apply-catalog-to-line-item";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 
 /**
  * Kompozītā pozīcija (jaunais modelis): nosaukums + laika norma (darbs) +
  * piesaistīti materiāli + piesaistīti mehānismi. Cenas:
  * - darbs = laika norma (c/h) × stundas likme
  * - materiāls = piesaistīto kataloga pozīciju cenu summa
- * - mehānisms = Σ (kataloga likme (EUR/h) × laika norma) katram mehānismam
+ * - mehānisms = Σ (kataloga likme × laika norma × daudzums) vai fiksētam mehānismam Σ (kataloga likme × daudzums)
  */
 export function isCompositeLineItem(item: EstimateLineItem): boolean {
   return (
@@ -80,6 +82,10 @@ function refreshCatalogRef(
     name: position.name,
     unit: position.unit,
     ...(ref.consumption != null ? { consumption: ref.consumption } : {}),
+    ...(ref.consumptionVolumeAttachment
+      ? { consumptionVolumeAttachment: ref.consumptionVolumeAttachment }
+      : {}),
+    ...(ref.fixedQuantity === true ? { fixedQuantity: true } : {}),
   };
 }
 
@@ -97,6 +103,7 @@ export function deriveCompositeUnitPrice(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  moduleSizeOptions: BuildingModuleSizeOption[] = [],
 ): PriceBreakdown {
   const timeNorm = Number.isFinite(item.laborTimeNorm)
     ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
@@ -108,6 +115,18 @@ export function deriveCompositeUnitPrice(
   const materials = roundToTwoDecimals(
     resolveEffectiveMaterials(item).reduce((sum, ref) => {
       const price = resolveCatalogRefUnitPrice(ref, catalogPositions);
+      if (moduleSizeOptions.length > 0) {
+        return (
+          sum +
+          resolveMaterialUnitPriceContribution(
+            ref,
+            item,
+            price,
+            moduleSizeOptions,
+          )
+        );
+      }
+
       const consumption = ref.consumption ?? 1;
       return sum + roundToTwoDecimals(price * consumption);
     }, 0),
@@ -116,7 +135,10 @@ export function deriveCompositeUnitPrice(
   const mechanisms = roundToTwoDecimals(
     resolveEffectiveMechanisms(item).reduce((sum, ref) => {
       const rate = resolveCatalogRefUnitPrice(ref, catalogPositions);
-      return sum + roundToTwoDecimals(rate * timeNorm);
+      const quantity = ref.consumption ?? 1;
+      const effectiveQuantity =
+        ref.fixedQuantity === true ? quantity : timeNorm * quantity;
+      return sum + roundToTwoDecimals(rate * effectiveQuantity);
     }, 0),
   );
 
@@ -142,7 +164,10 @@ export function hydrateCompositeLineItem(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
-  options?: { forceCatalogPrices?: boolean },
+  options?: {
+    forceCatalogPrices?: boolean;
+    moduleSizeOptions?: BuildingModuleSizeOption[];
+  },
 ): EstimateLineItem {
   // Migrācija no veca singular formāta uz masīviem
   const rawMaterials = item.materials ?? (item.material ? [item.material] : []);
@@ -166,6 +191,7 @@ export function hydrateCompositeLineItem(
         next,
         catalogPositions,
         defaultHourlyRate,
+        options.moduleSizeOptions ?? [],
       ),
     };
   }
@@ -181,6 +207,17 @@ export function catalogPositionToLineItemRef(
     name: position.name,
     unit: position.unit,
   };
+}
+
+/** Kataloga pozīciju ID, kas jau piesaistītas rindai — hintu sarakstā nerāda. */
+export function buildExcludedCatalogKeysFromRefs(
+  refs: ReadonlyArray<{ positionPriceId: string }>,
+): ReadonlySet<string> {
+  if (refs.length === 0) {
+    return new Set<string>();
+  }
+
+  return new Set(refs.map((ref) => `catalog:${ref.positionPriceId}`));
 }
 
 /** Jauna kompozītā pozīcija modālim. */
@@ -204,6 +241,7 @@ export function patchLineItemLaborTimeNorm(
   laborTimeNorm: number,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  moduleSizeOptions: BuildingModuleSizeOption[] = [],
 ): EstimateLineItem {
   const nextItem = {
     ...item,
@@ -220,6 +258,7 @@ export function patchLineItemLaborTimeNorm(
       nextItem,
       catalogPositions,
       defaultHourlyRate,
+      moduleSizeOptions,
     ),
   };
 }

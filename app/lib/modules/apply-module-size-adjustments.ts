@@ -47,7 +47,7 @@ function formatAdjustedDimension(value: number): string {
     return String(value);
   }
 
-  return formatAmountDisplay(value).replace(".", ",");
+  return formatAmountDisplay(value);
 }
 
 function formatAdjustedCount(value: number): string {

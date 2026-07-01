@@ -13,6 +13,19 @@ type Translate = (
 
 export type PositionCostTypeFilter = "all" | CatalogPositionCostType;
 
+const positionNameCollator = new Intl.Collator("lv-LV", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+/** Meklēšanai — noņem diakritikas, lai `drats` atbilstu `drāts`. */
+export function normalizePositionSearchText(value: string): string {
+  return value
+    .toLocaleLowerCase("lv-LV")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export function filterCatalogPositions(
   positions: PositionPriceSummary[],
 ): PositionPriceSummary[] {
@@ -23,7 +36,7 @@ export function sortPositionsByName(
   positions: PositionPriceSummary[],
 ): PositionPriceSummary[] {
   return [...positions].sort((left, right) =>
-    left.name.localeCompare(right.name, "lv-LV", { sensitivity: "base" }),
+    positionNameCollator.compare(left.name, right.name),
   );
 }
 
@@ -32,16 +45,17 @@ export function filterPositionsByQuery(
   query: string,
   t?: Translate,
 ): PositionPriceSummary[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase("lv-LV");
+  const normalizedQuery = normalizePositionSearchText(query.trim());
   if (!normalizedQuery) {
     return positions;
   }
 
   return positions.filter((position) => {
-    const name = position.name.toLocaleLowerCase("lv-LV");
-    const unit = position.unit.toLocaleLowerCase("lv-LV");
-    const costType = getPositionCostTypeLabel(position.costType, t)
-      .toLocaleLowerCase("lv-LV");
+    const name = normalizePositionSearchText(position.name);
+    const unit = normalizePositionSearchText(position.unit);
+    const costType = normalizePositionSearchText(
+      getPositionCostTypeLabel(position.costType, t),
+    );
 
     return (
       name.includes(normalizedQuery) ||

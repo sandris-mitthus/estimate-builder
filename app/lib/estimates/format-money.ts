@@ -1,8 +1,7 @@
 import {
-  addThousandSeparators,
+  formatDecimalDisplay,
   formatAmount,
   isAmountDisplayEmpty,
-  roundToTwoDecimals,
 } from "@/app/lib/estimates/calculate-line";
 import { getCurrencySymbol } from "@/app/lib/settings/currencies";
 
@@ -16,5 +15,5 @@ export function formatMoneyDisplay(value: number, currency?: string | null): str
     return "—";
   }
 
-  return `${getCurrencySymbol(currency)} ${addThousandSeparators(roundToTwoDecimals(value).toFixed(2))}`;
+  return `${getCurrencySymbol(currency)} ${formatDecimalDisplay(value)}`;
 }

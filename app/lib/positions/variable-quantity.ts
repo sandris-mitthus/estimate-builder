@@ -81,6 +81,69 @@ export function formatQuantityDisplay(value: number): string {
   return addThousandSeparators(roundQuantity(value).toFixed(2)).replace(".", ",");
 }
 
+export const CONSUMPTION_MAX_DECIMALS = 5;
+
+export function roundConsumption(value: number): number {
+  if (!Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+
+  const factor = 10 ** CONSUMPTION_MAX_DECIMALS;
+  return Math.round(value * factor) / factor;
+}
+
+/** Patēriņa ievade — max 5 cipari aiz komata. */
+export function sanitizeConsumptionInputString(value: string): string {
+  const sanitized = sanitizeQuantityInputString(value);
+  const separatorIndex = sanitized.search(/[.,]/);
+  if (separatorIndex === -1) {
+    return sanitized;
+  }
+
+  const beforeSeparator = sanitized.slice(0, separatorIndex + 1);
+  const afterSeparator = sanitized
+    .slice(separatorIndex + 1)
+    .slice(0, CONSUMPTION_MAX_DECIMALS);
+  return beforeSeparator + afterSeparator;
+}
+
+export function parseConsumptionInput(value: string): number {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) {
+    return 1;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 1;
+  }
+
+  return roundConsumption(parsed);
+}
+
+function trimFixedDecimalZeros(fixed: string): string {
+  const dotIndex = fixed.indexOf(".");
+  if (dotIndex === -1) {
+    return fixed;
+  }
+
+  const intPart = fixed.slice(0, dotIndex);
+  const decPart = fixed.slice(dotIndex + 1).replace(/0+$/, "");
+  return decPart ? `${intPart}.${decPart}` : intPart;
+}
+
+/** Rāda visus ievadītos ciparus aiz komata (līdz 5), bez liekas nulles piepildes. */
+export function formatConsumptionDisplay(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "";
+  }
+
+  const trimmed = trimFixedDecimalZeros(
+    roundConsumption(value).toFixed(CONSUMPTION_MAX_DECIMALS),
+  );
+  return addThousandSeparators(trimmed).replace(".", ",");
+}
+
 /** Atļauj ciparus un vienu decimālo atdalītāju, max 2 cipari aiz komata. */
 export function sanitizeTimeNormInputString(value: string): string {
   const sanitized = sanitizeQuantityInputString(value);

@@ -18,10 +18,14 @@ export type LineItemCatalogRef = {
   name: string;
   unit: string;
   /**
-   * Materiāla patēriņš uz vienu pozīcijas (moduļa apjoma) mērvienību, kad materiāla
-   * mērvienība atšķiras no pozīcijas mērvienības (piem. m uz vienu m²). Nav norādīts = 1.
+   * Materiāliem: patēriņš uz vienu patēriņa apjoma mērvienību (piem. t uz vienu m).
+   * Mehānismiem: daudzuma koeficients. Nav norādīts = 1.
    */
   consumption?: number;
+  /** Materiāliem: cits moduļa apjoms patēriņam (piem. perimetrs m, nevis pozīcijas laukums m²). */
+  consumptionVolumeAttachment?: LineItemModuleSizeAttachment;
+  /** Mehānismiem: izmanto `consumption` kā fiksētu daudzumu, nevis reizina ar laika normu. */
+  fixedQuantity?: boolean;
 };
 
 export type EstimateLineItem = {
@@ -47,7 +51,7 @@ export type EstimateLineItem = {
   mechanism?: LineItemCatalogRef | null;
   /** Piesaistītie materiāli — cenas summējas. */
   materials?: LineItemCatalogRef[];
-  /** Piesaistītie mehānismi — katrs: kataloga likme (EUR/h) × laika norma; summējas. */
+  /** Piesaistītie mehānismi — pēc noklusējuma kataloga likme × laika norma; fiksētiem mehānismiem likme × ievadītais daudzums. */
   mechanisms?: LineItemCatalogRef[];
   /** Ja `true` — apjoms nav saistīts ar moduļa lielumu; katrā projektā ierakstāms manuāli. */
   variableQuantity?: boolean;

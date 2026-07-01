@@ -13,6 +13,8 @@ type CatalogHintFieldProps = {
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate?: number | null;
   placeholder?: string;
+  /** Jau pievienotās kataloga pozīcijas — hintos nerāda. */
+  excludedCatalogKeys?: ReadonlySet<string>;
 };
 
 const fieldClassName =
@@ -25,6 +27,7 @@ export function CatalogHintField({
   catalogPositions,
   defaultHourlyRate = null,
   placeholder,
+  excludedCatalogKeys,
 }: CatalogHintFieldProps) {
   const { t } = useTranslations();
   const [query, setQuery] = useState(value?.name ?? "");
@@ -38,6 +41,7 @@ export function CatalogHintField({
       value={query}
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
+      excludedCatalogKeys={excludedCatalogKeys}
       className={fieldClassName}
       placeholder={placeholder ?? t("positions.catalog_search_placeholder", "Meklēt katalogā")}
       onNameChange={(name) => {

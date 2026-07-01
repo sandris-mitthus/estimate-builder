@@ -23,6 +23,7 @@ import {
 } from "@/app/lib/positions/apply-catalog-to-line-item";
 import { findCatalogPositionForLineItem } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { TranslationParams } from "@/app/lib/i18n/translations";
 
 type Translate = (
@@ -84,9 +85,15 @@ export function resolveLiveDisplayUnitPrice(
   item: EstimateLineItem,
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
+  moduleSizeOptions: BuildingModuleSizeOption[] = [],
 ): PriceBreakdown {
   if (isCompositeLineItem(item)) {
-    return deriveCompositeUnitPrice(item, catalogPositions, defaultHourlyRate);
+    return deriveCompositeUnitPrice(
+      item,
+      catalogPositions,
+      defaultHourlyRate,
+      moduleSizeOptions,
+    );
   }
 
   const position = findCatalogPositionForLineItem(item, catalogPositions);
