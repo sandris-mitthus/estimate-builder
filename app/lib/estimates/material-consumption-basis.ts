@@ -118,9 +118,33 @@ export function shouldShowMaterialConsumptionInput(
     item,
     moduleSizeOptions,
   );
-  return (
-    basisUnit != null && !areEstimateUnitsEquivalent(ref.unit, basisUnit)
+  if (basisUnit == null) {
+    return false;
+  }
+
+  if (ref.manualConsumption === true) {
+    return true;
+  }
+
+  return !areEstimateUnitsEquivalent(ref.unit, basisUnit);
+}
+
+/** Kad m.v. sakrīt — slēdzis, lai manuāli ievadītu patēriņu (piem. 2× uz m²). */
+export function shouldOfferMaterialManualConsumptionToggle(
+  ref: LineItemCatalogRef,
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): boolean {
+  const basisUnit = resolveMaterialConsumptionBasisUnit(
+    ref,
+    item,
+    moduleSizeOptions,
   );
+  if (basisUnit == null) {
+    return false;
+  }
+
+  return areEstimateUnitsEquivalent(ref.unit, basisUnit);
 }
 
 /** Materiāla cenas daļa kompozīta vienības cenā (uz 1 pozīcijas mērvienību). */

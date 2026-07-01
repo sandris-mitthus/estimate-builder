@@ -12,6 +12,7 @@ import {
   hasMaterialCustomConsumptionVolume,
   resolveMaterialConsumptionBasisUnit,
   resolveMaterialUnitPriceContribution,
+  shouldOfferMaterialManualConsumptionToggle,
   shouldShowMaterialConsumptionInput,
 } from "@/app/lib/estimates/material-consumption-basis";
 import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
@@ -30,6 +31,7 @@ type MaterialConsumptionBasisControlProps = {
   catalogPositions: PositionPriceSummary[];
   currency?: string | null;
   onConsumptionChange: (consumption: number) => void;
+  onManualConsumptionChange: (enabled: boolean) => void;
   onVolumeAttachmentChange: (
     attachment: LineItemModuleSizeAttachment | null,
   ) => void;
@@ -86,6 +88,45 @@ function ConsumptionValue({
   );
 }
 
+function ToggleSwitch({
+  checked,
+  labelId,
+  label,
+  onToggle,
+}: {
+  checked: boolean;
+  labelId: string;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <span
+        id={labelId}
+        className="whitespace-nowrap text-[8px] font-medium uppercase leading-none tracking-tight text-zinc-400"
+      >
+        {label}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={labelId}
+        onClick={onToggle}
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
+          checked ? "bg-sky-600" : "bg-zinc-200"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition ${
+            checked ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export function MaterialConsumptionBasisControl({
   material,
   item,
@@ -93,15 +134,25 @@ export function MaterialConsumptionBasisControl({
   catalogPositions,
   currency = null,
   onConsumptionChange,
+  onManualConsumptionChange,
   onVolumeAttachmentChange,
   onRemove,
 }: MaterialConsumptionBasisControlProps) {
   const { t } = useTranslations();
-  const switchLabelId = useId();
+  const customVolumeSwitchId = useId();
+  const manualConsumptionSwitchId = useId();
   const hasCustomVolume = hasMaterialCustomConsumptionVolume(material);
   const [customVolumeActive, setCustomVolumeActive] = useState(hasCustomVolume);
+  const [manualConsumptionActive, setManualConsumptionActive] = useState(
+    material.manualConsumption === true,
+  );
   const [volumeModalOpen, setVolumeModalOpen] = useState(false);
   const canPickCustomVolume = moduleSizeOptions.length > 0;
+  const offerManualConsumptionToggle = shouldOfferMaterialManualConsumptionToggle(
+    material,
+    item,
+    moduleSizeOptions,
+  );
   const positionUnit =
     resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions) ?? item.unit;
   const positionUnitPrice = useMemo(() => {
@@ -118,6 +169,10 @@ export function MaterialConsumptionBasisControl({
     setCustomVolumeActive(hasMaterialCustomConsumptionVolume(material));
   }, [material]);
 
+  useEffect(() => {
+    setManualConsumptionActive(material.manualConsumption === true);
+  }, [material]);
+
   function handleCustomVolumeToggle(enabled: boolean) {
     if (!enabled) {
       setCustomVolumeActive(false);
@@ -125,10 +180,25 @@ export function MaterialConsumptionBasisControl({
       return;
     }
 
+    if (manualConsumptionActive) {
+      setManualConsumptionActive(false);
+      onManualConsumptionChange(false);
+    }
+
     setCustomVolumeActive(true);
     if (!hasCustomVolume) {
       setVolumeModalOpen(true);
     }
+  }
+
+  function handleManualConsumptionToggle(enabled: boolean) {
+    if (enabled && customVolumeActive) {
+      setCustomVolumeActive(false);
+      onVolumeAttachmentChange(null);
+    }
+
+    setManualConsumptionActive(enabled);
+    onManualConsumptionChange(enabled);
   }
 
   function handleVolumeModalOpenChange(open: boolean) {
@@ -144,6 +214,40 @@ export function MaterialConsumptionBasisControl({
       setCustomVolumeActive(true);
     }
   }
+
+  const consumptionControls = (
+    <div className="min-w-0 flex-1 overflow-hidden">
+      {!customVolumeActive || material.consumptionVolumeAttachment ? (
+        <ConsumptionValue
+          material={material}
+          item={item}
+          moduleSizeOptions={moduleSizeOptions}
+          onConsumptionChange={onConsumptionChange}
+        />
+      ) : null}
+    </div>
+  );
+
+  const toggleControls = (
+    <div className="flex shrink-0 items-center gap-2">
+      {offerManualConsumptionToggle ? (
+        <ToggleSwitch
+          checked={manualConsumptionActive}
+          labelId={manualConsumptionSwitchId}
+          label={t("estimate.material_consumption.manual", "Patēriņš")}
+          onToggle={() => handleManualConsumptionToggle(!manualConsumptionActive)}
+        />
+      ) : null}
+      {canPickCustomVolume && !manualConsumptionActive ? (
+        <ToggleSwitch
+          checked={customVolumeActive}
+          labelId={customVolumeSwitchId}
+          label={t("estimate.material_consumption.custom_volume", "Cits apjoms")}
+          onToggle={() => handleCustomVolumeToggle(!customVolumeActive)}
+        />
+      ) : null}
+    </div>
+  );
 
   return (
     <>
@@ -212,41 +316,13 @@ export function MaterialConsumptionBasisControl({
               customVolumeActive ? "mt-2 border-t border-zinc-100 pt-2" : "mt-1.5"
             }`}
           >
-            <div className="min-w-0 flex-1 overflow-hidden">
-              {!customVolumeActive ||
-              material.consumptionVolumeAttachment ? (
-                <ConsumptionValue
-                  material={material}
-                  item={item}
-                  moduleSizeOptions={moduleSizeOptions}
-                  onConsumptionChange={onConsumptionChange}
-                />
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span
-                id={switchLabelId}
-                className="whitespace-nowrap text-[8px] font-medium uppercase leading-none tracking-tight text-zinc-400"
-              >
-                {t("estimate.material_consumption.custom_volume", "Cits apjoms")}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={customVolumeActive}
-                aria-labelledby={switchLabelId}
-                onClick={() => handleCustomVolumeToggle(!customVolumeActive)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
-                  customVolumeActive ? "bg-sky-600" : "bg-zinc-200"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                    customVolumeActive ? "translate-x-4" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
-            </div>
+            {consumptionControls}
+            {toggleControls}
+          </div>
+        ) : offerManualConsumptionToggle ? (
+          <div className="mt-1.5 flex items-center justify-between gap-3">
+            {consumptionControls}
+            {toggleControls}
           </div>
         ) : null}
       </div>

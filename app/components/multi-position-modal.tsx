@@ -244,6 +244,33 @@ export function MultiPositionModal({
     );
   }
 
+  function updateMaterialManualConsumption(
+    optionId: string,
+    index: number,
+    manualConsumption: boolean,
+  ) {
+    setOptions((current) =>
+      current.map((entry) =>
+        entry.optionId === optionId
+          ? {
+              ...entry,
+              materials: entry.materials.map((mat, i) =>
+                i === index
+                  ? {
+                      ...mat,
+                      manualConsumption: manualConsumption || undefined,
+                      consumption: manualConsumption
+                        ? (mat.consumption ?? 1)
+                        : undefined,
+                    }
+                  : mat,
+              ),
+            }
+          : entry,
+      ),
+    );
+  }
+
   function updateMaterialVolumeAttachment(
     optionId: string,
     index: number,
@@ -583,6 +610,13 @@ export function MultiPositionModal({
                                   option.optionId,
                                   matIdx,
                                   consumption,
+                                )
+                              }
+                              onManualConsumptionChange={(enabled) =>
+                                updateMaterialManualConsumption(
+                                  option.optionId,
+                                  matIdx,
+                                  enabled,
                                 )
                               }
                               onVolumeAttachmentChange={(volumeAttachment) =>

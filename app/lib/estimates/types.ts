@@ -24,6 +24,8 @@ export type LineItemCatalogRef = {
   consumption?: number;
   /** Materiāliem: cits moduļa apjoms patēriņam (piem. perimetrs m, nevis pozīcijas laukums m²). */
   consumptionVolumeAttachment?: LineItemModuleSizeAttachment;
+  /** Materiāliem: rāda patēriņa ievadi arī tad, ja materiāla m.v. sakrīt ar pozīcijas m.v. (piem. 2× siets). */
+  manualConsumption?: boolean;
   /** Mehānismiem: izmanto `consumption` kā fiksētu daudzumu, nevis reizina ar laika normu. */
   fixedQuantity?: boolean;
 };

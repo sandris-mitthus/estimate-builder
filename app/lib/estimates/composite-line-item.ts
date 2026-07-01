@@ -85,6 +85,7 @@ function refreshCatalogRef(
     ...(ref.consumptionVolumeAttachment
       ? { consumptionVolumeAttachment: ref.consumptionVolumeAttachment }
       : {}),
+    ...(ref.manualConsumption === true ? { manualConsumption: true } : {}),
     ...(ref.fixedQuantity === true ? { fixedQuantity: true } : {}),
   };
 }

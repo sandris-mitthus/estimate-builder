@@ -172,6 +172,24 @@ export function PositionModal({
     }));
   }
 
+  function updateMaterialManualConsumption(
+    index: number,
+    manualConsumption: boolean,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      materials: (current.materials ?? []).map((mat, i) =>
+        i === index
+          ? {
+              ...mat,
+              manualConsumption: manualConsumption || undefined,
+              consumption: manualConsumption ? (mat.consumption ?? 1) : undefined,
+            }
+          : mat,
+      ),
+    }));
+  }
+
   function updateMaterialVolumeAttachment(
     index: number,
     attachment: LineItemModuleSizeAttachment | null,
@@ -433,6 +451,9 @@ export function PositionModal({
                     currency={currency}
                     onConsumptionChange={(consumption) =>
                       updateMaterialConsumption(index, consumption)
+                    }
+                    onManualConsumptionChange={(enabled) =>
+                      updateMaterialManualConsumption(index, enabled)
                     }
                     onVolumeAttachmentChange={(attachment) =>
                       updateMaterialVolumeAttachment(index, attachment)
