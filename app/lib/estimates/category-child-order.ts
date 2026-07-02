@@ -1,6 +1,5 @@
 import { arrayMove } from "@/app/lib/array-move";
 import {
-  categoryDragId,
   itemDragId,
   parseDragId,
   subcategoryDragId,

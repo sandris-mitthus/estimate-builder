@@ -156,7 +156,6 @@ import {
 } from "@/app/lib/estimates/drag-ids";
 import {
   appendCategoryChild,
-  collectCategoryChildDragIds,
   removeCategoryChildRef,
   resolveCategoryChildren,
 } from "@/app/lib/estimates/category-child-order";
@@ -204,7 +203,6 @@ import {
 import {
   applySelectedSagataveChangesToProject,
   listSagatavePositionChanges,
-  sagataveHasPositionChangesForProject,
 } from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { RestoreSagatavePositionsModal } from "@/app/components/restore-sagatave-positions-modal";
 import { SyncSagataveChangesModal } from "@/app/components/sync-sagatave-changes-modal";

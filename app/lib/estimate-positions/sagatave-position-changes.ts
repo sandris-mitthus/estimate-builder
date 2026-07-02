@@ -17,7 +17,6 @@ import {
   findCorrespondingOptionLineItems,
   findSagataveRowForProjectRow,
   normalizeRowTitle,
-  rowItemLabel,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
 import { normalizeAttentionBudget } from "@/app/lib/estimates/attention-budget";
 
@@ -695,91 +694,6 @@ function applyLineItemField(
     default:
       return item;
   }
-}
-
-function applyRowField(
-  row: EstimateRowItem,
-  sagataveRow: EstimateRowItem,
-  path: SagataveChangePath,
-  field: SagataveChangeField,
-): EstimateRowItem {
-  if (field === "multiName" && isEstimateMultiPosition(row) && isEstimateMultiPosition(sagataveRow)) {
-    return {
-      ...row,
-      name: sagataveRow.name,
-    };
-  }
-
-  if (field === "multiNote" && isEstimateMultiPosition(row) && isEstimateMultiPosition(sagataveRow)) {
-    return {
-      ...row,
-      note: normalizeOptionalText(sagataveRow.note) || undefined,
-    };
-  }
-
-  if (
-    field === "multiRequiresAttention" &&
-    isEstimateMultiPosition(row) &&
-    isEstimateMultiPosition(sagataveRow)
-  ) {
-    return {
-      ...row,
-      requiresAttention:
-        sagataveRow.requiresAttention === true ? true : undefined,
-      attentionBudget:
-        sagataveRow.requiresAttention === true
-          ? row.attentionBudget
-          : undefined,
-    };
-  }
-
-  if (
-    field === "multiAttentionBudget" &&
-    isEstimateMultiPosition(row) &&
-    isEstimateMultiPosition(sagataveRow)
-  ) {
-    return {
-      ...row,
-      attentionBudget: normalizeAttentionBudget(sagataveRow.attentionBudget),
-    };
-  }
-
-  if (
-    path.optionIndex != null &&
-    isEstimateMultiPosition(row) &&
-    isEstimateMultiPosition(sagataveRow)
-  ) {
-    const optionIndex = path.optionIndex;
-    const { projectLineItem, sagataveLineItem } = findCorrespondingOptionLineItems(
-      sagataveRow.options,
-      row.options,
-      optionIndex,
-    );
-    if (!projectLineItem || !sagataveLineItem) {
-      return row;
-    }
-
-    const nextLineItem = applyLineItemField(
-      projectLineItem,
-      sagataveLineItem,
-      field,
-    );
-
-    const projectOption = row.options[optionIndex];
-    if (!projectOption || nextLineItem === projectLineItem) {
-      return row;
-    }
-
-    const options = [...row.options];
-    options[optionIndex] = { ...projectOption, lineItem: nextLineItem };
-    return { ...row, options };
-  }
-
-  if (!isEstimateLineItem(row) || !isEstimateLineItem(sagataveRow)) {
-    return row;
-  }
-
-  return applyLineItemField(row, sagataveRow, field);
 }
 
 function collectTouchedNodeIds(row: EstimateRowItem): string[] {

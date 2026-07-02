@@ -508,7 +508,7 @@ export function EstimatePdfDocument({
                   );
                 }
 
-                let subRowNr = rowNr;
+                const subRowNr = rowNr;
                 const result = buildSubcategoryOfferRows(
                   child.subcategory,
                   subRowNr,
