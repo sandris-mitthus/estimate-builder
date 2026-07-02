@@ -1,4 +1,8 @@
 import { createLineItem } from "@/app/lib/estimates/create-empty";
+import {
+  resolveEffectiveMaterials,
+  resolveEffectiveMechanisms,
+} from "@/app/lib/estimates/composite-line-item";
 import type {
   EstimateCategory,
   EstimateLineItem,
@@ -146,6 +150,7 @@ export function normalizeMultiPosition(
     ...multi,
     kind: "multi",
     name: multi.name.trim(),
+    note: multi.note?.trim() || undefined,
     options: options.length > 0 ? options : [createMultiPositionOption()],
     selectedOptionId: multi.selectedOptionId ?? null,
   };
@@ -357,8 +362,8 @@ export function resolveSelectedMultiLineItem(
 export function resolveLineItemDisplayName(item: EstimateLineItem): string {
   return (
     item.name.trim() ||
-    item.materials?.[0]?.name ||
-    item.mechanisms?.[0]?.name ||
+    resolveEffectiveMaterials(item)[0]?.name ||
+    resolveEffectiveMechanisms(item)[0]?.name ||
     "—"
   );
 }

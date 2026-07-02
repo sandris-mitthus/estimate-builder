@@ -11,6 +11,13 @@ import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { MultiPositionLinkHandle } from "@/app/components/multi-position-link-handle";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
+import {
+  EstimateAttentionIcon,
+  LineItemAttentionToggle,
+  estimateAttentionRowClassName,
+} from "@/app/components/line-item-attention-toggle";
+import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
+import { patchRequiresAttention } from "@/app/lib/estimates/attention-budget";
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
@@ -110,6 +117,7 @@ type EstimateMultiPositionRowProps = {
   highlightMergedSagatave?: boolean;
   optionLinkActions?: MultiOptionLinkActions;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  estimateUnits?: string[];
   allowOfferMultiEdit?: boolean;
 };
 
@@ -229,6 +237,7 @@ function MultiOptionSubRow({
   const missingModuleSize =
     moduleSizeOptions.length > 0 &&
     !hasModuleSizeAttachment(option.lineItem) &&
+    !option.lineItem.manualUnitEnabled &&
     !isVariableQuantityLineItem(option.lineItem, catalogPositions);
   const moduleSizeUnit =
     !isVariableQuantityLineItem(option.lineItem, catalogPositions)
@@ -468,6 +477,7 @@ export function EstimateMultiPositionRow({
   highlightMergedSagatave = false,
   optionLinkActions,
   moduleSizeOptions = [],
+  estimateUnits = [],
   allowOfferMultiEdit = false,
 }: EstimateMultiPositionRowProps) {
   const { t } = useTranslations();
@@ -561,6 +571,9 @@ export function EstimateMultiPositionRow({
       ? optionLinkActions.getLinkedOptions(selectedOption.id)
       : [];
   const canEditTimeNorm = mode === "template" || allowOfferMultiEdit;
+  const requiresAttention = value.requiresAttention === true;
+  const attentionToggleClass =
+    requiresAttention ? "opacity-100" : "opacity-0 group-hover/multi:opacity-100";
 
   return (
     <>
@@ -573,6 +586,8 @@ export function EstimateMultiPositionRow({
           <tr className={`align-middle ${
             highlightMergedSagatave
               ? "bg-emerald-50/80 hover:bg-emerald-50"
+              : requiresAttention
+                ? estimateAttentionRowClassName
               : showQuantityInput && selectedLineItem && selectedLineItem.quantity <= 0
                 ? "bg-red-50/60 hover:bg-red-50"
                 : "hover:bg-violet-50/30"
@@ -612,10 +627,27 @@ export function EstimateMultiPositionRow({
                         <span className="rounded bg-zinc-100 px-1 py-0.5 text-[10px] font-normal uppercase tracking-wide text-zinc-400">
                           Multi
                         </span>
-                        <span className="text-xs font-normal text-zinc-500">
+                        {requiresAttention ? <EstimateAttentionIcon /> : null}
+                        <span className={`text-xs font-normal ${requiresAttention ? "text-red-700" : "text-zinc-500"}`}>
                           {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                         </span>
                       </div>
+                      <EstimateLineItemNote note={value.note} />
+                      {requiresAttention ? (
+                        <EstimateAttentionBudgetControl
+                          id={`attention-budget-multi-offer-${value.id}`}
+                          value={value.attentionBudget}
+                          currency={currency}
+                          compact
+                          readOnly={!allowOfferMultiEdit}
+                          onChange={
+                            allowOfferMultiEdit
+                              ? (attentionBudget) =>
+                                  onChange({ ...value, attentionBudget })
+                              : undefined
+                          }
+                        />
+                      ) : null}
                       {linkedOptions.length > 0 ? (
                         <ul className="mt-1 space-y-0.5">
                           {linkedOptions.map((linked) => (
@@ -716,7 +748,11 @@ export function EstimateMultiPositionRow({
           </tr>
         ) : (
           <>
-            <tr className="hover:bg-violet-50/30">
+            <tr
+              className={`hover:bg-violet-50/30 ${
+                requiresAttention ? estimateAttentionRowClassName : ""
+              }`}
+            >
               <td className="border-b border-zinc-100 py-1 pr-2 align-top">
                 <div className="flex items-start gap-1 pl-3">
                   <span className="flex h-7 w-6 shrink-0 items-center justify-center self-start">
@@ -735,14 +771,31 @@ export function EstimateMultiPositionRow({
                           <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
                             Multi
                           </span>
+                          {requiresAttention ? <EstimateAttentionIcon /> : null}
                           <button
                             type="button"
                             onClick={() => setEditOpen(true)}
-                            className="text-left text-sm font-medium text-zinc-900 transition hover:text-violet-700 hover:underline"
+                            className={`text-left text-sm font-medium transition hover:underline ${
+                              requiresAttention
+                                ? "text-red-800 hover:text-red-900"
+                                : "text-zinc-900 hover:text-violet-700"
+                            }`}
                           >
                             {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                           </button>
                         </div>
+                        <EstimateLineItemNote note={value.note} />
+                        {requiresAttention ? (
+                          <EstimateAttentionBudgetControl
+                            id={`attention-budget-multi-${value.id}`}
+                            value={value.attentionBudget}
+                            currency={currency}
+                            compact
+                            onChange={(attentionBudget) =>
+                              onChange({ ...value, attentionBudget })
+                            }
+                          />
+                        ) : null}
                       </div>
                       <IconActionButton
                         label={t("estimate.multi.edit", "Labot multi-pozīciju")}
@@ -757,11 +810,21 @@ export function EstimateMultiPositionRow({
               </td>
               <EmptyHeaderMetricCells showQuantityColumn={showQuantityColumn} />
               <td className={rowActionCell}>
-                <DeleteButton
-                  label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
-                  onClick={onDelete}
-                  className="opacity-0 group-hover/multi:opacity-100"
-                />
+                <div className="flex items-center justify-end gap-0.5">
+                  <LineItemAttentionToggle
+                    id={`attention-multi-${value.id}`}
+                    enabled={requiresAttention}
+                    onChange={(nextEnabled) =>
+                      onChange(patchRequiresAttention(value, nextEnabled))
+                    }
+                    className={attentionToggleClass}
+                  />
+                  <DeleteButton
+                    label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
+                    onClick={onDelete}
+                    className="opacity-0 group-hover/multi:opacity-100"
+                  />
+                </div>
               </td>
             </tr>
 
@@ -833,6 +896,8 @@ export function EstimateMultiPositionRow({
           defaultHourlyRate={defaultHourlyRate}
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
+          estimateUnits={estimateUnits}
+          allowAttentionFlagEdit={mode === "template"}
         />
       ) : null}
     </>

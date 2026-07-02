@@ -114,12 +114,14 @@ function pushCount(
     return;
   }
 
+  const unit = "gab.";
+
   items.push({
     key,
     label,
-    value: value.trim(),
+    value: `${value.trim()} ${unit}`,
     numericValue: parseCountInput(value),
-    unit: null,
+    unit,
     adjustable: true,
   });
 }

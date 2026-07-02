@@ -10,6 +10,10 @@ import {
   resolveMechanismUnitPriceContribution,
 } from "@/app/lib/estimates/composite-line-item";
 import { formatMoneyDisplay } from "@/app/lib/estimates/format-money";
+import {
+  resolveMechanismPositionBasisUnit,
+  shouldShowMechanismPerPositionConsumption,
+} from "@/app/lib/estimates/material-consumption-basis";
 import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import type { EstimateLineItem, LineItemCatalogRef } from "@/app/lib/estimates/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -39,10 +43,28 @@ export function MechanismBasisControl({
   const { t } = useTranslations();
   const positionUnit =
     resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions) ?? item.unit;
+  const positionBasisUnit =
+    resolveMechanismPositionBasisUnit(item, moduleSizeOptions) ?? positionUnit;
+  const perPositionConsumption = shouldShowMechanismPerPositionConsumption(
+    mechanism,
+    item,
+    moduleSizeOptions,
+  );
+  const fixedQuantity =
+    perPositionConsumption || mechanism.fixedQuantity === true;
   const positionUnitPrice = useMemo(() => {
     const catalogPrice = resolveCatalogRefUnitPrice(mechanism, catalogPositions);
-    return resolveMechanismUnitPriceContribution(mechanism, item, catalogPrice);
-  }, [mechanism, item, catalogPositions]);
+    const effectiveMechanism =
+      perPositionConsumption && mechanism.fixedQuantity !== true
+        ? { ...mechanism, fixedQuantity: true as const }
+        : mechanism;
+    return resolveMechanismUnitPriceContribution(
+      effectiveMechanism,
+      item,
+      catalogPrice,
+      moduleSizeOptions,
+    );
+  }, [mechanism, item, catalogPositions, moduleSizeOptions, perPositionConsumption]);
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
@@ -71,10 +93,15 @@ export function MechanismBasisControl({
       <div className="mt-1.5 flex justify-end">
         <MechanismQuantityControl
           quantity={mechanism.consumption ?? 1}
-          fixedQuantity={mechanism.fixedQuantity === true}
+          fixedQuantity={fixedQuantity}
           unit={mechanism.unit}
+          basisUnit={
+            perPositionConsumption ? positionBasisUnit : undefined
+          }
           onQuantityChange={onQuantityChange}
-          onFixedQuantityChange={onFixedQuantityChange}
+          onFixedQuantityChange={
+            perPositionConsumption ? () => {} : onFixedQuantityChange
+          }
         />
       </div>
     </div>

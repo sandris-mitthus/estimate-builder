@@ -16,6 +16,8 @@ import { PositionCustomHourlyRateField } from "@/app/components/position-custom-
 import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
+import { LineItemAttentionToggle } from "@/app/components/line-item-attention-toggle";
 import { useIsSystemAdmin } from "@/app/components/system-admin-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
@@ -34,6 +36,10 @@ import { buildManualUnitSelectOptions } from "@/app/lib/estimates/collect-estima
 import {
   resolveLineItemDisplayUnitFromModuleSize,
 } from "@/app/lib/estimates/sync-module-size-quantities";
+import {
+  normalizeAttentionBudget,
+  patchRequiresAttention,
+} from "@/app/lib/estimates/attention-budget";
 import type {
   EstimateLineItem,
   LineItemCatalogRef,
@@ -52,6 +58,7 @@ type PositionModalProps = {
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   estimateUnits?: string[];
+  allowAttentionFlagEdit?: boolean;
 };
 
 const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
@@ -82,6 +89,8 @@ function snapshot(item: EstimateLineItem): string {
     variableQuantity: item.variableQuantity ?? false,
     manualUnitEnabled: item.manualUnitEnabled ?? false,
     manualUnit: item.manualUnit ?? "",
+    requiresAttention: item.requiresAttention === true,
+    attentionBudget: normalizeAttentionBudget(item.attentionBudget) ?? null,
   });
 }
 
@@ -95,6 +104,7 @@ export function PositionModal({
   currency = null,
   moduleSizeOptions,
   estimateUnits = [],
+  allowAttentionFlagEdit = false,
 }: PositionModalProps) {
   const { t } = useTranslations();
   const isSystemAdmin = useIsSystemAdmin();
@@ -283,6 +293,11 @@ export function PositionModal({
       mechanisms: draft.mechanisms ?? [],
       material: undefined,
       mechanism: undefined,
+      requiresAttention: draft.requiresAttention === true ? true : undefined,
+      attentionBudget:
+        draft.requiresAttention === true
+          ? normalizeAttentionBudget(draft.attentionBudget)
+          : undefined,
       unitPrice: deriveCompositeUnitPrice(
         draft,
         catalogPositions,
@@ -381,6 +396,32 @@ export function PositionModal({
                 </p>
               ) : null}
             </label>
+            {allowAttentionFlagEdit || draft.requiresAttention ? (
+              <div className="space-y-3 rounded-lg border border-red-100 bg-red-50/50 p-3">
+                {allowAttentionFlagEdit ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-red-800">
+                      {t("estimate.attention.section_title", "Īpaša uzmanība")}
+                    </span>
+                    <LineItemAttentionToggle
+                      id={`position-attention-${draft.id}`}
+                      enabled={draft.requiresAttention === true}
+                      onChange={(nextEnabled) =>
+                        patch(patchRequiresAttention(draft, nextEnabled))
+                      }
+                    />
+                  </div>
+                ) : null}
+                {draft.requiresAttention ? (
+                  <EstimateAttentionBudgetControl
+                    id={`position-attention-budget-${draft.id}`}
+                    value={draft.attentionBudget}
+                    currency={currency}
+                    onChange={(attentionBudget) => patch({ attentionBudget })}
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <label className="block">
             <span className={labelClassName}>{t("estimate.time_norm", "Laika norma (c/h)")}</span>

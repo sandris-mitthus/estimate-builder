@@ -1,6 +1,7 @@
 import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
 import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
 import {
+  resolveCompositeLineItemDisplayUnit,
   resolveLineItemDisplayQuantityFromModuleSize,
   resolveLineItemDisplayUnitFromModuleSize,
   resolveQuantityFromModuleSizeAttachment,
@@ -57,6 +58,31 @@ function resolveQuantityForAttachment(
   );
 }
 
+function hasPositionModuleSizeVolume(item: EstimateLineItem): boolean {
+  return (
+    normalizeLineItemModuleSizeAttachment(item.moduleSizeAttachment) != null
+  );
+}
+
+/** Pozīcijas mērvienība patēriņam, ja nav piesaistīts moduļa apjoms (manuālā m.v. vai individuālais apjoms). */
+function resolvePositionBasisUnitWithoutModuleVolume(
+  item: EstimateLineItem,
+): string | null {
+  if (hasPositionModuleSizeVolume(item)) {
+    return null;
+  }
+
+  if (item.manualUnitEnabled === true && item.manualUnit?.trim()) {
+    return item.manualUnit.trim();
+  }
+
+  if (item.variableQuantity && item.unit.trim()) {
+    return item.unit.trim();
+  }
+
+  return null;
+}
+
 /** Patēriņa mērvienība — moduļa apjoms, uz kuru attiecas `consumption`. */
 export function resolveMaterialConsumptionBasisUnit(
   ref: LineItemCatalogRef,
@@ -64,14 +90,39 @@ export function resolveMaterialConsumptionBasisUnit(
   moduleSizeOptions: BuildingModuleSizeOption[],
 ): string | null {
   const attachment = resolveMaterialConsumptionVolumeAttachment(ref, item);
-  if (!attachment || moduleSizeOptions.length === 0) {
-    return null;
+  if (attachment && moduleSizeOptions.length > 0) {
+    return resolveLineItemDisplayUnitFromModuleSize(
+      { ...item, moduleSizeAttachment: attachment },
+      moduleSizeOptions,
+    );
   }
 
-  return resolveLineItemDisplayUnitFromModuleSize(
-    { ...item, moduleSizeAttachment: attachment },
-    moduleSizeOptions,
-  );
+  return resolvePositionBasisUnitWithoutModuleVolume(item);
+}
+
+/** Mehānisma patēriņa bāze — pozīcijas mērvienība (ar moduļa apjomu vai bez). */
+export function resolveMechanismPositionBasisUnit(
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): string | null {
+  if (hasPositionModuleSizeVolume(item)) {
+    return resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions);
+  }
+
+  return resolvePositionBasisUnitWithoutModuleVolume(item);
+}
+
+export function shouldShowMechanismPerPositionConsumption(
+  ref: LineItemCatalogRef,
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): boolean {
+  const basisUnit = resolveMechanismPositionBasisUnit(item, moduleSizeOptions);
+  if (basisUnit == null) {
+    return false;
+  }
+
+  return !areEstimateUnitsEquivalent(ref.unit, basisUnit);
 }
 
 export function resolveMaterialConsumptionBasisQuantity(

@@ -19,6 +19,7 @@ import {
   normalizeRowTitle,
   rowItemLabel,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
+import { normalizeAttentionBudget } from "@/app/lib/estimates/attention-budget";
 
 export type SagataveChangeField =
   | "name"
@@ -30,9 +31,14 @@ export type SagataveChangeField =
   | "moduleSizeAttachment"
   | "customHourlyRate"
   | "hiddenPriceInOffer"
+  | "requiresAttention"
+  | "attentionBudget"
   | "materials"
   | "mechanisms"
   | "multiName"
+  | "multiNote"
+  | "multiRequiresAttention"
+  | "multiAttentionBudget"
   | "hiddenInOffer"
   | "hiddenPricesInOffer";
 
@@ -109,6 +115,12 @@ export function buildSagataveChangeId(
 
 function normalizeOptionalText(value: string | undefined): string {
   return (value ?? "").trim();
+}
+
+function attentionBudgetValue(
+  item: { attentionBudget?: number },
+): number | null {
+  return normalizeAttentionBudget(item.attentionBudget) ?? null;
 }
 
 function normalizeLaborTimeNorm(value: number | undefined): number | null {
@@ -308,6 +320,20 @@ function collectLineItemChanges(
     toValue: sagataveItem.hiddenPriceInOffer === true,
   });
 
+  pushChange(changes, {
+    ...context,
+    field: "requiresAttention",
+    fromValue: projectItem.requiresAttention === true,
+    toValue: sagataveItem.requiresAttention === true,
+  });
+
+  pushChange(changes, {
+    ...context,
+    field: "attentionBudget",
+    fromValue: attentionBudgetValue(projectItem),
+    toValue: attentionBudgetValue(sagataveItem),
+  });
+
   if (!catalogRefsEqual(projectItem.materials, sagataveItem.materials)) {
     changes.push({
       changeId: buildSagataveChangeId(context.path, "materials"),
@@ -355,6 +381,30 @@ function collectRowChanges(
       field: "multiName",
       fromValue: normalizeOptionalText(projectMulti.name),
       toValue: normalizeOptionalText(sagataveMulti.name),
+    });
+
+    pushChange(changes, {
+      ...context,
+      positionName: projectMulti.name,
+      field: "multiNote",
+      fromValue: normalizeOptionalText(projectMulti.note),
+      toValue: normalizeOptionalText(sagataveMulti.note),
+    });
+
+    pushChange(changes, {
+      ...context,
+      positionName: projectMulti.name,
+      field: "multiRequiresAttention",
+      fromValue: projectMulti.requiresAttention === true,
+      toValue: sagataveMulti.requiresAttention === true,
+    });
+
+    pushChange(changes, {
+      ...context,
+      positionName: projectMulti.name,
+      field: "multiAttentionBudget",
+      fromValue: attentionBudgetValue(projectMulti),
+      toValue: attentionBudgetValue(sagataveMulti),
     });
 
     const optionCount = Math.max(
@@ -617,6 +667,21 @@ function applyLineItemField(
         hiddenPriceInOffer:
           sagataveItem.hiddenPriceInOffer === true ? true : undefined,
       };
+    case "requiresAttention":
+      return {
+        ...item,
+        requiresAttention:
+          sagataveItem.requiresAttention === true ? true : undefined,
+        attentionBudget:
+          sagataveItem.requiresAttention === true
+            ? item.attentionBudget
+            : undefined,
+      };
+    case "attentionBudget":
+      return {
+        ...item,
+        attentionBudget: normalizeAttentionBudget(sagataveItem.attentionBudget),
+      };
     case "materials":
       return {
         ...item,
@@ -642,6 +707,40 @@ function applyRowField(
     return {
       ...row,
       name: sagataveRow.name,
+    };
+  }
+
+  if (field === "multiNote" && isEstimateMultiPosition(row) && isEstimateMultiPosition(sagataveRow)) {
+    return {
+      ...row,
+      note: normalizeOptionalText(sagataveRow.note) || undefined,
+    };
+  }
+
+  if (
+    field === "multiRequiresAttention" &&
+    isEstimateMultiPosition(row) &&
+    isEstimateMultiPosition(sagataveRow)
+  ) {
+    return {
+      ...row,
+      requiresAttention:
+        sagataveRow.requiresAttention === true ? true : undefined,
+      attentionBudget:
+        sagataveRow.requiresAttention === true
+          ? row.attentionBudget
+          : undefined,
+    };
+  }
+
+  if (
+    field === "multiAttentionBudget" &&
+    isEstimateMultiPosition(row) &&
+    isEstimateMultiPosition(sagataveRow)
+  ) {
+    return {
+      ...row,
+      attentionBudget: normalizeAttentionBudget(sagataveRow.attentionBudget),
     };
   }
 
@@ -703,6 +802,7 @@ const LINE_ITEM_SYNC_FIELDS = [
   "moduleSizeAttachment",
   "customHourlyRate",
   "hiddenPriceInOffer",
+  "requiresAttention",
   "materials",
   "mechanisms",
 ] as const satisfies readonly SagataveChangeField[];
@@ -810,6 +910,10 @@ export function applySelectedSagataveChangesToProject(
   const rowKeysToSync = new Set<string>();
   const optionKeysToSync = new Set<string>();
   const rowKeysWithMultiName = new Set<string>();
+  const rowKeysWithMultiNote = new Set<string>();
+  const rowKeysWithMultiRequiresAttention = new Set<string>();
+  const rowKeysWithMultiAttentionBudget = new Set<string>();
+  const rowKeysWithLineAttentionBudget = new Set<string>();
 
   for (const change of changes) {
     if (
@@ -866,6 +970,22 @@ export function applySelectedSagataveChangesToProject(
     if (change.field === "multiName") {
       rowKeysWithMultiName.add(rowOnlySyncKey(change.path));
     }
+
+    if (change.field === "multiNote") {
+      rowKeysWithMultiNote.add(rowOnlySyncKey(change.path));
+    }
+
+    if (change.field === "multiRequiresAttention") {
+      rowKeysWithMultiRequiresAttention.add(rowOnlySyncKey(change.path));
+    }
+
+    if (change.field === "multiAttentionBudget") {
+      rowKeysWithMultiAttentionBudget.add(rowOnlySyncKey(change.path));
+    }
+
+    if (change.field === "attentionBudget") {
+      rowKeysWithLineAttentionBudget.add(rowOnlySyncKey(change.path));
+    }
   }
 
   for (const rowKey of rowKeysToSync) {
@@ -894,6 +1014,32 @@ export function applySelectedSagataveChangesToProject(
         nextMulti = {
           ...nextMulti,
           name: sagataveRow.name,
+        };
+      }
+
+      if (rowKeysWithMultiNote.has(rowKey)) {
+        nextMulti = {
+          ...nextMulti,
+          note: normalizeOptionalText(sagataveRow.note) || undefined,
+        };
+      }
+
+      if (rowKeysWithMultiRequiresAttention.has(rowKey)) {
+        nextMulti = {
+          ...nextMulti,
+          requiresAttention:
+            sagataveRow.requiresAttention === true ? true : undefined,
+          attentionBudget:
+            sagataveRow.requiresAttention === true
+              ? nextMulti.attentionBudget
+              : undefined,
+        };
+      }
+
+      if (rowKeysWithMultiAttentionBudget.has(rowKey)) {
+        nextMulti = {
+          ...nextMulti,
+          attentionBudget: normalizeAttentionBudget(sagataveRow.attentionBudget),
         };
       }
 
@@ -954,10 +1100,15 @@ export function applySelectedSagataveChangesToProject(
       continue;
     }
 
-    const nextRow = syncLineItemFromSagatave(projectRow, sagataveRow);
-    if (nextRow !== projectRow) {
-      projectItems[rowIndex] = nextRow;
-      appliedNodeIds.push(...collectTouchedNodeIds(nextRow));
+    let nextRow: EstimateLineItem = projectRow;
+    if (rowKeysWithLineAttentionBudget.has(rowKey)) {
+      nextRow = applyLineItemField(projectRow, sagataveRow, "attentionBudget");
+    }
+
+    const syncedRow = syncLineItemFromSagatave(nextRow, sagataveRow);
+    if (syncedRow !== projectRow) {
+      projectItems[rowIndex] = syncedRow;
+      appliedNodeIds.push(...collectTouchedNodeIds(syncedRow));
     }
   }
 

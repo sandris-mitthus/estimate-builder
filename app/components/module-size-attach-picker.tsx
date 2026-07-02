@@ -23,6 +23,8 @@ type ModuleSizeAttachPickerProps = {
   onChange: (attachment: LineItemModuleSizeAttachment | null) => void;
 };
 
+const EMPTY_ATTACHED_ITEM_KEYS: string[] = [];
+
 /** Atgriež sadaļas nosaukumu, kurā atrodas dotais `itemKey`, vai `null`. */
 function findSectionForItemKey(
   sections: { title: string; items: { key: string }[] }[],
@@ -63,9 +65,16 @@ function ModuleCard({
 }) {
   const { t } = useTranslations();
   const isAttachedModule = attachment?.moduleId === module.id;
-  const attachedItemKeys = isAttachedModule
-    ? getLineItemModuleSizeItemKeys(attachment)
-    : [];
+  const attachedKeysSignature =
+    isAttachedModule && attachment
+      ? getLineItemModuleSizeItemKeys(attachment).join(",")
+      : "";
+  const attachedItemKeys = useMemo(() => {
+    if (!attachedKeysSignature) {
+      return EMPTY_ATTACHED_ITEM_KEYS;
+    }
+    return attachedKeysSignature.split(",");
+  }, [attachedKeysSignature]);
 
   // Lokālais korekciju stāvoklis — darbojas arī pirms kāda elementa piesaistīšanas.
   const [localAdjustments, setLocalAdjustments] = useState<Record<string, string>>(
@@ -117,10 +126,11 @@ function ModuleCard({
 
   // Kad mainās piesaistītais modulis vai atslēgas — atver attiecīgo sadaļu.
   useEffect(() => {
+    if (!isAttachedModule) {
+      return;
+    }
     setOpenSection(
-      isAttachedModule
-        ? findSectionForItemKey(module.sections, attachedItemKeys[0])
-        : null,
+      findSectionForItemKey(module.sections, attachedItemKeys[0]),
     );
   }, [attachedItemKeys, isAttachedModule, module.sections]);
 

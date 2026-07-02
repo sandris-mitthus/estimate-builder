@@ -1,5 +1,8 @@
 import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
-import { resolveMaterialUnitPriceContribution } from "@/app/lib/estimates/material-consumption-basis";
+import {
+  resolveMaterialUnitPriceContribution,
+  shouldShowMechanismPerPositionConsumption,
+} from "@/app/lib/estimates/material-consumption-basis";
 import type {
   EstimateLineItem,
   LineItemCatalogRef,
@@ -137,7 +140,13 @@ export function deriveCompositeUnitPrice(
     resolveEffectiveMechanisms(item).reduce((sum, ref) => {
       const rate = resolveCatalogRefUnitPrice(ref, catalogPositions);
       return (
-        sum + resolveMechanismUnitPriceContribution(ref, item, rate)
+        sum +
+        resolveMechanismUnitPriceContribution(
+          ref,
+          item,
+          rate,
+          moduleSizeOptions,
+        )
       );
     }, 0),
   );
@@ -150,13 +159,21 @@ export function resolveMechanismUnitPriceContribution(
   ref: LineItemCatalogRef,
   item: EstimateLineItem,
   catalogPrice: number,
+  moduleSizeOptions: BuildingModuleSizeOption[] = [],
 ): number {
   const timeNorm = Number.isFinite(item.laborTimeNorm)
     ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
     : 0;
   const quantity = ref.consumption ?? 1;
+  const perPositionConsumption = shouldShowMechanismPerPositionConsumption(
+    ref,
+    item,
+    moduleSizeOptions,
+  );
   const effectiveQuantity =
-    ref.fixedQuantity === true ? quantity : timeNorm * quantity;
+    ref.fixedQuantity === true || perPositionConsumption
+      ? quantity
+      : timeNorm * quantity;
   return roundToTwoDecimals(catalogPrice * effectiveQuantity);
 }
 

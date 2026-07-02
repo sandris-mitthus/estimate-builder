@@ -11,6 +11,7 @@ import {
   collectRowLineItems,
   resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
+import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
 import type {
   EstimateCategory,
   EstimateLineItem,
@@ -271,20 +272,23 @@ export async function buildEstimateExcel(
     catRow.getCell(11).alignment = { horizontal: "right", vertical: "middle" };
     catRow.getCell(11).numFmt = "0.00";
 
-    // Direct items under category
-    for (const item of collectRowLineItems(cat.items, { forTotals: true })) {
-      nr += 1;
-      const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
-        item,
-        catalogPositions,
-        defaultHourlyRate,
-        plannedProfitPercent,
-      );
-      addDataRow(ws, nr, item, unitPrice, lineTotal, "");
-    }
+    // Category children in configured order
+    for (const child of resolveCategoryChildren(cat)) {
+      if (child.kind === "item") {
+        for (const item of collectRowLineItems([child.row], { forTotals: true })) {
+          nr += 1;
+          const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
+            item,
+            catalogPositions,
+            defaultHourlyRate,
+            plannedProfitPercent,
+          );
+          addDataRow(ws, nr, item, unitPrice, lineTotal, "");
+        }
+        continue;
+      }
 
-    // Subcategories
-    for (const sub of cat.subcategories) {
+      const sub = child.subcategory;
       const subItems = collectRowLineItems(sub.items, { forTotals: true });
       if (subItems.length === 0) continue;
 

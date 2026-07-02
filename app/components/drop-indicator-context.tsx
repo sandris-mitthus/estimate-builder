@@ -3,14 +3,15 @@
 import {
   useCallback,
   createContext,
-  useEffect,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { canDropDragId } from "@/app/lib/estimates/reorder-estimate";
+import type { EstimateCategory } from "@/app/lib/estimates/types";
 
 type DropIndicatorContextValue = {
   activeId: string | null;
@@ -23,6 +24,24 @@ type DropIndicatorContextValue = {
 const DropIndicatorContext = createContext<DropIndicatorContextValue | null>(
   null,
 );
+
+const EstimateDragCategoriesContext = createContext<EstimateCategory[] | null>(
+  null,
+);
+
+export function EstimateDragCategoriesProvider({
+  categories,
+  children,
+}: {
+  categories: EstimateCategory[];
+  children: ReactNode;
+}) {
+  return (
+    <EstimateDragCategoriesContext.Provider value={categories}>
+      {children}
+    </EstimateDragCategoriesContext.Provider>
+  );
+}
 
 export function DropIndicatorProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -105,10 +124,14 @@ function useDropIndicatorContext() {
 
 export function useShowDropLine(sortId: string): boolean {
   const { activeId, overId } = useDropIndicatorContext();
+  const categories = useContext(EstimateDragCategoriesContext);
 
   if (!activeId || !overId || activeId === overId) return false;
 
-  return overId === sortId && canDropDragId(activeId, overId);
+  return (
+    overId === sortId &&
+    canDropDragId(activeId, overId, categories ?? undefined)
+  );
 }
 
 export function useDropIndicatorActions() {

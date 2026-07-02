@@ -13,7 +13,10 @@ import { MechanismBasisControl } from "@/app/components/mechanism-basis-control"
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
+import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
+import { LineItemAttentionToggle } from "@/app/components/line-item-attention-toggle";
 import { DeleteButton } from "@/app/components/delete-button";
 import { useIsSystemAdmin } from "@/app/components/system-admin-context";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -28,7 +31,12 @@ import {
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
 } from "@/app/lib/estimates/composite-line-item";
+import { buildManualUnitSelectOptions } from "@/app/lib/estimates/collect-estimate-document-units";
 import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import {
+  normalizeAttentionBudget,
+  patchRequiresAttention,
+} from "@/app/lib/estimates/attention-budget";
 import type {
   EstimateLineItem,
   EstimateMultiPosition,
@@ -47,12 +55,15 @@ type MultiPositionModalProps = {
   defaultHourlyRate: number | null;
   currency?: string | null;
   moduleSizeOptions?: BuildingModuleSizeOption[];
+  estimateUnits?: string[];
+  allowAttentionFlagEdit?: boolean;
 };
 
 type OptionDraft = {
   optionId: string;
   lineItemId: string;
   label: string;
+  note: string;
   timeNorm: number;
   customHourlyRateEnabled: boolean;
   customHourlyRate: number;
@@ -72,6 +83,7 @@ function createOptionDraft(): OptionDraft {
     optionId: crypto.randomUUID(),
     lineItemId: crypto.randomUUID(),
     label: "",
+    note: "",
     timeNorm: 0,
     customHourlyRateEnabled: false,
     customHourlyRate: 0,
@@ -86,13 +98,19 @@ function deriveSharedState(value: EstimateMultiPosition) {
   const first = value.options[0]?.lineItem;
   return {
     name: value.name,
+    note: value.note?.trim() ?? "",
+    requiresAttention: value.requiresAttention === true,
+    attentionBudget: normalizeAttentionBudget(value.attentionBudget) ?? null,
     attachment: first?.moduleSizeAttachment ?? null,
+    manualUnitEnabled: first?.manualUnitEnabled === true,
+    manualUnit: first?.manualUnit?.trim() ?? "",
     options:
       value.options.length > 0
         ? value.options.map<OptionDraft>((option) => ({
             optionId: option.id,
             lineItemId: option.lineItem.id,
             label: option.lineItem.name,
+            note: option.lineItem.note?.trim() ?? "",
             timeNorm: option.lineItem.laborTimeNorm ?? 0,
             customHourlyRateEnabled:
               option.lineItem.customHourlyRateEnabled ?? false,
@@ -108,14 +126,25 @@ function deriveSharedState(value: EstimateMultiPosition) {
 
 function snapshot(state: {
   name: string;
+  note: string;
+  requiresAttention: boolean;
+  attentionBudget: number | null;
   attachment: LineItemModuleSizeAttachment | null;
+  manualUnitEnabled: boolean;
+  manualUnit: string;
   options: OptionDraft[];
 }): string {
   return JSON.stringify({
     name: state.name.trim(),
+    note: state.note.trim(),
+    requiresAttention: state.requiresAttention,
+    attentionBudget: state.attentionBudget,
     attachment: state.attachment,
+    manualUnitEnabled: state.manualUnitEnabled,
+    manualUnit: state.manualUnit.trim(),
     options: state.options.map((option) => ({
       label: option.label.trim(),
+      note: option.note.trim(),
       timeNorm: option.timeNorm,
       customHourlyRateEnabled: option.customHourlyRateEnabled,
       customHourlyRate: option.customHourlyRate,
@@ -128,10 +157,14 @@ function snapshot(state: {
 function buildOptionPreviewLineItem(
   option: OptionDraft,
   sharedAttachment: LineItemModuleSizeAttachment | null,
+  manualUnitEnabled: boolean,
+  manualUnit: string,
+  moduleSizeOptions: BuildingModuleSizeOption[],
 ): EstimateLineItem {
-  return {
+  const partialItem: EstimateLineItem = {
     id: option.lineItemId,
     name: option.label,
+    note: option.note.trim() || undefined,
     unit: "gab.",
     quantity: 1,
     unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
@@ -141,7 +174,20 @@ function buildOptionPreviewLineItem(
     materials: option.materials,
     mechanisms: option.mechanisms,
     moduleSizeAttachment: sharedAttachment ?? undefined,
+    manualUnitEnabled: manualUnitEnabled ? true : undefined,
+    manualUnit:
+      manualUnitEnabled && manualUnit.trim() ? manualUnit.trim() : undefined,
   };
+  const unit = (() => {
+    if (manualUnitEnabled && manualUnit.trim()) {
+      return manualUnit.trim();
+    }
+    return (
+      resolveLineItemDisplayUnitFromModuleSize(partialItem, moduleSizeOptions) ??
+      "gab."
+    );
+  })();
+  return { ...partialItem, unit };
 }
 
 export function MultiPositionModal({
@@ -153,14 +199,23 @@ export function MultiPositionModal({
   defaultHourlyRate,
   currency = null,
   moduleSizeOptions = [],
+  estimateUnits = [],
+  allowAttentionFlagEdit = false,
 }: MultiPositionModalProps) {
   const { t } = useTranslations();
   const isSystemAdmin = useIsSystemAdmin();
   const [name, setName] = useState(value.name);
+  const [note, setNote] = useState(value.note?.trim() ?? "");
+  const [requiresAttention, setRequiresAttention] = useState(false);
+  const [attentionBudget, setAttentionBudget] = useState<number | null>(null);
   const [attachment, setAttachment] =
     useState<LineItemModuleSizeAttachment | null>(null);
+  const [manualUnitEnabled, setManualUnitEnabled] = useState(false);
+  const [manualUnit, setManualUnit] = useState("");
   const [options, setOptions] = useState<OptionDraft[]>([createOptionDraft()]);
   const [initialSnapshot, setInitialSnapshot] = useState("");
+  const [globalNoteError, setGlobalNoteError] = useState<string | undefined>();
+  const [noteErrors, setNoteErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) {
@@ -168,9 +223,16 @@ export function MultiPositionModal({
     }
     const shared = deriveSharedState(value);
     setName(shared.name);
+    setNote(shared.note);
+    setRequiresAttention(shared.requiresAttention);
+    setAttentionBudget(shared.attentionBudget);
     setAttachment(shared.attachment);
+    setManualUnitEnabled(shared.manualUnitEnabled);
+    setManualUnit(shared.manualUnit);
     setOptions(shared.options);
     setInitialSnapshot(snapshot(shared));
+    setGlobalNoteError(undefined);
+    setNoteErrors({});
   }, [open, value]);
 
   const materialPositions = useMemo(
@@ -182,10 +244,33 @@ export function MultiPositionModal({
       catalogPositions.filter((position) => position.costType === "mechanisms"),
     [catalogPositions],
   );
+  const manualUnitOptions = useMemo(
+    () => buildManualUnitSelectOptions(estimateUnits),
+    [estimateUnits],
+  );
 
   const currentSnapshot = useMemo(
-    () => snapshot({ name, attachment, options }),
-    [name, attachment, options],
+    () =>
+      snapshot({
+        name,
+        note,
+        requiresAttention,
+        attentionBudget,
+        attachment,
+        manualUnitEnabled,
+        manualUnit,
+        options,
+      }),
+    [
+      name,
+      note,
+      requiresAttention,
+      attentionBudget,
+      attachment,
+      manualUnitEnabled,
+      manualUnit,
+      options,
+    ],
   );
   const dirty = currentSnapshot !== initialSnapshot;
 
@@ -361,9 +446,39 @@ export function MultiPositionModal({
     );
   }
 
+  function handleManualUnitEnabledChange(enabled: boolean) {
+    if (!enabled) {
+      setManualUnitEnabled(false);
+      return;
+    }
+
+    const previewItem: EstimateLineItem = {
+      id: options[0]?.lineItemId ?? "",
+      name: "",
+      unit: "gab.",
+      quantity: 1,
+      unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
+      moduleSizeAttachment: attachment ?? undefined,
+    };
+    const nextUnit =
+      manualUnit.trim() ||
+      resolveLineItemDisplayUnitFromModuleSize(previewItem, moduleSizeOptions) ||
+      manualUnitOptions[0] ||
+      "gab.";
+
+    setManualUnitEnabled(true);
+    setManualUnit(nextUnit);
+  }
+
   function optionUnitPrice(option: OptionDraft) {
     return deriveCompositeUnitPrice(
-      buildOptionPreviewLineItem(option, attachment),
+      buildOptionPreviewLineItem(
+        option,
+        attachment,
+        manualUnitEnabled,
+        manualUnit,
+        moduleSizeOptions,
+      ),
       catalogPositions,
       defaultHourlyRate,
       moduleSizeOptions,
@@ -373,6 +488,7 @@ export function MultiPositionModal({
   function isMeaningfulOption(option: OptionDraft): boolean {
     return Boolean(
       option.label.trim() ||
+        option.note.trim() ||
         option.timeNorm > 0 ||
         option.customHourlyRateEnabled ||
         option.materials.length > 0 ||
@@ -383,14 +499,43 @@ export function MultiPositionModal({
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
+    const trimmedGlobalNote = note.trim();
+    if (trimmedGlobalNote.length > 255) {
+      setGlobalNoteError(
+        t(
+          "positions.validation.note_too_long",
+          "Piezīme nedrīkst būt garāka par 255 zīmēm.",
+        ),
+      );
+      return;
+    }
+    setGlobalNoteError(undefined);
+
+    const nextNoteErrors: Record<string, string> = {};
+    for (const option of options) {
+      if (option.note.trim().length > 255) {
+        nextNoteErrors[option.optionId] = t(
+          "positions.validation.note_too_long",
+          "Piezīme nedrīkst būt garāka par 255 zīmēm.",
+        );
+      }
+    }
+    if (Object.keys(nextNoteErrors).length > 0) {
+      setNoteErrors(nextNoteErrors);
+      return;
+    }
+    setNoteErrors({});
+
     const meaningful = options.filter(isMeaningfulOption);
     const finalOptions = meaningful.length > 0 ? meaningful : [options[0]];
 
     const builtOptions = finalOptions.map((option) => {
       const label = option.label.trim();
+      const trimmedNote = option.note.trim();
       const partialItem: EstimateLineItem = {
         id: option.lineItemId,
         name: label,
+        note: trimmedNote || undefined,
         unit: "gab.",
         quantity: 1,
         laborTimeNorm: option.timeNorm,
@@ -401,15 +546,25 @@ export function MultiPositionModal({
         materials: option.materials,
         mechanisms: option.mechanisms,
         moduleSizeAttachment: attachment ?? undefined,
+        manualUnitEnabled: manualUnitEnabled ? true : undefined,
+        manualUnit:
+          manualUnitEnabled && manualUnit.trim() ? manualUnit.trim() : undefined,
         unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
       };
-      const lineItem: EstimateLineItem = {
-        ...partialItem,
-        unit:
+      const resolvedUnit = (() => {
+        if (manualUnitEnabled && manualUnit.trim()) {
+          return manualUnit.trim();
+        }
+        return (
           resolveLineItemDisplayUnitFromModuleSize(
             partialItem,
             moduleSizeOptions,
-          ) ?? "gab.",
+          ) ?? "gab."
+        );
+      })();
+      const lineItem: EstimateLineItem = {
+        ...partialItem,
+        unit: resolvedUnit,
       };
       return {
         id: option.optionId,
@@ -429,6 +584,11 @@ export function MultiPositionModal({
       ...value,
       kind: "multi",
       name: name.trim(),
+      note: trimmedGlobalNote || undefined,
+      requiresAttention: requiresAttention ? true : undefined,
+      attentionBudget: requiresAttention
+        ? normalizeAttentionBudget(attentionBudget ?? undefined)
+        : undefined,
       options: builtOptions,
       selectedOptionId: value.selectedOptionId ?? null,
     });
@@ -448,17 +608,93 @@ export function MultiPositionModal({
       dirty={dirty}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className={inputClassName}
-            placeholder={t("estimate.multi.name_placeholder", "piem. Fasādes apdare")}
-            autoFocus
-          />
-        </label>
+        <div className="space-y-3">
+          <label className="block">
+            <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className={inputClassName}
+              placeholder={t("estimate.multi.name_placeholder", "piem. Fasādes apdare")}
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className={labelClassName}>{t("common.note", "Piezīme")}</span>
+            <textarea
+              value={note}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setGlobalNoteError(undefined);
+              }}
+              rows={2}
+              placeholder={t(
+                "positions.note.placeholder",
+                "Papildu informācija par pozīciju",
+              )}
+              className={`${inputClassName} resize-y`}
+              aria-invalid={Boolean(globalNoteError)}
+              aria-describedby={globalNoteError ? "multi-global-note-error" : undefined}
+            />
+            {globalNoteError ? (
+              <p
+                id="multi-global-note-error"
+                className="mt-1 text-sm text-red-600"
+                role="alert"
+              >
+                {globalNoteError}
+              </p>
+            ) : null}
+          </label>
+          {allowAttentionFlagEdit || requiresAttention ? (
+            <div className="space-y-3 rounded-lg border border-red-100 bg-red-50/50 p-3">
+              {allowAttentionFlagEdit ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-red-800">
+                    {t("estimate.attention.section_title", "Īpaša uzmanība")}
+                  </span>
+                  <LineItemAttentionToggle
+                    id={`multi-attention-${value.id}`}
+                    enabled={requiresAttention}
+                    onChange={(nextEnabled) => {
+                      const next = patchRequiresAttention(
+                        {
+                          requiresAttention,
+                          attentionBudget: attentionBudget ?? undefined,
+                        },
+                        nextEnabled,
+                      );
+                      setRequiresAttention(next.requiresAttention === true);
+                      setAttentionBudget(
+                        normalizeAttentionBudget(next.attentionBudget) ?? null,
+                      );
+                    }}
+                  />
+                </div>
+              ) : null}
+              {requiresAttention ? (
+                <EstimateAttentionBudgetControl
+                  id={`multi-attention-budget-${value.id}`}
+                  value={attentionBudget ?? undefined}
+                  currency={currency}
+                  onChange={(nextBudget) =>
+                    setAttentionBudget(normalizeAttentionBudget(nextBudget) ?? null)
+                  }
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <PositionManualUnitField
+          id={`multi-manual-unit-${value.id}`}
+          enabled={manualUnitEnabled}
+          unit={manualUnit}
+          unitOptions={manualUnitOptions}
+          onEnabledChange={handleManualUnitEnabledChange}
+          onUnitChange={setManualUnit}
+        />
 
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
@@ -561,6 +797,46 @@ export function MultiPositionModal({
                     </label>
                   </div>
 
+                  <label className="block">
+                    <span className={subLabelClassName}>
+                      {t("common.note", "Piezīme")}
+                    </span>
+                    <textarea
+                      value={option.note}
+                      onChange={(event) => {
+                        updateOption(option.optionId, { note: event.target.value });
+                        if (noteErrors[option.optionId]) {
+                          setNoteErrors((current) => {
+                            const next = { ...current };
+                            delete next[option.optionId];
+                            return next;
+                          });
+                        }
+                      }}
+                      rows={2}
+                      placeholder={t(
+                        "positions.note.placeholder",
+                        "Papildu informācija par pozīciju",
+                      )}
+                      className={`${inputClassName} resize-y`}
+                      aria-invalid={Boolean(noteErrors[option.optionId])}
+                      aria-describedby={
+                        noteErrors[option.optionId]
+                          ? `multi-option-note-error-${option.optionId}`
+                          : undefined
+                      }
+                    />
+                    {noteErrors[option.optionId] ? (
+                      <p
+                        id={`multi-option-note-error-${option.optionId}`}
+                        className="mt-1 text-sm text-red-600"
+                        role="alert"
+                      >
+                        {noteErrors[option.optionId]}
+                      </p>
+                    ) : null}
+                  </label>
+
                   {isSystemAdmin ? null : (
                     <PositionCustomHourlyRateField
                       id={`multi-custom-hourly-rate-${option.optionId}`}
@@ -600,7 +876,13 @@ export function MultiPositionModal({
                           renderItem={(mat, matIdx) => (
                             <MaterialConsumptionBasisControl
                               material={mat}
-                              item={buildOptionPreviewLineItem(option, attachment)}
+                              item={buildOptionPreviewLineItem(
+                                option,
+                                attachment,
+                                manualUnitEnabled,
+                                manualUnit,
+                                moduleSizeOptions,
+                              )}
                               moduleSizeOptions={moduleSizeOptions}
                               catalogPositions={catalogPositions}
                               currency={currency}
@@ -664,7 +946,13 @@ export function MultiPositionModal({
                           renderItem={(mech, mechIdx) => (
                             <MechanismBasisControl
                               mechanism={mech}
-                              item={buildOptionPreviewLineItem(option, attachment)}
+                              item={buildOptionPreviewLineItem(
+                                option,
+                                attachment,
+                                manualUnitEnabled,
+                                manualUnit,
+                                moduleSizeOptions,
+                              )}
                               moduleSizeOptions={moduleSizeOptions}
                               catalogPositions={catalogPositions}
                               currency={currency}

@@ -4,6 +4,7 @@ import {
   itemDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
+import { resolveCategoryChildOrder } from "@/app/lib/estimates/category-child-order";
 import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import type { EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimatePositionSection } from "@/app/lib/estimate-positions/types";
@@ -62,20 +63,23 @@ export function collectVisibleSectionDragIds(
       continue;
     }
 
-    for (const subcategory of section.subcategories) {
-      ids.push(subcategoryDragId(subcategory.id));
+    for (const ref of resolveCategoryChildOrder(section)) {
+      if (ref.kind === "subcategory") {
+        ids.push(subcategoryDragId(ref.id));
+        if (collapsedSectionIds.has(ref.id)) {
+          continue;
+        }
 
-      if (collapsedSectionIds.has(subcategory.id)) {
+        const subcategory = section.subcategories.find(
+          (entry) => entry.id === ref.id,
+        );
+        for (const row of subcategory?.items ?? []) {
+          ids.push(itemDragId(getRowItemId(row)));
+        }
         continue;
       }
 
-      for (const row of subcategory.items) {
-        ids.push(itemDragId(getRowItemId(row)));
-      }
-    }
-
-    for (const row of section.items) {
-      ids.push(itemDragId(getRowItemId(row)));
+      ids.push(itemDragId(ref.id));
     }
   }
 

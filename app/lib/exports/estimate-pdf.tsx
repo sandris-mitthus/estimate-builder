@@ -19,6 +19,7 @@ import {
   resolveLineItemDisplayName,
   resolveSelectedMultiLineItem,
 } from "@/app/lib/estimates/multi-position";
+import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
 import type { EstimateCategory, EstimateLineItem, EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -477,52 +478,53 @@ export function EstimatePdfDocument({
                 <Text style={s.catTotal}>{fmtMoney(catTotals.grand, company.currency)}</Text>
               </View>
 
-              {cat.items.map((row) => {
-                const lineItem = isEstimateLineItem(row)
-                  ? row
-                  : resolveSelectedMultiLineItem(row);
-                if (!lineItem) return null;
+              {resolveCategoryChildren(cat).map((child) => {
+                if (child.kind === "item") {
+                  const row = child.row;
+                  const lineItem = isEstimateLineItem(row)
+                    ? row
+                    : resolveSelectedMultiLineItem(row);
+                  if (!lineItem) return null;
 
-                rowNr += 1;
-                const grand = resolveItemGrand(
-                  lineItem,
-                  catalogPositions,
-                  defaultHourlyRate,
-                  plannedProfitPercent,
-                );
-                const hidePrice = lineItem.hiddenPriceInOffer === true;
-
-                return (
-                  <View key={row.id} style={s.itemRow}>
-                    <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
-                    <Text style={[s.cell, s.colName]}>
-                      {resolveLineItemDisplayName(lineItem)}
-                    </Text>
-                    <Text style={[s.cell, s.colTotal]}>
-                      {hidePrice ? "" : fmtMoney(grand, company.currency)}
-                    </Text>
-                  </View>
-                );
-              })}
-
-              {(() => {
-                let subRowNr = rowNr;
-                const subcategoryRows = cat.subcategories.flatMap((sub) => {
-                  const result = buildSubcategoryOfferRows(
-                    sub,
-                    subRowNr,
+                  rowNr += 1;
+                  const grand = resolveItemGrand(
+                    lineItem,
                     catalogPositions,
                     defaultHourlyRate,
                     plannedProfitPercent,
-                    company.currency,
-                    tx,
                   );
-                  subRowNr = result.nextRowNr;
-                  return result.rows;
-                });
-                rowNr = subRowNr;
-                return subcategoryRows;
-              })()}
+                  const hidePrice = lineItem.hiddenPriceInOffer === true;
+
+                  return (
+                    <View key={row.id} style={s.itemRow}>
+                      <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
+                      <Text style={[s.cell, s.colName]}>
+                        {resolveLineItemDisplayName(lineItem)}
+                      </Text>
+                      <Text style={[s.cell, s.colTotal]}>
+                        {hidePrice ? "" : fmtMoney(grand, company.currency)}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                let subRowNr = rowNr;
+                const result = buildSubcategoryOfferRows(
+                  child.subcategory,
+                  subRowNr,
+                  catalogPositions,
+                  defaultHourlyRate,
+                  plannedProfitPercent,
+                  company.currency,
+                  tx,
+                );
+                rowNr = result.nextRowNr;
+                return (
+                  <View key={child.subcategory.id}>
+                    {result.rows}
+                  </View>
+                );
+              })}
             </View>
           );
         })}

@@ -1,16 +1,21 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import {
+  canDropCategoryChild,
+  collectCategoryChildDragIds,
+  findCategoryIdForDragTarget,
+  insertCategoryLevelItem,
+  moveCategoryChildAcrossCategories,
+  removeCategoryChildRef,
+  reorderCategoryChildOrder,
+} from "@/app/lib/estimates/category-child-order";
+import {
   categoryDragId,
   itemDragId,
   parseDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
 import { getRowItemId } from "@/app/lib/estimates/multi-position";
-import type {
-  EstimateCategory,
-  EstimateRowItem,
-  EstimateSubcategory,
-} from "@/app/lib/estimates/types";
+import type { EstimateCategory, EstimateRowItem } from "@/app/lib/estimates/types";
 
 type ItemLocation = {
   categoryId: string;
@@ -23,30 +28,34 @@ export function collectAllDragIds(categories: EstimateCategory[]): string[] {
 
   for (const category of categories) {
     ids.push(categoryDragId(category.id));
-
-    for (const subcategory of category.subcategories) {
-      ids.push(subcategoryDragId(subcategory.id));
-      for (const row of subcategory.items) {
-        ids.push(itemDragId(getRowItemId(row)));
-      }
-    }
-
-    for (const row of category.items) {
-      ids.push(itemDragId(getRowItemId(row)));
-    }
+    ids.push(...collectCategoryChildDragIds(category));
   }
 
   return ids;
 }
 
-export function canDropDragId(activeDragId: string, overDragId: string): boolean {
+export function canDropDragId(
+  activeDragId: string,
+  overDragId: string,
+  categories?: EstimateCategory[],
+): boolean {
+  if (categories?.length) {
+    return canDropCategoryChild(categories, activeDragId, overDragId);
+  }
+
   const active = parseDragId(activeDragId);
   const over = parseDragId(overDragId);
 
   if (!active || !over || activeDragId === overDragId) return false;
 
   if (active.kind === "category") return over.kind === "category";
-  if (active.kind === "subcategory") return over.kind === "subcategory";
+  if (active.kind === "subcategory") {
+    return (
+      over.kind === "subcategory" ||
+      over.kind === "item" ||
+      over.kind === "category"
+    );
+  }
   if (active.kind === "item") {
     return (
       over.kind === "item" ||
@@ -74,46 +83,66 @@ function reorderCategories(
   return arrayMove(categories, oldIndex, newIndex);
 }
 
-function moveSubcategory(
+function findCategoryIdForSubcategory(
   categories: EstimateCategory[],
-  activeSubId: string,
-  overSubId: string,
-): EstimateCategory[] {
-  let extracted: EstimateSubcategory | null = null;
-
-  const reduced = categories.map((category) => {
-    const index = category.subcategories.findIndex((sub) => sub.id === activeSubId);
-    if (index < 0) return category;
-
-    const subcategories = [...category.subcategories];
-    extracted = subcategories[index];
-    subcategories.splice(index, 1);
-    return { ...category, subcategories };
-  });
-
-  if (!extracted) return categories;
-
-  let targetCategoryId: string | null = null;
-  let targetIndex = -1;
-
-  for (const category of reduced) {
-    const index = category.subcategories.findIndex((sub) => sub.id === overSubId);
-    if (index >= 0) {
-      targetCategoryId = category.id;
-      targetIndex = index;
-      break;
+  subcategoryId: string,
+): string | null {
+  for (const category of categories) {
+    if (category.subcategories.some((subcategory) => subcategory.id === subcategoryId)) {
+      return category.id;
     }
   }
 
-  if (!targetCategoryId || targetIndex < 0) return categories;
+  return null;
+}
 
-  return reduced.map((category) => {
-    if (category.id !== targetCategoryId) return category;
+function findCategoryIdForCategoryChild(
+  categories: EstimateCategory[],
+  over: NonNullable<ReturnType<typeof parseDragId>>,
+): string | null {
+  if (over.kind === "category") {
+    return over.id;
+  }
 
-    const subcategories = [...category.subcategories];
-    subcategories.splice(targetIndex, 0, extracted!);
-    return { ...category, subcategories };
-  });
+  if (over.kind === "subcategory") {
+    return findCategoryIdForDragTarget(categories, subcategoryDragId(over.id));
+  }
+
+  if (over.kind === "item") {
+    return findCategoryIdForDragTarget(categories, itemDragId(over.id));
+  }
+
+  return null;
+}
+
+function moveSubcategory(
+  categories: EstimateCategory[],
+  activeDragId: string,
+  overDragId: string,
+): EstimateCategory[] {
+  const active = parseDragId(activeDragId);
+  const over = parseDragId(overDragId);
+  if (!active || active.kind !== "subcategory" || !over) {
+    return categories;
+  }
+
+  const sourceCategoryId = findCategoryIdForSubcategory(categories, active.id);
+  const targetCategoryId = findCategoryIdForCategoryChild(categories, over);
+  if (!sourceCategoryId || !targetCategoryId) {
+    return categories;
+  }
+
+  if (sourceCategoryId === targetCategoryId) {
+    return categories.map((category) => {
+      if (category.id !== sourceCategoryId) {
+        return category;
+      }
+
+      return reorderCategoryChildOrder(category, activeDragId, overDragId) ?? category;
+    });
+  }
+
+  return moveCategoryChildAcrossCategories(categories, activeDragId, overDragId);
 }
 
 function findItemLocation(
@@ -155,26 +184,35 @@ function extractRowItem(
 ): { categories: EstimateCategory[]; row: EstimateRowItem | null } {
   let extracted: EstimateRowItem | null = null;
 
-  const next = categories.map((category) => ({
-    ...category,
-    items: category.items.filter((row) => {
-      if (getRowItemId(row) === rowId) {
-        extracted = row;
-        return false;
-      }
-      return true;
-    }),
-    subcategories: category.subcategories.map((subcategory) => ({
-      ...subcategory,
-      items: subcategory.items.filter((row) => {
-        if (getRowItemId(row) === rowId) {
-          extracted = row;
-          return false;
-        }
-        return true;
-      }),
-    })),
-  }));
+  const next = categories.map((category) => {
+    const directIndex = category.items.findIndex(
+      (row) => getRowItemId(row) === rowId,
+    );
+    if (directIndex >= 0) {
+      extracted = category.items[directIndex] ?? null;
+      return removeCategoryChildRef(
+        {
+          ...category,
+          items: category.items.filter((row) => getRowItemId(row) !== rowId),
+        },
+        { kind: "item", id: rowId },
+      );
+    }
+
+    return {
+      ...category,
+      subcategories: category.subcategories.map((subcategory) => ({
+        ...subcategory,
+        items: subcategory.items.filter((row) => {
+          if (getRowItemId(row) === rowId) {
+            extracted = row;
+            return false;
+          }
+          return true;
+        }),
+      })),
+    };
+  });
 
   return { categories: next, row: extracted };
 }
@@ -200,9 +238,7 @@ function insertRowItem(
       };
     }
 
-    const items = [...category.items];
-    items.splice(location.index, 0, row);
-    return { ...category, items };
+    return insertCategoryLevelItem(category, row, location.index);
   });
 }
 
@@ -229,10 +265,19 @@ function reorderItemsInContainer(
       };
     }
 
-    return {
-      ...category,
-      items: arrayMove(category.items, activeIndex, overIndex),
-    };
+    const activeRow = category.items[activeIndex];
+    const overRow = category.items[overIndex];
+    if (!activeRow || !overRow) {
+      return category;
+    }
+
+    return (
+      reorderCategoryChildOrder(
+        category,
+        itemDragId(getRowItemId(activeRow)),
+        itemDragId(getRowItemId(overRow)),
+      ) ?? category
+    );
   });
 }
 
@@ -306,7 +351,7 @@ export function reorderEstimate(
   const active = parseDragId(activeDragId);
   const over = parseDragId(overDragId);
 
-  if (!active || !over || !canDropDragId(activeDragId, overDragId)) {
+  if (!active || !over || !canDropDragId(activeDragId, overDragId, categories)) {
     return categories;
   }
 
@@ -314,8 +359,8 @@ export function reorderEstimate(
     return reorderCategories(categories, activeDragId, overDragId);
   }
 
-  if (active.kind === "subcategory" && over.kind === "subcategory") {
-    return moveSubcategory(categories, active.id, over.id);
+  if (active.kind === "subcategory") {
+    return moveSubcategory(categories, activeDragId, overDragId);
   }
 
   if (active.kind === "item") {

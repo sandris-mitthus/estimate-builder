@@ -66,6 +66,10 @@ export type EstimateLineItem = {
   manualUnit?: string;
   /** `true` — pozīcijas cena paslēpta piedāvājumā (tikai kategorijas līmeņa pozīcijām). */
   hiddenPriceInOffer?: boolean;
+  /** `true` — sagatavē atzīmēta pozīcija, kurai jāpievērš īpaša uzmanība (piem. ierobežots budžets). */
+  requiresAttention?: boolean;
+  /** Aptuvens budžets, ja `requiresAttention`. */
+  attentionBudget?: number;
 };
 
 export type EstimateMultiPositionOption = {
@@ -78,6 +82,12 @@ export type EstimateMultiPosition = {
   id: string;
   kind: "multi";
   name: string;
+  /** Kopīga piezīme visai multi-pozīcijai. */
+  note?: string;
+  /** `true` — sagatavē atzīmēta multi-pozīcija ar īpašu uzmanību. */
+  requiresAttention?: boolean;
+  /** Aptuvens budžets, ja `requiresAttention`. */
+  attentionBudget?: number;
   options: EstimateMultiPositionOption[];
   /** Projekta tāmē — `null` vai `__none__` = Neviena opcija */
   selectedOptionId?: string | null;
@@ -90,6 +100,10 @@ export type MultiOptionLinkGroup = {
 };
 
 export type EstimateRowItem = EstimateLineItem | EstimateMultiPosition;
+
+export type EstimateCategoryChildRef =
+  | { kind: "subcategory"; id: string }
+  | { kind: "item"; id: string };
 
 export type EstimateSubcategory = {
   id: string;
@@ -106,6 +120,8 @@ export type EstimateCategory = {
   title: string;
   subcategories: EstimateSubcategory[];
   items: EstimateRowItem[];
+  /** Apakškategoriju un tiešo pozīciju secība kategorijas līmenī. */
+  childOrder?: EstimateCategoryChildRef[];
 };
 
 export type EstimateDocument = {

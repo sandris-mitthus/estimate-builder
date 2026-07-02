@@ -80,6 +80,11 @@ import { PendingProjectMaterialsBanner } from "@/app/components/pending-project-
 import { ProjectMaterialsDelegationPanel } from "@/app/components/project-materials-delegation-panel";
 import { DeleteButton } from "@/app/components/delete-button";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
+import {
+  EstimateAttentionIcon,
+  estimateAttentionRowClassName,
+} from "@/app/components/line-item-attention-toggle";
+import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import {
@@ -139,6 +144,7 @@ import {
 import { getEstimateUnitOptions } from "@/app/lib/estimates/unit-options";
 import {
   DropIndicatorProvider,
+  EstimateDragCategoriesProvider,
   useDropIndicatorActions,
   useShowDropLine,
 } from "@/app/components/drop-indicator-context";
@@ -148,6 +154,12 @@ import {
   itemDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
+import {
+  appendCategoryChild,
+  collectCategoryChildDragIds,
+  removeCategoryChildRef,
+  resolveCategoryChildren,
+} from "@/app/lib/estimates/category-child-order";
 import {
   collectAllDragIds,
   reorderEstimate,
@@ -165,8 +177,10 @@ import {
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import {
   createMultiPosition,
+  getRowItemId,
   isEstimateMultiPosition,
   removeRowItemById,
+  resolveLineItemDisplayName,
   updateRowItemById,
 } from "@/app/lib/estimates/multi-position";
 import type {
@@ -357,6 +371,15 @@ function LineItemRow({
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
   const displayName = catalogPosition?.name ?? item.name;
+  const compositeResolvedName = isComposite
+    ? resolveLineItemDisplayName(item)
+    : null;
+  const compositeIsUnnamed = compositeResolvedName === "—";
+  const compositeRowLabel = compositeResolvedName
+    ? compositeIsUnnamed
+      ? t("positions.unnamed", "Nenosaukta pozīcija")
+      : compositeResolvedName
+    : null;
   const displayUnit = resolveEstimateRowDisplayUnit(
     item,
     moduleSizeOptions ?? [],
@@ -401,6 +424,7 @@ function LineItemRow({
   const laborWorkloadHours = showQuantityColumn
     ? resolveLaborWorkloadHours(effectiveQuantity, item, volumeVariable)
     : null;
+  const requiresAttention = item.requiresAttention === true;
 
   return (
     <tbody
@@ -412,6 +436,8 @@ function LineItemRow({
       className={`align-middle ${
         highlightMergedSagatave
           ? mergedSagataveRowClass
+          : requiresAttention
+            ? estimateAttentionRowClassName
           : quantityMissing && !estimateLocked
             ? "bg-red-50/60 hover:bg-red-50"
             : "hover:bg-sky-50/40"
@@ -421,6 +447,9 @@ function LineItemRow({
         <div className={`flex items-start gap-1 ${rowLead}`}>
           <span className={dragHandleColumn}>{dragHandle}</span>
           <span className="inline-flex min-w-0 flex-1 items-start gap-1.5">
+            {requiresAttention ? (
+              <EstimateAttentionIcon className="relative top-[5px]" />
+            ) : null}
             <span className="min-w-0 flex-1">
               {allowCompositeEdit && isComposite ? (
                 <div className="min-w-0 flex-1">
@@ -428,14 +457,29 @@ function LineItemRow({
                     type="button"
                     onClick={() => openPositionModal(item, onChange)}
                     className={`block w-full text-left text-sm transition hover:underline ${nameInput} ${indentName ? subcategoryItemNameIndent : ""} ${
-                      displayName.trim()
-                        ? "font-medium text-zinc-900 hover:text-sky-700"
-                        : "italic text-zinc-400"
+                      compositeIsUnnamed
+                        ? "italic text-zinc-400"
+                        : "font-medium text-zinc-900 hover:text-sky-700"
                     }`}
                   >
-                    {displayName.trim() || t("positions.unnamed", "Nenosaukta pozīcija")}
+                    {compositeRowLabel}
                   </button>
                   <EstimateLineItemNote note={item.note} />
+                  {requiresAttention ? (
+                    <EstimateAttentionBudgetControl
+                      id={`attention-budget-${item.id}`}
+                      value={item.attentionBudget}
+                      currency={currency}
+                      compact
+                      readOnly={estimateLocked}
+                      onChange={
+                        estimateLocked
+                          ? undefined
+                          : (attentionBudget) =>
+                              onChange({ ...item, attentionBudget })
+                      }
+                    />
+                  ) : null}
                   <AttachedModuleSizeLabel
                     attachment={item.moduleSizeAttachment}
                     moduleSizeOptions={moduleSizeOptions ?? []}
@@ -450,9 +494,24 @@ function LineItemRow({
                 currency={currency}
                 className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
                 footer={
-                  isComposite || item.note?.trim() ? (
+                  isComposite || item.note?.trim() || requiresAttention ? (
                     <>
                       <EstimateLineItemNote note={item.note} />
+                      {requiresAttention ? (
+                        <EstimateAttentionBudgetControl
+                          id={`attention-budget-inline-${item.id}`}
+                          value={item.attentionBudget}
+                          currency={currency}
+                          compact
+                          readOnly={estimateLocked}
+                          onChange={
+                            estimateLocked
+                              ? undefined
+                              : (attentionBudget) =>
+                                  onChange({ ...item, attentionBudget })
+                          }
+                        />
+                      ) : null}
                       {isComposite ? (
                         <AttachedModuleSizeLabel
                           attachment={item.moduleSizeAttachment}
@@ -677,6 +736,7 @@ function SortableMultiPositionRow({
   highlightStaleCatalogPrices = false,
   highlightMergedSagatave = false,
   estimateLocked = false,
+  estimateUnits = [],
 }: {
   sortId: string;
   categoryId: string;
@@ -692,6 +752,7 @@ function SortableMultiPositionRow({
   highlightStaleCatalogPrices?: boolean;
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
@@ -722,6 +783,7 @@ function SortableMultiPositionRow({
       showDropLine={showDropLine}
       showQuantityColumn={showQuantityColumn}
       moduleSizeOptions={moduleSizeOptions}
+      estimateUnits={estimateUnits}
       readOnlyPrices={true}
       allowOfferMultiEdit={!estimateLocked}
       highlightStaleCatalogPrices={highlightStaleCatalogPrices}
@@ -974,6 +1036,7 @@ function SubcategoryBlock({
   mergedSagataveHighlightIds,
   estimateLocked = false,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
@@ -993,6 +1056,7 @@ function SubcategoryBlock({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
 
@@ -1055,6 +1119,7 @@ function SubcategoryBlock({
             highlightStaleCatalogPrices={highlightStaleCatalogPrices}
             highlightMergedSagatave={mergedSagataveHighlightIds.has(row.id)}
             estimateLocked={estimateLocked}
+            estimateUnits={estimateUnits}
             value={row}
           />
         ) : (
@@ -1111,6 +1176,7 @@ function CategoryBlock({
   mergedSagataveHighlightIds,
   estimateLocked = false,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
@@ -1129,16 +1195,22 @@ function CategoryBlock({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const { requestFocus } = useSectionTitleFocus() ?? {};
 
   function handleAddMulti() {
     openMultiPositionModal(createMultiPosition(), (saved) =>
-      onChange({
-        ...category,
-        items: [...category.items, saved],
-      }),
+      onChange(
+        appendCategoryChild(
+          {
+            ...category,
+            items: [...category.items, saved],
+          },
+          { kind: "item", id: getRowItemId(saved) },
+        ),
+      ),
     );
   }
 
@@ -1162,67 +1234,88 @@ function CategoryBlock({
             onAddSub={() => {
               const subcategory = createSubcategory();
               requestFocus?.(subcategory.id);
-              onChange({
-                ...category,
-                subcategories: [...category.subcategories, subcategory],
-              });
+              onChange(
+                appendCategoryChild(
+                  {
+                    ...category,
+                    subcategories: [...category.subcategories, subcategory],
+                  },
+                  { kind: "subcategory", id: subcategory.id },
+                ),
+              );
             }}
             onAddMulti={
               showQuantityColumn
                 ? undefined
                 : handleAddMulti
             }
-            onAddItem={() =>
-              onChange({
-                ...category,
-                items: [...category.items, createLineItem()],
-              })
-            }
+            onAddItem={() => {
+              const item = createLineItem();
+              onChange(
+                appendCategoryChild(
+                  {
+                    ...category,
+                    items: [...category.items, item],
+                  },
+                  { kind: "item", id: getRowItemId(item) },
+                ),
+              );
+            }}
             onDelete={onDelete}
           />
         }
       />
 
-      {category.subcategories.map((subcategory) => (
-        <SubcategoryBlock
-          key={subcategory.id}
-          categoryId={category.id}
-          catalogPositions={catalogPositions}
-          defaultHourlyRate={defaultHourlyRate}
-          currency={currency}
-          showQuantityColumn={showQuantityColumn}
-          colSpan={colSpan}
-          allCategories={allCategories}
-          optionLinkActions={optionLinkActions}
-          moduleSizeOptions={moduleSizeOptions}
-          highlightStaleCatalogPrices={highlightStaleCatalogPrices}
-          mergedSagataveHighlightIds={mergedSagataveHighlightIds}
-          estimateLocked={estimateLocked}
-          onSyncCatalogPosition={onSyncCatalogPosition}
-          onScheduleCatalogSync={onScheduleCatalogSync}
-          subcategory={subcategory}
-          openMultiPositionModal={openMultiPositionModal}
-          onChange={(next) =>
-            onChange({
-              ...category,
-              subcategories: category.subcategories.map((entry) =>
-                entry.id === subcategory.id ? next : entry,
-              ),
-            })
-          }
-          onDelete={() =>
-            onChange({
-              ...category,
-              subcategories: category.subcategories.filter(
-                (entry) => entry.id !== subcategory.id,
-              ),
-            })
-          }
-        />
-      ))}
+      {resolveCategoryChildren(category).map((child) => {
+        if (child.kind === "subcategory") {
+          const subcategory = child.subcategory;
+          return (
+            <SubcategoryBlock
+              key={subcategory.id}
+              categoryId={category.id}
+              catalogPositions={catalogPositions}
+              defaultHourlyRate={defaultHourlyRate}
+              currency={currency}
+              showQuantityColumn={showQuantityColumn}
+              colSpan={colSpan}
+              allCategories={allCategories}
+              optionLinkActions={optionLinkActions}
+              moduleSizeOptions={moduleSizeOptions}
+              highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+              mergedSagataveHighlightIds={mergedSagataveHighlightIds}
+              estimateLocked={estimateLocked}
+              onSyncCatalogPosition={onSyncCatalogPosition}
+              onScheduleCatalogSync={onScheduleCatalogSync}
+              subcategory={subcategory}
+              openMultiPositionModal={openMultiPositionModal}
+              estimateUnits={estimateUnits}
+              onChange={(next) =>
+                onChange({
+                  ...category,
+                  subcategories: category.subcategories.map((entry) =>
+                    entry.id === subcategory.id ? next : entry,
+                  ),
+                })
+              }
+              onDelete={() =>
+                onChange(
+                  removeCategoryChildRef(
+                    {
+                      ...category,
+                      subcategories: category.subcategories.filter(
+                        (entry) => entry.id !== subcategory.id,
+                      ),
+                    },
+                    { kind: "subcategory", id: subcategory.id },
+                  ),
+                )
+              }
+            />
+          );
+        }
 
-      {category.items.map((row) =>
-        isEstimateMultiPosition(row) ? (
+        const row = child.row;
+        return isEstimateMultiPosition(row) ? (
           <SortableMultiPositionRow
             key={row.id}
             sortId={itemDragId(row.id)}
@@ -1237,6 +1330,7 @@ function CategoryBlock({
             highlightStaleCatalogPrices={highlightStaleCatalogPrices}
             highlightMergedSagatave={mergedSagataveHighlightIds.has(row.id)}
             estimateLocked={estimateLocked}
+            estimateUnits={estimateUnits}
             value={row}
           />
         ) : (
@@ -1262,14 +1356,19 @@ function CategoryBlock({
               })
             }
             onDelete={() =>
-              onChange({
-                ...category,
-                items: removeRowItemById(category.items, row.id),
-              })
+              onChange(
+                removeCategoryChildRef(
+                  {
+                    ...category,
+                    items: removeRowItemById(category.items, row.id),
+                  },
+                  { kind: "item", id: row.id },
+                ),
+              )
             }
           />
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -1292,6 +1391,7 @@ function EstimateDndTable({
   mergedSagataveHighlightIds,
   estimateLocked = false,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1315,12 +1415,14 @@ function EstimateDndTable({
   mergedSagataveHighlightIds: ReadonlySet<string>;
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const colSpan = getEstimateTableColCount(showQuantityColumn);
 
   return (
     <DropIndicatorProvider>
-      <EstimateDndTableInner
+      <EstimateDragCategoriesProvider categories={categories}>
+        <EstimateDndTableInner
         categories={categories}
         allDragIds={allDragIds}
         setCategories={setCategories}
@@ -1338,8 +1440,10 @@ function EstimateDndTable({
         mergedSagataveHighlightIds={mergedSagataveHighlightIds}
         estimateLocked={estimateLocked}
         openMultiPositionModal={openMultiPositionModal}
+        estimateUnits={estimateUnits}
         colSpan={colSpan}
       />
+      </EstimateDragCategoriesProvider>
     </DropIndicatorProvider>
   );
 }
@@ -1363,6 +1467,7 @@ function EstimateDndTableInner({
   estimateLocked = false,
   colSpan,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1387,6 +1492,7 @@ function EstimateDndTableInner({
   estimateLocked?: boolean;
   colSpan: number;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1579,6 +1685,7 @@ function EstimateDndTableInner({
               mergedSagataveHighlightIds={mergedSagataveHighlightIds}
               estimateLocked={estimateLocked}
               openMultiPositionModal={openMultiPositionModal}
+              estimateUnits={estimateUnits}
               colSpan={colSpan}
               allCategories={categories}
               optionLinkActions={optionLinkActions}
@@ -2220,6 +2327,7 @@ export function EstimateTable({
               mergedSagataveHighlightIds={mergedSagataveHighlightIds}
               estimateLocked={editorLocked}
               openMultiPositionModal={openMultiPositionModal}
+              estimateUnits={estimateUnits}
             />
           </PositionModalProvider>
         </EstimatePlannedProfitProvider>
@@ -2266,6 +2374,7 @@ export function EstimateTable({
             defaultHourlyRate={defaultHourlyRate}
             currency={currency}
             moduleSizeOptions={moduleSizeOptions}
+            estimateUnits={estimateUnits}
           />
         ) : null}
       </div>
@@ -2694,6 +2803,7 @@ export function EstimateTable({
           defaultHourlyRate={defaultHourlyRate}
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
+          estimateUnits={estimateUnits}
         />
       ) : null}
     </>

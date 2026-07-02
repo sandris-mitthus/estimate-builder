@@ -51,6 +51,11 @@ import {
   getCollapsedSubcategorySummary,
 } from "@/app/lib/estimate-positions/collapsed-sections-cookie";
 import { reorderEstimatePositionSections } from "@/app/lib/estimate-positions/reorder-sections";
+import {
+  appendCategoryChild,
+  removeCategoryChildRef,
+  resolveCategoryChildren,
+} from "@/app/lib/estimates/category-child-order";
 import { useCollapsedEstimateSections } from "@/app/lib/hooks/use-collapsed-estimate-sections";
 import type { EstimatePositionSection } from "@/app/lib/estimate-positions/types";
 import {
@@ -65,8 +70,10 @@ import {
 } from "@/app/lib/estimates/multi-position-links";
 import {
   createMultiPosition,
+  getRowItemId,
   isEstimateMultiPosition,
   removeRowItemById,
+  resolveLineItemDisplayName,
   updateRowItemById,
 } from "@/app/lib/estimates/multi-position";
 import type {
@@ -79,6 +86,13 @@ import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-l
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { LineItemPriceVisibilityToggle } from "@/app/components/line-item-price-visibility-toggle";
+import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
+import {
+  EstimateAttentionIcon,
+  LineItemAttentionToggle,
+  estimateAttentionRowClassName,
+} from "@/app/components/line-item-attention-toggle";
+import { patchRequiresAttention } from "@/app/lib/estimates/attention-budget";
 import { SubcategoryOfferVisibilityToggle } from "@/app/components/subcategory-offer-visibility-toggle";
 import { SubcategoryPriceVisibilityToggle } from "@/app/components/subcategory-price-visibility-toggle";
 import { DeleteButton } from "@/app/components/delete-button";
@@ -107,6 +121,7 @@ import {
 } from "@/app/lib/estimates/unit-price-columns";
 import {
   DropIndicatorProvider,
+  EstimateDragCategoriesProvider,
   useDropIndicatorActions,
   useShowDropLine,
 } from "@/app/components/drop-indicator-context";
@@ -156,7 +171,7 @@ function LineItemRow({
   showDropLine,
   catalogPositions,
   defaultHourlyRate,
-  currency: _currency = null,
+  currency = null,
   moduleSizeOptions,
 }: {
   item: EstimateLineItem;
@@ -182,8 +197,16 @@ function LineItemRow({
     !item.manualUnitEnabled;
   const missingTimeNorm =
     isCompositeLineItem(item) && !((item.laborTimeNorm ?? 0) > 0);
+  const requiresAttention = item.requiresAttention === true;
+  const resolvedName = resolveLineItemDisplayName(item);
+  const isUnnamed = resolvedName === "—";
+  const rowLabel = isUnnamed
+    ? t("positions.unnamed", "Nenosaukta pozīcija")
+    : resolvedName;
 
-  const rowBg = missingModuleSize
+  const rowBg = requiresAttention
+    ? estimateAttentionRowClassName
+    : missingModuleSize
     ? "bg-red-50/60 hover:bg-red-50"
     : missingTimeNorm
       ? "bg-amber-50/60 hover:bg-amber-50"
@@ -191,6 +214,9 @@ function LineItemRow({
   const hiddenPriceInOffer = item.hiddenPriceInOffer === true;
   const hoverOnlyActionClass = "opacity-0 group-hover:opacity-100";
   const priceToggleClass = hiddenPriceInOffer
+    ? "opacity-100"
+    : hoverOnlyActionClass;
+  const attentionToggleClass = requiresAttention
     ? "opacity-100"
     : hoverOnlyActionClass;
 
@@ -211,12 +237,17 @@ function LineItemRow({
           >
             <div className="flex min-w-0 flex-col gap-0 leading-snug">
               <div className="flex items-center gap-1.5">
+                {requiresAttention ? (
+                  <EstimateAttentionIcon className="relative top-[3px]" />
+                ) : null}
                 <button
                   type="button"
                   onClick={() => openPositionModal(item, onChange)}
                   className={`block min-w-0 flex-1 text-left text-sm font-medium transition hover:underline ${
-                    item.name.trim()
-                      ? missingModuleSize
+                    !isUnnamed
+                      ? requiresAttention
+                        ? "text-red-800 hover:text-red-900"
+                        : missingModuleSize
                         ? "text-red-700 hover:text-red-900"
                         : missingTimeNorm
                           ? "text-amber-700 hover:text-amber-900"
@@ -224,7 +255,7 @@ function LineItemRow({
                       : "italic text-zinc-400"
                   }`}
                 >
-                  {item.name.trim() || t("positions.unnamed", "Nenosaukta pozīcija")}
+                  {rowLabel}
                   {missingModuleSize ? (
                     <i
                       className="fas fa-exclamation-triangle ml-1.5 text-xs text-red-500"
@@ -240,6 +271,17 @@ function LineItemRow({
                 <PositionVariableQuantityIcon enabled={item.variableQuantity ?? false} />
               </div>
               <EstimateLineItemNote note={item.note} />
+              {requiresAttention ? (
+                <EstimateAttentionBudgetControl
+                  id={`attention-budget-${item.id}`}
+                  value={item.attentionBudget}
+                  currency={currency}
+                  compact
+                  onChange={(attentionBudget) =>
+                    onChange({ ...item, attentionBudget })
+                  }
+                />
+              ) : null}
               {missingModuleSize ? (
                 <span className="text-xs text-red-500">
                   {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
@@ -288,7 +330,15 @@ function LineItemRow({
         }
       />
       <td className={rowActionCell}>
-        <div className="flex min-w-[5.75rem] items-center justify-end gap-0.5 whitespace-nowrap">
+        <div className="flex min-w-[7.5rem] items-center justify-end gap-0.5 whitespace-nowrap">
+          <LineItemAttentionToggle
+            id={`attention-${item.id}`}
+            enabled={requiresAttention}
+            onChange={(nextEnabled) =>
+              onChange(patchRequiresAttention(item, nextEnabled))
+            }
+            className={attentionToggleClass}
+          />
           {showOfferPriceToggle ? (
             <LineItemPriceVisibilityToggle
               hiddenPriceInOffer={item.hiddenPriceInOffer}
@@ -404,6 +454,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate,
   currency = null,
   moduleSizeOptions,
+  estimateUnits = [],
 }: {
   sortId: string;
   sectionId: string;
@@ -414,6 +465,7 @@ function SortableMultiPositionRow({
   defaultHourlyRate: number | null;
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
@@ -433,6 +485,7 @@ function SortableMultiPositionRow({
       defaultHourlyRate={defaultHourlyRate}
       currency={currency}
       moduleSizeOptions={moduleSizeOptions}
+      estimateUnits={estimateUnits}
       optionLinkActions={optionLinkActions}
       indentName={subcategoryId != null}
       showDropLine={showDropLine}
@@ -634,6 +687,7 @@ function SubcategoryBlock({
   onEnsureExpanded,
   optionLinkActions,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   sectionId: string;
   subcategory: EstimateSubcategory;
@@ -649,6 +703,7 @@ function SubcategoryBlock({
   onEnsureExpanded: () => void;
   optionLinkActions: MultiOptionLinkActions;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
@@ -728,6 +783,7 @@ function SubcategoryBlock({
             defaultHourlyRate={defaultHourlyRate}
             currency={currency}
             moduleSizeOptions={moduleSizeOptions}
+            estimateUnits={estimateUnits}
             optionLinkActions={optionLinkActions}
             value={row}
           />
@@ -777,6 +833,7 @@ function SectionBlock({
   expandSection,
   optionLinkActions,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   section: EstimatePositionSection;
   onChange: (section: EstimatePositionSection) => void;
@@ -794,6 +851,7 @@ function SectionBlock({
   expandSection: (rowId: string) => void;
   optionLinkActions: MultiOptionLinkActions;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
@@ -808,19 +866,29 @@ function SectionBlock({
 
   function handleAddItem() {
     openPositionModal(createCompositePosition(), (saved) =>
-      withExpandedContent((current) => ({
-        ...current,
-        items: [...current.items, saved],
-      })),
+      withExpandedContent((current) =>
+        appendCategoryChild(
+          {
+            ...current,
+            items: [...current.items, saved],
+          },
+          { kind: "item", id: getRowItemId(saved) },
+        ),
+      ),
     );
   }
 
   function handleAddMulti() {
     openMultiPositionModal(createMultiPosition(), (saved) =>
-      withExpandedContent((current) => ({
-        ...current,
-        items: [...current.items, saved],
-      })),
+      withExpandedContent((current) =>
+        appendCategoryChild(
+          {
+            ...current,
+            items: [...current.items, saved],
+          },
+          { kind: "item", id: getRowItemId(saved) },
+        ),
+      ),
     );
   }
 
@@ -843,10 +911,15 @@ function SectionBlock({
             onAddSub={() => {
               const subcategory = createSubcategory();
               requestFocus?.(subcategory.id);
-              withExpandedContent((current) => ({
-                ...current,
-                subcategories: [...current.subcategories, subcategory],
-              }));
+              withExpandedContent((current) =>
+                appendCategoryChild(
+                  {
+                    ...current,
+                    subcategories: [...current.subcategories, subcategory],
+                  },
+                  { kind: "subcategory", id: subcategory.id },
+                ),
+              );
             }}
             onAddMulti={handleAddMulti}
             onAddItem={handleAddItem}
@@ -855,77 +928,95 @@ function SectionBlock({
         }
       />
 
-      {collapsed ? null : section.subcategories.map((subcategory) => (
-        <SubcategoryBlock
-          key={subcategory.id}
-          sectionId={section.id}
-          catalogPositions={catalogPositions}
-          defaultHourlyRate={defaultHourlyRate}
-          currency={currency}
-          moduleSizeOptions={moduleSizeOptions}
-          collapsed={collapsedSectionIds.has(subcategory.id)}
-          collapsedSummary={getCollapsedSubcategorySummary(subcategory, t)}
-          onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
-          onEnsureExpanded={() => expandSection(subcategory.id)}
-          optionLinkActions={optionLinkActions}
-          openMultiPositionModal={openMultiPositionModal}
-          subcategory={subcategory}
-          onChange={(next) =>
-            onChange({
-              ...section,
-              subcategories: section.subcategories.map((entry) =>
-                entry.id === subcategory.id ? next : entry,
-              ),
-            })
-          }
-          onDelete={() =>
-            onChange({
-              ...section,
-              subcategories: section.subcategories.filter(
-                (entry) => entry.id !== subcategory.id,
-              ),
-            })
-          }
-        />
-      ))}
+      {collapsed
+        ? null
+        : resolveCategoryChildren(section).map((child) => {
+            if (child.kind === "subcategory") {
+              const subcategory = child.subcategory;
+              return (
+                <SubcategoryBlock
+                  key={subcategory.id}
+                  sectionId={section.id}
+                  catalogPositions={catalogPositions}
+                  defaultHourlyRate={defaultHourlyRate}
+                  currency={currency}
+                  moduleSizeOptions={moduleSizeOptions}
+                  collapsed={collapsedSectionIds.has(subcategory.id)}
+                  collapsedSummary={getCollapsedSubcategorySummary(subcategory, t)}
+                  onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
+                  onEnsureExpanded={() => expandSection(subcategory.id)}
+                  optionLinkActions={optionLinkActions}
+                  openMultiPositionModal={openMultiPositionModal}
+                  estimateUnits={estimateUnits}
+                  subcategory={subcategory}
+                  onChange={(next) =>
+                    onChange({
+                      ...section,
+                      subcategories: section.subcategories.map((entry) =>
+                        entry.id === subcategory.id ? next : entry,
+                      ),
+                    })
+                  }
+                  onDelete={() =>
+                    onChange(
+                      removeCategoryChildRef(
+                        {
+                          ...section,
+                          subcategories: section.subcategories.filter(
+                            (entry) => entry.id !== subcategory.id,
+                          ),
+                        },
+                        { kind: "subcategory", id: subcategory.id },
+                      ),
+                    )
+                  }
+                />
+              );
+            }
 
-      {collapsed ? null : section.items.map((row) =>
-        isEstimateMultiPosition(row) ? (
-          <SortableMultiPositionRow
-            key={row.id}
-            sortId={itemDragId(row.id)}
-            sectionId={section.id}
-            catalogPositions={catalogPositions}
-            defaultHourlyRate={defaultHourlyRate}
-            currency={currency}
-            moduleSizeOptions={moduleSizeOptions}
-            optionLinkActions={optionLinkActions}
-            value={row}
-          />
-        ) : (
-          <SortableLineItemRow
-            key={row.id}
-            sortId={itemDragId(row.id)}
-            sectionId={section.id}
-            catalogPositions={catalogPositions}
-            defaultHourlyRate={defaultHourlyRate}
-            moduleSizeOptions={moduleSizeOptions}
-            item={row}
-            onChange={(next) =>
-              onChange({
-                ...section,
-                items: updateRowItemById(section.items, row.id, next),
-              })
-            }
-            onDelete={() =>
-              onChange({
-                ...section,
-                items: removeRowItemById(section.items, row.id),
-              })
-            }
-          />
-        ),
-      )}
+            const row = child.row;
+            return isEstimateMultiPosition(row) ? (
+              <SortableMultiPositionRow
+                key={row.id}
+                sortId={itemDragId(row.id)}
+                sectionId={section.id}
+                catalogPositions={catalogPositions}
+                defaultHourlyRate={defaultHourlyRate}
+                currency={currency}
+                moduleSizeOptions={moduleSizeOptions}
+                estimateUnits={estimateUnits}
+                optionLinkActions={optionLinkActions}
+                value={row}
+              />
+            ) : (
+              <SortableLineItemRow
+                key={row.id}
+                sortId={itemDragId(row.id)}
+                sectionId={section.id}
+                catalogPositions={catalogPositions}
+                defaultHourlyRate={defaultHourlyRate}
+                moduleSizeOptions={moduleSizeOptions}
+                item={row}
+                onChange={(next) =>
+                  onChange({
+                    ...section,
+                    items: updateRowItemById(section.items, row.id, next),
+                  })
+                }
+                onDelete={() =>
+                  onChange(
+                    removeCategoryChildRef(
+                      {
+                        ...section,
+                        items: removeRowItemById(section.items, row.id),
+                      },
+                      { kind: "item", id: row.id },
+                    ),
+                  )
+                }
+              />
+            );
+          })}
     </>
   );
 }
@@ -944,6 +1035,7 @@ function EstimatePositionDndTable({
   toggleSectionCollapsed,
   expandSection,
   openMultiPositionModal,
+  estimateUnits = [],
 }: {
   sections: EstimatePositionSection[];
   allDragIds: string[];
@@ -958,6 +1050,7 @@ function EstimatePositionDndTable({
   toggleSectionCollapsed: (sectionId: string) => void;
   expandSection: (sectionId: string) => void;
   openMultiPositionModal: OpenMultiPositionModal;
+  estimateUnits?: string[];
 }) {
   const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1051,15 +1144,16 @@ function EstimatePositionDndTable({
   }
 
   return (
-    <DndContext
-      id={ESTIMATE_POSITION_DND_CONTEXT_ID}
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={clear}
-    >
+    <EstimateDragCategoriesProvider categories={sections}>
+      <DndContext
+        id={ESTIMATE_POSITION_DND_CONTEXT_ID}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={clear}
+      >
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col style={{ width: "31%" }} />
@@ -1114,6 +1208,7 @@ function EstimatePositionDndTable({
               collapsedSummary={getCollapsedSectionSummary(section, t)}
               optionLinkActions={optionLinkActions}
               openMultiPositionModal={openMultiPositionModal}
+              estimateUnits={estimateUnits}
                 onToggleCollapse={() => toggleSectionCollapsed(section.id)}
                 onEnsureExpanded={() => expandSection(section.id)}
                 collapsedSectionIds={collapsedSectionIds}
@@ -1137,6 +1232,7 @@ function EstimatePositionDndTable({
         </SortableContext>
       </table>
     </DndContext>
+    </EstimateDragCategoriesProvider>
   );
 }
 
@@ -1356,6 +1452,7 @@ export function EstimatePositionTable({
                 toggleSectionCollapsed={toggleSectionCollapsed}
                 expandSection={expandSection}
                 openMultiPositionModal={openMultiPositionModal}
+                estimateUnits={estimateUnits}
               />
             </DropIndicatorProvider>
           </PositionModalProvider>
@@ -1378,6 +1475,7 @@ export function EstimatePositionTable({
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
+          allowAttentionFlagEdit
         />
       ) : null}
 
@@ -1395,6 +1493,8 @@ export function EstimatePositionTable({
           defaultHourlyRate={defaultHourlyRate}
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
+          estimateUnits={estimateUnits}
+          allowAttentionFlagEdit
         />
       ) : null}
 
