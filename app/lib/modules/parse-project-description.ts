@@ -284,6 +284,9 @@ export function parseProjectDescriptionFormState(
       : [],
     gablePediments: parseGablePediments(row.gablePediments),
     roofPlanes: parseRoofPlanes(row.roofPlanes),
+    coldWaterLengthM: readStringField(row, "coldWaterLengthM"),
+    hotWaterLengthM: readStringField(row, "hotWaterLengthM"),
+    recirculationLengthM: readStringField(row, "recirculationLengthM"),
   };
 }
 

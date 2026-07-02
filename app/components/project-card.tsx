@@ -16,6 +16,7 @@ const cardClassNameDefault = `${cardClassNameBase} border-zinc-200 bg-white hove
 const cardClassNameApproved = `${cardClassNameBase} ${approvedEstimateSurfaceClassName} hover:border-green-300`;
 const cardClassNameStalePrices = `${cardClassNameBase} border-red-300 bg-white hover:border-red-400`;
 const cardClassNameNewSagatavePositions = `${cardClassNameBase} border-amber-300 bg-white hover:border-amber-400`;
+const cardClassNameSagatavePositionChanges = `${cardClassNameBase} border-sky-300 bg-white hover:border-sky-400`;
 
 function resolveProjectModuleName(
   buildingModuleId: string | null,
@@ -68,6 +69,7 @@ export function ProjectCard({
   moduleNameById,
   hasStaleCatalogPrices = false,
   hasNewSagatavePositions = false,
+  hasSagatavePositionChanges = false,
   hasPendingMaterials = false,
   isCreating = false,
 }: {
@@ -76,6 +78,7 @@ export function ProjectCard({
   moduleNameById?: ReadonlyMap<string, string>;
   hasStaleCatalogPrices?: boolean;
   hasNewSagatavePositions?: boolean;
+  hasSagatavePositionChanges?: boolean;
   hasPendingMaterials?: boolean;
   isCreating?: boolean;
 }) {
@@ -155,6 +158,16 @@ export function ProjectCard({
           Sagatavē ir pozīcijas, kuras nav šajā tāmē
         </p>
       ) : null}
+
+      {hasSagatavePositionChanges ? (
+        <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-sky-700">
+          <i className="fas fa-pen-to-square text-[11px]" aria-hidden="true" />
+          {t(
+            "projects.list.sagatave_changes_available",
+            "Sagatavē ir izmaiņas pozīcijām",
+          )}
+        </p>
+      ) : null}
     </>
   );
 
@@ -167,7 +180,9 @@ export function ProjectCard({
             ? cardClassNameStalePrices
             : hasNewSagatavePositions
               ? cardClassNameNewSagatavePositions
-              : cardClassNameDefault
+              : hasSagatavePositionChanges
+                ? cardClassNameSagatavePositionChanges
+                : cardClassNameDefault
       }`}
       aria-busy={isCreating}
     >

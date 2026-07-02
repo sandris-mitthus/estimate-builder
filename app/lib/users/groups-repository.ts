@@ -711,7 +711,7 @@ export function canPerformAction(
   }
 
   if (
-    key === "users.manage_company_access" &&
+    (key === "users.manage_company_access" || key === "project.delete") &&
     (access.companyRole === "owner" || access.companyRole === "admin")
   ) {
     return true;

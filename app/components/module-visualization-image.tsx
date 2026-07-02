@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { resolveModuleBlockAssetUrl } from "@/app/lib/modules/resolve-block-asset";
 import type { ModuleContentBlock } from "@/app/lib/modules/types";
 
@@ -11,11 +11,17 @@ type ModuleVisualizationImageProps = {
 export function ModuleVisualizationImage({ block }: ModuleVisualizationImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
   const assetUrl = resolveModuleBlockAssetUrl(block);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setLoaded(false);
     setFailed(false);
+
+    const image = imageRef.current;
+    if (image?.complete && image.naturalHeight > 0) {
+      setLoaded(true);
+    }
   }, [assetUrl]);
 
   if (failed) {
@@ -34,13 +40,14 @@ export function ModuleVisualizationImage({ block }: ModuleVisualizationImageProp
         </div>
       ) : null}
       <img
+        key={assetUrl}
+        ref={imageRef}
         src={assetUrl}
         alt=""
-        loading="lazy"
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
-        className={`size-full object-cover transition hover:opacity-95 ${
-          loaded ? "opacity-100" : "opacity-0"
+        className={`size-full object-cover transition ${
+          loaded ? "opacity-100 hover:opacity-95" : "opacity-0"
         }`}
       />
     </div>

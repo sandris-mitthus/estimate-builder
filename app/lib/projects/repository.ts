@@ -10,6 +10,7 @@ import {
 import { cloneSagataveDocumentForProject } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
 import { sagataveHasNewPositionsForProject } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
+import { sagataveHasPositionChangesForProject } from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { propagateLaborTimeNormsFromProject } from "@/app/lib/estimate-positions/labor-time-norm-sync";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -254,6 +255,7 @@ async function parseEstimateRow(
 export type ProjectListBadges = {
   staleCatalogPriceProjectIds: Set<string>;
   newSagatavePositionProjectIds: Set<string>;
+  sagatavePositionChangeProjectIds: Set<string>;
   pendingMaterialsProjectIds: Set<string>;
 };
 
@@ -263,6 +265,7 @@ export async function getProjectListBadges(
   const empty: ProjectListBadges = {
     staleCatalogPriceProjectIds: new Set(),
     newSagatavePositionProjectIds: new Set(),
+    sagatavePositionChangeProjectIds: new Set(),
     pendingMaterialsProjectIds: new Set(),
   };
 
@@ -303,6 +306,7 @@ export async function getProjectListBadges(
 
   const staleCatalogPriceProjectIds = new Set<string>();
   const newSagatavePositionProjectIds = new Set<string>();
+  const sagatavePositionChangeProjectIds = new Set<string>();
   const pendingMaterialsProjectIds = new Set<string>();
   const moduleIds = Array.from(
     new Set(
@@ -359,6 +363,14 @@ export async function getProjectListBadges(
       ) {
         newSagatavePositionProjectIds.add(projectId);
       }
+
+      if (
+        sagatave.sections.length > 0 &&
+        !rawMeta.clonedFromProjectId &&
+        sagataveHasPositionChangesForProject(sagatave.sections, parsed.sections)
+      ) {
+        sagatavePositionChangeProjectIds.add(projectId);
+      }
     }
 
     const approvedProject = approvedProjectById.get(projectId);
@@ -394,6 +406,7 @@ export async function getProjectListBadges(
   return {
     staleCatalogPriceProjectIds,
     newSagatavePositionProjectIds,
+    sagatavePositionChangeProjectIds,
     pendingMaterialsProjectIds,
   };
 }

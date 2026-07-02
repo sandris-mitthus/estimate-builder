@@ -448,6 +448,40 @@ function buildRoofSection(
   return { title: "Jumts", items };
 }
 
+function buildPlumbingSection(
+  state: ProjectDescriptionFormState,
+): ModuleSizeSummarySection | null {
+  const items: ModuleSizeSummaryItem[] = [];
+
+  pushInput(
+    items,
+    "plumbing.cold-water",
+    "Aukstā ūdens garums (m)",
+    state.coldWaterLengthM,
+    "m",
+  );
+  pushInput(
+    items,
+    "plumbing.hot-water",
+    "Karstā ūdens garums (m)",
+    state.hotWaterLengthM,
+    "m",
+  );
+  pushInput(
+    items,
+    "plumbing.recirculation",
+    "Recirkulācijas garums (m)",
+    state.recirculationLengthM,
+    "m",
+  );
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return { title: "Ūdensapgāde", items };
+}
+
 export function buildModuleSizeSummarySections(
   state: ProjectDescriptionFormState,
 ): ModuleSizeSummarySection[] {
@@ -458,6 +492,7 @@ export function buildModuleSizeSummarySections(
     buildWindowsSection(state),
     buildDoorsSection(state),
     buildRoofSection(state),
+    buildPlumbingSection(state),
   ].filter((section): section is ModuleSizeSummarySection => section != null);
 }
 
@@ -469,6 +504,7 @@ function translateSummaryTitle(title: string, t: Translate): string {
     Logi: "project_description.summary.windows.title",
     Durvis: "project_description.summary.doors.title",
     Jumts: "project_description.summary.roof.title",
+    Ūdensapgāde: "project_description.summary.plumbing.title",
   };
 
   const key = keys[title];
@@ -504,6 +540,9 @@ function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): strin
     "roof.total-area": "project_description.summary.roof.total_area",
     "roof.total-gutter": "project_description.summary.roof.total_gutter",
     "roof.total-downpipe": "project_description.summary.roof.total_downpipe",
+    "plumbing.cold-water": "project_description.summary.plumbing.cold_water",
+    "plumbing.hot-water": "project_description.summary.plumbing.hot_water",
+    "plumbing.recirculation": "project_description.summary.plumbing.recirculation",
   };
 
   const staticKey = staticKeys[item.key];

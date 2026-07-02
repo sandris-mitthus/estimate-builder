@@ -48,6 +48,7 @@ export default async function ProjectsPage({
   const {
     staleCatalogPriceProjectIds,
     newSagatavePositionProjectIds,
+    sagatavePositionChangeProjectIds,
     pendingMaterialsProjectIds,
   } = badges;
 
@@ -77,6 +78,7 @@ export default async function ProjectsPage({
               modules={modules}
               staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
               newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+              sagatavePositionChangeProjectIds={sagatavePositionChangeProjectIds}
               pendingMaterialsProjectIds={pendingMaterialsProjectIds}
             />
           ) : (
@@ -85,6 +87,7 @@ export default async function ProjectsPage({
               modules={modules}
               staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
               newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+              sagatavePositionChangeProjectIds={sagatavePositionChangeProjectIds}
               pendingMaterialsProjectIds={pendingMaterialsProjectIds}
             />
           )}

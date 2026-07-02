@@ -62,6 +62,9 @@ export type ProjectDescriptionFormState = {
   doors: DoorEntry[];
   gablePediments: GablePedimentEntry[];
   roofPlanes: RoofPlaneEntry[];
+  coldWaterLengthM: string;
+  hotWaterLengthM: string;
+  recirculationLengthM: string;
 };
 
 export const DEFAULT_FOUNDATION_CROSS_SECTION_ID = "foundation-cross-section-default";
@@ -153,5 +156,8 @@ export function createEmptyProjectDescriptionFormState(): ProjectDescriptionForm
     doors: [],
     gablePediments: [],
     roofPlanes: [],
+    coldWaterLengthM: "",
+    hotWaterLengthM: "",
+    recirculationLengthM: "",
   };
 }

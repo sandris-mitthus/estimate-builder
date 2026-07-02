@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { TruncatedText } from "@/app/components/truncated-text";
 import { MaterialConsumptionInput } from "@/app/components/material-consumption-input";
 import { MaterialConsumptionVolumeModal } from "@/app/components/material-consumption-volume-modal";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -254,7 +255,11 @@ export function MaterialConsumptionBasisControl({
       <div className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <span className="block truncate text-zinc-800">{material.name}</span>
+            <TruncatedText
+              text={material.name}
+              className="block text-zinc-800"
+              tooltipAlign="start"
+            />
             <div className="mt-0.5 text-xs text-zinc-500">
               {t("estimate.material.position_unit_price", "Uz pozīciju:")}{" "}
               <span className="font-medium tabular-nums text-zinc-700">

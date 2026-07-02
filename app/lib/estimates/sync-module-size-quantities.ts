@@ -1,10 +1,12 @@
 import { collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
+import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
 import {
   isEstimateLineItem,
   isEstimateMultiPosition,
 } from "@/app/lib/estimates/multi-position";
 import {
   getLineItemModuleSizeAdjustments,
+  getLineItemModuleSizeItemKeys,
   normalizeLineItemModuleSizeAttachment,
 } from "@/app/lib/estimates/module-size-attachment";
 import type {
@@ -20,6 +22,7 @@ import {
 import { buildModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
 import { hasProjectDescriptionData } from "@/app/lib/modules/has-project-description-data";
 import type { ProjectDescriptionFormState } from "@/app/lib/modules/project-description-types";
+import type { ModuleSizeSummaryItem } from "@/app/lib/modules/module-size-summary-types";
 import type {
   BuildingModuleDetail,
   BuildingModuleSizeOption,
@@ -91,27 +94,53 @@ export function buildProjectModuleSizeOptions(
   return options;
 }
 
-function resolveSummaryItemFromAttachment(
+function buildAttachmentSummarySections(
   attachment: LineItemModuleSizeAttachment,
   projectDescription: ProjectDescriptionFormState,
 ) {
   const adjustments = getLineItemModuleSizeAdjustments(attachment);
-  const sections =
-    Object.keys(adjustments).length > 0
-      ? buildAdjustedModuleSizeSummarySections(projectDescription, adjustments)
-      : buildModuleSizeSummarySections(projectDescription);
-  return findModuleSizeSummaryItem(sections, attachment.itemKey);
+  return Object.keys(adjustments).length > 0
+    ? buildAdjustedModuleSizeSummarySections(projectDescription, adjustments)
+    : buildModuleSizeSummarySections(projectDescription);
+}
+
+function resolveSummaryItemsFromAttachment(
+  attachment: LineItemModuleSizeAttachment,
+  projectDescription: ProjectDescriptionFormState,
+): ModuleSizeSummaryItem[] {
+  const sections = buildAttachmentSummarySections(attachment, projectDescription);
+  return getLineItemModuleSizeItemKeys(attachment)
+    .map((itemKey) => findModuleSizeSummaryItem(sections, itemKey))
+    .filter((item): item is ModuleSizeSummaryItem => item != null);
+}
+
+function resolveSummaryItemFromAttachment(
+  attachment: LineItemModuleSizeAttachment,
+  projectDescription: ProjectDescriptionFormState,
+) {
+  return resolveSummaryItemsFromAttachment(attachment, projectDescription)[0] ?? null;
 }
 
 export function resolveQuantityFromModuleSizeAttachment(
   attachment: LineItemModuleSizeAttachment,
   projectDescription: ProjectDescriptionFormState,
 ): number | null {
-  const item = resolveSummaryItemFromAttachment(attachment, projectDescription);
-  if (item?.numericValue == null || !Number.isFinite(item.numericValue)) {
+  const items = resolveSummaryItemsFromAttachment(attachment, projectDescription);
+  let total = 0;
+  let hasValue = false;
+
+  for (const item of items) {
+    if (item.numericValue != null && Number.isFinite(item.numericValue)) {
+      total += item.numericValue;
+      hasValue = true;
+    }
+  }
+
+  if (!hasValue) {
     return null;
   }
-  return roundQuantity(item.numericValue);
+
+  return roundQuantity(total);
 }
 
 export function hasModuleSizeAttachment(item: EstimateLineItem): boolean {
@@ -137,6 +166,36 @@ export function resolveCompositeLineItemDisplayUnit(
   return resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions);
 }
 
+/** Saglabātā mērvienība salīdzināšanai (ar manuālo mērvienību, ja ieslēgta). */
+export function resolveLineItemStoredDisplayUnit(item: EstimateLineItem): string {
+  if (item.manualUnitEnabled === true && item.manualUnit?.trim()) {
+    return item.manualUnit.trim();
+  }
+
+  return item.unit.trim();
+}
+
+/** Vienota mērvienība projekta un sagataves tabulās. */
+export function resolveEstimateRowDisplayUnit(
+  item: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+  catalogUnit?: string | null,
+): string {
+  if (isCompositeLineItem(item)) {
+    return (
+      resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions) ??
+      catalogUnit?.trim() ??
+      item.unit.trim()
+    );
+  }
+
+  if (item.manualUnitEnabled === true && item.manualUnit?.trim()) {
+    return item.manualUnit.trim();
+  }
+
+  return catalogUnit?.trim() || item.unit.trim();
+}
+
 /** Mērvienība no piesaistītā moduļa lieluma pozīcijas (piem. "m²", "m"). */
 export function resolveLineItemDisplayUnitFromModuleSize(
   item: EstimateLineItem,
@@ -153,11 +212,19 @@ export function resolveLineItemDisplayUnitFromModuleSize(
     moduleSizeOptions.find((entry) => entry.id === attachment.moduleId) ??
     moduleSizeOptions[0];
 
-  const sections = buildModuleSizeSummarySections(
+  const items = resolveSummaryItemsFromAttachment(
+    attachment,
     moduleOption.projectDescription,
   );
-  const summaryItem = findModuleSizeSummaryItem(sections, attachment.itemKey);
-  return summaryItem?.unit ?? null;
+  const units = [
+    ...new Set(
+      items
+        .map((item) => item.unit)
+        .filter((unit): unit is string => unit != null && unit.trim().length > 0),
+    ),
+  ];
+
+  return units[0] ?? null;
 }
 
 export function resolveLineItemDisplayQuantityFromModuleSize(
@@ -196,17 +263,19 @@ export function syncLineItemQuantityFromModuleSize(
   }
 
   const normalizedItem = { ...item, moduleSizeAttachment: attachment };
-  const summaryItem = resolveSummaryItemFromAttachment(attachment, projectDescription);
+  const quantity = resolveQuantityFromModuleSizeAttachment(
+    attachment,
+    projectDescription,
+  );
+  const summaryItem = resolveSummaryItemFromAttachment(
+    attachment,
+    projectDescription,
+  );
+  const unit = summaryItem?.unit ?? null;
 
-  if (summaryItem == null) {
+  if (quantity == null && summaryItem == null) {
     return normalizedItem;
   }
-
-  const quantity =
-    summaryItem.numericValue != null && Number.isFinite(summaryItem.numericValue)
-      ? roundQuantity(summaryItem.numericValue)
-      : null;
-  const unit = summaryItem.unit ?? null;
 
   return {
     ...normalizedItem,

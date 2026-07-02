@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { TruncatedText } from "@/app/components/truncated-text";
 import { MechanismQuantityControl } from "@/app/components/mechanism-quantity-control";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
@@ -47,7 +48,11 @@ export function MechanismBasisControl({
     <div className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <span className="block truncate text-zinc-800">{mechanism.name}</span>
+          <TruncatedText
+            text={mechanism.name}
+            className="block text-zinc-800"
+            tooltipAlign="start"
+          />
           <div className="mt-0.5 text-xs text-zinc-500">
             {t("estimate.material.position_unit_price", "Uz pozīciju:")}{" "}
             <span className="font-medium tabular-nums text-zinc-700">

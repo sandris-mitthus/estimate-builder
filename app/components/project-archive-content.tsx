@@ -15,6 +15,7 @@ type ProjectArchiveContentProps = {
   modules: BuildingModuleSummary[];
   staleCatalogPriceProjectIds: ReadonlySet<string>;
   newSagatavePositionProjectIds: ReadonlySet<string>;
+  sagatavePositionChangeProjectIds: ReadonlySet<string>;
   pendingMaterialsProjectIds: ReadonlySet<string>;
 };
 
@@ -23,6 +24,7 @@ export function ProjectArchiveContent({
   modules,
   staleCatalogPriceProjectIds,
   newSagatavePositionProjectIds,
+  sagatavePositionChangeProjectIds,
   pendingMaterialsProjectIds,
 }: ProjectArchiveContentProps) {
   const [filter, setFilter] = useState<ProjectArchiveFilter>("all");
@@ -50,6 +52,7 @@ export function ProjectArchiveContent({
           modules={modules}
           staleCatalogPriceProjectIds={staleCatalogPriceProjectIds}
           newSagatavePositionProjectIds={newSagatavePositionProjectIds}
+          sagatavePositionChangeProjectIds={sagatavePositionChangeProjectIds}
           pendingMaterialsProjectIds={pendingMaterialsProjectIds}
         />
       )}

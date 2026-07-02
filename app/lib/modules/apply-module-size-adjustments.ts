@@ -281,6 +281,30 @@ function applySingleItemKeyAdjustment(
           adjustment,
         ),
       };
+    case "plumbing.cold-water":
+      return {
+        ...state,
+        coldWaterLengthM: applyDimensionAdjustment(
+          state.coldWaterLengthM,
+          adjustment,
+        ),
+      };
+    case "plumbing.hot-water":
+      return {
+        ...state,
+        hotWaterLengthM: applyDimensionAdjustment(
+          state.hotWaterLengthM,
+          adjustment,
+        ),
+      };
+    case "plumbing.recirculation":
+      return {
+        ...state,
+        recirculationLengthM: applyDimensionAdjustment(
+          state.recirculationLengthM,
+          adjustment,
+        ),
+      };
     default:
       break;
   }

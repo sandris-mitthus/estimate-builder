@@ -39,7 +39,7 @@ export function ProjectCardActions({
   const [isPending, startTransition] = useTransition();
   const isIndividualProject = project.buildingModuleId === null;
   const moduleDataComplete = isIndividualProjectModuleDataComplete(project);
-  const canEditOrDelete = project.status === "active";
+  const canEditProject = project.status === "active";
   const canApprove = project.status === "active";
   const canReject = project.status === "active";
   const canComplete = project.status === "approved";
@@ -164,7 +164,7 @@ export function ProjectCardActions({
             onClick={() => setCopyOpen(true)}
           />
         ) : null}
-        {canEditOrDelete && canEdit ? (
+        {canEditProject && canEdit ? (
           <>
             <IconActionButton
               label={t("actions.edit", "Labot")}
@@ -174,7 +174,7 @@ export function ProjectCardActions({
             />
           </>
         ) : null}
-        {canEditOrDelete && canDelete ? (
+        {canDelete ? (
           <IconActionButton
             label={t("actions.delete", "Dzēst")}
             icon="fas fa-trash"

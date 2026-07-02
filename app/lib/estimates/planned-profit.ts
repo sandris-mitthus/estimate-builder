@@ -9,6 +9,10 @@ export function normalizePlannedProfitPercent(value: unknown): number {
   return roundToTwoDecimals(value);
 }
 
+export function isPlannedProfitUnset(value: unknown): boolean {
+  return normalizePlannedProfitPercent(value) <= 0;
+}
+
 export function parsePlannedProfitInput(raw: string): number {
   const trimmed = raw.trim().replace(",", ".");
   if (!trimmed) {

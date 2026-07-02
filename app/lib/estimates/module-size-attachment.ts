@@ -42,6 +42,60 @@ export function parseAttachItemStateKey(stateKey: string): {
   };
 }
 
+export function getLineItemModuleSizeItemKeys(
+  attachment: LineItemModuleSizeAttachment,
+): string[] {
+  const rawKeys =
+    attachment.itemKeys && attachment.itemKeys.length > 0
+      ? attachment.itemKeys
+      : [attachment.itemKey];
+
+  const uniqueKeys: string[] = [];
+  for (const key of rawKeys) {
+    if (
+      typeof key === "string" &&
+      key.trim().length > 0 &&
+      !uniqueKeys.includes(key)
+    ) {
+      uniqueKeys.push(key);
+    }
+  }
+
+  return uniqueKeys;
+}
+
+export function createLineItemModuleSizeAttachment(
+  moduleId: string,
+  itemKeys: string[],
+  adjustments: Record<string, string> = {},
+): LineItemModuleSizeAttachment | null {
+  const uniqueKeys = getLineItemModuleSizeItemKeys({
+    moduleId,
+    itemKey: itemKeys[0] ?? "",
+    itemKeys,
+  });
+
+  if (uniqueKeys.length === 0) {
+    return null;
+  }
+
+  const normalizedAdjustments = Object.fromEntries(
+    Object.entries(adjustments).filter(([, value]) =>
+      hasModuleSizeAdjustment(value),
+    ),
+  );
+
+  return {
+    moduleId,
+    itemKey: uniqueKeys[0],
+    itemKeys: uniqueKeys,
+    adjustments:
+      Object.keys(normalizedAdjustments).length > 0
+        ? normalizedAdjustments
+        : undefined,
+  };
+}
+
 export function normalizeLineItemModuleSizeAttachment(
   value: unknown,
 ): LineItemModuleSizeAttachment | undefined {
@@ -52,18 +106,34 @@ export function normalizeLineItemModuleSizeAttachment(
   const record = value as {
     moduleId?: unknown;
     itemKey?: unknown;
+    itemKeys?: unknown;
     adjustment?: unknown;
     adjustments?: unknown;
   };
 
-  if (
-    typeof record.moduleId !== "string" ||
-    typeof record.itemKey !== "string" ||
-    record.moduleId.trim().length === 0 ||
-    record.itemKey.trim().length === 0
-  ) {
+  if (typeof record.moduleId !== "string" || record.moduleId.trim().length === 0) {
     return undefined;
   }
+
+  let itemKeys: string[] = [];
+  if (Array.isArray(record.itemKeys)) {
+    itemKeys = record.itemKeys.filter(
+      (key): key is string => typeof key === "string" && key.trim().length > 0,
+    );
+  }
+  if (
+    itemKeys.length === 0 &&
+    typeof record.itemKey === "string" &&
+    record.itemKey.trim().length > 0
+  ) {
+    itemKeys = [record.itemKey];
+  }
+
+  if (itemKeys.length === 0) {
+    return undefined;
+  }
+
+  const uniqueKeys = [...new Set(itemKeys)];
 
   const adjustments: Record<string, string> = {};
 
@@ -77,18 +147,19 @@ export function normalizeLineItemModuleSizeAttachment(
     }
   }
 
+  const primaryItemKey = uniqueKeys[0];
   if (
     typeof record.adjustment === "string" &&
     hasModuleSizeAdjustment(record.adjustment)
   ) {
-    adjustments[record.itemKey] = record.adjustment;
+    adjustments[primaryItemKey] = record.adjustment;
   }
 
-  return {
-    moduleId: record.moduleId,
-    itemKey: record.itemKey,
+  return createLineItemModuleSizeAttachment(
+    record.moduleId,
+    uniqueKeys,
     adjustments,
-  };
+  ) ?? undefined;
 }
 
 export function getLineItemModuleSizeAdjustments(
@@ -196,10 +267,7 @@ export function lineItemModuleSizeAttachmentToAttachState(
     return {};
   }
 
-  const attachedStateKey = createAttachItemStateKey(
-    attachment.moduleId,
-    attachment.itemKey,
-  );
+  const enabledKeys = new Set(getLineItemModuleSizeItemKeys(attachment));
   const state: Record<string, ModuleSizeAttachItemState> = {};
 
   for (const [itemKey, adjustment] of Object.entries(
@@ -207,18 +275,21 @@ export function lineItemModuleSizeAttachmentToAttachState(
   )) {
     const stateKey = createAttachItemStateKey(attachment.moduleId, itemKey);
     state[stateKey] = {
-      enabled: stateKey === attachedStateKey,
+      enabled: enabledKeys.has(itemKey),
       adjustment,
     };
   }
 
-  if (!state[attachedStateKey]) {
-    state[attachedStateKey] = { enabled: true, adjustment: "" };
-  } else {
-    state[attachedStateKey] = {
-      ...state[attachedStateKey],
-      enabled: true,
-    };
+  for (const itemKey of enabledKeys) {
+    const stateKey = createAttachItemStateKey(attachment.moduleId, itemKey);
+    if (!state[stateKey]) {
+      state[stateKey] = { enabled: true, adjustment: "" };
+    } else {
+      state[stateKey] = {
+        ...state[stateKey],
+        enabled: true,
+      };
+    }
   }
 
   return state;

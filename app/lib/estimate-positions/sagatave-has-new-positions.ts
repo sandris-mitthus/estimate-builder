@@ -10,13 +10,14 @@ import {
   cloneSubcategory,
   remapMultiOptionLinks,
 } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
+import {
+  findProjectRowForSagataveRow,
+  normalizeRowTitle,
+  rowItemLabel,
+} from "@/app/lib/estimate-positions/sagatave-row-matching";
 
 function normalizeTitle(title: string): string {
-  return title.trim().toLowerCase();
-}
-
-function rowItemLabel(row: EstimateRowItem): string {
-  return row.name;
+  return normalizeRowTitle(title);
 }
 
 function findProjectCategory(
@@ -55,17 +56,13 @@ function findProjectRowItem(
   projectItems: EstimateRowItem[],
   sagataveRow: EstimateRowItem,
   rowIndex: number,
+  sagataveItemCount: number,
 ): EstimateRowItem | undefined {
-  const byIndex = projectItems[rowIndex];
-  if (byIndex && normalizeTitle(rowItemLabel(byIndex)) === normalizeTitle(rowItemLabel(sagataveRow))) {
-    return byIndex;
-  }
-
-  const normalizedLabel = normalizeTitle(rowItemLabel(sagataveRow));
-  if (!normalizedLabel) return undefined;
-
-  return projectItems.find(
-    (row) => normalizeTitle(rowItemLabel(row)) === normalizedLabel,
+  return findProjectRowForSagataveRow(
+    projectItems,
+    sagataveRow,
+    rowIndex,
+    sagataveItemCount,
   );
 }
 
@@ -74,7 +71,8 @@ function sagataveRowsMissingInProject(
   projectItems: EstimateRowItem[],
 ): boolean {
   return sagataveItems.some(
-    (row, rowIndex) => !findProjectRowItem(projectItems, row, rowIndex),
+    (row, rowIndex) =>
+      !findProjectRowItem(projectItems, row, rowIndex, sagataveItems.length),
   );
 }
 
@@ -82,9 +80,17 @@ function isMissingRowSelected(
   sagataveRow: EstimateRowItem,
   projectItems: EstimateRowItem[],
   rowIndex: number,
+  sagataveItemCount: number,
   selectedSagataveRowIds?: ReadonlySet<string>,
 ): boolean {
-  if (findProjectRowItem(projectItems, sagataveRow, rowIndex)) {
+  if (
+    findProjectRowItem(
+      projectItems,
+      sagataveRow,
+      rowIndex,
+      sagataveItemCount,
+    )
+  ) {
     return false;
   }
 
@@ -126,7 +132,12 @@ export function listMissingSagatavePositions(
     for (const [rowIndex, row] of sagataveCategory.items.entries()) {
       if (
         !projectCategory ||
-        !findProjectRowItem(projectCategory.items, row, rowIndex)
+        !findProjectRowItem(
+          projectCategory.items,
+          row,
+          rowIndex,
+          sagataveCategory.items.length,
+        )
       ) {
         missingCategoryItems.push({
           sagataveRowId: row.id,
@@ -155,7 +166,12 @@ export function listMissingSagatavePositions(
       for (const [rowIndex, row] of sagataveSubcategory.items.entries()) {
         if (
           !projectSubcategory ||
-          !findProjectRowItem(projectSubcategory.items, row, rowIndex)
+          !findProjectRowItem(
+            projectSubcategory.items,
+            row,
+            rowIndex,
+            sagataveSubcategory.items.length,
+          )
         ) {
           missingSubcategoryItems.push({
             sagataveRowId: row.id,
@@ -306,7 +322,13 @@ export function mergeNewSagatavePositionsIntoProject(
 
       for (const sagataveSubcategory of sagataveCategory.subcategories) {
         const selectedItems = sagataveSubcategory.items.filter((row, rowIndex) =>
-          isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+          isMissingRowSelected(
+            row,
+            [],
+            rowIndex,
+            sagataveSubcategory.items.length,
+            selectedSagataveRowIds,
+          ),
         );
 
         if (selectedItems.length > 0) {
@@ -318,7 +340,13 @@ export function mergeNewSagatavePositionsIntoProject(
       }
 
       const selectedCategoryItems = sagataveCategory.items.filter((row, rowIndex) =>
-        isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+        isMissingRowSelected(
+          row,
+          [],
+          rowIndex,
+          sagataveCategory.items.length,
+          selectedSagataveRowIds,
+        ),
       );
 
       if (partialSubcategories.length === 0 && selectedCategoryItems.length === 0) {
@@ -347,7 +375,13 @@ export function mergeNewSagatavePositionsIntoProject(
 
       if (!projectSubcategory) {
         const selectedItems = sagataveSubcategory.items.filter((row, rowIndex) =>
-          isMissingRowSelected(row, [], rowIndex, selectedSagataveRowIds),
+          isMissingRowSelected(
+            row,
+            [],
+            rowIndex,
+            sagataveSubcategory.items.length,
+            selectedSagataveRowIds,
+          ),
         );
 
         if (selectedItems.length === 0) {
@@ -372,6 +406,7 @@ export function mergeNewSagatavePositionsIntoProject(
             sagataveRow,
             projectSubcategory.items,
             rowIndex,
+            sagataveSubcategory.items.length,
             selectedSagataveRowIds,
           )
         ) {
@@ -388,6 +423,7 @@ export function mergeNewSagatavePositionsIntoProject(
           sagataveRow,
           projectCategory.items,
           rowIndex,
+          sagataveCategory.items.length,
           selectedSagataveRowIds,
         )
       ) {

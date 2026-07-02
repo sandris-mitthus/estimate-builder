@@ -47,6 +47,7 @@ import {
 } from "@/app/lib/estimates/volume-price-columns";
 import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
 import {
+  isPlannedProfitUnset,
   normalizePlannedProfitPercent,
   parsePlannedProfitInput,
   applyPlannedProfitPercent,
@@ -86,7 +87,7 @@ import {
   isCompositeLineItem,
   patchLineItemLaborTimeNorm,
 } from "@/app/lib/estimates/composite-line-item";
-import { resolveLineItemDisplayUnitFromModuleSize } from "@/app/lib/estimates/sync-module-size-quantities";
+import { resolveEstimateRowDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
   UNIT_PRICE_COLUMN_COUNT,
   getUnitPriceSubheaderLabels,
@@ -186,7 +187,13 @@ import {
   mergeNewSagatavePositionsIntoProject,
   sagataveHasNewPositionsForProject,
 } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
+import {
+  applySelectedSagataveChangesToProject,
+  listSagatavePositionChanges,
+  sagataveHasPositionChangesForProject,
+} from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { RestoreSagatavePositionsModal } from "@/app/components/restore-sagatave-positions-modal";
+import { SyncSagataveChangesModal } from "@/app/components/sync-sagatave-changes-modal";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import type { UserSummary } from "@/app/lib/users/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
@@ -350,11 +357,11 @@ function LineItemRow({
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
   const displayName = catalogPosition?.name ?? item.name;
-  const moduleSizeUnit =
-    isComposite && !item.variableQuantity
-      ? resolveLineItemDisplayUnitFromModuleSize(item, moduleSizeOptions ?? [])
-      : null;
-  const displayUnit = moduleSizeUnit ?? catalogPosition?.unit ?? item.unit;
+  const displayUnit = resolveEstimateRowDisplayUnit(
+    item,
+    moduleSizeOptions ?? [],
+    catalogPosition?.unit,
+  );
   const unitOptions = getEstimateUnitOptions(item.unit);
   const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
   const quantityMissing = showQuantityInput && item.quantity <= 0;
@@ -1545,23 +1552,14 @@ function EstimateDndTableInner({
               </th>
             ))}
             {showQuantityColumn
-              ? getVolumePriceSubheaderLabels(t).map((label, index) => {
-                  const translatedLabel =
-                    [
-                      t("estimate.column.workload_hours", "Darbietilpība (c/h)"),
-                      t("estimate.column.material", "Materiāls"),
-                      t("estimate.column.mechanisms", "Mehānismi"),
-                    ][index] ?? label;
-
-                  return (
-                    <th
-                      key={`volume-${label}`}
-                      className="border-b border-r border-zinc-200 bg-emerald-50/40 px-2 py-1.5 text-right"
-                    >
-                      {translatedLabel}
-                    </th>
-                  );
-                })
+              ? getVolumePriceSubheaderLabels(t).map((label) => (
+                  <th
+                    key={`volume-${label}`}
+                    className="border-b border-r border-zinc-200 bg-emerald-50/40 px-2 py-1.5 text-right"
+                  >
+                    {label}
+                  </th>
+                ))
               : null}
           </tr>
         </thead>
@@ -1805,12 +1803,17 @@ export function EstimateTable({
     ReadonlySet<string>
   >(() => new Set());
   const [restoreSagataveModalOpen, setRestoreSagataveModalOpen] = useState(false);
+  const [syncSagataveChangesModalOpen, setSyncSagataveChangesModalOpen] = useState(false);
+  const [hideSagataveChangesBanner, setHideSagataveChangesBanner] = useState(false);
   const [, startSaveDatesTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
   const [isExcelDownloading, setIsExcelDownloading] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     serializeEstimatePositionDocument(initialTitle, initialCategories, initialMultiOptionLinks),
+  );
+  const [savedPlannedProfitPercent, setSavedPlannedProfitPercent] = useState(() =>
+    normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
   );
   const [savedAt, setSavedAt] = useState<string | undefined>(
     initialMeta.savedAt,
@@ -1835,6 +1838,8 @@ export function EstimateTable({
   const plannedProfitPercent = normalizePlannedProfitPercent(
     meta.plannedProfitPercent ?? 0,
   );
+  const showPlannedProfitMissingNotice =
+    project != null && isPlannedProfitUnset(meta.plannedProfitPercent);
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       setPositionModalState({ item, onSave });
@@ -1858,6 +1863,9 @@ export function EstimateTable({
   useEffect(() => {
     setMeta(initialMeta);
     setSavedAt(initialMeta.savedAt);
+    setSavedPlannedProfitPercent(
+      normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
+    );
   }, [initialMeta]);
 
   useEffect(() => {
@@ -1926,6 +1934,34 @@ export function EstimateTable({
     setCategories(nextCategories);
     setMultiOptionLinks(merged.multiOptionLinks);
     setMergedSagataveHighlightIds(new Set(merged.addedNodeIds));
+  }
+
+  function handleApplySagataveChanges(selectedChangeIds: Set<string>) {
+    if (!highlightSagatavePositionChanges || editorLocked) return;
+
+    const applied = applySelectedSagataveChangesToProject(
+      categories,
+      sagataveSections,
+      selectedChangeIds,
+    );
+    let nextCategories = applied.categories;
+
+    if (moduleSizeOptions.length > 0) {
+      nextCategories = syncCategoriesQuantitiesFromModuleSizes(
+        nextCategories,
+        moduleSizeOptions[0].projectDescription,
+        catalogPositions,
+      );
+    }
+
+    setCategories(nextCategories);
+    setMergedSagataveHighlightIds(new Set(applied.appliedNodeIds));
+
+    const remainingChanges = listSagatavePositionChanges(
+      sagataveSections,
+      nextCategories,
+    );
+    setHideSagataveChangesBanner(remainingChanges.length === 0);
   }
 
   function handleFileDownload(url: string, setLoading: (v: boolean) => void) {
@@ -2002,6 +2038,9 @@ export function EstimateTable({
       setSavedSnapshot(
         serializeEstimatePositionDocument(title, bakedCategories, multiOptionLinks),
       );
+      setSavedPlannedProfitPercent(
+        normalizePlannedProfitPercent(nextMeta.plannedProfitPercent ?? 0),
+      );
       setSavedAt(savedAtIso);
       showFeedback({ type: "success", text: t("estimate.feedback.saved", "Tāme saglabāta.") });
     } else {
@@ -2013,7 +2052,10 @@ export function EstimateTable({
     () => serializeEstimatePositionDocument(title, categories, multiOptionLinks),
     [title, categories, multiOptionLinks],
   );
-  const isDirty = currentSnapshot !== savedSnapshot;
+  const isPlannedProfitDirty =
+    project != null &&
+    plannedProfitPercent !== savedPlannedProfitPercent;
+  const isDirty = currentSnapshot !== savedSnapshot || isPlannedProfitDirty;
 
   const showQuantityColumn = Boolean(project);
   const isEstimateSaved = isProjectEstimateSaved(meta, {
@@ -2046,6 +2088,7 @@ export function EstimateTable({
       !meta.clonedFromProjectId &&
       sagataveSections.length > 0,
   );
+  const highlightSagatavePositionChanges = highlightNewSagatavePositions;
 
   const hasNewSagatavePositions = useMemo(
     () =>
@@ -2053,6 +2096,21 @@ export function EstimateTable({
       sagataveHasNewPositionsForProject(sagataveSections, categories),
     [highlightNewSagatavePositions, sagataveSections, categories],
   );
+
+  const sagatavePositionChanges = useMemo(
+    () =>
+      highlightSagatavePositionChanges
+        ? listSagatavePositionChanges(sagataveSections, categories)
+        : [],
+    [highlightSagatavePositionChanges, sagataveSections, categories],
+  );
+
+  useEffect(() => {
+    setHideSagataveChangesBanner(false);
+  }, [sagataveSections, project?.id]);
+
+  const hasSagatavePositionChanges =
+    sagatavePositionChanges.length > 0 && !hideSagataveChangesBanner;
 
   const missingSagatavePositionGroups = useMemo(
     () =>
@@ -2402,6 +2460,39 @@ export function EstimateTable({
         </div>
       ) : null}
 
+      {project && hasSagatavePositionChanges ? (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900"
+        >
+          <div className="flex items-center gap-2">
+            <i className="fas fa-pen-to-square text-xs" aria-hidden="true" />
+            {t(
+              "estimate.sagatave.changes_available",
+              "Sagatavē ir izmaiņas, kuras var pielāgot šai tāmei",
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncSagataveChangesModalOpen(true)}
+            disabled={isSaving || editorLocked}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("estimate.sagatave.sync_changes", "Pielāgot no sagataves")}
+          </button>
+        </div>
+      ) : null}
+
+      {project && hasSagatavePositionChanges ? (
+        <SyncSagataveChangesModal
+          open={syncSagataveChangesModalOpen}
+          onOpenChange={setSyncSagataveChangesModalOpen}
+          changes={sagatavePositionChanges}
+          disabled={isSaving || editorLocked}
+          onConfirm={handleApplySagataveChanges}
+        />
+      ) : null}
+
       {project && hasNewSagatavePositions ? (
         <div
           role="status"
@@ -2435,6 +2526,24 @@ export function EstimateTable({
         />
       ) : null}
 
+      {showPlannedProfitMissingNotice ? (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <i
+            className="fas fa-info-circle mt-0.5 shrink-0 text-xs text-amber-700"
+            aria-hidden="true"
+          />
+          <p>
+            {t(
+              "estimate.planned_profit.missing_notice",
+              "Plānotā peļņa nav norādīta vai ir 0%. Vai tiešām vēlaties turpināt bez plānotās peļņas? Visas summas tabulā tiek rādītas bez peļņas piemērošanas.",
+            )}
+          </p>
+        </div>
+      ) : null}
+
       {tablePanel}
 
       {project && globalExcludedPositions.length > 0 ? (
@@ -2453,89 +2562,100 @@ export function EstimateTable({
       ) : null}
 
       {project ? (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {isDirty ? (
-            <span className="text-xs text-zinc-400">
-              {t("common.unsaved_changes", "Nesaglabātas izmaiņas")}
-            </span>
-          ) : isEstimateSaved && savedAt ? (
-            <span className="text-xs text-zinc-400">
-              {t("common.saved_at", "Saglabāts: {date}", {
-                date: formatDisplayDateDdMmYy(savedAt),
-              })}
-            </span>
-          ) : null}
+        <div className="flex w-full flex-col items-end gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {isDirty ? (
+              <span className="text-xs text-zinc-400">
+                {t("common.unsaved_changes", "Nesaglabātas izmaiņas")}
+              </span>
+            ) : isEstimateSaved && savedAt ? (
+              <span className="text-xs text-zinc-400">
+                {t("common.saved_at", "Saglabāts: {date}", {
+                  date: formatDisplayDateDdMmYy(savedAt),
+                })}
+              </span>
+            ) : null}
 
-          {!isDirty && isEstimateSaved && savedAt && canExportEstimate ? (
-            <>
+            {!isDirty && isEstimateSaved && savedAt && canExportEstimate ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isPdfDownloading}
+                  onClick={() =>
+                    handleFileDownload(
+                      `/api/estimates/${project.id}/pdf`,
+                      setIsPdfDownloading,
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isPdfDownloading ? (
+                    <i className="fas fa-circle-notch fa-spin text-red-500 text-xs" aria-hidden="true" />
+                  ) : (
+                    <i className="fas fa-file-pdf text-red-500 text-xs" aria-hidden="true" />
+                  )}
+                  PDF
+                  <span className="text-xs text-zinc-400">
+                    {t("estimate.export.offer_suffix", "(piedāvājums)")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isExcelDownloading}
+                  onClick={() =>
+                    handleFileDownload(
+                      `/api/estimates/${project.id}/excel`,
+                      setIsExcelDownloading,
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isExcelDownloading ? (
+                    <i className="fas fa-circle-notch fa-spin text-green-600 text-xs" aria-hidden="true" />
+                  ) : (
+                    <i className="fas fa-file-excel text-green-600 text-xs" aria-hidden="true" />
+                  )}
+                  Excel
+                  <span className="text-xs text-zinc-400">
+                    {t("estimate.export.estimate_suffix", "(tāme)")}
+                  </span>
+                </button>
+              </>
+            ) : null}
+
+            {!editorLocked ? (
               <button
                 type="button"
-                disabled={isPdfDownloading}
-                onClick={() =>
-                  handleFileDownload(
-                    `/api/estimates/${project.id}/pdf`,
-                    setIsPdfDownloading,
-                  )
-                }
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleSave}
+                disabled={isSaving || !isDirty}
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isPdfDownloading ? (
-                  <i className="fas fa-circle-notch fa-spin text-red-500 text-xs" aria-hidden="true" />
-                ) : (
-                  <i className="fas fa-file-pdf text-red-500 text-xs" aria-hidden="true" />
-                )}
-                PDF
-                <span className="text-xs text-zinc-400">
-                  {t("estimate.export.offer_suffix", "(piedāvājums)")}
-                </span>
+                {isSaving
+                  ? t("actions.saving", "Saglabā…")
+                  : t("estimate.actions.save", "Saglabāt tāmi")}
               </button>
+            ) : null}
+
+            {hasStaleCatalogPrices && !editorLocked ? (
               <button
                 type="button"
-                disabled={isExcelDownloading}
-                onClick={() =>
-                  handleFileDownload(
-                    `/api/estimates/${project.id}/excel`,
-                    setIsExcelDownloading,
-                  )
-                }
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleRefreshCatalogPrices}
+                disabled={isSaving}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isExcelDownloading ? (
-                  <i className="fas fa-circle-notch fa-spin text-green-600 text-xs" aria-hidden="true" />
-                ) : (
-                  <i className="fas fa-file-excel text-green-600 text-xs" aria-hidden="true" />
-                )}
-                Excel
-                <span className="text-xs text-zinc-400">
-                  {t("estimate.export.estimate_suffix", "(tāme)")}
-                </span>
+                <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
+                {t("estimate.actions.refresh_prices", "Atjaunot cenas")}
               </button>
-            </>
-          ) : null}
+            ) : null}
+          </div>
 
-          {!editorLocked ? (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || !isDirty}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isSaving
-                ? t("actions.saving", "Saglabā…")
-                : t("estimate.actions.save", "Saglabāt tāmi")}
-            </button>
-          ) : null}
-
-          {hasStaleCatalogPrices && !editorLocked ? (
-            <button
-              type="button"
-              onClick={handleRefreshCatalogPrices}
-              disabled={isSaving}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
-              {t("estimate.actions.refresh_prices", "Atjaunot cenas")}
-            </button>
+          {showPlannedProfitMissingNotice ? (
+            <p className="max-w-lg text-right text-xs text-amber-700">
+              {t(
+                "estimate.planned_profit.export_hint",
+                "Piedāvājums un tāme tiks eksportēti bez plānotās peļņas",
+              )}
+            </p>
           ) : null}
         </div>
       ) : null}

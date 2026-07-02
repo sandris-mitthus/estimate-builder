@@ -9,7 +9,12 @@ import {
 } from "@/app/lib/modules/apply-module-size-adjustments";
 import { translateModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
 import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
+import {
+  createLineItemModuleSizeAttachment,
+  getLineItemModuleSizeItemKeys,
+} from "@/app/lib/estimates/module-size-attachment";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
+import type { ModuleSizeSummaryItem } from "@/app/lib/modules/module-size-summary-types";
 
 type ModuleSizeAttachPickerProps = {
   controlPrefix: string;
@@ -32,6 +37,19 @@ function findSectionForItemKey(
   return null;
 }
 
+function findBaseSummaryItem(
+  module: BuildingModuleSizeOption,
+  itemKey: string,
+): ModuleSizeSummaryItem | null {
+  for (const section of module.sections) {
+    const item = section.items.find((entry) => entry.key === itemKey);
+    if (item) {
+      return item;
+    }
+  }
+  return null;
+}
+
 function ModuleCard({
   controlPrefix,
   module,
@@ -45,6 +63,9 @@ function ModuleCard({
 }) {
   const { t } = useTranslations();
   const isAttachedModule = attachment?.moduleId === module.id;
+  const attachedItemKeys = isAttachedModule
+    ? getLineItemModuleSizeItemKeys(attachment)
+    : [];
 
   // Lokālais korekciju stāvoklis — darbojas arī pirms kāda elementa piesaistīšanas.
   const [localAdjustments, setLocalAdjustments] = useState<Record<string, string>>(
@@ -59,7 +80,7 @@ function ModuleCard({
       setLocalAdjustments(attachment?.adjustments ?? {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAttachedModule, attachment?.itemKey]);
+  }, [isAttachedModule, attachment?.itemKeys, attachment?.itemKey]);
 
   const adjustments = useMemo(
     () =>
@@ -90,18 +111,18 @@ function ModuleCard({
 
   const [openSection, setOpenSection] = useState<string | null>(() =>
     isAttachedModule
-      ? findSectionForItemKey(module.sections, attachment?.itemKey)
+      ? findSectionForItemKey(module.sections, attachedItemKeys[0])
       : null,
   );
 
-  // Kad mainās piesaistītais modulis vai itemKey — atver attiecīgo sadaļu.
+  // Kad mainās piesaistītais modulis vai atslēgas — atver attiecīgo sadaļu.
   useEffect(() => {
     setOpenSection(
       isAttachedModule
-        ? findSectionForItemKey(module.sections, attachment?.itemKey)
+        ? findSectionForItemKey(module.sections, attachedItemKeys[0])
         : null,
     );
-  }, [isAttachedModule, attachment?.itemKey, module.sections]);
+  }, [attachedItemKeys, isAttachedModule, module.sections]);
 
   function toggleSection(title: string) {
     setOpenSection((current) => (current === title ? null : title));
@@ -143,8 +164,7 @@ function ModuleCard({
               {isOpen && (
                 <ul className="mt-2 space-y-0.5">
                   {section.items.map((baseItem, index) => {
-                    const enabled =
-                      isAttachedModule && attachment?.itemKey === baseItem.key;
+                    const enabled = attachedItemKeys.includes(baseItem.key);
                       const translatedBaseItem =
                         translatedSection.items[index] ?? baseItem;
                       const displayItem =
@@ -155,6 +175,9 @@ function ModuleCard({
                         ? baseItem.value
                         : undefined;
                     const adjustment = localAdjustments[baseItem.key] ?? "";
+                    const currentAdjustments = isAttachedModule
+                      ? (attachment?.adjustments ?? {})
+                      : localAdjustments;
 
                     return (
                       <ModuleSizeAttachItemRow
@@ -165,19 +188,61 @@ function ModuleCard({
                         state={{ enabled, adjustment }}
                         onEnabledChange={(nextEnabled) => {
                           if (nextEnabled) {
-                            onChange({
-                              moduleId: module.id,
-                              itemKey: baseItem.key,
-                              // Iekļauj visas lokālās korekcijas, kas ievadītas pirms piesaistīšanas
-                              adjustments: isAttachedModule
-                                ? (attachment?.adjustments ?? {})
-                                : localAdjustments,
-                            });
+                            const currentKeys = isAttachedModule
+                              ? attachedItemKeys
+                              : [];
+                            const toggledUnit =
+                              findBaseSummaryItem(module, baseItem.key)?.unit ?? null;
+                            const existingUnit =
+                              currentKeys.length > 0
+                                ? (findBaseSummaryItem(module, currentKeys[0])?.unit ??
+                                  null)
+                                : null;
+
+                            let nextKeys: string[];
+                            if (
+                              currentKeys.length > 0 &&
+                              toggledUnit &&
+                              existingUnit &&
+                              toggledUnit !== existingUnit
+                            ) {
+                              nextKeys = [baseItem.key];
+                            } else if (currentKeys.includes(baseItem.key)) {
+                              nextKeys = currentKeys;
+                            } else {
+                              nextKeys = [...currentKeys, baseItem.key];
+                            }
+
+                            const nextAttachment = createLineItemModuleSizeAttachment(
+                              module.id,
+                              nextKeys,
+                              currentAdjustments,
+                            );
+                            if (nextAttachment) {
+                              onChange(nextAttachment);
+                            }
                             return;
                           }
 
-                          if (enabled) {
+                          if (!enabled) {
+                            return;
+                          }
+
+                          const nextKeys = attachedItemKeys.filter(
+                            (key) => key !== baseItem.key,
+                          );
+                          if (nextKeys.length === 0) {
                             onChange(null);
+                            return;
+                          }
+
+                          const nextAttachment = createLineItemModuleSizeAttachment(
+                            module.id,
+                            nextKeys,
+                            currentAdjustments,
+                          );
+                          if (nextAttachment) {
+                            onChange(nextAttachment);
                           }
                         }}
                         onAdjustmentChange={(nextAdjustment) => {

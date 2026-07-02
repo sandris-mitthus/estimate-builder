@@ -15,6 +15,7 @@ type ProjectListProps = {
   modules: BuildingModuleSummary[];
   staleCatalogPriceProjectIds?: ReadonlySet<string>;
   newSagatavePositionProjectIds?: ReadonlySet<string>;
+  sagatavePositionChangeProjectIds?: ReadonlySet<string>;
   pendingMaterialsProjectIds?: ReadonlySet<string>;
 };
 
@@ -23,6 +24,7 @@ export function ProjectList({
   modules,
   staleCatalogPriceProjectIds = new Set(),
   newSagatavePositionProjectIds = new Set(),
+  sagatavePositionChangeProjectIds = new Set(),
   pendingMaterialsProjectIds = new Set(),
 }: ProjectListProps) {
   const pageCreate = useOptionalProjectsPageCreate();
@@ -52,6 +54,10 @@ export function ProjectList({
           hasNewSagatavePositions={
             !isOptimisticProjectId(project.id) &&
             newSagatavePositionProjectIds.has(project.id)
+          }
+          hasSagatavePositionChanges={
+            !isOptimisticProjectId(project.id) &&
+            sagatavePositionChangeProjectIds.has(project.id)
           }
           hasPendingMaterials={
             !isOptimisticProjectId(project.id) &&

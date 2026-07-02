@@ -1249,6 +1249,65 @@ export function ModuleProjectDescriptionForm({
             </div>
           ) : null}
         </section>
+
+        <section className="space-y-4">
+          <SectionHeading>
+            {t("project_description.section.plumbing", "Ūdensapgāde")}
+          </SectionHeading>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label={t(
+                "project_description.field.cold_water_length_m",
+                "Aukstā ūdens garums (m)",
+              )}
+              id="cold-water-length"
+            >
+              <DimensionInput
+                id="cold-water-length"
+                value={form.coldWaterLengthM}
+                onChange={(coldWaterLengthM) =>
+                  setForm((current) => ({ ...current, coldWaterLengthM }))
+                }
+                placeholder="120"
+              />
+            </Field>
+
+            <Field
+              label={t(
+                "project_description.field.hot_water_length_m",
+                "Karstā ūdens garums (m)",
+              )}
+              id="hot-water-length"
+            >
+              <DimensionInput
+                id="hot-water-length"
+                value={form.hotWaterLengthM}
+                onChange={(hotWaterLengthM) =>
+                  setForm((current) => ({ ...current, hotWaterLengthM }))
+                }
+                placeholder="80"
+              />
+            </Field>
+
+            <Field
+              label={t(
+                "project_description.field.recirculation_length_m",
+                "Recirkulācijas garums (m)",
+              )}
+              id="recirculation-length"
+            >
+              <DimensionInput
+                id="recirculation-length"
+                value={form.recirculationLengthM}
+                onChange={(recirculationLengthM) =>
+                  setForm((current) => ({ ...current, recirculationLengthM }))
+                }
+                placeholder="40"
+              />
+            </Field>
+          </div>
+        </section>
       </div>
 
       <div className="mt-4 flex justify-end border-t border-zinc-100 pt-4">

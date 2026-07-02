@@ -32,7 +32,10 @@ export function hasProjectDescriptionData(
     hasDimension(state.foundationExtensionDepthM) ||
     hasDimension(state.floorHeightM) ||
     hasDimension(state.exteriorWallLengthM) ||
-    hasDimension(state.interiorWallLengthM)
+    hasDimension(state.interiorWallLengthM) ||
+    hasDimension(state.coldWaterLengthM) ||
+    hasDimension(state.hotWaterLengthM) ||
+    hasDimension(state.recirculationLengthM)
   ) {
     return true;
   }

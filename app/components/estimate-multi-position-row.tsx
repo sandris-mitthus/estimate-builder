@@ -53,7 +53,7 @@ import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import {
   hasModuleSizeAttachment,
   resolveLineItemDisplayQuantityFromModuleSize,
-  resolveLineItemDisplayUnitFromModuleSize,
+  resolveCompositeLineItemDisplayUnit,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { hasDefinedLaborLineItem } from "@/app/lib/positions/has-defined-labor";
 import {
@@ -232,9 +232,10 @@ function MultiOptionSubRow({
     !isVariableQuantityLineItem(option.lineItem, catalogPositions);
   const moduleSizeUnit =
     !isVariableQuantityLineItem(option.lineItem, catalogPositions)
-      ? resolveLineItemDisplayUnitFromModuleSize(option.lineItem, moduleSizeOptions)
+      ? resolveCompositeLineItemDisplayUnit(option.lineItem, moduleSizeOptions)
       : null;
-  const displayUnit = moduleSizeUnit ?? (option.lineItem.unit.trim() || "—");
+  const displayUnit =
+    moduleSizeUnit ?? (option.lineItem.unit.trim() || "—");
   const displayPrices = resolveDisplayUnitPrice(
     option.lineItem,
     catalogPositions,
@@ -512,7 +513,7 @@ export function EstimateMultiPositionRow({
     isVariableQuantityLineItem(selectedLineItem, catalogPositions);
   const selectedModuleSizeUnit =
     selectedLineItem != null && !showQuantityInput
-      ? resolveLineItemDisplayUnitFromModuleSize(selectedLineItem, moduleSizeOptions)
+      ? resolveCompositeLineItemDisplayUnit(selectedLineItem, moduleSizeOptions)
       : null;
   const selectedDisplayUnit =
     selectedModuleSizeUnit ?? (selectedLineItem?.unit.trim() || "—");

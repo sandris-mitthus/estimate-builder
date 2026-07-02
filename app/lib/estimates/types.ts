@@ -4,10 +4,13 @@ export type PriceBreakdown = {
   mechanisms: number;
 };
 
-/** Piesaistīts moduļa lielums tāmes rindai (vienlaikus tikai viens slēdzis). */
+/** Piesaistīts moduļa lielums tāmes rindai (var piesaistīt vairākus, ja vienāda mērvienība). */
 export type LineItemModuleSizeAttachment = {
   moduleId: string;
+  /** Pirmā piesaistītā atslēga — atpakaļsaderībai un primārais rādītājs. */
   itemKey: string;
+  /** Visas piesaistītās atslēgas; daudzums = to skaitlisko vērtību summa. */
+  itemKeys?: string[];
   /** Korekcijas (+) pēc summary atslēgas — tikai šai tāmes pozīcijai. */
   adjustments?: Record<string, string>;
 };
