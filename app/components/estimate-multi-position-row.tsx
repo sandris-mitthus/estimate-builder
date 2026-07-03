@@ -19,6 +19,7 @@ import {
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
 import { patchRequiresAttention } from "@/app/lib/estimates/attention-budget";
 import { DeleteButton } from "@/app/components/delete-button";
+import { RestoreButton } from "@/app/components/restore-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -73,16 +74,20 @@ import type {
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 
 const readOnlyNum =
-  "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
+  "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";
 const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
-const cellNum = `${cellInput} text-right tabular-nums`;
+const cellNum = `${cellInput} text-center tabular-nums`;
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const rowActionCell =
-  "border-b border-zinc-100 px-1 py-0.5 text-center align-top";
+  "border-b border-zinc-100 px-1 py-0.5 text-center align-middle";
+const hiddenEstimateRowBodyClass =
+  "[&_td:not(:last-child)]:opacity-55 [&_td:not(:last-child)]:pointer-events-none [&_td:not(:last-child)]:select-none";
+const hiddenEstimateRowClass = "bg-zinc-100/90 hover:bg-zinc-100/90";
 
 function updateMultiOptionLineItem(
   multi: EstimateMultiPosition,
@@ -102,6 +107,8 @@ type EstimateMultiPositionRowProps = {
   mode: "template" | "offer";
   onChange: (value: EstimateMultiPosition) => void;
   onDelete: () => void;
+  onRestore?: () => void;
+  hiddenInEstimate?: boolean;
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   currency?: string | null;
@@ -166,21 +173,31 @@ function EmptyHeaderMetricCells({
 }: {
   showQuantityColumn?: boolean;
 }) {
+  const styles = getEstimateNumericStyles(showQuantityColumn);
+  const metricCell = showQuantityColumn
+    ? styles.cell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+
   return (
     <>
-      <td className="border-b border-zinc-100 px-1 py-0.5 align-top" />
-      {showQuantityColumn ? (
-        <td className="border-b border-zinc-100 px-1 py-0.5 align-top" />
-      ) : null}
+      <td className={metricCell} />
+      {showQuantityColumn ? <td className={metricCell} /> : null}
       {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
         <td
           key={index}
-          className={`border-b border-zinc-100 px-1 py-0.5 align-top ${
-            index === UNIT_PRICE_COLUMN_COUNT - 1 ? "bg-zinc-50/60" : ""
-          }`}
+          className={
+            index === UNIT_PRICE_COLUMN_COUNT - 1
+              ? styles.cellTotal
+              : metricCell
+          }
         />
       ))}
-      {showQuantityColumn ? <EmptyVolumePriceCells /> : null}
+      {showQuantityColumn ? (
+        <EmptyVolumePriceCells
+          cellClassName={styles.volumeCell}
+          totalCellClassName={styles.volumeCellTotal}
+        />
+      ) : null}
     </>
   );
 }
@@ -220,6 +237,11 @@ function MultiOptionSubRow({
 }) {
   const { t } = useTranslations();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
+  const numericStyles = getEstimateNumericStyles(showQuantityColumn);
+  const metricCellClass = showQuantityColumn
+    ? numericStyles.cell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+  const metricReadOnly = showQuantityColumn ? numericStyles.readOnly : readOnlyNum;
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
   const label =
     option.lineItem.name.trim() ||
@@ -420,14 +442,14 @@ function MultiOptionSubRow({
           </div>
         </div>
       </td>
-      <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-        <span className={`${readOnlyNum} text-zinc-500`}>
+      <td className={metricCellClass}>
+        <span className={`${metricReadOnly} text-zinc-500`}>
           {displayUnit}
         </span>
       </td>
       {showQuantityColumn ? (
-        <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-          <span className={`${readOnlyNum} text-zinc-300`}>—</span>
+        <td className={metricCellClass}>
+          <span className={`${metricReadOnly} text-zinc-300`}>—</span>
         </td>
       ) : null}
       <EstimateUnitPriceCells
@@ -436,6 +458,7 @@ function MultiOptionSubRow({
         values={displayPrices}
         staleCatalogPriceHints={staleCatalogPriceHints}
         onTimeNormChange={onTimeNormChange}
+        compact={showQuantityColumn}
       />
       {showQuantityColumn ? (
         <VolumeSumCells
@@ -450,6 +473,7 @@ function MultiOptionSubRow({
             option.lineItem,
             isVariableQuantityLineItem(option.lineItem, catalogPositions),
           )}
+          compact
         />
       ) : null}
       <td className={rowActionCell} />
@@ -462,6 +486,8 @@ export function EstimateMultiPositionRow({
   mode,
   onChange,
   onDelete,
+  onRestore,
+  hiddenInEstimate = false,
   catalogPositions,
   defaultHourlyRate,
   currency = null,
@@ -481,6 +507,12 @@ export function EstimateMultiPositionRow({
   allowOfferMultiEdit = false,
 }: EstimateMultiPositionRowProps) {
   const { t } = useTranslations();
+  const numericStyles = getEstimateNumericStyles(showQuantityColumn);
+  const metricCellClass = showQuantityColumn
+    ? numericStyles.cell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+  const metricReadOnly = showQuantityColumn ? numericStyles.readOnly : readOnlyNum;
+  const metricCellNum = showQuantityColumn ? numericStyles.input : cellNum;
   const [editOpen, setEditOpen] = useState(false);
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const selectionOptions = getMultiPositionSelectionOptions(
@@ -580,11 +612,15 @@ export function EstimateMultiPositionRow({
       <tbody
         ref={rowRef}
         style={rowStyle}
-        className={`group/multi align-middle ${showDropLine ? dropLineClass : ""}`}
+        className={`group/multi align-middle ${showDropLine ? dropLineClass : ""} ${
+          hiddenInEstimate ? hiddenEstimateRowBodyClass : ""
+        }`}
       >
         {mode === "offer" ? (
           <tr className={`align-middle ${
-            highlightMergedSagatave
+            hiddenInEstimate
+              ? hiddenEstimateRowClass
+              : highlightMergedSagatave
               ? "bg-emerald-50/80 hover:bg-emerald-50"
               : requiresAttention
                 ? estimateAttentionRowClassName
@@ -684,20 +720,20 @@ export function EstimateMultiPositionRow({
                 </div>
               </div>
             </td>
-            <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
-              <span className={`${readOnlyNum} text-zinc-500`}>
+            <td className={metricCellClass}>
+              <span className={`${metricReadOnly} text-zinc-500`}>
                 {selectedDisplayUnit}
               </span>
             </td>
             {showQuantityColumn ? (
-              <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
+              <td className={metricCellClass}>
                 {hasAttachedQuantity && selectedLineItem ? (
-                  <span className={`${readOnlyNum} text-zinc-700`}>
+                  <span className={`${metricReadOnly} text-zinc-700`}>
                     {formatQuantityDisplay(attachedQuantity)}
                   </span>
                 ) : showQuantityInput && selectedOption && selectedLineItem ? (
                   <EstimateQuantityInput
-                    className={`${cellNum} ${selectedLineItem.quantity <= 0 ? "border-red-300 bg-red-50 text-red-700" : ""}`}
+                    className={`${metricCellNum} ${selectedLineItem.quantity <= 0 ? "border-red-300 bg-red-50 text-red-700" : ""}`}
                     value={selectedLineItem.quantity}
                     onChange={(quantity) =>
                       onChange(
@@ -710,7 +746,7 @@ export function EstimateMultiPositionRow({
                     emptyValue={0}
                   />
                 ) : (
-                  <span className={`${readOnlyNum} text-zinc-300`}>—</span>
+                  <span className={`${metricReadOnly} text-zinc-300`}>—</span>
                 )}
               </td>
             ) : null}
@@ -719,6 +755,7 @@ export function EstimateMultiPositionRow({
               defaultHourlyRate={defaultHourlyRate}
               values={displayPrices}
               staleCatalogPriceHints={selectedStaleCatalogPriceHints}
+              compact={showQuantityColumn}
               onTimeNormChange={
                 canEditTimeNorm && selectedLineItem && selectedOption
                   ? (laborTimeNorm) =>
@@ -742,9 +779,26 @@ export function EstimateMultiPositionRow({
                 values={volumeSum}
                 laborWorkloadHours={laborWorkloadHours}
                 staleCatalogPriceHints={selectedStaleCatalogPriceHints}
+                compact
               />
             ) : null}
-            <td className={rowActionCell} />
+            <td className={rowActionCell}>
+              {allowOfferMultiEdit ? (
+                hiddenInEstimate && onRestore ? (
+                  <RestoreButton
+                    label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                    onClick={onRestore}
+                    className="opacity-100"
+                  />
+                ) : (
+                  <DeleteButton
+                    label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
+                    onClick={onDelete}
+                    className="opacity-0 group-hover/multi:opacity-100"
+                  />
+                )
+              ) : null}
+            </td>
           </tr>
         ) : (
           <>
@@ -819,11 +873,19 @@ export function EstimateMultiPositionRow({
                     }
                     className={attentionToggleClass}
                   />
-                  <DeleteButton
-                    label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
-                    onClick={onDelete}
-                    className="opacity-0 group-hover/multi:opacity-100"
-                  />
+                  {hiddenInEstimate && onRestore ? (
+                    <RestoreButton
+                      label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                      onClick={onRestore}
+                      className="opacity-100"
+                    />
+                  ) : (
+                    <DeleteButton
+                      label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
+                      onClick={onDelete}
+                      className="opacity-0 group-hover/multi:opacity-100"
+                    />
+                  )}
                 </div>
               </td>
             </tr>

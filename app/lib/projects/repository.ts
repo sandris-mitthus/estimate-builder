@@ -1036,6 +1036,65 @@ export async function omitProjectExcludedPosition(
   return { ok: true, omittedIds };
 }
 
+export async function restoreProjectExcludedPosition(
+  projectId: string,
+  excludedPositionId: string,
+): Promise<{ ok: true; omittedIds: string[] } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const trimmedId = excludedPositionId.trim();
+  if (!trimmedId) {
+    return { ok: false, error: "Pozīcija nav norādīta." };
+  }
+
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("meta")
+    .eq("project_id", projectId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Tāme nav atrasta." };
+  }
+
+  const currentMeta = (data.meta ?? {}) as EstimateMeta;
+  const omittedIds = (currentMeta.excludedPositionIdsOmitted ?? []).filter(
+    (id) => id !== trimmedId,
+  );
+
+  const meta: EstimateMeta = {
+    ...currentMeta,
+    excludedPositionIdsOmitted:
+      omittedIds.length > 0 ? omittedIds : undefined,
+  };
+
+  const { error: updateError } = await supabase
+    .from("estimates")
+    .update({ meta })
+    .eq("project_id", projectId)
+    .eq("company_id", companyId);
+
+  if (updateError) {
+    return { ok: false, error: "Neizdevās atjaunot pozīciju projektā." };
+  }
+
+  return { ok: true, omittedIds };
+}
+
 export async function markProjectMaterialOrdered(
   projectId: string,
   positionPriceId: string,

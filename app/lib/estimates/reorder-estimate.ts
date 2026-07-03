@@ -1,7 +1,6 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import {
   canDropCategoryChild,
-  collectCategoryChildDragIds,
   findCategoryIdForDragTarget,
   insertCategoryLevelItem,
   moveCategoryChildAcrossCategories,
@@ -14,6 +13,7 @@ import {
   parseDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
+import { collectAllDragIds as collectAllEstimateDragIds } from "@/app/lib/estimates/hidden-estimate-rows";
 import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import type { EstimateCategory, EstimateRowItem } from "@/app/lib/estimates/types";
 
@@ -23,15 +23,11 @@ type ItemLocation = {
   index: number;
 };
 
-export function collectAllDragIds(categories: EstimateCategory[]): string[] {
-  const ids: string[] = [];
-
-  for (const category of categories) {
-    ids.push(categoryDragId(category.id));
-    ids.push(...collectCategoryChildDragIds(category));
-  }
-
-  return ids;
+export function collectAllDragIds(
+  categories: EstimateCategory[],
+  options?: { includeHiddenRows?: boolean },
+): string[] {
+  return collectAllEstimateDragIds(categories, options);
 }
 
 export function canDropDragId(

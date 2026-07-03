@@ -12,14 +12,12 @@ import {
   formatTimeNormDisplay,
   roundQuantity,
 } from "@/app/lib/positions/variable-quantity";
+import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import { Tooltip } from "@/app/components/tooltip";
 
-const readOnlyNum =
-  "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
-const volumeCell = "border-b border-zinc-100 px-1 py-0.5 align-top bg-emerald-50/25";
-const volumeCellTotal = `${volumeCell} bg-emerald-50/50`;
-const staleVolumeCell =
-  "border-b border-zinc-100 px-1 py-0.5 align-top bg-red-100 ring-1 ring-inset ring-red-300";
+const defaultStyles = getEstimateNumericStyles(false);
+const defaultVolumeCell = defaultStyles.volumeCell;
+const defaultVolumeCellTotal = defaultStyles.volumeCellTotal;
 
 export function resolveLineItemVolumeSum(
   quantity: number,
@@ -56,7 +54,11 @@ export function resolveLaborWorkloadHours(
   return roundQuantity(qty * timeNorm);
 }
 
-function volumeAmountClassName(value: number, emphasis = false): string {
+function volumeAmountClassName(
+  readOnlyNum: string,
+  value: number,
+  emphasis = false,
+): string {
   if (isAmountDisplayEmpty(value)) {
     return `${readOnlyNum} text-zinc-300`;
   }
@@ -70,11 +72,18 @@ export function VolumeSumCells({
   values,
   laborWorkloadHours = null,
   staleCatalogPriceHints,
+  compact = false,
 }: {
   values: PriceBreakdown | null;
   laborWorkloadHours?: number | null;
   staleCatalogPriceHints?: StaleCatalogPriceHints;
+  compact?: boolean;
 }) {
+  const styles = getEstimateNumericStyles(compact);
+  const readOnlyNum = styles.readOnly;
+  const volumeCell = styles.volumeCell;
+  const volumeCellTotal = styles.volumeCellTotal;
+  const staleVolumeCell = `${styles.volumeCell} bg-red-100 ring-1 ring-inset ring-red-300`;
   const total = values ? sumBreakdown(values) : 0;
   const workloadText =
     laborWorkloadHours != null && laborWorkloadHours > 0
@@ -86,6 +95,7 @@ export function VolumeSumCells({
       <td className={volumeCell}>
         <span
           className={volumeAmountClassName(
+            readOnlyNum,
             laborWorkloadHours ?? 0,
             false,
           )}
@@ -101,7 +111,10 @@ export function VolumeSumCells({
         const cellClassName = staleHint ? staleVolumeCell : volumeCell;
         const amountSpan = (
           <span
-            className={volumeAmountClassName(values ? values[field] : 0)}
+            className={volumeAmountClassName(
+              readOnlyNum,
+              values ? values[field] : 0,
+            )}
           >
             {values ? formatAmountDisplay(values[field]) : "—"}
           </span>
@@ -110,7 +123,7 @@ export function VolumeSumCells({
         return (
           <td key={field} className={cellClassName}>
             {staleHint ? (
-              <Tooltip label={staleHint} className="w-full justify-end">
+              <Tooltip label={staleHint} className="w-full justify-center">
                 {amountSpan}
               </Tooltip>
             ) : (
@@ -120,7 +133,7 @@ export function VolumeSumCells({
         );
       })}
       <td className={volumeCellTotal}>
-        <span className={volumeAmountClassName(total, true)}>
+        <span className={volumeAmountClassName(readOnlyNum, total, true)}>
           {values ? formatAmountDisplay(total) : "—"}
         </span>
       </td>
@@ -129,14 +142,14 @@ export function VolumeSumCells({
 }
 
 export const volumeSumFooterCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-xs font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
+  "border-t-2 border-zinc-300 px-2 py-2.5 text-center text-xs font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
 
 export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60 text-sm`;
 
 /** Tukšas šūnas kategoriju / multi galvenes rindām. */
 export function EmptyVolumePriceCells({
-  cellClassName = "border-b border-zinc-100 px-1 py-0.5 align-top bg-emerald-50/25",
-  totalCellClassName = "border-b border-zinc-100 px-1 py-0.5 align-top bg-emerald-50/50",
+  cellClassName = defaultVolumeCell,
+  totalCellClassName = defaultVolumeCellTotal,
 }: {
   cellClassName?: string;
   totalCellClassName?: string;

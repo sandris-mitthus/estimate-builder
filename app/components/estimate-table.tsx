@@ -32,6 +32,8 @@ import {
   updateProjectEstimateDatesAction,
 } from "@/app/(protected)/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { EstimateTableStickyShell } from "@/app/components/estimate-table-sticky-shell";
+import { EstimateTableSubheaderLabel } from "@/app/components/estimate-table-header-label";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
@@ -46,6 +48,7 @@ import {
   getVolumePriceSubheaderLabels,
 } from "@/app/lib/estimates/volume-price-columns";
 import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
+import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import {
   isPlannedProfitUnset,
   normalizePlannedProfitPercent,
@@ -79,6 +82,7 @@ import { ProjectExcludedPositionsPanel } from "@/app/components/project-excluded
 import { PendingProjectMaterialsBanner } from "@/app/components/pending-project-materials-banner";
 import { ProjectMaterialsDelegationPanel } from "@/app/components/project-materials-delegation-panel";
 import { DeleteButton } from "@/app/components/delete-button";
+import { RestoreButton } from "@/app/components/restore-button";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import {
   EstimateAttentionIcon,
@@ -164,6 +168,14 @@ import {
   reorderEstimate,
 } from "@/app/lib/estimates/reorder-estimate";
 import {
+  countHiddenEstimateRows,
+  hideMultiFromCategories,
+  isEstimateRowHidden,
+  removeOrHideRowItemById,
+  restoreRowItemById,
+  shouldRenderEstimateRow,
+} from "@/app/lib/estimates/hidden-estimate-rows";
+import {
   applyMultiChangeWithLinkSync,
   cleanupLinksAfterMultiDelete,
   findMultiById,
@@ -178,7 +190,6 @@ import {
   createMultiPosition,
   getRowItemId,
   isEstimateMultiPosition,
-  removeRowItemById,
   resolveLineItemDisplayName,
   updateRowItemById,
 } from "@/app/lib/estimates/multi-position";
@@ -213,6 +224,40 @@ import { countPendingProjectMaterials } from "@/app/lib/projects/pending-project
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
 function getEstimateTableColCount(showQuantityColumn: boolean): number {
   return showQuantityColumn ? 15 : 9;
+}
+
+function EstimateProjectTableColgroup({
+  showQuantityColumn,
+}: {
+  showQuantityColumn: boolean;
+}) {
+  if (showQuantityColumn) {
+    return (
+      <colgroup>
+        <col style={{ width: "44%" }} />
+        <col style={{ width: "2.5%" }} />
+        <col style={{ width: "3%" }} />
+        {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
+          <col key={`unit-${index}`} style={{ width: "4%" }} />
+        ))}
+        {Array.from({ length: VOLUME_PRICE_COLUMN_COUNT }).map((_, index) => (
+          <col key={`volume-${index}`} style={{ width: "4.2%" }} />
+        ))}
+        <col style={{ width: "5.5%" }} />
+      </colgroup>
+    );
+  }
+
+  return (
+    <colgroup>
+      <col style={{ width: "42%" }} />
+      <col style={{ width: "5%" }} />
+      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
+        <col key={`unit-${index}`} style={{ width: "8%" }} />
+      ))}
+      <col style={{ width: "5%" }} />
+    </colgroup>
+  );
 }
 
 function bakeInCatalogPrices(
@@ -295,17 +340,17 @@ const cellInput =
   "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
 const nameInput =
   "w-full min-h-[2.75rem] resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm leading-snug whitespace-normal break-words transition [field-sizing:content] focus:border-zinc-300 focus:bg-white focus:outline-none";
-const cellNum = `${cellInput} text-right tabular-nums`;
+const cellNum = `${cellInput} text-center tabular-nums`;
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
-const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
+const readOnlyNum = "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";
 /** Stable DndContext id — avoids SSR/client mismatch on aria-describedby. */
 const ESTIMATE_DND_CONTEXT_ID = "estimate-table-dnd";
 
 const footerCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-right text-xs font-semibold tabular-nums text-zinc-900";
+  "border-t-2 border-zinc-300 px-2 py-2.5 text-center text-xs font-semibold tabular-nums text-zinc-900";
 
 /** Shared left gutter + fixed drag column so handles align across all row types. */
-const rowLead = "pl-3";
+const rowLead = "pl-[22px]";
 const dragHandleColumn =
   "flex h-7 w-6 shrink-0 items-center justify-center self-start";
 const subcategoryNameIndent = "ml-[10px]";
@@ -315,6 +360,21 @@ const mergedSagataveRowClass = "bg-emerald-50/80 hover:bg-emerald-50";
 const mergedSagataveCategoryRowClass = "bg-emerald-100/90";
 const mergedSagataveSubcategoryRowClass =
   "border-b border-b-zinc-200 bg-emerald-50/90";
+const estimateTableClassName =
+  "w-full min-w-0 table-fixed border-separate border-spacing-0 text-sm";
+const estimateTableToolbarRowClass =
+  "border-b border-zinc-100 bg-zinc-50/95 p-0 font-normal text-left";
+const estimateTableToolbarInnerClass =
+  "flex flex-wrap items-center justify-between gap-3 px-4 py-2.5";
+const estimateSubheaderThClass =
+  "border-b border-r border-zinc-200 max-w-0 overflow-hidden px-1 py-1.5 text-center align-middle text-[10px] font-medium leading-snug text-zinc-500";
+const estimatePrimaryHeaderThClass =
+  "border-b border-r border-zinc-200 max-w-0 overflow-hidden bg-white py-1.5 text-center align-middle text-[10px] font-medium uppercase leading-snug tracking-normal text-zinc-500";
+const estimateGroupHeaderThClass =
+  "border-b border-r border-zinc-200 px-1 py-1.5 text-center align-middle text-[10px] font-medium uppercase leading-snug tracking-normal whitespace-normal";
+const hiddenEstimateRowBodyClass =
+  "[&_td:not(:last-child)]:opacity-55 [&_td:not(:last-child)]:pointer-events-none [&_td:not(:last-child)]:select-none";
+const hiddenEstimateRowClass = "bg-zinc-100/90 hover:bg-zinc-100/90";
 
 type OpenMultiPositionModal = (
   value: EstimateMultiPosition,
@@ -325,6 +385,7 @@ function LineItemRow({
   item,
   onChange,
   onDelete,
+  onRestore,
   onSyncCatalogPosition,
   onScheduleCatalogSync,
   dragHandle,
@@ -341,10 +402,12 @@ function LineItemRow({
   highlightMergedSagatave = false,
   estimateLocked = false,
   allowCompositeEdit = false,
+  hiddenInEstimate = false,
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
+  onRestore?: () => void;
   onSyncCatalogPosition: (item: EstimateLineItem) => void;
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   dragHandle?: ReactNode;
@@ -361,10 +424,17 @@ function LineItemRow({
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
   allowCompositeEdit?: boolean;
+  hiddenInEstimate?: boolean;
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
+  const numericStyles = getEstimateNumericStyles(showQuantityColumn);
+  const metricCellClass = showQuantityColumn
+    ? numericStyles.cell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+  const metricReadOnly = showQuantityColumn ? numericStyles.readOnly : readOnlyNum;
+  const metricCellNum = showQuantityColumn ? numericStyles.input : cellNum;
   const catalogPosition = findCatalogPositionForLineItem(item, catalogPositions);
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
@@ -428,11 +498,15 @@ function LineItemRow({
     <tbody
       ref={rowRef}
       style={rowStyle}
-      className={`group ${showDropLine ? dropLineClass : ""}`}
+      className={`group ${showDropLine ? dropLineClass : ""} ${
+        hiddenInEstimate ? hiddenEstimateRowBodyClass : ""
+      }`}
     >
     <tr
       className={`align-middle ${
-        highlightMergedSagatave
+        hiddenInEstimate
+          ? hiddenEstimateRowClass
+          : highlightMergedSagatave
           ? mergedSagataveRowClass
           : requiresAttention
             ? estimateAttentionRowClassName
@@ -587,14 +661,14 @@ function LineItemRow({
           </span>
         </div>
       </td>
-      <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
+      <td className={metricCellClass}>
         {isCatalogLinked || isComposite ? (
-          <span className={`${readOnlyNum} text-zinc-700`}>
+          <span className={`${metricReadOnly} text-zinc-700`}>
             {displayUnit.trim() || "—"}
           </span>
         ) : (
           <select
-            className={`${cellInput} cursor-pointer`}
+            className={`${showQuantityColumn ? numericStyles.input : cellInput} cursor-pointer`}
             value={item.unit}
             onChange={(event) => {
               const next = { ...item, unit: event.target.value };
@@ -611,26 +685,26 @@ function LineItemRow({
         )}
       </td>
       {showQuantityColumn ? (
-        <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
+        <td className={metricCellClass}>
           {hasAttachedQuantity ? (
-            <span className={`${readOnlyNum} text-zinc-700`}>
+            <span className={`${metricReadOnly} text-zinc-700`}>
               {formatQuantityDisplay(attachedQuantity)}
             </span>
           ) : showQuantityInput ? (
             estimateLocked ? (
-              <span className={`${readOnlyNum} ${item.quantity <= 0 ? "text-red-500" : "text-zinc-700"}`}>
+              <span className={`${metricReadOnly} ${item.quantity <= 0 ? "text-red-500" : "text-zinc-700"}`}>
                 {item.quantity <= 0 ? "—" : formatQuantityDisplay(item.quantity)}
               </span>
             ) : (
               <EstimateQuantityInput
-                className={`${cellNum} ${quantityMissing ? "border-red-300 bg-red-50 text-red-700 placeholder-red-300" : ""}`}
+                className={`${metricCellNum} ${quantityMissing ? "border-red-300 bg-red-50 text-red-700 placeholder-red-300" : ""}`}
                 value={item.quantity}
                 onChange={(quantity) => onChange({ ...item, quantity })}
                 emptyValue={0}
               />
             )
           ) : (
-            <span className={`${readOnlyNum} text-zinc-300`}>—</span>
+            <span className={`${metricReadOnly} text-zinc-300`}>—</span>
           )}
         </td>
       ) : null}
@@ -639,6 +713,7 @@ function LineItemRow({
         defaultHourlyRate={defaultHourlyRate}
         values={displayUnitPrice}
         staleCatalogPriceHints={staleCatalogPriceHints}
+        compact={showQuantityColumn}
         onTimeNormChange={
           isComposite && !estimateLocked
             ? (laborTimeNorm) =>
@@ -658,10 +733,17 @@ function LineItemRow({
           values={volumeSum}
           laborWorkloadHours={laborWorkloadHours}
           staleCatalogPriceHints={staleCatalogPriceHints}
+          compact
         />
       ) : null}
-      <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-top">
-        {estimateLocked ? null : (
+      <td className="border-b border-zinc-100 px-1 py-0.5 text-center align-middle">
+        {estimateLocked ? null : hiddenInEstimate && onRestore ? (
+          <RestoreButton
+            label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+            onClick={onRestore}
+            className="opacity-100"
+          />
+        ) : (
           <DeleteButton
             label={t("positions.delete.action", "Dzēst pozīciju")}
             onClick={onDelete}
@@ -735,6 +817,7 @@ function SortableMultiPositionRow({
   highlightMergedSagatave = false,
   estimateLocked = false,
   estimateUnits = [],
+  onRestore,
 }: {
   sortId: string;
   categoryId: string;
@@ -751,12 +834,14 @@ function SortableMultiPositionRow({
   highlightMergedSagatave?: boolean;
   estimateLocked?: boolean;
   estimateUnits?: string[];
+  onRestore?: () => void;
 }) {
   const { t } = useTranslations();
+  const hiddenInEstimate = isEstimateRowHidden(value);
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
-    disabled: estimateLocked,
+    disabled: estimateLocked || hiddenInEstimate,
     animateLayoutChanges: () => false,
   });
   return (
@@ -764,7 +849,7 @@ function SortableMultiPositionRow({
       mode="offer"
       value={value}
       onChange={
-        estimateLocked
+        estimateLocked || hiddenInEstimate
           ? () => {}
           : (next) => optionLinkActions.onMultiChange(value.id, next, true)
       }
@@ -773,6 +858,8 @@ function SortableMultiPositionRow({
           ? () => {}
           : () => optionLinkActions.onMultiDelete(value.id)
       }
+      onRestore={estimateLocked ? undefined : onRestore}
+      hiddenInEstimate={hiddenInEstimate}
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
       currency={currency}
@@ -789,7 +876,7 @@ function SortableMultiPositionRow({
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        estimateLocked ? null : (
+        estimateLocked || hiddenInEstimate ? null : (
           <DragHandle
             label={t("estimate.drag.multi_position", "Pārvietot multi-pozīciju")}
             attributes={attributes}
@@ -813,6 +900,7 @@ function SortableLineItemRow({
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
   onDelete: () => void;
+  onRestore?: () => void;
   onSyncCatalogPosition: (item: EstimateLineItem) => void;
   onScheduleCatalogSync: (item: EstimateLineItem) => void;
   catalogPositions: PositionPriceSummary[];
@@ -825,17 +913,21 @@ function SortableLineItemRow({
   estimateLocked?: boolean;
 }) {
   const { t } = useTranslations();
+  const hiddenInEstimate = isEstimateRowHidden(props.item);
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
-    disabled: props.estimateLocked,
+    disabled: props.estimateLocked || hiddenInEstimate,
     animateLayoutChanges: () => false,
   });
 
   return (
     <LineItemRow
       {...props}
-      allowCompositeEdit={props.showQuantityColumn && !props.estimateLocked}
+      hiddenInEstimate={hiddenInEstimate}
+      allowCompositeEdit={
+        props.showQuantityColumn && !props.estimateLocked && !hiddenInEstimate
+      }
       highlightStaleCatalogPrices={props.highlightStaleCatalogPrices}
       highlightMergedSagatave={props.highlightMergedSagatave}
       estimateLocked={props.estimateLocked}
@@ -845,7 +937,7 @@ function SortableLineItemRow({
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        props.estimateLocked ? null : (
+        props.estimateLocked || hiddenInEstimate ? null : (
           <DragHandle
             label={t("positions.drag.position", "Pārvietot pozīciju")}
             attributes={attributes}
@@ -1035,6 +1127,8 @@ function SubcategoryBlock({
   estimateLocked = false,
   openMultiPositionModal,
   estimateUnits = [],
+  softDeleteRows = false,
+  showHiddenEstimateRows = false,
 }: {
   categoryId: string;
   subcategory: EstimateSubcategory;
@@ -1055,6 +1149,8 @@ function SubcategoryBlock({
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  softDeleteRows?: boolean;
+  showHiddenEstimateRows?: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -1100,7 +1196,9 @@ function SubcategoryBlock({
           />
         }
       />
-      {subcategory.items.map((row) =>
+      {subcategory.items
+        .filter((row) => shouldRenderEstimateRow(row, showHiddenEstimateRows))
+        .map((row) =>
         isEstimateMultiPosition(row) ? (
           <SortableMultiPositionRow
             key={row.id}
@@ -1119,6 +1217,15 @@ function SubcategoryBlock({
             estimateLocked={estimateLocked}
             estimateUnits={estimateUnits}
             value={row}
+            onRestore={
+              softDeleteRows && isEstimateRowHidden(row)
+                ? () =>
+                    onChange({
+                      ...subcategory,
+                      items: restoreRowItemById(subcategory.items, row.id),
+                    })
+                : undefined
+            }
           />
         ) : (
           <SortableLineItemRow
@@ -1146,8 +1253,21 @@ function SubcategoryBlock({
             onDelete={() =>
               onChange({
                 ...subcategory,
-                items: removeRowItemById(subcategory.items, row.id),
+                items: removeOrHideRowItemById(
+                  subcategory.items,
+                  row.id,
+                  softDeleteRows,
+                ),
               })
+            }
+            onRestore={
+              softDeleteRows && isEstimateRowHidden(row)
+                ? () =>
+                    onChange({
+                      ...subcategory,
+                      items: restoreRowItemById(subcategory.items, row.id),
+                    })
+                : undefined
             }
           />
         ),
@@ -1175,6 +1295,8 @@ function CategoryBlock({
   estimateLocked = false,
   openMultiPositionModal,
   estimateUnits = [],
+  softDeleteRows = false,
+  showHiddenEstimateRows = false,
 }: {
   category: EstimateCategory;
   onChange: (category: EstimateCategory) => void;
@@ -1194,6 +1316,8 @@ function CategoryBlock({
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  softDeleteRows?: boolean;
+  showHiddenEstimateRows?: boolean;
 }) {
   const { t } = useTranslations();
   const { requestFocus } = useSectionTitleFocus() ?? {};
@@ -1264,7 +1388,13 @@ function CategoryBlock({
         }
       />
 
-      {resolveCategoryChildren(category).map((child) => {
+      {resolveCategoryChildren(category)
+        .filter(
+          (child) =>
+            child.kind === "subcategory" ||
+            shouldRenderEstimateRow(child.row, showHiddenEstimateRows),
+        )
+        .map((child) => {
         if (child.kind === "subcategory") {
           const subcategory = child.subcategory;
           return (
@@ -1287,6 +1417,8 @@ function CategoryBlock({
               subcategory={subcategory}
               openMultiPositionModal={openMultiPositionModal}
               estimateUnits={estimateUnits}
+              softDeleteRows={softDeleteRows}
+              showHiddenEstimateRows={showHiddenEstimateRows}
               onChange={(next) =>
                 onChange({
                   ...category,
@@ -1330,6 +1462,15 @@ function CategoryBlock({
             estimateLocked={estimateLocked}
             estimateUnits={estimateUnits}
             value={row}
+            onRestore={
+              softDeleteRows && isEstimateRowHidden(row)
+                ? () =>
+                    onChange({
+                      ...category,
+                      items: restoreRowItemById(category.items, row.id),
+                    })
+                : undefined
+            }
           />
         ) : (
           <SortableLineItemRow
@@ -1354,15 +1495,23 @@ function CategoryBlock({
               })
             }
             onDelete={() =>
-              onChange(
-                removeCategoryChildRef(
-                  {
-                    ...category,
-                    items: removeRowItemById(category.items, row.id),
-                  },
-                  { kind: "item", id: row.id },
+              onChange({
+                ...category,
+                items: removeOrHideRowItemById(
+                  category.items,
+                  row.id,
+                  softDeleteRows,
                 ),
-              )
+              })
+            }
+            onRestore={
+              softDeleteRows && isEstimateRowHidden(row)
+                ? () =>
+                    onChange({
+                      ...category,
+                      items: restoreRowItemById(category.items, row.id),
+                    })
+                : undefined
             }
           />
         );
@@ -1390,6 +1539,9 @@ function EstimateDndTable({
   estimateLocked = false,
   openMultiPositionModal,
   estimateUnits = [],
+  softDeleteRows = false,
+  showHiddenEstimateRows = false,
+  toolbar = null,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1414,6 +1566,9 @@ function EstimateDndTable({
   estimateLocked?: boolean;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  softDeleteRows?: boolean;
+  showHiddenEstimateRows?: boolean;
+  toolbar?: ReactNode;
 }) {
   const colSpan = getEstimateTableColCount(showQuantityColumn);
 
@@ -1440,6 +1595,9 @@ function EstimateDndTable({
         openMultiPositionModal={openMultiPositionModal}
         estimateUnits={estimateUnits}
         colSpan={colSpan}
+        softDeleteRows={softDeleteRows}
+        showHiddenEstimateRows={showHiddenEstimateRows}
+        toolbar={toolbar}
       />
       </EstimateDragCategoriesProvider>
     </DropIndicatorProvider>
@@ -1466,6 +1624,9 @@ function EstimateDndTableInner({
   colSpan,
   openMultiPositionModal,
   estimateUnits = [],
+  softDeleteRows = false,
+  showHiddenEstimateRows = false,
+  toolbar = null,
 }: {
   categories: EstimateCategory[];
   allDragIds: string[];
@@ -1491,8 +1652,21 @@ function EstimateDndTableInner({
   colSpan: number;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  softDeleteRows?: boolean;
+  showHiddenEstimateRows?: boolean;
+  toolbar?: ReactNode;
 }) {
   const { t } = useTranslations();
+  const numericHeaderStyles = getEstimateNumericStyles(showQuantityColumn);
+  const primaryHeaderThClass = showQuantityColumn
+    ? numericHeaderStyles.headerMetric
+    : estimatePrimaryHeaderThClass;
+  const subheaderThClass = showQuantityColumn
+    ? numericHeaderStyles.headerSub
+    : estimateSubheaderThClass;
+  const groupHeaderThClass = showQuantityColumn
+    ? numericHeaderStyles.headerGroup
+    : estimateGroupHeaderThClass;
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
   const [linkDragSourceOptionId, setLinkDragSourceOptionId] = useState<
     string | null
@@ -1533,6 +1707,10 @@ function EstimateDndTableInner({
       },
       onMultiDelete: (multiId) => {
         setCategories((current) => {
+          if (softDeleteRows) {
+            return hideMultiFromCategories(current, multiId);
+          }
+
           const multi = findMultiById(current, multiId);
           if (multi) {
             setMultiOptionLinks((links) =>
@@ -1550,6 +1728,7 @@ function EstimateDndTableInner({
       multiOptionLinks,
       setCategories,
       setMultiOptionLinks,
+      softDeleteRows,
       t,
     ],
   );
@@ -1589,84 +1768,79 @@ function EstimateDndTableInner({
       onDragEnd={handleDragEnd}
       onDragCancel={clear}
     >
-      <table className="w-full table-fixed border-collapse text-sm">
-        <colgroup>
-          <col style={{ width: showQuantityColumn ? "26%" : "35%" }} />
-          <col style={{ width: "5%" }} />
-          {showQuantityColumn ? <col style={{ width: "6%" }} /> : null}
-          {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
-            <col
-              key={`unit-${index}`}
-              style={{ width: showQuantityColumn ? "6.5%" : "8%" }}
-            />
-          ))}
-          {showQuantityColumn
-            ? Array.from({ length: VOLUME_PRICE_COLUMN_COUNT }).map((_, index) => (
-                <col
-                  key={`volume-${index}`}
-                  style={{ width: index === VOLUME_PRICE_COLUMN_COUNT - 1 ? "6.5%" : "6%" }}
-                />
-              ))
-            : null}
-          <col style={{ width: "3%" }} />
-        </colgroup>
-        <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgb(228_228_231)]">
-          <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-            <th
-              rowSpan={2}
-              className="border-b border-r border-zinc-200 px-3 py-2.5 text-left whitespace-normal"
-            >
-              {t("common.name", "Nosaukums")}
-            </th>
-            <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
-              {t("common.unit_short", "Mērv.")}
-            </th>
-            {showQuantityColumn ? (
-              <th
-                rowSpan={2}
-                className="border-b border-r border-zinc-200 px-2 py-2.5 text-center"
-                title={t("estimate.quantity.individual_title", "Individuāls apjoms katram projektam")}
-              >
-                {t("common.quantity_short", "Apj.")}
-              </th>
-            ) : null}
-            <th
-              colSpan={UNIT_PRICE_COLUMN_COUNT}
-              className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
-            >
-              {t("estimate.unit_price", "Vienības cena")}
-            </th>
-            {showQuantityColumn ? (
-              <th
-                colSpan={VOLUME_PRICE_COLUMN_COUNT}
-                className="border-b border-r border-zinc-200 bg-emerald-50/80 px-2 py-2 text-center text-emerald-800/70"
-              >
-                {t("estimate.volume_price", "Apjoma cena")}
-              </th>
-            ) : null}
-            <th rowSpan={2} className="border-b border-zinc-200" />
-          </tr>
-          <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {getUnitPriceSubheaderLabels(currency, t).map((label) => (
-              <th
-                key={label}
-                className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
-              >
-                {label}
-              </th>
-            ))}
-            {showQuantityColumn
-              ? getVolumePriceSubheaderLabels(t).map((label) => (
-                  <th
-                    key={`volume-${label}`}
-                    className="border-b border-r border-zinc-200 bg-emerald-50/40 px-2 py-1.5 text-right"
-                  >
-                    {label}
+      <EstimateTableStickyShell
+        header={
+          <table className={estimateTableClassName}>
+            <EstimateProjectTableColgroup showQuantityColumn={showQuantityColumn} />
+            <thead>
+              {toolbar ? (
+                <tr>
+                  <th colSpan={colSpan} className={estimateTableToolbarRowClass}>
+                    <div className={estimateTableToolbarInnerClass}>{toolbar}</div>
                   </th>
-                ))
-              : null}
-          </tr>
-        </thead>
+                </tr>
+              ) : null}
+              <tr>
+                <th rowSpan={2} className={`${primaryHeaderThClass} pl-[22px] pr-1 text-left`}>
+                  {t("common.name", "Nosaukums")}
+                </th>
+                <th rowSpan={2} className={`${primaryHeaderThClass} px-1 text-center`}>
+                  {t("common.unit_short", "Mērv.")}
+                </th>
+                {showQuantityColumn ? (
+                  <th
+                    rowSpan={2}
+                    className={`${primaryHeaderThClass} px-1 text-center`}
+                    title={t(
+                      "estimate.quantity.individual_title",
+                      "Individuāls apjoms katram projektam",
+                    )}
+                  >
+                    {t("common.quantity_short", "Daudz.")}
+                  </th>
+                ) : null}
+                <th
+                  colSpan={UNIT_PRICE_COLUMN_COUNT}
+                  className={`${groupHeaderThClass} bg-sky-50/80 text-sky-800/70`}
+                >
+                  {t("estimate.unit_price", "Vienības cena")}
+                </th>
+                {showQuantityColumn ? (
+                  <th
+                    colSpan={VOLUME_PRICE_COLUMN_COUNT}
+                    className={`${groupHeaderThClass} bg-emerald-50/80 text-emerald-800/70`}
+                  >
+                    {t("estimate.volume_price", "Apjoma cena")}
+                  </th>
+                ) : null}
+                <th rowSpan={2} className="border-b border-zinc-200 bg-white" />
+              </tr>
+              <tr>
+                {getUnitPriceSubheaderLabels(currency, t).map((label) => (
+                  <th
+                    key={label}
+                    className={`${subheaderThClass} bg-sky-50/40`}
+                  >
+                    <EstimateTableSubheaderLabel label={label} />
+                  </th>
+                ))}
+                {showQuantityColumn
+                  ? getVolumePriceSubheaderLabels(t).map((label) => (
+                      <th
+                        key={`volume-${label}`}
+                        className={`${subheaderThClass} bg-emerald-50/40`}
+                      >
+                        <EstimateTableSubheaderLabel label={label} />
+                      </th>
+                    ))
+                  : null}
+              </tr>
+            </thead>
+          </table>
+        }
+      >
+      <table className={estimateTableClassName}>
+        <EstimateProjectTableColgroup showQuantityColumn={showQuantityColumn} />
         <SortableContext
           items={allDragIds}
           strategy={verticalListSortingStrategy}
@@ -1687,6 +1861,8 @@ function EstimateDndTableInner({
               colSpan={colSpan}
               allCategories={categories}
               optionLinkActions={optionLinkActions}
+              softDeleteRows={softDeleteRows}
+              showHiddenEstimateRows={showHiddenEstimateRows}
               onSyncCatalogPosition={onSyncCatalogPosition}
               onScheduleCatalogSync={onScheduleCatalogSync}
               category={category}
@@ -1759,6 +1935,7 @@ function EstimateDndTableInner({
           </tr>
         </tfoot>
       </table>
+      </EstimateTableStickyShell>
     </DndContext>
   );
 }
@@ -1910,6 +2087,7 @@ export function EstimateTable({
   const [restoreSagataveModalOpen, setRestoreSagataveModalOpen] = useState(false);
   const [syncSagataveChangesModalOpen, setSyncSagataveChangesModalOpen] = useState(false);
   const [hideSagataveChangesBanner, setHideSagataveChangesBanner] = useState(false);
+  const [showHiddenEstimateRows, setShowHiddenEstimateRows] = useState(false);
   const [, startSaveDatesTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
@@ -2257,9 +2435,17 @@ export function EstimateTable({
     [categories],
   );
 
+  const hiddenEstimateRowCount = useMemo(
+    () => (project ? countHiddenEstimateRows(categories) : 0),
+    [project, categories],
+  );
+
   const allDragIds = useMemo(
-    () => collectAllDragIds(categories),
-    [categories],
+    () =>
+      collectAllDragIds(categories, {
+        includeHiddenRows: showHiddenEstimateRows,
+      }),
+    [categories, showHiddenEstimateRows],
   );
   const { flushSyncFromLineItem, scheduleSyncFromLineItem } =
     useSyncCatalogPositionFromLineItem(catalogPositions);
@@ -2272,16 +2458,14 @@ export function EstimateTable({
       !moduleDataSpotlightDismissed,
   );
 
-  const tablePanel = (
-    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
-      <SectionTitleFocusProvider>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
-        {variant === "tableOnly" ? (
-          editorLocked ? (
-            <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
-              {title}
-            </p>
-          ) : (
+  const estimateTableToolbar = (
+    <>
+      {variant === "tableOnly" ? (
+        editorLocked ? (
+          <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
+            {title}
+          </p>
+        ) : (
           <input
             type="text"
             value={title}
@@ -2289,47 +2473,73 @@ export function EstimateTable({
             className="min-w-[12rem] flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none"
             aria-label={t("estimate.title.aria", "Tāmes nosaukums")}
           />
-          )
-        ) : null}
-        <p className="text-xs text-zinc-500">
-          {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
-            sections: categories.length,
-            rows: positionCount,
-          })}
-        </p>
-        {!editorLocked ? (
-          <AddEstimateSectionButton
-            onAdd={(section) => setCategories([...categories, section])}
+        )
+      ) : null}
+      <p className="text-xs text-zinc-500">
+        {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
+          sections: categories.length,
+          rows: positionCount,
+        })}
+      </p>
+      {project && hiddenEstimateRowCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowHiddenEstimateRows((current) => !current)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            showHiddenEstimateRows
+              ? "border-zinc-400 bg-zinc-200 text-zinc-900"
+              : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+          }`}
+        >
+          <i
+            className={`fas ${showHiddenEstimateRows ? "fa-eye-slash" : "fa-eye"} text-[10px]`}
+            aria-hidden="true"
           />
-        ) : null}
-      </div>
+          {showHiddenEstimateRows
+            ? t("estimate.hidden.hide", "Paslēpt noņemtās")
+            : t("estimate.hidden.show", "Rādīt noņemtās ({count})", {
+                count: hiddenEstimateRowCount,
+              })}
+        </button>
+      ) : null}
+      {!editorLocked ? (
+        <AddEstimateSectionButton
+          onAdd={(section) => setCategories([...categories, section])}
+        />
+      ) : null}
+    </>
+  );
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto">
-        <EstimatePlannedProfitProvider percent={plannedProfitPercent}>
-          <PositionModalProvider openPositionModal={openPositionModal}>
-            <EstimateDndTable
-              categories={categories}
-              allDragIds={allDragIds}
-              setCategories={setCategories}
-              multiOptionLinks={multiOptionLinks}
-              setMultiOptionLinks={setMultiOptionLinks}
-              totals={totals}
-              onSyncCatalogPosition={flushSyncFromLineItem}
-              onScheduleCatalogSync={scheduleSyncFromLineItem}
-              catalogPositions={catalogPositions}
-              defaultHourlyRate={defaultHourlyRate}
-              currency={currency}
-              showQuantityColumn={showQuantityColumn}
-              moduleSizeOptions={moduleSizeOptions}
-              highlightStaleCatalogPrices={highlightStaleCatalogPrices}
-              mergedSagataveHighlightIds={mergedSagataveHighlightIds}
-              estimateLocked={editorLocked}
-              openMultiPositionModal={openMultiPositionModal}
-              estimateUnits={estimateUnits}
-            />
-          </PositionModalProvider>
-        </EstimatePlannedProfitProvider>
-      </div>
+  const tablePanel = (
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <SectionTitleFocusProvider>
+      <EstimatePlannedProfitProvider percent={plannedProfitPercent}>
+        <PositionModalProvider openPositionModal={openPositionModal}>
+          <EstimateDndTable
+            categories={categories}
+            allDragIds={allDragIds}
+            setCategories={setCategories}
+            multiOptionLinks={multiOptionLinks}
+            setMultiOptionLinks={setMultiOptionLinks}
+            totals={totals}
+            onSyncCatalogPosition={flushSyncFromLineItem}
+            onScheduleCatalogSync={scheduleSyncFromLineItem}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            showQuantityColumn={showQuantityColumn}
+            moduleSizeOptions={moduleSizeOptions}
+            highlightStaleCatalogPrices={highlightStaleCatalogPrices}
+            mergedSagataveHighlightIds={mergedSagataveHighlightIds}
+            estimateLocked={editorLocked}
+            openMultiPositionModal={openMultiPositionModal}
+            estimateUnits={estimateUnits}
+            softDeleteRows={Boolean(project)}
+            showHiddenEstimateRows={showHiddenEstimateRows}
+            toolbar={estimateTableToolbar}
+          />
+        </PositionModalProvider>
+      </EstimatePlannedProfitProvider>
       </SectionTitleFocusProvider>
     </div>
   );

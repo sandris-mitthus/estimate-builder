@@ -9,6 +9,7 @@ import {
   createProject,
   deleteProject,
   omitProjectExcludedPosition,
+  restoreProjectExcludedPosition,
   markProjectMaterialOrdered,
   assignProjectMaterialUser,
   saveProjectEstimate,
@@ -164,6 +165,25 @@ export async function omitProjectExcludedPositionAction(
   if (denied) return denied;
 
   const result = await omitProjectExcludedPosition(projectId, excludedPositionId);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
+export async function restoreProjectExcludedPositionAction(
+  projectId: string,
+  excludedPositionId: string,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await restoreProjectExcludedPosition(
+    projectId,
+    excludedPositionId,
+  );
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);

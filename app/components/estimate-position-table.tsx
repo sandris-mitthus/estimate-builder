@@ -28,6 +28,7 @@ import {
 } from "react";
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { EstimateTableStickyShell } from "@/app/components/estimate-table-sticky-shell";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
@@ -113,6 +114,7 @@ import {
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
+import { EstimateTableSubheaderLabel } from "@/app/components/estimate-table-header-label";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { resolveCompositeLineItemDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
@@ -134,10 +136,35 @@ import {
 
 const FULL_COL_COUNT = 9;
 const ESTIMATE_POSITION_DND_CONTEXT_ID = "estimate-position-table-dnd";
+const estimateTableClassName =
+  "w-full min-w-0 table-fixed border-separate border-spacing-0 text-sm";
+const estimateTableToolbarRowClass =
+  "border-b border-zinc-100 bg-zinc-50/95 p-0 font-normal text-left";
+const estimateTableToolbarInnerClass =
+  "flex flex-wrap items-center justify-between gap-3 px-4 py-2.5";
+const estimateSubheaderThClass =
+  "border-b border-r border-zinc-200 max-w-0 overflow-hidden px-1 py-1.5 text-center align-middle text-[10px] font-medium leading-snug text-zinc-500";
+const estimatePrimaryHeaderThClass =
+  "border-b border-r border-zinc-200 max-w-0 overflow-hidden bg-white py-1.5 text-center align-middle text-[10px] font-medium uppercase leading-snug tracking-normal text-zinc-500";
+const estimateGroupHeaderThClass =
+  "border-b border-r border-zinc-200 px-1 py-1.5 text-center align-middle text-[10px] font-medium uppercase leading-snug tracking-normal whitespace-normal";
+
+function EstimatePositionTableColgroup() {
+  return (
+    <colgroup>
+      <col style={{ width: "32%" }} />
+      <col style={{ width: "7%" }} />
+      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
+        <col key={index} style={{ width: "9%" }} />
+      ))}
+      <col style={{ width: "7%" }} />
+    </colgroup>
+  );
+}
 
 const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
-const readOnlyNum = "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
-const rowLead = "pl-3";
+const readOnlyNum = "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";
+const rowLead = "pl-[22px]";
 const dragHandleColumn =
   "flex h-7 w-6 shrink-0 items-center justify-center self-start";
 const subcategoryNameIndent = "ml-[10px]";
@@ -146,7 +173,7 @@ const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 const actionBtn =
   "inline-flex h-7 items-center rounded-md px-2 text-xs text-zinc-500 transition hover:bg-white hover:text-zinc-800";
 const rowActionCell =
-  "border-b border-zinc-100 px-1 py-0.5 text-right align-top";
+  "border-b border-zinc-100 px-1 py-0.5 text-center align-middle";
 
 function buildHydrateCatalogOptions(
   moduleSizeOptions: BuildingModuleSizeOption[],
@@ -301,7 +328,7 @@ function LineItemRow({
           </div>
         </div>
       </td>
-      <td className="border-b border-zinc-100 px-1 py-0.5 align-top">
+      <td className="border-b border-zinc-100 px-1 py-0.5 align-middle text-center">
         <span className={`${readOnlyNum} text-zinc-500`}>
           {(isCompositeLineItem(item)
             ? resolveCompositeLineItemDisplayUnit(item, moduleSizeOptions)
@@ -1036,6 +1063,7 @@ function EstimatePositionDndTable({
   expandSection,
   openMultiPositionModal,
   estimateUnits = [],
+  toolbar = null,
 }: {
   sections: EstimatePositionSection[];
   allDragIds: string[];
@@ -1051,6 +1079,7 @@ function EstimatePositionDndTable({
   expandSection: (sectionId: string) => void;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  toolbar?: ReactNode;
 }) {
   const { t } = useTranslations();
   const { setActiveId, setOverId, clear } = useDropIndicatorActions();
@@ -1154,45 +1183,49 @@ function EstimatePositionDndTable({
         onDragEnd={handleDragEnd}
         onDragCancel={clear}
       >
-      <table className="w-full table-fixed border-collapse text-sm">
-        <colgroup>
-          <col style={{ width: "31%" }} />
-          <col style={{ width: "6%" }} />
-          {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
-            <col key={index} style={{ width: "8%" }} />
-          ))}
-          <col style={{ width: "6.5rem" }} />
-        </colgroup>
-        <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgb(228_228_231)]">
-          <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-            <th
-              rowSpan={2}
-              className="border-b border-r border-zinc-200 px-3 py-2.5 text-left whitespace-normal"
-            >
-              {t("common.name", "Nosaukums")}
-            </th>
-            <th rowSpan={2} className="border-b border-r border-zinc-200 px-2 py-2.5 text-center">
-              {t("common.unit_short", "Mērv.")}
-            </th>
-            <th
-              colSpan={UNIT_PRICE_COLUMN_COUNT}
-              className="border-b border-r border-zinc-200 bg-sky-50/80 px-2 py-2 text-center text-sky-800/70"
-            >
-              {t("estimate.unit_price", "Vienības cena")}
-            </th>
-            <th rowSpan={2} className="border-b border-zinc-200" />
-          </tr>
-          <tr className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            {getUnitPriceSubheaderLabels(currency, t).map((label) => (
-              <th
-                key={label}
-                className="border-b border-r border-zinc-200 bg-sky-50/40 px-2 py-1.5 text-right"
-              >
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
+      <EstimateTableStickyShell
+        header={
+          <table className={estimateTableClassName}>
+            <EstimatePositionTableColgroup />
+            <thead>
+              {toolbar ? (
+                <tr>
+                  <th colSpan={FULL_COL_COUNT} className={estimateTableToolbarRowClass}>
+                    <div className={estimateTableToolbarInnerClass}>{toolbar}</div>
+                  </th>
+                </tr>
+              ) : null}
+              <tr>
+                <th rowSpan={2} className={`${estimatePrimaryHeaderThClass} pl-[22px] pr-1 text-left`}>
+                  {t("common.name", "Nosaukums")}
+                </th>
+                <th rowSpan={2} className={`${estimatePrimaryHeaderThClass} px-1 text-center`}>
+                  {t("common.unit_short", "Mērv.")}
+                </th>
+                <th
+                  colSpan={UNIT_PRICE_COLUMN_COUNT}
+                  className={`${estimateGroupHeaderThClass} bg-sky-50/80 text-sky-800/70`}
+                >
+                  {t("estimate.unit_price", "Vienības cena")}
+                </th>
+                <th rowSpan={2} className="border-b border-zinc-200 bg-white" />
+              </tr>
+              <tr>
+                {getUnitPriceSubheaderLabels(currency, t).map((label) => (
+                  <th
+                    key={label}
+                    className={`${estimateSubheaderThClass} bg-sky-50/40`}
+                  >
+                    <EstimateTableSubheaderLabel label={label} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          </table>
+        }
+      >
+      <table className={estimateTableClassName}>
+        <EstimatePositionTableColgroup />
         <SortableContext
           items={allDragIds}
           strategy={verticalListSortingStrategy}
@@ -1231,6 +1264,7 @@ function EstimatePositionDndTable({
           ))}
         </SortableContext>
       </table>
+      </EstimateTableStickyShell>
     </DndContext>
     </EstimateDragCategoriesProvider>
   );
@@ -1408,34 +1442,9 @@ export function EstimatePositionTable({
 
   return (
     <div className="max-w-full space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm max-w-full">
+      <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <SectionTitleFocusProvider>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
-          {readOnly && title.trim() ? (
-            <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
-              {title}
-            </p>
-          ) : (
-            <div className="min-w-[12rem] flex-1" aria-hidden="true" />
-          )}
-          <p className="text-xs text-zinc-500">
-            {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
-              sections: sections.length,
-              rows: lineItemCount,
-            })}
-          </p>
-          {!readOnly ? (
-            <AddEstimateSectionButton
-              onAdd={(section) => setSections([...sections, section])}
-            />
-          ) : null}
-        </div>
-
-        <div
-          className={`max-h-[calc(100vh-14rem)] overflow-x-hidden overflow-y-auto${
-            readOnly ? " pointer-events-none opacity-80" : ""
-          }`}
-        >
+        <div className={readOnly ? "pointer-events-none opacity-80" : undefined}>
           <PositionModalProvider openPositionModal={openPositionModal}>
             <DropIndicatorProvider>
               <EstimatePositionDndTable
@@ -1453,6 +1462,28 @@ export function EstimatePositionTable({
                 expandSection={expandSection}
                 openMultiPositionModal={openMultiPositionModal}
                 estimateUnits={estimateUnits}
+                toolbar={
+                  <>
+                    {readOnly && title.trim() ? (
+                      <p className="min-w-[12rem] flex-1 text-sm font-semibold text-zinc-900">
+                        {title}
+                      </p>
+                    ) : (
+                      <div className="min-w-[12rem] flex-1" aria-hidden="true" />
+                    )}
+                    <p className="text-xs text-zinc-500">
+                      {t("estimate.table.counts", "{sections} tāmes pozīcijas · {rows} rindas", {
+                        sections: sections.length,
+                        rows: lineItemCount,
+                      })}
+                    </p>
+                    {!readOnly ? (
+                      <AddEstimateSectionButton
+                        onAdd={(section) => setSections([...sections, section])}
+                      />
+                    ) : null}
+                  </>
+                }
               />
             </DropIndicatorProvider>
           </PositionModalProvider>

@@ -19,7 +19,7 @@ export const VOLUME_PRICE_SUBHEADER_LABELS = [
 
 export function getVolumePriceSubheaderLabels(t?: Translate): readonly string[] {
   return [
-    t ? t("estimate.volume_price_columns.workload", "Darbietilpība (c/h)") : "Darbietilpība (c/h)",
+    t ? t("estimate.volume_price_columns.workload", "Darbietilpība") : "Darbietilpība",
     t ? t("estimate.column.labor", "Darbs") : "Darbs",
     t ? t("estimate.column.material", "Materiāls") : "Materiāls",
     t ? t("estimate.column.mechanisms", "Mehānismi") : "Mehānismi",

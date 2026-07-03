@@ -14,27 +14,16 @@ import {
 import type { EstimateLineItem, PriceBreakdown } from "@/app/lib/estimates/types";
 import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
 import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns";
+import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
 
-const readOnlyNum =
-  "block px-2 py-1.5 text-right text-sm tabular-nums text-zinc-700";
-const cellInput =
-  "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm transition focus:border-zinc-300 focus:bg-white focus:outline-none";
-const cellNum = `${cellInput} text-right tabular-nums`;
-export const estimateUnitPriceCell =
-  "border-b border-zinc-100 px-1 py-0.5 align-top";
-export const estimateUnitPriceCellTotal = `${estimateUnitPriceCell} bg-zinc-50/60`;
+const defaultStyles = getEstimateNumericStyles(false);
 
-function EmptyAmountCell({ className = estimateUnitPriceCell }: { className?: string }) {
-  return (
-    <td className={className}>
-      <span className={`${readOnlyNum} text-zinc-300`}>—</span>
-    </td>
-  );
-}
+export const estimateUnitPriceCell = defaultStyles.cell;
+export const estimateUnitPriceCellTotal = defaultStyles.cellTotal;
 
 type EstimateUnitPriceCellsProps = {
   item: EstimateLineItem | null;
@@ -44,6 +33,7 @@ type EstimateUnitPriceCellsProps = {
   onChange?: (field: keyof PriceBreakdown, value: number) => void;
   onTimeNormChange?: (value: number) => void;
   staleCatalogPriceHints?: StaleCatalogPriceHints;
+  compact?: boolean;
 };
 
 export function EstimateUnitPriceCells({
@@ -54,24 +44,30 @@ export function EstimateUnitPriceCells({
   onChange,
   onTimeNormChange,
   staleCatalogPriceHints,
+  compact = false,
 }: EstimateUnitPriceCellsProps) {
   const { t } = useTranslations();
+  const styles = getEstimateNumericStyles(compact);
+  const readOnlyNum = styles.readOnly;
+  const cellNum = styles.input;
+  const unitPriceCell = styles.cell;
+  const unitPriceCellTotal = styles.cellTotal;
+
   const total = sumBreakdown(values);
   const showLaborBreakdown = item != null && isCompositeLineItem(item);
   const timeNormText =
     showLaborBreakdown && item.laborTimeNorm != null && item.laborTimeNorm > 0
       ? formatTimeNormDisplay(item.laborTimeNorm)
       : null;
-  const hourlyRateText =
-    showLaborBreakdown
-      ? formatAmountDisplay(resolveLineItemHourlyRate(item, defaultHourlyRate))
-      : null;
+  const hourlyRateText = showLaborBreakdown
+    ? formatAmountDisplay(resolveLineItemHourlyRate(item, defaultHourlyRate))
+    : null;
 
   return (
     <>
       {showLaborBreakdown ? (
         <>
-          <td className={estimateUnitPriceCell}>
+          <td className={unitPriceCell}>
             {onTimeNormChange ? (
               <LaborTimeNormInput
                 value={item?.laborTimeNorm ?? 0}
@@ -81,19 +77,15 @@ export function EstimateUnitPriceCells({
               />
             ) : (
               <span
-                className={`${readOnlyNum} ${
-                  timeNormText ? "" : "text-zinc-300"
-                }`}
+                className={`${readOnlyNum} ${timeNormText ? "" : "text-zinc-300"}`}
               >
                 {timeNormText ?? "—"}
               </span>
             )}
           </td>
-          <td className={estimateUnitPriceCell}>
+          <td className={unitPriceCell}>
             <span
-              className={`${readOnlyNum} ${
-                hourlyRateText ? "" : "text-zinc-300"
-              }`}
+              className={`${readOnlyNum} ${hourlyRateText ? "" : "text-zinc-300"}`}
             >
               {hourlyRateText ?? "—"}
             </span>
@@ -101,8 +93,8 @@ export function EstimateUnitPriceCells({
         </>
       ) : (
         <>
-          <EmptyAmountCell />
-          <EmptyAmountCell />
+          <EmptyAmountCell className={unitPriceCell} readOnlyNum={readOnlyNum} />
+          <EmptyAmountCell className={unitPriceCell} readOnlyNum={readOnlyNum} />
         </>
       )}
       {(["labor", "materials", "mechanisms"] as const).map((field) => {
@@ -125,8 +117,8 @@ export function EstimateUnitPriceCells({
           }
         }
         const cellClassName = staleHint
-          ? `${estimateUnitPriceCell} bg-red-100 ring-1 ring-inset ring-red-300`
-          : estimateUnitPriceCell;
+          ? `${unitPriceCell} bg-red-100 ring-1 ring-inset ring-red-300`
+          : unitPriceCell;
 
         const amountSpan = (
           <span
@@ -142,7 +134,7 @@ export function EstimateUnitPriceCells({
           <td key={field} className={cellClassName}>
             {readOnly ? (
               tooltipLabel ? (
-                <Tooltip label={tooltipLabel} className="w-full justify-end">
+                <Tooltip label={tooltipLabel} className="w-full justify-center">
                   {amountSpan}
                 </Tooltip>
               ) : (
@@ -163,7 +155,7 @@ export function EstimateUnitPriceCells({
           </td>
         );
       })}
-      <td className={estimateUnitPriceCellTotal}>
+      <td className={unitPriceCellTotal}>
         <span
           className={`${readOnlyNum} ${
             isAmountDisplayEmpty(total)
@@ -175,6 +167,20 @@ export function EstimateUnitPriceCells({
         </span>
       </td>
     </>
+  );
+}
+
+function EmptyAmountCell({
+  className,
+  readOnlyNum,
+}: {
+  className: string;
+  readOnlyNum: string;
+}) {
+  return (
+    <td className={className}>
+      <span className={`${readOnlyNum} text-zinc-300`}>—</span>
+    </td>
   );
 }
 

@@ -29,13 +29,13 @@ export function getUnitPriceSubheaderLabels(
       ? t
         ? t(
             "estimate.unit_price_columns.labor_rate_currency",
-            "Darba samaksas likme {currency}/h",
+            "Likme {currency}/h",
             { currency },
           )
-        : `Darba samaksas likme ${currency}/h`
+        : `Likme ${currency}/h`
       : t
-        ? t("estimate.unit_price_columns.labor_rate", "Darba samaksas likme")
-        : "Darba samaksas likme",
+        ? t("estimate.unit_price_columns.labor_rate", "Likme")
+        : "Likme",
     t ? t("estimate.column.labor", "Darbs") : "Darbs",
     t ? t("estimate.column.material", "Materiāls") : "Materiāls",
     t ? t("estimate.column.mechanisms", "Mehānismi") : "Mehānismi",

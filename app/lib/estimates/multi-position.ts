@@ -3,6 +3,7 @@ import {
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
 } from "@/app/lib/estimates/composite-line-item";
+import { isEstimateRowHidden } from "@/app/lib/estimates/hidden-estimate-rows";
 import type {
   EstimateCategory,
   EstimateLineItem,
@@ -375,6 +376,10 @@ export function collectRowLineItems(
   const items: EstimateLineItem[] = [];
 
   for (const row of rows) {
+    if (isEstimateRowHidden(row)) {
+      continue;
+    }
+
     if (isEstimateLineItem(row)) {
       items.push(row);
       continue;

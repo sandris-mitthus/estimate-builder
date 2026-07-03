@@ -70,6 +70,8 @@ export type EstimateLineItem = {
   requiresAttention?: boolean;
   /** Aptuvens budžets, ja `requiresAttention`. */
   attentionBudget?: number;
+  /** Projekta tāmē — pozīcija paslēpta no tabulas un kopsummām, bet saglabāta datos. */
+  hiddenInEstimate?: boolean;
 };
 
 export type EstimateMultiPositionOption = {
@@ -91,6 +93,8 @@ export type EstimateMultiPosition = {
   options: EstimateMultiPositionOption[];
   /** Projekta tāmē — `null` vai `__none__` = Neviena opcija */
   selectedOptionId?: string | null;
+  /** Projekta tāmē — multi-pozīcija paslēpta no tabulas un kopsummām, bet saglabāta datos. */
+  hiddenInEstimate?: boolean;
 };
 
 /** Saistītu multi opciju grupa — glabājas dokumenta līmenī. */
