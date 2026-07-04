@@ -60,7 +60,7 @@ export function AssignedMaterialsBanner({
       aria-labelledby="assigned-materials-banner-heading"
       className="border-b border-amber-200 bg-amber-50/70"
     >
-      <div className="mx-auto max-w-[1480px] px-4 py-4 md:px-6">
+      <div className="w-full py-4 pl-[var(--app-content-inset-left)] pr-4 md:pr-6">
         <div className="flex min-h-8 items-center justify-between gap-3">
           <h2
             id="assigned-materials-banner-heading"

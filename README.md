@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, configurable excluded-offer positions, workers, tools, and approved-project timeline planning. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, workers, tools, timeline, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.79` (see [Changelog](#changelog))
+**Current version:** `1.3.80` (see [Changelog](#changelog))
 
 ---
 
@@ -54,7 +54,7 @@ English routes, Latvian labels:
 | Uzstādījumi | `/settings` |
 | System admin | `/site_companies`, `/site_companies_users`, `/site_user_groups`, `/site_docs`, `/todo`, `/site_frontend_modules`, `/site_languages`, `/site_translations`, `/site_settings` |
 
-- **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms); sidebar augšā ir poga manuālai sakļaušanai/izvēršanai, saturs automātiski pielāgo kreiso atkāpi, nav linkiem ir count badge (sakļautā izvēlnē iekš ikonas augšējā labā stūra) un viewport iekšēji tooltipi, apakšā piesprausti uzstādījumu/pārvaldības linki, un valodas dropdown apakšējā zonā atveras uz augšu, lai paliktu redzams
+- **Navigācijas loading** — klikšķis uz izvēlnes saites rāda spinneri un bloķē citas saites līdz `pathname` mainās (`app-nav.tsx`); **Projekti** aktīvs tikai uz `/` (no `/{id}` atkal klikšķināms); sidebar augšā ir poga manuālai sakļaušanai/izvēršanai, saturs automātiski pielāgo kreiso atkāpi un aizpilda visu pieejamo platumu (bez fiksēta max-width), kompaktāka atstarpe starp sidebar un saturu (`globals.css` CSS mainīgie `--app-sidebar-*`, `--app-content-inset-left`); nav linkiem ir count badge (sakļautā izvēlnē iekš ikonas augšējā labā stūra) un viewport iekšēji tooltipi, apakšā piesprausti uzstādījumu/pārvaldības linki, un valodas dropdown apakšējā zonā atveras uz augšu, lai paliktu redzams
 - **Publiskā dokumentācija** — `/docs` (`/wiki` alias) ir publiski pieejams dokumentācijas portāls ar fixed sidebar kategorijām, animēti atveramiem rakstu linkiem, noklusējuma kategoriju/rakstu kartīšu sarakstu un raksta content skatu; login kartē ir tieša saite uz dokumentāciju
 - **Kartes → detaļa** — projekta un moduļa kartēm pilnekrāna blur + modālis (**Ielādē projektu…** / **Ielādē moduli…**) līdz navigācija pabeigta (`navigation-loading-context.tsx`)
 - **Projekti** — project cards (module name above client name, email, phone, address); galvenē **Jauns projekts** + **Arhīvs** (`fa-archive`, `/?archive=1`); **Jauns projekts** modal creates project + estimate **cloned from Sagatave** in Supabase; pēc **Izveidot** — optimistiska karte sarakstā (blur + spinner) un automātiska navigācija uz projektu; card actions **Moduļa dati** (individual projects only — amber highlight when viz/PDF missing), **Kopēt** (vienmēr redzama), **Labot** (tikai `active`), **Dzēst** (`project.delete`; arī arhīvā — `approved` / `rejected` / `completed`), **Apstiprināts**, **Noraidīts** (tikai `active`), **Pabeigts** (`fa-check-double`, tikai `approved`; `ConfirmModal`); uzņēmuma **Administrators** / **Īpašnieks** var dzēst arī bez grupas `project.delete`; **`approved` kartes** — visa karte zaļā tonī (`bg-green-50`, `text-green-800`, `border-green-200`), bez atsevišķas statusa birkas; **`approved` ar nepasūtītiem materiāliem** — izteikts oranžs bloks kartē **Visi materiāli vēl nav pasūtīti!** (`listProjectIdsWithPendingMaterials`); **sarkanā apmale** + teksts **Ir jauninājumi izcenojumos** tikai `active` projektiem ar novecojušām kataloga cenām; **dzeltena apmale** + **Sagatavē ir pozīcijas, kuras nav šajā tāmē** tikai `active` projektiem, kuru tāmē trūkst sagataves struktūras (izņemot **Kopēt** no cita projekta); **debesszila apmale** + **Sagatavē ir izmaiņas pozīcijām** tikai `active` projektiem, kur sagatavē mainītas esošās rindas (`sagatavePositionChangeProjectIds`); list loads **only real DB rows** when Supabase is configured (no demo fallback on empty/error); sarakstā tikai `active` un `approved`; **Arhīvs** rāda visus statusus ar radio filtru (**Visi**, **Aktīvie**, **Procesā**, **Pabeigtie**, **Noraidītie**); **noraidītie** un **pabeigtie** paslēpti no galvenā saraksta, bet netiek dzēsti no DB
@@ -289,7 +289,7 @@ app/
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
 │   ├── modules/        # repository, outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (company-scoped module-assets), file-validation
-│   ├── navigation/     # sidebar cookie constants, nav count badges and navigation helpers
+│   ├── navigation/     # sidebar cookie + layout-change event, nav count badges and navigation helpers
 │   ├── positions/      # repository (listPositionPricesForHydration), apply-catalog-to-line-item, sync-from-estimate-line-items (catalog lookup), sync-estimate-line-items-to-catalog (batch update), has-defined-labor, variable-quantity, stale-catalog-price, filter-positions
 │   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
 │   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation, IBAN bank resolve, currencies
@@ -404,6 +404,14 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.80
+
+**Sidebar izkārtojums un sticky tāmes galvene**
+
+- **Pilns satura platums** — noņemts `.page` `max-width: 1480px`; saturs aizpilda visu vietu aiz sidebar (arī sakļautā izvēlnē)
+- **Kompaktāka atstarpe** — sidebar un satura atkāpe samazināta par 40% caur `--app-sidebar-padding`, `--app-sidebar-width-*` un `--app-content-inset-left` (`globals.css`)
+- **Sticky galvene** — projekta tāmē un sagatavē fiksētā tabulas galvene uzreiz seko sidebar animācijai (`estimate-table-sticky-shell.tsx`, `SIDEBAR_LAYOUT_CHANGE_EVENT`, `data-app-main` padding novērošana)
 
 ### v1.3.79
 

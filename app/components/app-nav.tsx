@@ -15,7 +15,7 @@ import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 import { signOut } from "@/app/lib/auth/sign-out";
 import { writeCookie } from "@/app/lib/client/cookies";
 import type { NavCountMap } from "@/app/lib/navigation/nav-counts";
-import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
+import { SIDEBAR_COLLAPSED_COOKIE, SIDEBAR_LAYOUT_CHANGE_EVENT } from "@/app/lib/navigation/sidebar-cookie";
 
 type NavItem = {
   key: NavPermissionKey | `system_admin:${string}`;
@@ -658,6 +658,7 @@ export function AppNav({
   function updateManualCollapsed(collapsed: boolean) {
     setManualCollapsed(collapsed);
     writeCookie(SIDEBAR_COLLAPSED_COOKIE, collapsed ? "1" : "0");
+    window.dispatchEvent(new Event(SIDEBAR_LAYOUT_CHANGE_EVENT));
   }
 
   function renderNavItem(item: NavItem) {
@@ -749,8 +750,10 @@ export function AppNav({
   return (
     <aside
       data-expanded={menuExpanded ? "true" : "false"}
-      className={`peer/sidebar fixed inset-y-0 left-0 z-50 flex bg-zinc-100/85 p-3 backdrop-blur transition-[width] duration-200 ${
-        menuExpanded ? "w-[284px]" : "w-[86px]"
+      className={`peer/sidebar fixed inset-y-0 left-0 z-50 flex bg-zinc-100/85 p-[var(--app-sidebar-padding)] backdrop-blur transition-[width] duration-200 ${
+        menuExpanded
+          ? "w-[var(--app-sidebar-width-expanded)]"
+          : "w-[var(--app-sidebar-width-collapsed)]"
       }`}
     >
       <div

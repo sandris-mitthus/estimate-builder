@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+:root {
+  /* Sidebar: p-3 (12px) un platums samazināti par 40%. */
+  --app-sidebar-padding: 7px;
+  --app-sidebar-width-collapsed: 76px;
+  --app-sidebar-width-expanded: 274px;
+  /* Atstarpe starp sidebar un saturu: 1rem/1.5rem → −40%. */
+  --app-content-inset-left: 0.6rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-content-inset-left: 0.9rem;
+  }
+}
+
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -30,9 +45,9 @@ button:disabled,
 }
 
 .page {
-  max-width: 1480px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 2.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 1.5rem 1rem 2.5rem var(--app-content-inset-left);
 }
 
 .estimate-table-scroll-scope {
@@ -41,7 +56,7 @@ button:disabled,
 
 @media (min-width: 768px) {
   .page {
-    padding: 2rem 1.5rem 3rem;
+    padding: 2rem 1.5rem 3rem var(--app-content-inset-left);
   }
 }
 

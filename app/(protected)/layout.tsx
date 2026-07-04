@@ -160,7 +160,10 @@ export default async function ProtectedLayout({
               initialSidebarCollapsed={initialSidebarCollapsed}
               navCounts={navCounts}
             />
-            <div className="min-w-0 pl-[86px] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[284px]">
+            <div
+              data-app-main
+              className="min-w-0 w-full pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
+            >
               {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
               {children}
             </div>
