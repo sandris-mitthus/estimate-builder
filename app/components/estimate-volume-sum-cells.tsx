@@ -1,71 +1,91 @@
 import {
   formatAmountDisplay,
   isAmountDisplayEmpty,
-  multiplyBreakdown,
   sumBreakdown,
 } from "@/app/lib/estimates/calculate-line";
-import { isCompositeLineItem } from "@/app/lib/estimates/composite-line-item";
 import { VOLUME_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/volume-price-columns";
-import type { EstimateLineItem, PriceBreakdown } from "@/app/lib/estimates/types";
-import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
-import {
-  formatTimeNormDisplay,
-  roundQuantity,
-} from "@/app/lib/positions/variable-quantity";
+import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns";
+import type { PriceBreakdown } from "@/app/lib/estimates/types";
 import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import { Tooltip } from "@/app/components/tooltip";
+import { EstimateCollapsedSummaryDisplay } from "@/app/components/estimate-collapsed-summary-display";
+import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
+import type { CollapsedSectionSummaryParts } from "@/app/lib/estimate-positions/collapsed-sections-cookie";
+import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
+
+export {
+  resolveLaborWorkloadHours,
+  resolveLineItemVolumeSum,
+} from "@/app/lib/estimates/volume-sum-calculations";
 
 const defaultStyles = getEstimateNumericStyles(false);
 const defaultVolumeCell = defaultStyles.volumeCell;
 const defaultVolumeCellTotal = defaultStyles.volumeCellTotal;
 
-export function resolveLineItemVolumeSum(
-  quantity: number,
-  unitPrice: PriceBreakdown,
-  variableQuantity: boolean,
-): PriceBreakdown | null {
-  if (!variableQuantity) {
-    return null;
-  }
-
-  return multiplyBreakdown(roundQuantity(quantity), unitPrice);
-}
-
-/** Darbietilpība (c/h) = apjoms × laika norma (tikai mainīga apjoma kompozītām pozīcijām). */
-export function resolveLaborWorkloadHours(
-  quantity: number,
-  item: EstimateLineItem | null,
-  variableQuantity: boolean,
-): number | null {
-  if (!variableQuantity || !item || !isCompositeLineItem(item)) {
-    return null;
-  }
-
-  const timeNorm = item.laborTimeNorm;
-  if (timeNorm == null || !Number.isFinite(timeNorm) || timeNorm <= 0) {
-    return null;
-  }
-
-  const qty = roundQuantity(quantity);
-  if (qty <= 0) {
-    return null;
-  }
-
-  return roundQuantity(qty * timeNorm);
-}
-
 function volumeAmountClassName(
   readOnlyNum: string,
   value: number,
   emphasis = false,
+  summary = false,
 ): string {
   if (isAmountDisplayEmpty(value)) {
     return `${readOnlyNum} text-zinc-300`;
   }
 
-  return emphasis
-    ? `${readOnlyNum} font-medium text-zinc-900`
-    : readOnlyNum;
+  if (summary || emphasis) {
+    return `${readOnlyNum} font-semibold text-zinc-900`;
+  }
+
+  return readOnlyNum;
+}
+
+function stripDefaultSectionCellBorder(className: string): string {
+  return className.replace(/\s*border-b\s+border-zinc-100/g, "");
+}
+
+function sectionVolumeCellClass(
+  styles: ReturnType<typeof getEstimateNumericStyles>,
+  rowBgClassName: string | undefined,
+  total = false,
+): string {
+  const base = total ? styles.volumeCellTotal : styles.volumeCell;
+  if (!rowBgClassName) {
+    return base;
+  }
+
+  return `${stripDefaultSectionCellBorder(
+    base.replace(/\s*bg-emerald-50\/\S+/g, ""),
+  )} max-w-0 overflow-hidden ${rowBgClassName}`;
+}
+
+function SummaryAmount({
+  value,
+  readOnlyNum,
+  emphasis = false,
+  summary = false,
+}: {
+  value: number;
+  readOnlyNum: string;
+  emphasis?: boolean;
+  summary?: boolean;
+}) {
+  const display = formatAmountDisplay(value);
+  const className = `${volumeAmountClassName(
+    readOnlyNum,
+    value,
+    emphasis,
+    summary,
+  )} block w-full truncate`;
+
+  if (!summary || isAmountDisplayEmpty(value)) {
+    return <span className={className}>{display}</span>;
+  }
+
+  return (
+    <Tooltip label={display} className="block w-full min-w-0" align="end">
+      <span className={className}>{display}</span>
+    </Tooltip>
+  );
 }
 
 export function VolumeSumCells({
@@ -73,17 +93,28 @@ export function VolumeSumCells({
   laborWorkloadHours = null,
   staleCatalogPriceHints,
   compact = false,
+  summary = false,
+  rowBgClassName,
+  preLaborSummary,
 }: {
   values: PriceBreakdown | null;
   laborWorkloadHours?: number | null;
   staleCatalogPriceHints?: StaleCatalogPriceHints;
   compact?: boolean;
+  summary?: boolean;
+  rowBgClassName?: string;
+  /** Rāda tieši pirms darba summas kolonnas (darbietilpības šūnā). */
+  preLaborSummary?: CollapsedSectionSummaryParts;
 }) {
   const styles = getEstimateNumericStyles(compact);
   const readOnlyNum = styles.readOnly;
-  const volumeCell = styles.volumeCell;
-  const volumeCellTotal = styles.volumeCellTotal;
-  const staleVolumeCell = `${styles.volumeCell} bg-red-100 ring-1 ring-inset ring-red-300`;
+  const volumeCell = sectionVolumeCellClass(styles, summary ? rowBgClassName : undefined);
+  const volumeCellTotal = sectionVolumeCellClass(
+    styles,
+    summary ? rowBgClassName : undefined,
+    true,
+  );
+  const staleVolumeCell = `${styles.volumeCell} bg-red-100 ring-1 ring-inset ring-red-300 max-w-0 overflow-hidden`;
   const total = values ? sumBreakdown(values) : 0;
   const workloadText =
     laborWorkloadHours != null && laborWorkloadHours > 0
@@ -93,15 +124,20 @@ export function VolumeSumCells({
   return (
     <>
       <td className={volumeCell}>
-        <span
-          className={volumeAmountClassName(
-            readOnlyNum,
-            laborWorkloadHours ?? 0,
-            false,
-          )}
-        >
-          {workloadText ?? "—"}
-        </span>
+        {preLaborSummary ? (
+          <EstimateCollapsedSummaryDisplay parts={preLaborSummary} />
+        ) : (
+          <span
+            className={`${volumeAmountClassName(
+              readOnlyNum,
+              laborWorkloadHours ?? 0,
+              false,
+              summary,
+            )}${summary ? " truncate" : ""}`}
+          >
+            {workloadText ?? "—"}
+          </span>
+        )}
       </td>
       {(["labor", "materials", "mechanisms"] as const).map((field) => {
         const staleHint =
@@ -109,14 +145,23 @@ export function VolumeSumCells({
             ? staleCatalogPriceHints?.[field]
             : undefined;
         const cellClassName = staleHint ? staleVolumeCell : volumeCell;
-        const amountSpan = (
+        const amountValue = values ? values[field] : 0;
+        const amountSpan = summary ? (
+          <SummaryAmount
+            value={amountValue}
+            readOnlyNum={readOnlyNum}
+            summary={summary}
+          />
+        ) : (
           <span
             className={volumeAmountClassName(
               readOnlyNum,
-              values ? values[field] : 0,
+              amountValue,
+              false,
+              summary,
             )}
           >
-            {values ? formatAmountDisplay(values[field]) : "—"}
+            {values ? formatAmountDisplay(amountValue) : "—"}
           </span>
         );
 
@@ -133,9 +178,18 @@ export function VolumeSumCells({
         );
       })}
       <td className={volumeCellTotal}>
-        <span className={volumeAmountClassName(readOnlyNum, total, true)}>
-          {values ? formatAmountDisplay(total) : "—"}
-        </span>
+        {summary ? (
+          <SummaryAmount
+            value={total}
+            readOnlyNum={readOnlyNum}
+            emphasis
+            summary={summary}
+          />
+        ) : (
+          <span className={volumeAmountClassName(readOnlyNum, total, true, summary)}>
+            {values ? formatAmountDisplay(total) : "—"}
+          </span>
+        )}
       </td>
     </>
   );
@@ -145,6 +199,44 @@ export const volumeSumFooterCell =
   "border-t-2 border-zinc-300 px-2 py-2.5 text-center text-xs font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
 
 export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60 text-sm`;
+
+/** Tukšas šūnas pirms apjoma cenas kolonnām (Mērv., Daudz., Vienības cena). */
+export function SectionLeadingEmptyCells({
+  showQuantityColumn = false,
+  rowBgClassName,
+}: {
+  showQuantityColumn?: boolean;
+  rowBgClassName?: string;
+}) {
+  const styles = getEstimateNumericStyles(showQuantityColumn);
+  const metricCell = showQuantityColumn
+    ? `${stripDefaultSectionCellBorder(styles.cell)}${
+        rowBgClassName ? ` ${rowBgClassName}` : ""
+      }`
+    : `border-b border-zinc-100 px-1 py-0.5 align-middle text-center${
+        rowBgClassName ? ` ${rowBgClassName}` : ""
+      }`;
+  const metricCellTotal = showQuantityColumn
+    ? `${stripDefaultSectionCellBorder(styles.cellTotal)}${
+        rowBgClassName ? ` ${rowBgClassName}` : ""
+      }`
+    : metricCell;
+
+  return (
+    <>
+      <td className={metricCell} />
+      {showQuantityColumn ? <td className={metricCell} /> : null}
+      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
+        <td
+          key={index}
+          className={
+            index === UNIT_PRICE_COLUMN_COUNT - 1 ? metricCellTotal : metricCell
+          }
+        />
+      ))}
+    </>
+  );
+}
 
 /** Tukšas šūnas kategoriju / multi galvenes rindām. */
 export function EmptyVolumePriceCells({

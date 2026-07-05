@@ -72,6 +72,8 @@ export type EstimateMeta = {
   materialAssigneeUserIds?: Record<string, string>;
   /** Plānotā peļņa procentos — piemērota vienības cenām (darbs, materiāli, mehānismi). */
   plannedProfitPercent?: number;
+  /** Automātiski pievienotas, paslēptas sagataves daļas — lietotājs vēl nav apstiprinājis iepazīšanās bloku. */
+  unacknowledgedSagataveStructureIds?: string[];
 };
 
 export type ProjectEstimate = {

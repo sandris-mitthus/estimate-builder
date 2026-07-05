@@ -7,8 +7,10 @@ import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   createProject,
+  createExcludedPositionFromProject,
   deleteProject,
   omitProjectExcludedPosition,
+  reorderProjectExcludedPositions,
   restoreProjectExcludedPosition,
   markProjectMaterialOrdered,
   assignProjectMaterialUser,
@@ -18,6 +20,8 @@ import {
   updateProjectEstimatePlannedProfit,
   updateProjectStatus,
 } from "@/app/lib/projects/repository";
+import { acknowledgeSagataveStructureIntro } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
+import type { ReorderExcludedPositionsInput } from "@/app/lib/excluded-positions/types";
 import type { ProjectStatus } from "@/app/lib/projects/project-status";
 import type { CreateProjectInput, UpdateProjectInput } from "@/app/lib/projects/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
@@ -187,6 +191,54 @@ export async function restoreProjectExcludedPositionAction(
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
+export async function createExcludedPositionFromProjectAction(
+  projectId: string,
+  name: string,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await createExcludedPositionFromProject(projectId, name);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath("/excluded-positions");
+  }
+
+  return result;
+}
+
+export async function reorderExcludedPositionsFromProjectAction(
+  projectId: string,
+  input: ReorderExcludedPositionsInput,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await reorderProjectExcludedPositions(projectId, input);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath("/excluded-positions");
+  }
+
+  return result;
+}
+
+export async function acknowledgeSagataveStructureIntroAction(projectId: string) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await acknowledgeSagataveStructureIntro(projectId);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath("/");
   }
 
   return result;

@@ -2,6 +2,8 @@ export function getEstimateNumericStyles(compact: boolean) {
   if (!compact) {
     return {
       cell: "border-b border-zinc-100 px-1 py-0.5 align-middle text-center",
+      unitCell: "border-b border-zinc-100 px-1 py-0.5 align-middle text-center",
+      quantityCell: "border-b border-zinc-100 px-1 py-0.5 align-middle text-center",
       cellTotal:
         "border-b border-zinc-100 px-1 py-0.5 align-middle text-center bg-zinc-50/60",
       volumeCell:
@@ -22,21 +24,25 @@ export function getEstimateNumericStyles(compact: boolean) {
   }
 
   return {
-    cell: "border-b border-zinc-100 px-0.5 py-px align-middle text-center",
+    cell: "border-b border-zinc-100 px-1 py-px align-middle text-center",
+    unitCell:
+      "border-b border-zinc-100 py-px pl-1 pr-2 align-middle text-center whitespace-nowrap",
+    quantityCell:
+      "border-b border-zinc-100 py-px pl-1 pr-1 align-middle text-center whitespace-nowrap",
     cellTotal:
-      "border-b border-zinc-100 px-0.5 py-px align-middle text-center bg-zinc-50/60",
+      "border-b border-zinc-100 px-1 py-px align-middle text-center bg-zinc-50/60",
     volumeCell:
-      "border-b border-zinc-100 px-0.5 py-px align-middle text-center bg-emerald-50/25",
+      "border-b border-zinc-100 px-1 py-px align-middle text-center bg-emerald-50/25",
     volumeCellTotal:
-      "border-b border-zinc-100 px-0.5 py-px align-middle text-center bg-emerald-50/50",
+      "border-b border-zinc-100 px-1 py-px align-middle text-center bg-emerald-50/50",
     readOnly:
-      "block px-0.5 py-px text-center text-[11px] tabular-nums leading-tight text-zinc-700",
+      "block px-1 py-px text-center text-[11px] tabular-nums leading-tight text-zinc-700",
     input:
-      "w-full rounded border border-transparent bg-transparent px-0.5 py-px text-[11px] transition focus:border-zinc-300 focus:bg-white focus:outline-none text-center tabular-nums leading-tight",
+      "w-full rounded border border-transparent bg-transparent px-1 py-px text-[11px] transition focus:border-zinc-300 focus:bg-white focus:outline-none text-center tabular-nums leading-tight",
     headerSub:
       "border-b border-r border-zinc-200 max-w-0 overflow-hidden px-0.5 py-1 text-center align-middle text-[9px] font-medium leading-tight text-zinc-500",
     headerMetric:
-      "border-b border-r border-zinc-200 max-w-0 overflow-hidden bg-white py-1 px-0.5 text-center align-middle text-[9px] font-medium uppercase leading-tight tracking-normal text-zinc-500",
+      "border-b border-r border-zinc-200 max-w-0 overflow-hidden bg-white py-1 px-1 text-center align-middle text-[9px] font-medium uppercase leading-tight tracking-normal text-zinc-500",
     headerGroup:
       "border-b border-r border-zinc-200 px-0.5 py-1 text-center align-middle text-[9px] font-medium uppercase leading-tight tracking-normal whitespace-normal",
   };

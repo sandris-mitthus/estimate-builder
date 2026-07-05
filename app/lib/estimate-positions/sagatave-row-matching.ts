@@ -3,8 +3,10 @@ import {
   isEstimateMultiPosition,
 } from "@/app/lib/estimates/multi-position";
 import type {
+  EstimateCategory,
   EstimateLineItem,
   EstimateRowItem,
+  EstimateSubcategory,
 } from "@/app/lib/estimates/types";
 
 export function normalizeRowTitle(title: string): string {
@@ -116,6 +118,38 @@ export function findSagataveRowForProjectRow(
   }
 
   return undefined;
+}
+
+export function findSagataveCategoryForProject(
+  sagataveSections: EstimateCategory[],
+  projectCategory: EstimateCategory,
+  categoryIndex: number,
+): EstimateCategory | undefined {
+  const byIndex = sagataveSections[categoryIndex];
+  if (byIndex) return byIndex;
+
+  const normalizedTitle = normalizeRowTitle(projectCategory.title);
+  if (!normalizedTitle) return undefined;
+
+  return sagataveSections.find(
+    (section) => normalizeRowTitle(section.title) === normalizedTitle,
+  );
+}
+
+export function findSagataveSubcategoryForProject(
+  sagataveSubcategories: EstimateSubcategory[],
+  projectSubcategory: EstimateSubcategory,
+  subcategoryIndex: number,
+): EstimateSubcategory | undefined {
+  const normalizedTitle = normalizeRowTitle(projectSubcategory.title);
+  if (normalizedTitle) {
+    const byTitle = sagataveSubcategories.find(
+      (subcategory) => normalizeRowTitle(subcategory.title) === normalizedTitle,
+    );
+    if (byTitle) return byTitle;
+  }
+
+  return sagataveSubcategories[subcategoryIndex];
 }
 
 export function findCorrespondingOptionLineItems(

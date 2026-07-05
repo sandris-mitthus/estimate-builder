@@ -83,7 +83,7 @@ export function RestoreSagatavePositionsModal({
       title={t("estimate.sagatave.restore_title", "Pozīcijas no sagataves")}
       description={t(
         "estimate.sagatave.restore_description",
-        "Atzīmē pozīcijas, kuras pievienot šai tāmei",
+        "Atzīmē kategorijas, subkategorijas un pozīcijas, kuras pievienot šai tāmei",
       )}
       blocking={disabled}
       dirty={dirty}
@@ -105,6 +105,15 @@ export function RestoreSagatavePositionsModal({
               <ul className="divide-y divide-zinc-100">
                 {group.positions.map((position) => {
                   const checked = selectedIds.has(position.sagataveRowId);
+                  const structureLabel =
+                    group.structureKind === "category"
+                      ? t("estimate.sagatave.structure.category", "Kategorija")
+                      : group.structureKind === "subcategory"
+                        ? t(
+                            "estimate.sagatave.structure.subcategory",
+                            "Subkategorija",
+                          )
+                        : null;
 
                   return (
                     <li key={position.sagataveRowId}>
@@ -116,7 +125,15 @@ export function RestoreSagatavePositionsModal({
                           disabled={disabled}
                           onChange={() => toggleRow(position.sagataveRowId)}
                         />
-                        <span className="min-w-0 break-words">{position.name}</span>
+                        <span className="min-w-0 break-words">
+                          {structureLabel ? (
+                            <span className="mr-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              {structureLabel}
+                            </span>
+                          ) : null}
+                          {position.name.trim() ||
+                            t("common.untitled", "Bez nosaukuma")}
+                        </span>
                       </label>
                     </li>
                   );

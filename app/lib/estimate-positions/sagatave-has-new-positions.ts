@@ -76,6 +76,13 @@ function sagataveRowsMissingInProject(
   );
 }
 
+function isStructureSelected(
+  structureId: string,
+  selectedSagataveRowIds?: ReadonlySet<string>,
+): boolean {
+  return !selectedSagataveRowIds || selectedSagataveRowIds.has(structureId);
+}
+
 function isMissingRowSelected(
   sagataveRow: EstimateRowItem,
   projectItems: EstimateRowItem[],
@@ -106,10 +113,13 @@ export type MissingSagatavePositionEntry = {
   name: string;
 };
 
+export type MissingSagataveStructureKind = "category" | "subcategory";
+
 export type MissingSagatavePositionGroup = {
   categoryTitle: string;
   subcategoryTitle?: string;
   positions: MissingSagatavePositionEntry[];
+  structureKind?: MissingSagataveStructureKind;
 };
 
 /**
@@ -151,6 +161,21 @@ export function listMissingSagatavePositions(
         categoryTitle: sagataveCategory.title,
         positions: missingCategoryItems,
       });
+    } else if (
+      !projectCategory &&
+      sagataveCategory.items.length === 0 &&
+      sagataveCategory.subcategories.length === 0
+    ) {
+      groups.push({
+        categoryTitle: sagataveCategory.title,
+        structureKind: "category",
+        positions: [
+          {
+            sagataveRowId: sagataveCategory.id,
+            name: sagataveCategory.title,
+          },
+        ],
+      });
     }
 
     for (const [subcategoryIndex, sagataveSubcategory] of sagataveCategory.subcategories.entries()) {
@@ -185,6 +210,21 @@ export function listMissingSagatavePositions(
           categoryTitle: sagataveCategory.title,
           subcategoryTitle: sagataveSubcategory.title,
           positions: missingSubcategoryItems,
+        });
+      } else if (
+        !projectSubcategory &&
+        sagataveSubcategory.items.length === 0
+      ) {
+        groups.push({
+          categoryTitle: sagataveCategory.title,
+          subcategoryTitle: sagataveSubcategory.title,
+          structureKind: "subcategory",
+          positions: [
+            {
+              sagataveRowId: sagataveSubcategory.id,
+              name: sagataveSubcategory.title,
+            },
+          ],
         });
       }
     }
@@ -243,18 +283,18 @@ export function sagataveHasNewPositionsForProject(
   return false;
 }
 
-function collectRowItemNodeIds(row: EstimateRowItem): string[] {
+export function collectRowItemNodeIds(row: EstimateRowItem): string[] {
   return [row.id];
 }
 
-function collectSubcategoryNodeIds(subcategory: EstimateSubcategory): string[] {
+export function collectSubcategoryNodeIds(subcategory: EstimateSubcategory): string[] {
   return [
     subcategory.id,
     ...subcategory.items.flatMap(collectRowItemNodeIds),
   ];
 }
 
-function collectCategoryNodeIds(category: EstimateCategory): string[] {
+export function collectCategoryNodeIds(category: EstimateCategory): string[] {
   return [
     category.id,
     ...category.subcategories.flatMap(collectSubcategoryNodeIds),
@@ -350,6 +390,11 @@ export function mergeNewSagatavePositionsIntoProject(
       );
 
       if (partialSubcategories.length === 0 && selectedCategoryItems.length === 0) {
+        if (isStructureSelected(sagataveCategory.id, selectedSagataveRowIds)) {
+          const clonedCategory = cloneCategory(sagataveCategory, optionIdMap);
+          categories.push(clonedCategory);
+          addedNodeIds.push(...collectCategoryNodeIds(clonedCategory));
+        }
         continue;
       }
 
@@ -385,6 +430,16 @@ export function mergeNewSagatavePositionsIntoProject(
         );
 
         if (selectedItems.length === 0) {
+          if (
+            isStructureSelected(sagataveSubcategory.id, selectedSagataveRowIds)
+          ) {
+            const clonedSubcategory = cloneSubcategory(
+              sagataveSubcategory,
+              optionIdMap,
+            );
+            projectCategory.subcategories.push(clonedSubcategory);
+            addedNodeIds.push(...collectSubcategoryNodeIds(clonedSubcategory));
+          }
           continue;
         }
 

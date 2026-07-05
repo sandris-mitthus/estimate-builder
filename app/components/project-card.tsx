@@ -155,7 +155,10 @@ export function ProjectCard({
       {hasNewSagatavePositions ? (
         <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-700">
           <i className="fas fa-layer-group text-[11px]" aria-hidden="true" />
-          Sagatavē ir pozīcijas, kuras nav šajā tāmē
+          {t(
+            "projects.list.new_sagatave_structure_available",
+            "Sagatavē ir jaunas kategorijas, subkategorijas vai pozīcijas",
+          )}
         </p>
       ) : null}
 

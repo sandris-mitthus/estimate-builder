@@ -121,9 +121,17 @@ export function collectEstimateLineItems(
   const items: EstimateLineItem[] = [];
 
   for (const category of categories) {
+    if (category.hiddenInEstimate) {
+      continue;
+    }
+
     items.push(...collectRowLineItems(category.items, options));
 
     for (const subcategory of category.subcategories) {
+      if (subcategory.hiddenInEstimate) {
+        continue;
+      }
+
       items.push(...collectRowLineItems(subcategory.items, options));
     }
   }

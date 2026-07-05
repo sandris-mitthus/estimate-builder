@@ -75,6 +75,7 @@ import type {
 } from "@/app/lib/estimates/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
+import type { SectionGroupHoverHandlers } from "@/app/lib/hooks/use-section-group-hover";
 
 const readOnlyNum =
   "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";
@@ -84,7 +85,8 @@ const cellNum = `${cellInput} text-center tabular-nums`;
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const rowActionCell =
-  "border-b border-zinc-100 px-1 py-0.5 text-center align-middle";
+  "border-b border-zinc-100 px-1 py-0.5 align-middle";
+const rowActionCellInner = "flex justify-end";
 const hiddenEstimateRowBodyClass =
   "[&_td:not(:last-child)]:opacity-55 [&_td:not(:last-child)]:pointer-events-none [&_td:not(:last-child)]:select-none";
 const hiddenEstimateRowClass = "bg-zinc-100/90 hover:bg-zinc-100/90";
@@ -126,6 +128,7 @@ type EstimateMultiPositionRowProps = {
   moduleSizeOptions?: BuildingModuleSizeOption[];
   estimateUnits?: string[];
   allowOfferMultiEdit?: boolean;
+  sectionGroupHover?: SectionGroupHoverHandlers;
 };
 
 function resolveDisplayUnitPrice(
@@ -238,8 +241,11 @@ function MultiOptionSubRow({
   const { t } = useTranslations();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const numericStyles = getEstimateNumericStyles(showQuantityColumn);
-  const metricCellClass = showQuantityColumn
-    ? numericStyles.cell
+  const metricUnitCellClass = showQuantityColumn
+    ? numericStyles.unitCell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+  const metricQuantityCellClass = showQuantityColumn
+    ? numericStyles.quantityCell
     : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
   const metricReadOnly = showQuantityColumn ? numericStyles.readOnly : readOnlyNum;
   const [isLinkDropTarget, setIsLinkDropTarget] = useState(false);
@@ -442,13 +448,13 @@ function MultiOptionSubRow({
           </div>
         </div>
       </td>
-      <td className={metricCellClass}>
+      <td className={metricUnitCellClass}>
         <span className={`${metricReadOnly} text-zinc-500`}>
           {displayUnit}
         </span>
       </td>
       {showQuantityColumn ? (
-        <td className={metricCellClass}>
+        <td className={metricQuantityCellClass}>
           <span className={`${metricReadOnly} text-zinc-300`}>—</span>
         </td>
       ) : null}
@@ -505,11 +511,15 @@ export function EstimateMultiPositionRow({
   moduleSizeOptions = [],
   estimateUnits = [],
   allowOfferMultiEdit = false,
+  sectionGroupHover,
 }: EstimateMultiPositionRowProps) {
   const { t } = useTranslations();
   const numericStyles = getEstimateNumericStyles(showQuantityColumn);
-  const metricCellClass = showQuantityColumn
-    ? numericStyles.cell
+  const metricUnitCellClass = showQuantityColumn
+    ? numericStyles.unitCell
+    : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
+  const metricQuantityCellClass = showQuantityColumn
+    ? numericStyles.quantityCell
     : "border-b border-zinc-100 px-1 py-0.5 align-middle text-center";
   const metricReadOnly = showQuantityColumn ? numericStyles.readOnly : readOnlyNum;
   const metricCellNum = showQuantityColumn ? numericStyles.input : cellNum;
@@ -612,6 +622,8 @@ export function EstimateMultiPositionRow({
       <tbody
         ref={rowRef}
         style={rowStyle}
+        onMouseEnter={sectionGroupHover?.onSectionGroupEnter}
+        onMouseLeave={sectionGroupHover?.onSectionGroupLeave}
         className={`group/multi align-middle ${showDropLine ? dropLineClass : ""} ${
           hiddenInEstimate ? hiddenEstimateRowBodyClass : ""
         }`}
@@ -720,13 +732,13 @@ export function EstimateMultiPositionRow({
                 </div>
               </div>
             </td>
-            <td className={metricCellClass}>
+            <td className={metricUnitCellClass}>
               <span className={`${metricReadOnly} text-zinc-500`}>
                 {selectedDisplayUnit}
               </span>
             </td>
             {showQuantityColumn ? (
-              <td className={metricCellClass}>
+              <td className={metricQuantityCellClass}>
                 {hasAttachedQuantity && selectedLineItem ? (
                   <span className={`${metricReadOnly} text-zinc-700`}>
                     {formatQuantityDisplay(attachedQuantity)}
@@ -783,6 +795,7 @@ export function EstimateMultiPositionRow({
               />
             ) : null}
             <td className={rowActionCell}>
+              <div className={rowActionCellInner}>
               {allowOfferMultiEdit ? (
                 hiddenInEstimate && onRestore ? (
                   <RestoreButton
@@ -798,6 +811,7 @@ export function EstimateMultiPositionRow({
                   />
                 )
               ) : null}
+              </div>
             </td>
           </tr>
         ) : (

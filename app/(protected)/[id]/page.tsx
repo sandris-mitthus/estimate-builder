@@ -7,6 +7,7 @@ import {
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
+import { ensureHiddenSagataveStructureForProject } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
 import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
@@ -51,6 +52,8 @@ export default async function ProjectDetailPage({
   if (!project) {
     notFound();
   }
+
+  await ensureHiddenSagataveStructureForProject(id);
 
   const estimate = await getProjectEstimateForProject(
     project,

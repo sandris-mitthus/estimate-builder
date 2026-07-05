@@ -13,6 +13,17 @@ import { sagataveHasNewPositionsForProject } from "@/app/lib/estimate-positions/
 import { sagataveHasPositionChangesForProject } from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { propagateLaborTimeNormsFromProject } from "@/app/lib/estimate-positions/labor-time-norm-sync";
+import { propagateProjectStructureToSagatave } from "@/app/lib/estimate-positions/project-structure-to-sagatave";
+import { propagateSagataveStructureToOtherProjects } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
+import {
+  createExcludedPosition,
+  deleteExcludedPosition,
+  reorderExcludedPositions,
+} from "@/app/lib/excluded-positions/repository";
+import type {
+  ExcludedPosition,
+  ReorderExcludedPositionsInput,
+} from "@/app/lib/excluded-positions/types";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import {
   estimateHasStaleCatalogPrices,
@@ -357,16 +368,13 @@ export async function getProjectListBadges(
       }
 
       if (
-        sagatave.sections.length > 0 &&
-        !rawMeta.clonedFromProjectId &&
-        sagataveHasNewPositionsForProject(sagatave.sections, parsed.sections)
+        (rawMeta.unacknowledgedSagataveStructureIds ?? []).length > 0
       ) {
         newSagatavePositionProjectIds.add(projectId);
       }
 
       if (
         sagatave.sections.length > 0 &&
-        !rawMeta.clonedFromProjectId &&
         sagataveHasPositionChangesForProject(sagatave.sections, parsed.sections)
       ) {
         sagatavePositionChangeProjectIds.add(projectId);
@@ -1095,6 +1103,101 @@ export async function restoreProjectExcludedPosition(
   return { ok: true, omittedIds };
 }
 
+async function omitExcludedPositionOnOtherProjectEstimates(
+  sourceProjectId: string,
+  excludedPositionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("project_id, meta")
+    .eq("company_id", companyId)
+    .neq("project_id", sourceProjectId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās atjaunināt pārējos projektus." };
+  }
+
+  const rows = data ?? [];
+  const updates = rows.map((row) => {
+    const currentMeta = (row.meta ?? {}) as EstimateMeta;
+    const omittedIds = Array.from(
+      new Set([
+        ...(currentMeta.excludedPositionIdsOmitted ?? []),
+        excludedPositionId,
+      ]),
+    );
+
+    return supabase
+      .from("estimates")
+      .update({
+        meta: {
+          ...currentMeta,
+          excludedPositionIdsOmitted: omittedIds,
+        },
+      })
+      .eq("project_id", row.project_id)
+      .eq("company_id", companyId);
+  });
+
+  const results = await Promise.all(updates);
+  const failed = results.find((result) => result.error);
+
+  if (failed?.error) {
+    return { ok: false, error: "Neizdevās atjaunināt pārējos projektus." };
+  }
+
+  return { ok: true };
+}
+
+export async function createExcludedPositionFromProject(
+  sourceProjectId: string,
+  name: string,
+): Promise<{ ok: true; position: ExcludedPosition } | { ok: false; error: string }> {
+  const editable = await assertProjectEstimateEditable(sourceProjectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const createResult = await createExcludedPosition({ name });
+  if (!createResult.ok) {
+    return createResult;
+  }
+
+  const omitResult = await omitExcludedPositionOnOtherProjectEstimates(
+    sourceProjectId,
+    createResult.position.id,
+  );
+
+  if (!omitResult.ok) {
+    await deleteExcludedPosition(createResult.position.id);
+    return omitResult;
+  }
+
+  return createResult;
+}
+
+export async function reorderProjectExcludedPositions(
+  projectId: string,
+  input: ReorderExcludedPositionsInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const editable = await assertProjectEstimateEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  return reorderExcludedPositions(input);
+}
+
 export async function markProjectMaterialOrdered(
   projectId: string,
   positionPriceId: string,
@@ -1325,6 +1428,23 @@ export async function saveProjectEstimate(
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt tāmi." };
+  }
+
+  const structureSyncResult = await propagateProjectStructureToSagatave(
+    payload.categories,
+    payload.multiOptionLinks,
+  );
+  if (!structureSyncResult.ok) {
+    return structureSyncResult;
+  }
+
+  if (structureSyncResult.addedNodeIds.length > 0) {
+    const propagateResult = await propagateSagataveStructureToOtherProjects(
+      projectId,
+    );
+    if (!propagateResult.ok) {
+      return propagateResult;
+    }
   }
 
   const syncResult = await propagateLaborTimeNormsFromProject(

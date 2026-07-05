@@ -28,6 +28,8 @@ import {
 } from "react";
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { EstimateSectionRowActions } from "@/app/components/estimate-section-row-actions";
+import { EstimateSectionActionsCell } from "@/app/components/estimate-section-actions-cell";
 import { EstimateTableStickyShell } from "@/app/components/estimate-table-sticky-shell";
 import { useActionPermission } from "@/app/components/action-permissions-context";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -48,8 +50,9 @@ import {
 import { collectSectionLineItems } from "@/app/lib/estimate-positions/collect-section-items";
 import {
   collectVisibleSectionDragIds,
-  getCollapsedSectionSummary,
-  getCollapsedSubcategorySummary,
+  getCollapsedSectionSummaryParts,
+  getCollapsedSubcategorySummaryParts,
+  type CollapsedSectionSummaryParts,
 } from "@/app/lib/estimate-positions/collapsed-sections-cookie";
 import { reorderEstimatePositionSections } from "@/app/lib/estimate-positions/reorder-sections";
 import {
@@ -58,6 +61,11 @@ import {
   resolveCategoryChildren,
 } from "@/app/lib/estimates/category-child-order";
 import { useCollapsedEstimateSections } from "@/app/lib/hooks/use-collapsed-estimate-sections";
+import {
+  mergeSectionGroupHoverHandlers,
+  useSectionGroupHover,
+  type SectionGroupHoverHandlers,
+} from "@/app/lib/hooks/use-section-group-hover";
 import type { EstimatePositionSection } from "@/app/lib/estimate-positions/types";
 import {
   applyMultiChangeWithLinkSync,
@@ -152,12 +160,12 @@ const estimateGroupHeaderThClass =
 function EstimatePositionTableColgroup() {
   return (
     <colgroup>
-      <col style={{ width: "32%" }} />
+      <col style={{ width: "30%" }} />
       <col style={{ width: "7%" }} />
       {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
         <col key={index} style={{ width: "9%" }} />
       ))}
-      <col style={{ width: "7%" }} />
+      <col style={{ width: "9%" }} />
     </colgroup>
   );
 }
@@ -170,8 +178,6 @@ const dragHandleColumn =
 const subcategoryNameIndent = "ml-[10px]";
 const subcategoryItemNameIndent = "ml-[20px]";
 const dropLineClass = "shadow-[inset_0_4px_0_0_rgb(24_24_27)]";
-const actionBtn =
-  "inline-flex h-7 items-center rounded-md px-2 text-xs text-zinc-500 transition hover:bg-white hover:text-zinc-800";
 const rowActionCell =
   "border-b border-zinc-100 px-1 py-0.5 text-center align-middle";
 
@@ -200,6 +206,7 @@ function LineItemRow({
   defaultHourlyRate,
   currency = null,
   moduleSizeOptions,
+  sectionGroupHover,
 }: {
   item: EstimateLineItem;
   onChange: (item: EstimateLineItem) => void;
@@ -214,6 +221,7 @@ function LineItemRow({
   defaultHourlyRate: number | null;
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
+  sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
@@ -251,6 +259,8 @@ function LineItemRow({
     <tbody
       ref={rowRef}
       style={rowStyle}
+      onMouseEnter={sectionGroupHover?.onSectionGroupEnter}
+      onMouseLeave={sectionGroupHover?.onSectionGroupLeave}
       className={`group ${showDropLine ? dropLineClass : ""}`}
     >
     <tr
@@ -397,6 +407,7 @@ function LineItemRow({
 function SortableLineItemRow({
   sortId,
   subcategoryId,
+  sectionGroupHover,
   ...props
 }: {
   sortId: string;
@@ -408,6 +419,7 @@ function SortableLineItemRow({
   catalogPositions: PositionPriceSummary[];
   defaultHourlyRate: number | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
+  sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
@@ -424,6 +436,7 @@ function SortableLineItemRow({
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
+      sectionGroupHover={sectionGroupHover}
       dragHandle={
         <DragHandle
           label={t("positions.drag.position", "Pārvietot pozīciju")}
@@ -432,43 +445,6 @@ function SortableLineItemRow({
         />
       }
     />
-  );
-}
-
-function RowActions({
-  onAddSub,
-  onAddMulti,
-  onAddItem,
-  onDelete,
-  deleteLabel,
-  showSub = true,
-}: {
-  onAddSub?: () => void;
-  onAddMulti?: () => void;
-  onAddItem: () => void;
-  onDelete: () => void;
-  deleteLabel: string;
-  showSub?: boolean;
-}) {
-  const { t } = useTranslations();
-
-  return (
-    <div className="flex h-7 shrink-0 items-center gap-1 self-center">
-      {showSub && onAddSub ? (
-        <button type="button" className={actionBtn} onClick={onAddSub}>
-          {t("estimate.actions.add_subcategory_short", "+ Sub")}
-        </button>
-      ) : null}
-      {onAddMulti ? (
-        <button type="button" className={actionBtn} onClick={onAddMulti}>
-          {t("estimate.actions.add_multi_short", "+ Multi")}
-        </button>
-      ) : null}
-      <button type="button" className={actionBtn} onClick={onAddItem}>
-        {t("estimate.actions.add_position_short", "+ Pozīcija")}
-      </button>
-      <DeleteButton label={deleteLabel} onClick={onDelete} />
-    </div>
   );
 }
 
@@ -482,6 +458,7 @@ function SortableMultiPositionRow({
   currency = null,
   moduleSizeOptions,
   estimateUnits = [],
+  sectionGroupHover,
 }: {
   sortId: string;
   sectionId: string;
@@ -493,6 +470,7 @@ function SortableMultiPositionRow({
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   estimateUnits?: string[];
+  sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
   const showDropLine = useShowDropLine(sortId);
@@ -518,6 +496,7 @@ function SortableMultiPositionRow({
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
+      sectionGroupHover={sectionGroupHover}
       dragHandle={
         <DragHandle
           label={t("estimate.drag.multi_position", "Pārvietot multi-pozīciju")}
@@ -541,9 +520,11 @@ function SectionRow({
   rowStyle,
   showDropLine,
   collapsed = false,
-  collapsedSummary,
+  collapsedSummaryParts,
   onToggleCollapse,
   nameTrailing,
+  actionsVisible = true,
+  sectionGroupHover,
 }: {
   sectionRowId: string;
   kind: "category" | "subcategory";
@@ -556,9 +537,11 @@ function SectionRow({
   rowStyle?: CSSProperties;
   showDropLine?: boolean;
   collapsed?: boolean;
-  collapsedSummary?: string;
+  collapsedSummaryParts?: CollapsedSectionSummaryParts;
   onToggleCollapse?: () => void;
   nameTrailing?: ReactNode;
+  actionsVisible?: boolean;
+  sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
   const focusCtx = useSectionTitleFocus();
@@ -589,6 +572,8 @@ function SectionRow({
     <tbody
       ref={rowRef}
       style={rowStyle}
+      onMouseEnter={sectionGroupHover?.onSectionGroupEnter}
+      onMouseLeave={sectionGroupHover?.onSectionGroupLeave}
       className={`${isCategory ? "category-row" : "subcategory-row"} ${showDropLine ? dropLineClass : ""}`}
     >
     <tr>
@@ -638,17 +623,18 @@ function SectionRow({
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
               />
-              {collapsed && collapsedSummary ? (
-                <span className="shrink-0 text-xs font-normal text-zinc-500">
-                  {collapsedSummary}
-                </span>
-              ) : null}
               {nameTrailing ? (
                 <span className="shrink-0">{nameTrailing}</span>
               ) : null}
             </div>
           </div>
-          {actions}
+          <EstimateSectionActionsCell
+            actions={actions}
+            collapsedSummaryParts={collapsedSummaryParts}
+            showSummary={collapsed}
+            actionsVisible={actionsVisible}
+            className="self-center"
+          />
         </div>
       </td>
     </tr>
@@ -671,9 +657,11 @@ function SortableSectionRow({
   onChange: (value: string) => void;
   actions: ReactNode;
   collapsed?: boolean;
-  collapsedSummary?: string;
+  collapsedSummaryParts?: CollapsedSectionSummaryParts;
   onToggleCollapse?: () => void;
   nameTrailing?: ReactNode;
+  actionsVisible?: boolean;
+  sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const showDropLine = useShowDropLine(sortId);
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -709,12 +697,13 @@ function SubcategoryBlock({
   currency = null,
   moduleSizeOptions,
   collapsed,
-  collapsedSummary,
+  collapsedSummaryParts,
   onToggleCollapse,
   onEnsureExpanded,
   optionLinkActions,
   openMultiPositionModal,
   estimateUnits = [],
+  parentSectionHover,
 }: {
   sectionId: string;
   subcategory: EstimateSubcategory;
@@ -725,15 +714,21 @@ function SubcategoryBlock({
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   collapsed: boolean;
-  collapsedSummary: string;
+  collapsedSummaryParts: CollapsedSectionSummaryParts;
   onToggleCollapse: () => void;
   onEnsureExpanded: () => void;
   optionLinkActions: MultiOptionLinkActions;
   openMultiPositionModal: OpenMultiPositionModal;
   estimateUnits?: string[];
+  parentSectionHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
+  const subcategoryHover = useSectionGroupHover();
+  const sectionGroupHover = mergeSectionGroupHoverHandlers(
+    subcategoryHover,
+    parentSectionHover,
+  );
 
   function withExpandedContent(
     updater: (current: EstimateSubcategory) => EstimateSubcategory,
@@ -771,8 +766,10 @@ function SubcategoryBlock({
         value={subcategory.title}
         onChange={(title) => onChange({ ...subcategory, title })}
         collapsed={collapsed}
-        collapsedSummary={collapsedSummary}
+        collapsedSummaryParts={collapsedSummaryParts}
         onToggleCollapse={onToggleCollapse}
+        actionsVisible={subcategoryHover.hovered}
+        sectionGroupHover={sectionGroupHover}
         nameTrailing={
           <>
             <SubcategoryPriceVisibilityToggle
@@ -790,7 +787,7 @@ function SubcategoryBlock({
           </>
         }
         actions={
-          <RowActions
+          <EstimateSectionRowActions
             showSub={false}
             deleteLabel={t("estimate.delete.subcategory", "Dzēst subkategoriju")}
             onAddMulti={handleAddMulti}
@@ -812,6 +809,7 @@ function SubcategoryBlock({
             moduleSizeOptions={moduleSizeOptions}
             estimateUnits={estimateUnits}
             optionLinkActions={optionLinkActions}
+            sectionGroupHover={sectionGroupHover}
             value={row}
           />
         ) : (
@@ -823,6 +821,7 @@ function SubcategoryBlock({
             catalogPositions={catalogPositions}
             defaultHourlyRate={defaultHourlyRate}
             moduleSizeOptions={moduleSizeOptions}
+            sectionGroupHover={sectionGroupHover}
             item={row}
             onChange={(next) =>
               onChange({
@@ -852,7 +851,7 @@ function SectionBlock({
   currency = null,
   moduleSizeOptions,
   collapsed,
-  collapsedSummary,
+  collapsedSummaryParts,
   onToggleCollapse,
   onEnsureExpanded,
   collapsedSectionIds,
@@ -870,7 +869,7 @@ function SectionBlock({
   currency?: string | null;
   moduleSizeOptions: BuildingModuleSizeOption[];
   collapsed: boolean;
-  collapsedSummary: string;
+  collapsedSummaryParts: CollapsedSectionSummaryParts;
   onToggleCollapse: () => void;
   onEnsureExpanded: () => void;
   collapsedSectionIds: ReadonlySet<string>;
@@ -883,6 +882,7 @@ function SectionBlock({
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
   const { requestFocus } = useSectionTitleFocus() ?? {};
+  const sectionHover = useSectionGroupHover();
 
   function withExpandedContent(
     updater: (current: EstimatePositionSection) => EstimatePositionSection,
@@ -930,10 +930,12 @@ function SectionBlock({
         value={section.title}
         onChange={(title) => onChange({ ...section, title })}
         collapsed={collapsed}
-        collapsedSummary={collapsedSummary}
+        collapsedSummaryParts={collapsedSummaryParts}
         onToggleCollapse={onToggleCollapse}
+        actionsVisible={sectionHover.hovered}
+        sectionGroupHover={sectionHover}
         actions={
-          <RowActions
+          <EstimateSectionRowActions
             deleteLabel={t("estimate.delete.section", "Dzēst tāmes pozīciju")}
             onAddSub={() => {
               const subcategory = createSubcategory();
@@ -969,12 +971,13 @@ function SectionBlock({
                   currency={currency}
                   moduleSizeOptions={moduleSizeOptions}
                   collapsed={collapsedSectionIds.has(subcategory.id)}
-                  collapsedSummary={getCollapsedSubcategorySummary(subcategory, t)}
+                  collapsedSummaryParts={getCollapsedSubcategorySummaryParts(subcategory, t)}
                   onToggleCollapse={() => toggleSectionCollapsed(subcategory.id)}
                   onEnsureExpanded={() => expandSection(subcategory.id)}
                   optionLinkActions={optionLinkActions}
                   openMultiPositionModal={openMultiPositionModal}
                   estimateUnits={estimateUnits}
+                  parentSectionHover={sectionHover}
                   subcategory={subcategory}
                   onChange={(next) =>
                     onChange({
@@ -1013,6 +1016,7 @@ function SectionBlock({
                 moduleSizeOptions={moduleSizeOptions}
                 estimateUnits={estimateUnits}
                 optionLinkActions={optionLinkActions}
+                sectionGroupHover={sectionHover}
                 value={row}
               />
             ) : (
@@ -1023,6 +1027,7 @@ function SectionBlock({
                 catalogPositions={catalogPositions}
                 defaultHourlyRate={defaultHourlyRate}
                 moduleSizeOptions={moduleSizeOptions}
+                sectionGroupHover={sectionHover}
                 item={row}
                 onChange={(next) =>
                   onChange({
@@ -1238,7 +1243,7 @@ function EstimatePositionDndTable({
               currency={currency}
               moduleSizeOptions={moduleSizeOptions}
               collapsed={collapsedSectionIds.has(section.id)}
-              collapsedSummary={getCollapsedSectionSummary(section, t)}
+              collapsedSummaryParts={getCollapsedSectionSummaryParts(section, t)}
               optionLinkActions={optionLinkActions}
               openMultiPositionModal={openMultiPositionModal}
               estimateUnits={estimateUnits}

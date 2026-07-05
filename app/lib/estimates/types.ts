@@ -117,6 +117,8 @@ export type EstimateSubcategory = {
   hiddenInOffer?: boolean;
   /** `true` — subkategorijas pozīciju cenas paslēptas piedāvājumā. */
   hiddenPricesInOffer?: boolean;
+  /** Projekta tāmē — subkategorija paslēpta no tabulas un kopsummām, bet saglabāta datos. */
+  hiddenInEstimate?: boolean;
 };
 
 export type EstimateCategory = {
@@ -126,6 +128,8 @@ export type EstimateCategory = {
   items: EstimateRowItem[];
   /** Apakškategoriju un tiešo pozīciju secība kategorijas līmenī. */
   childOrder?: EstimateCategoryChildRef[];
+  /** Projekta tāmē — kategorija paslēpta no tabulas un kopsummām, bet saglabāta datos. */
+  hiddenInEstimate?: boolean;
 };
 
 export type EstimateDocument = {
