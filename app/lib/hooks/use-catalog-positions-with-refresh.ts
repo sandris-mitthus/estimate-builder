@@ -12,20 +12,24 @@ type UseCatalogPositionsWithRefreshOptions = {
 async function fetchCatalogPositionsForHints(): Promise<
   PositionPriceSummary[] | null
 > {
-  const response = await fetch("/api/catalog-positions/hints", {
-    method: "GET",
-    cache: "no-store",
-  });
+  try {
+    const response = await fetch("/api/catalog-positions/hints", {
+      method: "GET",
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      positions?: PositionPriceSummary[];
+    };
+
+    return Array.isArray(payload.positions) ? payload.positions : null;
+  } catch {
     return null;
   }
-
-  const payload = (await response.json()) as {
-    positions?: PositionPriceSummary[];
-  };
-
-  return Array.isArray(payload.positions) ? payload.positions : null;
 }
 
 /** Servera props atjauninājums — neaizstāj klienta fetch, ja tas jau satur jaunākus ID. */
