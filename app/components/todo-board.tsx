@@ -534,7 +534,11 @@ function TodoCategoryColumn({
               />
             </span>
           )}
-          <div className="min-w-0 flex-1">
+          <div
+            className={
+              defaultCategory ? "min-w-0 flex-1 ml-[5px]" : "min-w-0 flex-1"
+            }
+          >
             <TruncatedText
               as="h2"
               text={category.title}
