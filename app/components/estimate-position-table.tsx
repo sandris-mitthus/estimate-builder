@@ -1389,11 +1389,16 @@ export function EstimatePositionTable({
     isDirty,
   });
 
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
   const catalogPositionsRef = useRef(catalogPositions);
   catalogPositionsRef.current = catalogPositions;
 
+  // Sinhronizē ar servera props tikai kad tie mainās un lokāli nav nesaglabātu izmaiņu.
+  // isDirty nedrīkst būt dependency — pēc veiksmīgas saglabāšanas initialSections vēl nav atjaunināts.
   useEffect(() => {
-    if (isDirty) {
+    if (isDirtyRef.current) {
       return;
     }
 
@@ -1405,9 +1410,14 @@ export function EstimatePositionTable({
         moduleSizeOptions,
       ),
     );
-  }, [initialSections, isDirty, defaultHourlyRate, moduleSizeOptions]);
+  }, [initialSections, defaultHourlyRate, moduleSizeOptions]);
 
+  // Kataloga atjauninājums — tikai kad nav lokālu izmaiņu (lai nepārrakstītu rediģējumu).
   useEffect(() => {
+    if (isDirtyRef.current) {
+      return;
+    }
+
     setSections((current) =>
       buildHydratedSections(
         current,

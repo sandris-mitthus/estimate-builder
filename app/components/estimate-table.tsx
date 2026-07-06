@@ -2602,13 +2602,17 @@ export function EstimateTable({
     plannedProfitPercent !== savedPlannedProfitPercent;
   const isDirty = currentSnapshot !== savedSnapshot || isPlannedProfitDirty;
 
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  // Sinhronizē ar servera props tikai kad tie mainās un lokāli nav nesaglabātu izmaiņu.
   useEffect(() => {
-    if (isDirty) {
+    if (isDirtyRef.current) {
       return;
     }
 
     setCategories(initialCategories);
-  }, [initialCategories, isDirty]);
+  }, [initialCategories]);
 
   useEffect(() => {
     setCategories((current) =>
