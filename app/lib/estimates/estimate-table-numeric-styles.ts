@@ -59,3 +59,9 @@ export function deemphasizeReadOnlyNumericClass(
 
   return readOnlyClass.replace(/\btext-zinc-700\b/g, "text-zinc-400");
 }
+
+/** Pietiek 5 darbību pogām (uzmanība, acs, bookmark, labot, dzēst) sagataves tabulā. */
+export const ESTIMATE_TEMPLATE_ACTIONS_COL_WIDTH = "12rem";
+
+export const estimateLineItemActionsInnerClassName =
+  "flex items-center justify-end gap-0.5 whitespace-nowrap";

@@ -75,7 +75,7 @@ import type {
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
-import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
+import { getEstimateNumericStyles, estimateLineItemActionsInnerClassName } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import type { SectionGroupHoverHandlers } from "@/app/lib/hooks/use-section-group-hover";
 
 const readOnlyNum =
@@ -933,7 +933,7 @@ export function EstimateMultiPositionRow({
               </td>
               <EmptyHeaderMetricCells showQuantityColumn={showQuantityColumn} />
               <td className={rowActionCell}>
-                <div className="flex items-center justify-end gap-0.5">
+                <div className={estimateLineItemActionsInnerClassName}>
                   <LineItemAttentionToggle
                     id={`attention-multi-${value.id}`}
                     enabled={requiresAttention}

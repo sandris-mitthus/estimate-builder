@@ -119,6 +119,10 @@ import {
 } from "@/app/components/position-modal-context";
 import { resolveLiveDisplayUnitPrice } from "@/app/lib/positions/stale-catalog-price";
 import {
+  ESTIMATE_TEMPLATE_ACTIONS_COL_WIDTH,
+  estimateLineItemActionsInnerClassName,
+} from "@/app/lib/estimates/estimate-table-numeric-styles";
+import {
   createCompositePosition,
   isCompositeLineItem,
   patchLineItemLaborTimeNorm,
@@ -164,12 +168,12 @@ const estimateGroupHeaderThClass =
 function EstimatePositionTableColgroup() {
   return (
     <colgroup>
-      <col style={{ width: "30%" }} />
-      <col style={{ width: "7%" }} />
+      <col style={{ width: "26%" }} />
+      <col style={{ width: "6.5%" }} />
       {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
-        <col key={index} style={{ width: "9%" }} />
+        <col key={index} style={{ width: "8.25%" }} />
       ))}
-      <col style={{ width: "9%" }} />
+      <col style={{ width: ESTIMATE_TEMPLATE_ACTIONS_COL_WIDTH }} />
     </colgroup>
   );
 }
@@ -376,7 +380,7 @@ function LineItemRow({
         }
       />
       <td className={rowActionCell}>
-        <div className="flex min-w-[9rem] items-center justify-end gap-0.5 whitespace-nowrap">
+        <div className={estimateLineItemActionsInnerClassName}>
           <LineItemAttentionToggle
             id={`attention-${item.id}`}
             enabled={requiresAttention}
