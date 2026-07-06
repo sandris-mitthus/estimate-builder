@@ -98,6 +98,7 @@ import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-l
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { LineItemPriceVisibilityToggle } from "@/app/components/line-item-price-visibility-toggle";
+import { LineItemTotalOnlyToggle } from "@/app/components/line-item-total-only-toggle";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
 import {
   EstimateAttentionIcon,
@@ -250,8 +251,12 @@ function LineItemRow({
       ? "bg-amber-50/60 hover:bg-amber-50"
       : "hover:bg-sky-50/40";
   const hiddenPriceInOffer = item.hiddenPriceInOffer === true;
+  const showOnlyTotalPrice = item.showOnlyTotalPrice === true;
   const hoverOnlyActionClass = "opacity-0 group-hover:opacity-100";
   const priceToggleClass = hiddenPriceInOffer
+    ? "opacity-100"
+    : hoverOnlyActionClass;
+  const totalOnlyToggleClass = showOnlyTotalPrice
     ? "opacity-100"
     : hoverOnlyActionClass;
   const attentionToggleClass = requiresAttention
@@ -357,6 +362,7 @@ function LineItemRow({
           defaultHourlyRate,
           moduleSizeOptions,
         )}
+        deemphasizeBreakdown={showOnlyTotalPrice}
         onTimeNormChange={(laborTimeNorm) =>
           onChange(
             patchLineItemLaborTimeNorm(
@@ -370,7 +376,7 @@ function LineItemRow({
         }
       />
       <td className={rowActionCell}>
-        <div className="flex min-w-[7.5rem] items-center justify-end gap-0.5 whitespace-nowrap">
+        <div className="flex min-w-[9rem] items-center justify-end gap-0.5 whitespace-nowrap">
           <LineItemAttentionToggle
             id={`attention-${item.id}`}
             enabled={requiresAttention}
@@ -388,6 +394,16 @@ function LineItemRow({
               className={priceToggleClass}
             />
           ) : null}
+          <LineItemTotalOnlyToggle
+            showOnlyTotalPrice={item.showOnlyTotalPrice}
+            onChange={(nextShowOnlyTotal) =>
+              onChange({
+                ...item,
+                showOnlyTotalPrice: nextShowOnlyTotal ? true : undefined,
+              })
+            }
+            className={totalOnlyToggleClass}
+          />
           <IconActionButton
             label={t("positions.edit.title", "Labot pozīciju")}
             icon="fas fa-pen"
@@ -489,6 +505,7 @@ function SortableMultiPositionRow({
         optionLinkActions.onMultiChange(value.id, next, false)
       }
       onDelete={() => optionLinkActions.onMultiDelete(value.id)}
+      showTotalOnlyToggle
       catalogPositions={catalogPositions}
       defaultHourlyRate={defaultHourlyRate}
       currency={currency}

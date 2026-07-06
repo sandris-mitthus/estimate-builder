@@ -66,6 +66,8 @@ export type EstimateLineItem = {
   manualUnit?: string;
   /** `true` — pozīcijas cena paslēpta piedāvājumā (tikai kategorijas līmeņa pozīcijām). */
   hiddenPriceInOffer?: boolean;
+  /** `true` — PDF/Excel eksportā rāda tikai gala summu; web tabulā sadalījums paliek redzams (blāvāks). */
+  showOnlyTotalPrice?: boolean;
   /** `true` — sagatavē atzīmēta pozīcija, kurai jāpievērš īpaša uzmanība (piem. ierobežots budžets). */
   requiresAttention?: boolean;
   /** Aptuvens budžets, ja `requiresAttention`. */

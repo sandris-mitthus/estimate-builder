@@ -30,6 +30,7 @@ export type SagataveChangeField =
   | "moduleSizeAttachment"
   | "customHourlyRate"
   | "hiddenPriceInOffer"
+  | "showOnlyTotalPrice"
   | "requiresAttention"
   | "attentionBudget"
   | "materials"
@@ -317,6 +318,13 @@ function collectLineItemChanges(
     field: "hiddenPriceInOffer",
     fromValue: projectItem.hiddenPriceInOffer === true,
     toValue: sagataveItem.hiddenPriceInOffer === true,
+  });
+
+  pushChange(changes, {
+    ...context,
+    field: "showOnlyTotalPrice",
+    fromValue: projectItem.showOnlyTotalPrice === true,
+    toValue: sagataveItem.showOnlyTotalPrice === true,
   });
 
   pushChange(changes, {
@@ -666,6 +674,12 @@ function applyLineItemField(
         hiddenPriceInOffer:
           sagataveItem.hiddenPriceInOffer === true ? true : undefined,
       };
+    case "showOnlyTotalPrice":
+      return {
+        ...item,
+        showOnlyTotalPrice:
+          sagataveItem.showOnlyTotalPrice === true ? true : undefined,
+      };
     case "requiresAttention":
       return {
         ...item,
@@ -716,6 +730,7 @@ const LINE_ITEM_SYNC_FIELDS = [
   "moduleSizeAttachment",
   "customHourlyRate",
   "hiddenPriceInOffer",
+  "showOnlyTotalPrice",
   "requiresAttention",
   "materials",
   "mechanisms",

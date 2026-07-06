@@ -104,6 +104,7 @@ import {
 } from "@/app/components/line-item-attention-toggle";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
+import { LineItemTotalOnlyToggle } from "@/app/components/line-item-total-only-toggle";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import {
   deriveCompositeUnitPrice,
@@ -521,6 +522,10 @@ function LineItemRow({
     ? resolveLaborWorkloadHours(effectiveQuantity, item, volumeVariable)
     : null;
   const requiresAttention = item.requiresAttention === true;
+  const showOnlyTotalPrice = item.showOnlyTotalPrice === true;
+  const totalOnlyToggleClass = showOnlyTotalPrice
+    ? "opacity-100"
+    : "opacity-0 group-hover:opacity-100";
 
   return (
     <tbody
@@ -744,6 +749,7 @@ function LineItemRow({
         values={displayUnitPrice}
         staleCatalogPriceHints={staleCatalogPriceHints}
         compact={showQuantityColumn}
+        deemphasizeBreakdown={showOnlyTotalPrice}
         onTimeNormChange={
           isComposite && !estimateLocked
             ? (laborTimeNorm) =>
@@ -764,22 +770,37 @@ function LineItemRow({
           laborWorkloadHours={laborWorkloadHours}
           staleCatalogPriceHints={staleCatalogPriceHints}
           compact
+          deemphasizeBreakdown={showOnlyTotalPrice}
         />
       ) : null}
       <td className="border-b border-zinc-100 px-1 py-0.5 align-middle">
-        <div className="flex justify-end">
-        {estimateLocked ? null : hiddenInEstimate && onRestore ? (
-          <RestoreButton
-            label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
-            onClick={onRestore}
-            className="opacity-100"
-          />
-        ) : (
-          <DeleteButton
-            label={t("positions.delete.action", "Dzēst pozīciju")}
-            onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100"
-          />
+        <div className="flex items-center justify-end gap-0.5">
+        {estimateLocked ? null : (
+          <>
+            <LineItemTotalOnlyToggle
+              showOnlyTotalPrice={item.showOnlyTotalPrice}
+              onChange={(nextShowOnlyTotal) =>
+                onChange({
+                  ...item,
+                  showOnlyTotalPrice: nextShowOnlyTotal ? true : undefined,
+                })
+              }
+              className={totalOnlyToggleClass}
+            />
+            {hiddenInEstimate && onRestore ? (
+              <RestoreButton
+                label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                onClick={onRestore}
+                className="opacity-100"
+              />
+            ) : (
+              <DeleteButton
+                label={t("positions.delete.action", "Dzēst pozīciju")}
+                onClick={onDelete}
+                className="opacity-0 group-hover:opacity-100"
+              />
+            )}
+          </>
         )}
         </div>
       </td>
@@ -859,6 +880,7 @@ function SortableMultiPositionRow({
       estimateUnits={estimateUnits}
       readOnlyPrices={true}
       allowOfferMultiEdit={!estimateLocked}
+      showTotalOnlyToggle={!estimateLocked}
       highlightStaleCatalogPrices={highlightStaleCatalogPrices}
       highlightMergedSagatave={highlightMergedSagatave}
       rowRef={setNodeRef}

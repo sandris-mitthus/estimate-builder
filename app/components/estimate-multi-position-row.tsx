@@ -21,6 +21,7 @@ import { patchRequiresAttention } from "@/app/lib/estimates/attention-budget";
 import { DeleteButton } from "@/app/components/delete-button";
 import { RestoreButton } from "@/app/components/restore-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import { LineItemTotalOnlyToggle } from "@/app/components/line-item-total-only-toggle";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
@@ -128,6 +129,7 @@ type EstimateMultiPositionRowProps = {
   moduleSizeOptions?: BuildingModuleSizeOption[];
   estimateUnits?: string[];
   allowOfferMultiEdit?: boolean;
+  showTotalOnlyToggle?: boolean;
   sectionGroupHover?: SectionGroupHoverHandlers;
 };
 
@@ -220,6 +222,8 @@ function MultiOptionSubRow({
   onLinkDrop,
   onUnlink,
   onTimeNormChange,
+  onShowOnlyTotalChange,
+  showTotalOnlyToggle = false,
   moduleSizeOptions = [],
 }: {
   option: EstimateMultiPosition["options"][number];
@@ -236,6 +240,8 @@ function MultiOptionSubRow({
   onLinkDrop?: (sourceOptionId: string) => void;
   onUnlink?: (targetOptionId: string) => void;
   onTimeNormChange?: (value: number) => void;
+  onShowOnlyTotalChange?: (value: boolean) => void;
+  showTotalOnlyToggle?: boolean;
   moduleSizeOptions?: BuildingModuleSizeOption[];
 }) {
   const { t } = useTranslations();
@@ -281,6 +287,10 @@ function MultiOptionSubRow({
     highlightStaleCatalogPrices,
     plannedProfitPercent,
   );
+  const showOnlyTotalPrice = option.lineItem.showOnlyTotalPrice === true;
+  const totalOnlyToggleClass = showOnlyTotalPrice
+    ? "opacity-100"
+    : "opacity-0 group-hover/multi:opacity-100";
   const staleCatalogPriceHints = highlightStaleCatalogPrices
     ? resolveStaleCatalogPriceHints(
         option.lineItem,
@@ -463,6 +473,7 @@ function MultiOptionSubRow({
         defaultHourlyRate={defaultHourlyRate}
         values={displayPrices}
         staleCatalogPriceHints={staleCatalogPriceHints}
+        deemphasizeBreakdown={showOnlyTotalPrice}
         onTimeNormChange={onTimeNormChange}
         compact={showQuantityColumn}
       />
@@ -482,7 +493,17 @@ function MultiOptionSubRow({
           compact
         />
       ) : null}
-      <td className={rowActionCell} />
+      <td className={rowActionCell}>
+        {showTotalOnlyToggle && onShowOnlyTotalChange ? (
+          <div className={rowActionCellInner}>
+            <LineItemTotalOnlyToggle
+              showOnlyTotalPrice={option.lineItem.showOnlyTotalPrice}
+              onChange={onShowOnlyTotalChange}
+              className={totalOnlyToggleClass}
+            />
+          </div>
+        ) : null}
+      </td>
     </tr>
   );
 }
@@ -511,6 +532,7 @@ export function EstimateMultiPositionRow({
   moduleSizeOptions = [],
   estimateUnits = [],
   allowOfferMultiEdit = false,
+  showTotalOnlyToggle = false,
   sectionGroupHover,
 }: EstimateMultiPositionRowProps) {
   const { t } = useTranslations();
@@ -616,6 +638,13 @@ export function EstimateMultiPositionRow({
   const requiresAttention = value.requiresAttention === true;
   const attentionToggleClass =
     requiresAttention ? "opacity-100" : "opacity-0 group-hover/multi:opacity-100";
+  const selectedShowOnlyTotalPrice =
+    selectedLineItem?.showOnlyTotalPrice === true;
+  const totalOnlyToggleClass = selectedShowOnlyTotalPrice
+    ? "opacity-100"
+    : mode === "offer"
+      ? "opacity-0 group-hover/multi:opacity-100"
+      : "opacity-0 group-hover/multi:opacity-100";
 
   return (
     <>
@@ -768,8 +797,11 @@ export function EstimateMultiPositionRow({
               values={displayPrices}
               staleCatalogPriceHints={selectedStaleCatalogPriceHints}
               compact={showQuantityColumn}
+              deemphasizeBreakdown={selectedShowOnlyTotalPrice}
               onTimeNormChange={
-                canEditTimeNorm && selectedLineItem && selectedOption
+                canEditTimeNorm &&
+                selectedLineItem &&
+                selectedOption
                   ? (laborTimeNorm) =>
                       onChange(
                         updateMultiOptionLineItem(
@@ -792,6 +824,7 @@ export function EstimateMultiPositionRow({
                 laborWorkloadHours={laborWorkloadHours}
                 staleCatalogPriceHints={selectedStaleCatalogPriceHints}
                 compact
+                deemphasizeBreakdown={selectedShowOnlyTotalPrice}
               />
             ) : null}
             <td className={rowActionCell}>
@@ -804,11 +837,33 @@ export function EstimateMultiPositionRow({
                     className="opacity-100"
                   />
                 ) : (
-                  <DeleteButton
-                    label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
-                    onClick={onDelete}
-                    className="opacity-0 group-hover/multi:opacity-100"
-                  />
+                  <>
+                    {showTotalOnlyToggle && selectedOption && selectedLineItem ? (
+                      <LineItemTotalOnlyToggle
+                        showOnlyTotalPrice={selectedLineItem.showOnlyTotalPrice}
+                        onChange={(nextShowOnlyTotal) =>
+                          onChange(
+                            updateMultiOptionLineItem(
+                              value,
+                              selectedOption.id,
+                              {
+                                ...selectedLineItem,
+                                showOnlyTotalPrice: nextShowOnlyTotal
+                                  ? true
+                                  : undefined,
+                              },
+                            ),
+                          )
+                        }
+                        className={totalOnlyToggleClass}
+                      />
+                    ) : null}
+                    <DeleteButton
+                      label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
+                      onClick={onDelete}
+                      className="opacity-0 group-hover/multi:opacity-100"
+                    />
+                  </>
                 )
               ) : null}
               </div>
@@ -953,6 +1008,24 @@ export function EstimateMultiPositionRow({
                               : o,
                           ),
                         })
+                    : undefined
+                }
+                showTotalOnlyToggle={showTotalOnlyToggle}
+                onShowOnlyTotalChange={
+                  showTotalOnlyToggle
+                    ? (nextShowOnlyTotal) =>
+                        onChange(
+                          updateMultiOptionLineItem(
+                            value,
+                            option.id,
+                            {
+                              ...option.lineItem,
+                              showOnlyTotalPrice: nextShowOnlyTotal
+                                ? true
+                                : undefined,
+                            },
+                          ),
+                        )
                     : undefined
                 }
                 moduleSizeOptions={moduleSizeOptions}

@@ -6,7 +6,7 @@ import {
 import { VOLUME_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/volume-price-columns";
 import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns";
 import type { PriceBreakdown } from "@/app/lib/estimates/types";
-import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
+import { getEstimateNumericStyles, deemphasizeReadOnlyNumericClass } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import { Tooltip } from "@/app/components/tooltip";
 import { EstimateCollapsedSummaryDisplay } from "@/app/components/estimate-collapsed-summary-display";
 import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
@@ -123,6 +123,7 @@ export function VolumeSumCells({
   summary = false,
   rowBgClassName,
   preLaborSummary,
+  deemphasizeBreakdown = false,
 }: {
   values: PriceBreakdown | null;
   laborWorkloadHours?: number | null;
@@ -132,9 +133,15 @@ export function VolumeSumCells({
   rowBgClassName?: string;
   /** Rāda tieši pirms darba summas kolonnas (darbietilpības šūnā). */
   preLaborSummary?: CollapsedSectionSummaryParts;
+  /** UI: samazina uzmanību sadalījuma kolonnām (eksportā joprojām paslēpj). */
+  deemphasizeBreakdown?: boolean;
 }) {
   const styles = getEstimateNumericStyles(compact);
   const readOnlyNum = styles.readOnly;
+  const breakdownReadOnlyNum = deemphasizeReadOnlyNumericClass(
+    readOnlyNum,
+    deemphasizeBreakdown,
+  );
   const volumeCell = sectionVolumeCellClass(styles, summary ? rowBgClassName : undefined);
   const volumeCellTotal = sectionVolumeCellClass(
     styles,
@@ -156,7 +163,7 @@ export function VolumeSumCells({
         ) : (
           <span
             className={`${volumeAmountClassName(
-              readOnlyNum,
+              breakdownReadOnlyNum,
               laborWorkloadHours ?? 0,
               false,
               summary,
@@ -182,7 +189,7 @@ export function VolumeSumCells({
         ) : (
           <span
             className={volumeAmountClassName(
-              readOnlyNum,
+              breakdownReadOnlyNum,
               amountValue,
               false,
               summary,

@@ -14,7 +14,7 @@ import {
 import type { EstimateLineItem, PriceBreakdown } from "@/app/lib/estimates/types";
 import type { StaleCatalogPriceHints } from "@/app/lib/positions/stale-catalog-price";
 import { UNIT_PRICE_COLUMN_COUNT } from "@/app/lib/estimates/unit-price-columns";
-import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
+import { getEstimateNumericStyles, deemphasizeReadOnlyNumericClass } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import { formatTimeNormDisplay } from "@/app/lib/positions/variable-quantity";
 import { LaborTimeNormInput } from "@/app/components/labor-time-norm-input";
 import { Tooltip } from "@/app/components/tooltip";
@@ -34,6 +34,8 @@ type EstimateUnitPriceCellsProps = {
   onTimeNormChange?: (value: number) => void;
   staleCatalogPriceHints?: StaleCatalogPriceHints;
   compact?: boolean;
+  /** UI: samazina uzmanību sadalījuma kolonnām (eksportā joprojām paslēpj). */
+  deemphasizeBreakdown?: boolean;
 };
 
 export function EstimateUnitPriceCells({
@@ -45,6 +47,7 @@ export function EstimateUnitPriceCells({
   onTimeNormChange,
   staleCatalogPriceHints,
   compact = false,
+  deemphasizeBreakdown = false,
 }: EstimateUnitPriceCellsProps) {
   const { t } = useTranslations();
   const styles = getEstimateNumericStyles(compact);
@@ -52,6 +55,10 @@ export function EstimateUnitPriceCells({
   const cellNum = styles.input;
   const unitPriceCell = styles.cell;
   const unitPriceCellTotal = styles.cellTotal;
+  const breakdownReadOnlyNum = deemphasizeReadOnlyNumericClass(
+    readOnlyNum,
+    deemphasizeBreakdown,
+  );
 
   const total = sumBreakdown(values);
   const showLaborBreakdown = item != null && isCompositeLineItem(item);
@@ -72,12 +79,14 @@ export function EstimateUnitPriceCells({
               <LaborTimeNormInput
                 value={item?.laborTimeNorm ?? 0}
                 onChange={onTimeNormChange}
-                className={cellNum}
+                className={`${cellNum} ${deemphasizeBreakdown ? "text-zinc-400" : ""}`}
                 aria-label={t("estimate.time_norm", "Laika norma (c/h)")}
               />
             ) : (
               <span
-                className={`${readOnlyNum} ${timeNormText ? "" : "text-zinc-300"}`}
+                className={`${breakdownReadOnlyNum} ${
+                  timeNormText ? "" : "text-zinc-300"
+                }`}
               >
                 {timeNormText ?? "—"}
               </span>
@@ -85,7 +94,9 @@ export function EstimateUnitPriceCells({
           </td>
           <td className={unitPriceCell}>
             <span
-              className={`${readOnlyNum} ${hourlyRateText ? "" : "text-zinc-300"}`}
+              className={`${breakdownReadOnlyNum} ${
+                hourlyRateText ? "" : "text-zinc-300"
+              }`}
             >
               {hourlyRateText ?? "—"}
             </span>
@@ -93,8 +104,14 @@ export function EstimateUnitPriceCells({
         </>
       ) : (
         <>
-          <EmptyAmountCell className={unitPriceCell} readOnlyNum={readOnlyNum} />
-          <EmptyAmountCell className={unitPriceCell} readOnlyNum={readOnlyNum} />
+          <EmptyAmountCell
+            className={unitPriceCell}
+            readOnlyNum={breakdownReadOnlyNum}
+          />
+          <EmptyAmountCell
+            className={unitPriceCell}
+            readOnlyNum={breakdownReadOnlyNum}
+          />
         </>
       )}
       {(["labor", "materials", "mechanisms"] as const).map((field) => {
@@ -122,7 +139,7 @@ export function EstimateUnitPriceCells({
 
         const amountSpan = (
           <span
-            className={`${readOnlyNum} ${
+            className={`${breakdownReadOnlyNum} ${
               isAmountDisplayEmpty(values[field]) ? "text-zinc-300" : ""
             }`}
           >

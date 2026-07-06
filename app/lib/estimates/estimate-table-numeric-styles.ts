@@ -47,3 +47,15 @@ export function getEstimateNumericStyles(compact: boolean) {
       "border-b border-r border-zinc-200 px-0.5 py-1 text-center align-middle text-[9px] font-medium uppercase leading-tight tracking-normal whitespace-normal",
   };
 }
+
+/** Aizstāj `text-zinc-700`, lai blāvinājums strādātu arī uz read-only skaitļu šūnām. */
+export function deemphasizeReadOnlyNumericClass(
+  readOnlyClass: string,
+  deemphasize: boolean,
+): string {
+  if (!deemphasize) {
+    return readOnlyClass;
+  }
+
+  return readOnlyClass.replace(/\btext-zinc-700\b/g, "text-zinc-400");
+}

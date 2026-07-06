@@ -20,6 +20,7 @@ import {
   resolveSelectedMultiLineItem,
 } from "@/app/lib/estimates/multi-position";
 import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
+import { shouldHideLineItemOfferExportPrice } from "@/app/lib/estimates/line-item-export-visibility";
 import type { EstimateCategory, EstimateLineItem, EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -269,13 +270,16 @@ function buildSubcategoryOfferRows(
       defaultHourlyRate,
       plannedProfitPercent,
     );
+    const hidePrice = shouldHideLineItemOfferExportPrice(item);
     rows.push(
       <View key={item.id} style={s.itemRow}>
         <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
         <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
           {resolveLineItemDisplayName(item)}
         </Text>
-        <Text style={[s.cell, s.colTotal]}>{fmtMoney(grand, currency)}</Text>
+        <Text style={[s.cell, s.colTotal]}>
+          {hidePrice ? "" : fmtMoney(grand, currency)}
+        </Text>
       </View>,
     );
   }
@@ -493,7 +497,7 @@ export function EstimatePdfDocument({
                     defaultHourlyRate,
                     plannedProfitPercent,
                   );
-                  const hidePrice = lineItem.hiddenPriceInOffer === true;
+                  const hidePrice = shouldHideLineItemOfferExportPrice(lineItem);
 
                   return (
                     <View key={row.id} style={s.itemRow}>

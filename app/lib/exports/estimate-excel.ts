@@ -7,6 +7,7 @@ import {
   calculateEstimateTotals,
   resolveEstimateLineItemPrices,
 } from "@/app/lib/estimates/calculate-totals";
+import { shouldHideLineItemEstimateExportBreakdown } from "@/app/lib/estimates/line-item-export-visibility";
 import {
   collectRowLineItems,
   resolveLineItemDisplayName,
@@ -389,17 +390,18 @@ function addDataRow(
   lineTotal: PriceBreakdown,
   nameIndent: string,
 ) {
+  const hideBreakdown = shouldHideLineItemEstimateExportBreakdown(item);
   const row = ws.addRow([
     nr,
     `${nameIndent}${resolveLineItemDisplayName(item)}`,
     item.unit || "",
     fmtQty(item.quantity),
-    fmtNum(unitPrice.labor),
-    fmtNum(unitPrice.materials),
-    fmtNum(unitPrice.mechanisms),
-    fmtNum(lineTotal.labor),
-    fmtNum(lineTotal.materials),
-    fmtNum(lineTotal.mechanisms),
+    hideBreakdown ? "" : fmtNum(unitPrice.labor),
+    hideBreakdown ? "" : fmtNum(unitPrice.materials),
+    hideBreakdown ? "" : fmtNum(unitPrice.mechanisms),
+    hideBreakdown ? "" : fmtNum(lineTotal.labor),
+    hideBreakdown ? "" : fmtNum(lineTotal.materials),
+    hideBreakdown ? "" : fmtNum(lineTotal.mechanisms),
     fmtNum(sumBreakdown(lineTotal)),
   ]);
   row.height = 16;
