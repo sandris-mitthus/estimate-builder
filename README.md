@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, configurable excluded-offer positions, workers, tools, and approved-project timeline planning. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, workers, tools, timeline, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.83` (see [Changelog](#changelog))
+**Current version:** `1.3.84` (see [Changelog](#changelog))
 
 ---
 
@@ -407,6 +407,12 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 ### Unreleased
 
 - (none)
+
+### v1.3.84
+
+**Sakļautas kategorijas — kopsavilkuma izlīdzinājums**
+
+- Sakļautu kategoriju/subkategoriju kopsavilkums (piem. `5 apakškategorijas` / `38 pozīcijas`) tagad izlīdzināts ar labo malu, saglabājot tekstu pa kreisi (`estimate-collapsed-summary-display.tsx`)
 
 ### v1.3.83
 
