@@ -28,6 +28,8 @@ import {
 } from "react";
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { useCatalogPositionsWithRefresh } from "@/app/lib/hooks/use-catalog-positions-with-refresh";
+import { resolveEstimateGroupTitle } from "@/app/lib/estimates/resolve-group-title";
 import { EstimateSectionRowActions } from "@/app/components/estimate-section-row-actions";
 import { EstimateSectionActionsCell } from "@/app/components/estimate-section-actions-cell";
 import { EstimateTableStickyShell } from "@/app/components/estimate-table-sticky-shell";
@@ -46,6 +48,7 @@ import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/
 import {
   createSubcategory,
   ensureSectionHasLineItem,
+  normalizeEstimatePositionSection,
 } from "@/app/lib/estimate-positions/create-empty";
 import { collectSectionLineItems } from "@/app/lib/estimate-positions/collect-section-items";
 import {
@@ -612,14 +615,14 @@ function SectionRow({
             </button>
           ) : null}
           <div
-            className={`min-w-0 flex-1 ${isCategory ? "" : subcategoryNameIndent}`}
+            className={`min-w-0 flex-1 basis-0 ${isCategory ? "" : subcategoryNameIndent}`}
           >
             <div className="flex min-w-0 items-center gap-2">
               <input
                 ref={inputRef}
                 type="text"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
-                value={value}
+                className="min-w-0 w-full flex-1 border-0 bg-transparent text-sm font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+                value={value ?? ""}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
               />
@@ -763,7 +766,7 @@ function SubcategoryBlock({
         dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         kind="subcategory"
         placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
-        value={subcategory.title}
+        value={resolveEstimateGroupTitle(subcategory)}
         onChange={(title) => onChange({ ...subcategory, title })}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
@@ -927,7 +930,7 @@ function SectionBlock({
         dragLabel={t("estimate.drag.section", "Pārvietot tāmes pozīciju")}
         kind="category"
         placeholder={t("estimate.placeholder.section", "Tāmes pozīcijas grupas nosaukums")}
-        value={section.title}
+        value={resolveEstimateGroupTitle(section)}
         onChange={(title) => onChange({ ...section, title })}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
@@ -1291,12 +1294,14 @@ export function EstimatePositionTable({
   initialTitle,
   initialSections = [],
   initialMultiOptionLinks = [],
-  catalogPositions = [],
+  catalogPositions: initialCatalogPositions = [],
   defaultHourlyRate = null,
   currency = null,
   moduleSizeOptions = [],
 }: EstimatePositionTableProps) {
   const { t } = useTranslations();
+  const { catalogPositions, refreshCatalogPositions } =
+    useCatalogPositionsWithRefresh(initialCatalogPositions);
   const canSaveSagatave = useActionPermission("sagatave.save");
   const readOnly = !canSaveSagatave;
   const { showFeedback, clearFeedback } = useFeedbackToast();
@@ -1309,13 +1314,35 @@ export function EstimatePositionTable({
       mountedRef.current = false;
     };
   }, []);
+
+  const initialDocumentRef = useRef({
+    sections: initialSections,
+    catalogPositions: initialCatalogPositions,
+    defaultHourlyRate,
+    moduleSizeOptions,
+  });
+
+  function buildHydratedSections(
+    sourceSections: EstimatePositionSection[],
+    catalog: PositionPriceSummary[],
+    hourlyRate: number | null,
+    moduleOptions: BuildingModuleSizeOption[],
+  ) {
+    return hydrateSectionsWithCatalogLinks(
+      sourceSections.map(ensureSectionHasLineItem),
+      catalog,
+      hourlyRate,
+      buildHydrateCatalogOptions(moduleOptions),
+    );
+  }
+
   const normalizedInitialSections = useMemo(
     () =>
-      hydrateSectionsWithCatalogLinks(
-        initialSections.map(ensureSectionHasLineItem),
-        catalogPositions,
-        defaultHourlyRate,
-        buildHydrateCatalogOptions(moduleSizeOptions),
+      buildHydratedSections(
+        initialDocumentRef.current.sections,
+        initialDocumentRef.current.catalogPositions,
+        initialDocumentRef.current.defaultHourlyRate,
+        initialDocumentRef.current.moduleSizeOptions,
       ),
     // Sagataves sākuma stāvoklis — tikai pirmā mount vērtība no servera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1361,6 +1388,42 @@ export function EstimatePositionTable({
   const { confirmOpen, stayOnPage, confirmLeave } = useUnsavedChangesGuard({
     isDirty,
   });
+
+  const catalogPositionsRef = useRef(catalogPositions);
+  catalogPositionsRef.current = catalogPositions;
+
+  useEffect(() => {
+    if (isDirty) {
+      return;
+    }
+
+    setSections(
+      buildHydratedSections(
+        initialSections,
+        catalogPositionsRef.current,
+        defaultHourlyRate,
+        moduleSizeOptions,
+      ),
+    );
+  }, [initialSections, isDirty, defaultHourlyRate, moduleSizeOptions]);
+
+  useEffect(() => {
+    setSections((current) =>
+      buildHydratedSections(
+        current,
+        catalogPositions,
+        defaultHourlyRate,
+        moduleSizeOptions,
+      ),
+    );
+  }, [catalogPositions, defaultHourlyRate, moduleSizeOptions]);
+
+  useEffect(() => {
+    setSections((current) =>
+      current.map((section) => normalizeEstimatePositionSection(section)),
+    );
+  }, []);
+
   const [positionModalState, setPositionModalState] = useState<{
     item: EstimateLineItem;
     onSave: (next: EstimateLineItem) => void;
@@ -1372,18 +1435,20 @@ export function EstimatePositionTable({
 
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
+      refreshCatalogPositions();
       setPositionModalState({ item, onSave });
     },
-    [setPositionModalState],
+    [refreshCatalogPositions],
   );
   const openMultiPositionModal = useCallback(
     (
       value: EstimateMultiPosition,
       onSave: (next: EstimateMultiPosition) => void,
     ) => {
+      refreshCatalogPositions();
       setMultiPositionModalState({ value, onSave });
     },
-    [setMultiPositionModalState],
+    [refreshCatalogPositions],
   );
 
   function handleSave() {

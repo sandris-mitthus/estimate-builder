@@ -80,32 +80,37 @@ export const listPositionPrices = cache(async function listPositionPrices(): Pro
   return enrichPositionPricesWithLatestHistory(positions);
 });
 
+async function loadPositionPricesForHydration(): Promise<PositionPriceSummary[]> {
+  if (!isSupabaseAdminConfigured()) {
+    return SAMPLE_POSITION_PRICES;
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return SAMPLE_POSITION_PRICES;
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("position_prices")
+    .select("id, name, unit, cost_type, unit_price, variable_quantity")
+    .eq("company_id", companyId)
+    .order("name", { ascending: true });
+
+  if (error || !data) {
+    return SAMPLE_POSITION_PRICES;
+  }
+
+  return data.map((row) => mapPositionPrice(row as PositionPriceRow));
+}
+
 /** Katalogs sagataves saglabāšanai / hidratācijai — bez vēstures vaicājuma. */
-export const listPositionPricesForHydration = cache(
-  async function listPositionPricesForHydration(): Promise<PositionPriceSummary[]> {
-    if (!isSupabaseAdminConfigured()) {
-      return SAMPLE_POSITION_PRICES;
-    }
+export const listPositionPricesForHydration = cache(loadPositionPricesForHydration);
 
-    const companyId = await getCurrentCompanyId();
-    if (!companyId) {
-      return SAMPLE_POSITION_PRICES;
-    }
-
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("position_prices")
-      .select("id, name, unit, cost_type, unit_price, variable_quantity")
-      .eq("company_id", companyId)
-      .order("name", { ascending: true });
-
-    if (error || !data) {
-      return SAMPLE_POSITION_PRICES;
-    }
-
-    return data.map((row) => mapPositionPrice(row as PositionPriceRow));
-  },
-);
+/** Svaigs katalogs modāļu hintiem — bez React `cache`, lai API atgrieztu jaunākos ierakstus. */
+export async function listPositionPricesForHints(): Promise<PositionPriceSummary[]> {
+  return loadPositionPricesForHydration();
+}
 
 async function enrichPositionPricesWithLatestHistory(
   positions: PositionPriceSummary[],

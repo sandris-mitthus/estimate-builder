@@ -88,6 +88,33 @@ function SummaryAmount({
   );
 }
 
+const footerAmountClassName =
+  "block w-full truncate px-0.5 py-0 text-center text-[11px] tabular-nums leading-tight font-semibold text-zinc-900";
+
+/** Kājenes kopsummas — mazāks fonts, saīsinājums ar … un pilna summa tooltipā. */
+export function FooterSumAmount({
+  value,
+  emphasis = false,
+}: {
+  value: number;
+  emphasis?: boolean;
+}) {
+  const display = formatAmountDisplay(value);
+  const className = `${footerAmountClassName}${
+    isAmountDisplayEmpty(value) ? " text-zinc-300" : ""
+  }${emphasis ? " font-bold" : ""}`;
+
+  if (isAmountDisplayEmpty(value)) {
+    return <span className={className}>{display}</span>;
+  }
+
+  return (
+    <Tooltip label={display} className="block w-full min-w-0" align="end">
+      <span className={className}>{display}</span>
+    </Tooltip>
+  );
+}
+
 export function VolumeSumCells({
   values,
   laborWorkloadHours = null,
@@ -196,9 +223,14 @@ export function VolumeSumCells({
 }
 
 export const volumeSumFooterCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-center text-xs font-semibold tabular-nums text-zinc-900 bg-emerald-50/40";
+  "border-t-2 border-zinc-300 px-0.5 py-2 text-center max-w-0 overflow-hidden align-middle bg-emerald-50/40";
 
-export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60 text-sm`;
+export const volumeSumFooterCellTotal = `${volumeSumFooterCell} bg-emerald-100/60`;
+
+export const unitPriceFooterCell =
+  "border-t-2 border-zinc-300 px-0.5 py-2 text-center max-w-0 overflow-hidden align-middle";
+
+export const unitPriceFooterCellTotal = `${unitPriceFooterCell} bg-sky-100/60`;
 
 /** Tukšas šūnas pirms apjoma cenas kolonnām (Mērv., Daudz., Vienības cena). */
 export function SectionLeadingEmptyCells({

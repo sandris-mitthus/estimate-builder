@@ -42,10 +42,13 @@ import { useTranslations } from "@/app/components/translations-provider";
 import {
   VolumeSumCells,
   SectionLeadingEmptyCells,
+  FooterSumAmount,
   resolveLaborWorkloadHours,
   resolveLineItemVolumeSum,
   volumeSumFooterCell,
   volumeSumFooterCellTotal,
+  unitPriceFooterCell,
+  unitPriceFooterCellTotal,
 } from "@/app/components/estimate-volume-sum-cells";
 import {
   calculateCategoryVolumeTotals,
@@ -77,6 +80,8 @@ import {
   SAMPLE_TITLE,
 } from "@/app/lib/estimates/sample-data";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
+import { normalizeEstimatePositionSection } from "@/app/lib/estimate-positions/create-empty";
+import { resolveEstimateGroupTitle } from "@/app/lib/estimates/resolve-group-title";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import {
@@ -125,6 +130,7 @@ import { PositionVariableQuantityIcon } from "@/app/components/position-variable
 import { Tooltip } from "@/app/components/tooltip";
 import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
+import { useCatalogPositionsWithRefresh } from "@/app/lib/hooks/use-catalog-positions-with-refresh";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import {
   applyCatalogPositionToLineItem,
@@ -364,9 +370,6 @@ const nameCell = "border-b border-zinc-100 py-1 pr-2 align-top";
 const readOnlyNum = "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";
 /** Stable DndContext id — avoids SSR/client mismatch on aria-describedby. */
 const ESTIMATE_DND_CONTEXT_ID = "estimate-table-dnd";
-
-const footerCell =
-  "border-t-2 border-zinc-300 px-2 py-2.5 text-center text-xs font-semibold tabular-nums text-zinc-900";
 
 /** Shared left gutter + fixed drag column so handles align across all row types. */
 const rowLead = "pl-[22px]";
@@ -1022,10 +1025,10 @@ function SectionRow({
     <input
       ref={inputRef}
       type="text"
-      className={`min-w-0 w-full border-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none ${
+      className={`min-w-0 w-full flex-1 border-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none ${
         isCategory ? "font-semibold" : "font-normal"
       }`}
-      value={value}
+      value={value ?? ""}
       placeholder={placeholder}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -1081,7 +1084,7 @@ function SectionRow({
                 </button>
               ) : null}
               <div
-                className={`min-w-0 flex-1 ${isCategory ? "" : subcategoryNameIndent}`}
+                className={`min-w-0 flex-1 basis-0 ${isCategory ? "" : subcategoryNameIndent}`}
               >
                 {titleField}
               </div>
@@ -1139,7 +1142,7 @@ function SectionRow({
             </button>
           ) : null}
           <div
-            className={`min-w-0 flex-1 ${isCategory ? "" : subcategoryNameIndent}`}
+            className={`min-w-0 flex-1 basis-0 ${isCategory ? "" : subcategoryNameIndent}`}
           >
             {titleField}
           </div>
@@ -1320,7 +1323,7 @@ function SubcategoryBlock({
         colSpan={colSpan}
         kind="subcategory"
         placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
-        value={subcategory.title}
+        value={resolveEstimateGroupTitle(subcategory)}
         onChange={(title) => onChange({ ...subcategory, title })}
         estimateLocked={estimateLocked}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(subcategory.id)}
@@ -1552,7 +1555,7 @@ function CategoryBlock({
         colSpan={colSpan}
         kind="category"
         placeholder={t("estimate.placeholder.category", "Kategorijas nosaukums")}
-        value={category.title}
+        value={resolveEstimateGroupTitle(category)}
         onChange={(title) => onChange({ ...category, title })}
         estimateLocked={estimateLocked}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(category.id)}
@@ -2152,17 +2155,17 @@ function EstimateDndTableInner({
               <>
                 <td className="border-t-2 border-zinc-300 bg-sky-50/30" />
                 <td className="border-t-2 border-zinc-300 bg-sky-50/30" />
-                <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatAmountDisplay(totals.labor)}
+                <td className={`${unitPriceFooterCell} bg-sky-50/50`}>
+                  <FooterSumAmount value={totals.labor} />
                 </td>
-                <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatAmountDisplay(totals.materials)}
+                <td className={`${unitPriceFooterCell} bg-sky-50/50`}>
+                  <FooterSumAmount value={totals.materials} />
                 </td>
-                <td className={`${footerCell} bg-sky-50/50`}>
-                  {formatAmountDisplay(totals.mechanisms)}
+                <td className={`${unitPriceFooterCell} bg-sky-50/50`}>
+                  <FooterSumAmount value={totals.mechanisms} />
                 </td>
-                <td className={`${footerCell} bg-sky-100/60 text-sm`}>
-                  {formatAmountDisplay(totals.grand)}
+                <td className={unitPriceFooterCellTotal}>
+                  <FooterSumAmount value={totals.grand} emphasis />
                 </td>
               </>
             )}
@@ -2170,16 +2173,16 @@ function EstimateDndTableInner({
               <>
                 <td className="border-t-2 border-zinc-300 bg-emerald-50/40" />
                 <td className={volumeSumFooterCell}>
-                  {formatAmountDisplay(totals.labor)}
+                  <FooterSumAmount value={totals.labor} />
                 </td>
                 <td className={volumeSumFooterCell}>
-                  {formatAmountDisplay(totals.materials)}
+                  <FooterSumAmount value={totals.materials} />
                 </td>
                 <td className={volumeSumFooterCell}>
-                  {formatAmountDisplay(totals.mechanisms)}
+                  <FooterSumAmount value={totals.mechanisms} />
                 </td>
                 <td className={volumeSumFooterCellTotal}>
-                  {formatAmountDisplay(totals.grand)}
+                  <FooterSumAmount value={totals.grand} emphasis />
                 </td>
               </>
             ) : null}
@@ -2314,7 +2317,7 @@ export function EstimateTable({
   project,
   modules = [],
   estimateValidityDays = DEFAULT_ESTIMATE_VALIDITY_DAYS,
-  catalogPositions = [],
+  catalogPositions: initialCatalogPositions = [],
   defaultHourlyRate = null,
   currency = null,
   sagataveSections = [],
@@ -2323,6 +2326,8 @@ export function EstimateTable({
   users = [],
 }: EstimateTableProps = {}) {
   const { t } = useTranslations();
+  const { catalogPositions, refreshCatalogPositions } =
+    useCatalogPositionsWithRefresh(initialCatalogPositions);
   const [title, setTitle] = useState(initialTitle);
   const [meta, setMeta] = useState(initialMeta);
   const [categories, setCategories] = useState<EstimateCategory[]>(
@@ -2379,18 +2384,20 @@ export function EstimateTable({
     project != null && isPlannedProfitUnset(meta.plannedProfitPercent);
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
+      refreshCatalogPositions();
       setPositionModalState({ item, onSave });
     },
-    [],
+    [refreshCatalogPositions],
   );
   const openMultiPositionModal = useCallback(
     (
       value: EstimateMultiPosition,
       onSave: (next: EstimateMultiPosition) => void,
     ) => {
+      refreshCatalogPositions();
       setMultiPositionModalState({ value, onSave });
     },
-    [],
+    [refreshCatalogPositions],
   );
   const estimateUnits = useMemo(
     () => collectEstimateDocumentUnits(categories, moduleSizeOptions),
@@ -2410,10 +2417,6 @@ export function EstimateTable({
       normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
     );
   }, [initialMeta]);
-
-  useEffect(() => {
-    setCategories(initialCategories);
-  }, [initialCategories]);
 
   useEffect(() => {
     setExcludedPositions(globalExcludedPositions);
@@ -2598,6 +2601,20 @@ export function EstimateTable({
     project != null &&
     plannedProfitPercent !== savedPlannedProfitPercent;
   const isDirty = currentSnapshot !== savedSnapshot || isPlannedProfitDirty;
+
+  useEffect(() => {
+    if (isDirty) {
+      return;
+    }
+
+    setCategories(initialCategories);
+  }, [initialCategories, isDirty]);
+
+  useEffect(() => {
+    setCategories((current) =>
+      current.map((category) => normalizeEstimatePositionSection(category)),
+    );
+  }, []);
 
   const showQuantityColumn = Boolean(project);
   const isEstimateSaved = isProjectEstimateSaved(meta, {

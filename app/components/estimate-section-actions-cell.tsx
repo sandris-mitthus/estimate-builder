@@ -21,7 +21,7 @@ export function EstimateSectionActionsCell({
 }) {
   return (
     <div
-      className={`flex min-h-[1.75rem] w-full min-w-0 items-center justify-end gap-0.5 overflow-hidden ${className}`}
+      className={`ml-auto flex min-h-[1.75rem] shrink-0 items-center justify-end gap-0.5 ${className}`.trim()}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >

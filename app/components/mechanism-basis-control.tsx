@@ -50,21 +50,16 @@ export function MechanismBasisControl({
     item,
     moduleSizeOptions,
   );
-  const fixedQuantity =
-    perPositionConsumption || mechanism.fixedQuantity === true;
+  const fixedQuantity = mechanism.fixedQuantity === true;
   const positionUnitPrice = useMemo(() => {
     const catalogPrice = resolveCatalogRefUnitPrice(mechanism, catalogPositions);
-    const effectiveMechanism =
-      perPositionConsumption && mechanism.fixedQuantity !== true
-        ? { ...mechanism, fixedQuantity: true as const }
-        : mechanism;
     return resolveMechanismUnitPriceContribution(
-      effectiveMechanism,
+      mechanism,
       item,
       catalogPrice,
       moduleSizeOptions,
     );
-  }, [mechanism, item, catalogPositions, moduleSizeOptions, perPositionConsumption]);
+  }, [mechanism, item, catalogPositions, moduleSizeOptions]);
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm">
@@ -99,9 +94,7 @@ export function MechanismBasisControl({
             perPositionConsumption ? positionBasisUnit : undefined
           }
           onQuantityChange={onQuantityChange}
-          onFixedQuantityChange={
-            perPositionConsumption ? () => {} : onFixedQuantityChange
-          }
+          onFixedQuantityChange={onFixedQuantityChange}
         />
       </div>
     </div>

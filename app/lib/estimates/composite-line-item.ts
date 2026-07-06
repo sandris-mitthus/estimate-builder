@@ -1,7 +1,6 @@
 import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
 import {
   resolveMaterialUnitPriceContribution,
-  shouldShowMechanismPerPositionConsumption,
 } from "@/app/lib/estimates/material-consumption-basis";
 import type {
   EstimateLineItem,
@@ -165,15 +164,8 @@ export function resolveMechanismUnitPriceContribution(
     ? roundToTwoDecimals(item.laborTimeNorm ?? 0)
     : 0;
   const quantity = ref.consumption ?? 1;
-  const perPositionConsumption = shouldShowMechanismPerPositionConsumption(
-    ref,
-    item,
-    moduleSizeOptions,
-  );
   const effectiveQuantity =
-    ref.fixedQuantity === true || perPositionConsumption
-      ? quantity
-      : timeNorm * quantity;
+    ref.fixedQuantity === true ? quantity : timeNorm * quantity;
   return roundToTwoDecimals(catalogPrice * effectiveQuantity);
 }
 
