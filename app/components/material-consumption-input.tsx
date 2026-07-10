@@ -42,6 +42,7 @@ export function MaterialConsumptionInput({
       value={draft}
       aria-label={ariaLabel ?? t("estimate.material_consumption.label", "Patēriņš")}
       placeholder="1"
+      onPointerDown={(event) => event.stopPropagation()}
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);

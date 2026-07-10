@@ -575,6 +575,43 @@ export function canDropCategoryChild(
   return false;
 }
 
+export function insertCategoryLevelSubcategory(
+  category: EstimateCategory,
+  subcategory: EstimateSubcategory,
+  index: number,
+): EstimateCategory {
+  const subcategories = [...category.subcategories];
+  subcategories.splice(index, 0, subcategory);
+
+  const childOrder = resolveCategoryChildOrder(category);
+  const subcategoryRef: EstimateCategoryChildRef = {
+    kind: "subcategory",
+    id: subcategory.id,
+  };
+
+  const subcategoryPositions = childOrder
+    .map((entry, entryIndex) =>
+      entry.kind === "subcategory" ? entryIndex : -1,
+    )
+    .filter((entryIndex) => entryIndex >= 0);
+
+  const targetChildIndex =
+    index <= 0
+      ? subcategoryPositions[0] ?? childOrder.length
+      : index >= subcategoryPositions.length
+        ? childOrder.length
+        : subcategoryPositions[index];
+
+  const nextOrder = [...childOrder];
+  nextOrder.splice(targetChildIndex, 0, subcategoryRef);
+
+  return withNormalizedCategoryChildOrder({
+    ...category,
+    subcategories,
+    childOrder: nextOrder,
+  });
+}
+
 export function insertCategoryLevelItem(
   category: EstimateCategory,
   row: EstimateRowItem,

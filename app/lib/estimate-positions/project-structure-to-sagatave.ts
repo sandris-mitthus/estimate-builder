@@ -2,6 +2,7 @@ import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import type {
   EstimateCategory,
   EstimateRowItem,
+  EstimateSubcategory,
 } from "@/app/lib/estimates/types";
 import {
   cloneCategory,
@@ -10,9 +11,9 @@ import {
   remapMultiOptionLinks,
 } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import {
-  ensureDefaultEstimatePosition,
-  saveEstimatePositionDocument,
-} from "@/app/lib/estimate-positions/repository";
+  insertCategoryLevelItem,
+  insertCategoryLevelSubcategory,
+} from "@/app/lib/estimates/category-child-order";
 import {
   collectCategoryNodeIds,
   collectRowItemNodeIds,
@@ -23,6 +24,10 @@ import {
   findSagataveRowForProjectRow,
   findSagataveSubcategoryForProject,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
+import {
+  ensureDefaultEstimatePosition,
+  saveEstimatePositionDocument,
+} from "@/app/lib/estimate-positions/repository";
 
 function multiOptionLinkKey(optionIds: string[]): string {
   return [...optionIds].sort().join("\0");
@@ -65,6 +70,7 @@ function projectRowsMissingInSagatave(
         row,
         rowIndex,
         projectItems.length,
+        projectItems,
       ),
   );
 }
@@ -121,6 +127,87 @@ export function projectHasNewStructureForSagatave(
   return false;
 }
 
+function countExistingProjectRowPredecessors(
+  sagataveItems: EstimateRowItem[],
+  projectItems: EstimateRowItem[],
+  rowIndex: number,
+): number {
+  let count = 0;
+
+  for (let index = 0; index < rowIndex; index++) {
+    if (
+      findSagataveRowForProjectRow(
+        sagataveItems,
+        projectItems[index],
+        index,
+        projectItems.length,
+        projectItems,
+      )
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function countExistingProjectSubcategoryPredecessors(
+  sagataveSubcategories: EstimateSubcategory[],
+  projectSubcategories: EstimateSubcategory[],
+  subcategoryIndex: number,
+): number {
+  let count = 0;
+
+  for (let index = 0; index < subcategoryIndex; index++) {
+    if (
+      findSagataveSubcategoryForProject(
+        sagataveSubcategories,
+        projectSubcategories[index],
+        index,
+      )
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function countExistingProjectCategoryPredecessors(
+  sagataveSections: EstimateCategory[],
+  projectCategories: EstimateCategory[],
+  categoryIndex: number,
+): number {
+  let count = 0;
+
+  for (let index = 0; index < categoryIndex; index++) {
+    if (
+      findSagataveCategoryForProject(
+        sagataveSections,
+        projectCategories[index],
+        index,
+      )
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function replaceSagataveCategory(
+  sections: EstimateCategory[],
+  nextCategory: EstimateCategory,
+): void {
+  const categoryIndex = sections.findIndex(
+    (category) => category.id === nextCategory.id,
+  );
+
+  if (categoryIndex >= 0) {
+    sections[categoryIndex] = nextCategory;
+  }
+}
+
 /**
  * Pievieno sagatavē tikai to projekta struktūru, kuras vēl nav sagatavē.
  */
@@ -147,36 +234,72 @@ export function mergeNewProjectStructureIntoSagatave(
 
     if (!sagataveCategory) {
       const clonedCategory = cloneCategory(projectCategory, optionIdMap);
-      sections.push(clonedCategory);
+      const insertIndex = countExistingProjectCategoryPredecessors(
+        sections,
+        projectCategories,
+        categoryIndex,
+      );
+      sections.splice(insertIndex, 0, clonedCategory);
       addedNodeIds.push(...collectCategoryNodeIds(clonedCategory));
       continue;
     }
 
+    let currentCategory = sagataveCategory;
+
     for (const [subcategoryIndex, projectSubcategory] of projectCategory.subcategories.entries()) {
       const sagataveSubcategory = findSagataveSubcategoryForProject(
-        sagataveCategory.subcategories,
+        currentCategory.subcategories,
         projectSubcategory,
         subcategoryIndex,
       );
 
       if (!sagataveSubcategory) {
         const clonedSubcategory = cloneSubcategory(projectSubcategory, optionIdMap);
-        sagataveCategory.subcategories.push(clonedSubcategory);
+        const subInsertIndex = countExistingProjectSubcategoryPredecessors(
+          currentCategory.subcategories,
+          projectCategory.subcategories,
+          subcategoryIndex,
+        );
+        currentCategory = insertCategoryLevelSubcategory(
+          currentCategory,
+          clonedSubcategory,
+          subInsertIndex,
+        );
+        replaceSagataveCategory(sections, currentCategory);
         addedNodeIds.push(...collectSubcategoryNodeIds(clonedSubcategory));
         continue;
       }
 
+      const subcategoryIndexInCategory = currentCategory.subcategories.findIndex(
+        (subcategory) => subcategory.id === sagataveSubcategory.id,
+      );
+      let currentSubcategory = sagataveSubcategory;
+
       for (const [rowIndex, projectRow] of projectSubcategory.items.entries()) {
         if (
           !findSagataveRowForProjectRow(
-            sagataveSubcategory.items,
+            currentSubcategory.items,
             projectRow,
             rowIndex,
             projectSubcategory.items.length,
+            projectSubcategory.items,
           )
         ) {
           const clonedRow = cloneRowItem(projectRow, optionIdMap);
-          sagataveSubcategory.items.push(clonedRow);
+          const insertIndex = countExistingProjectRowPredecessors(
+            currentSubcategory.items,
+            projectSubcategory.items,
+            rowIndex,
+          );
+          const items = [...currentSubcategory.items];
+          items.splice(insertIndex, 0, clonedRow);
+          currentSubcategory = { ...currentSubcategory, items };
+          if (subcategoryIndexInCategory >= 0) {
+            const subcategories = [...currentCategory.subcategories];
+            subcategories[subcategoryIndexInCategory] = currentSubcategory;
+            currentCategory = { ...currentCategory, subcategories };
+            replaceSagataveCategory(sections, currentCategory);
+          }
           addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
         }
       }
@@ -185,14 +308,25 @@ export function mergeNewProjectStructureIntoSagatave(
     for (const [rowIndex, projectRow] of projectCategory.items.entries()) {
       if (
         !findSagataveRowForProjectRow(
-          sagataveCategory.items,
+          currentCategory.items,
           projectRow,
           rowIndex,
           projectCategory.items.length,
+          projectCategory.items,
         )
       ) {
         const clonedRow = cloneRowItem(projectRow, optionIdMap);
-        sagataveCategory.items.push(clonedRow);
+        const insertIndex = countExistingProjectRowPredecessors(
+          currentCategory.items,
+          projectCategory.items,
+          rowIndex,
+        );
+        currentCategory = insertCategoryLevelItem(
+          currentCategory,
+          clonedRow,
+          insertIndex,
+        );
+        replaceSagataveCategory(sections, currentCategory);
         addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
       }
     }

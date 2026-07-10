@@ -1,10 +1,13 @@
 import {
+  getRowItemId,
   isEstimateLineItem,
   isEstimateMultiPosition,
+  resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
 import type {
   EstimateCategory,
   EstimateLineItem,
+  EstimateMultiPosition,
   EstimateRowItem,
   EstimateSubcategory,
 } from "@/app/lib/estimates/types";
@@ -14,7 +17,11 @@ export function normalizeRowTitle(title: string): string {
 }
 
 export function rowItemLabel(row: EstimateRowItem): string {
-  return row.name;
+  if (isEstimateMultiPosition(row)) {
+    return row.name.trim() || "—";
+  }
+
+  return resolveLineItemDisplayName(row);
 }
 
 export function sameRowKind(a: EstimateRowItem, b: EstimateRowItem): boolean {
@@ -60,6 +67,111 @@ function findRowByCorrespondence(
   return items.find((row) => rowsCorrespond(row, target));
 }
 
+function normalizedMultiLabel(multi: EstimateMultiPosition): string {
+  return normalizeRowTitle(multi.name.trim() || "—");
+}
+
+function countSameMultiOccurrenceBefore(
+  items: EstimateRowItem[],
+  rowIndex: number,
+): number {
+  const target = items[rowIndex];
+  if (!target || !isEstimateMultiPosition(target)) {
+    return 0;
+  }
+
+  const label = normalizedMultiLabel(target);
+  let occurrence = 0;
+
+  for (let index = 0; index < rowIndex; index++) {
+    const row = items[index];
+    if (isEstimateMultiPosition(row) && normalizedMultiLabel(row) === label) {
+      occurrence++;
+    }
+  }
+
+  return occurrence;
+}
+
+function findNthMultiByLabel(
+  items: EstimateRowItem[],
+  label: string,
+  occurrence: number,
+): EstimateMultiPosition | undefined {
+  let seen = 0;
+
+  for (const row of items) {
+    if (!isEstimateMultiPosition(row)) {
+      continue;
+    }
+
+    if (normalizedMultiLabel(row) !== label) {
+      continue;
+    }
+
+    if (seen === occurrence) {
+      return row;
+    }
+
+    seen++;
+  }
+
+  return undefined;
+}
+
+function findMultiByNameOccurrence(
+  targetItems: EstimateRowItem[],
+  sourceItems: EstimateRowItem[],
+  sourceIndex: number,
+  sourceRow: EstimateMultiPosition,
+): EstimateMultiPosition | undefined {
+  const label = normalizedMultiLabel(sourceRow);
+  const occurrence = countSameMultiOccurrenceBefore(sourceItems, sourceIndex);
+  return findNthMultiByLabel(targetItems, label, occurrence);
+}
+
+export function buildSagataveMultiLabelCounts(
+  items: EstimateRowItem[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const row of items) {
+    if (!isEstimateMultiPosition(row)) {
+      continue;
+    }
+
+    const label = normalizedMultiLabel(row);
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+export function getMultiLabelOccurrenceAtIndex(
+  items: EstimateRowItem[],
+  rowIndex: number,
+): { label: string; occurrence: number } | null {
+  const row = items[rowIndex];
+  if (!row || !isEstimateMultiPosition(row)) {
+    return null;
+  }
+
+  const label = normalizedMultiLabel(row);
+  let occurrence = 0;
+
+  for (let index = 0; index < rowIndex; index++) {
+    const candidate = items[index];
+    if (
+      isEstimateMultiPosition(candidate) &&
+      normalizedMultiLabel(candidate) === label
+    ) {
+      occurrence++;
+    }
+  }
+
+  return { label, occurrence };
+}
+
 /**
  * Atrod projekta rindu, kas atbilst sagataves rindai (nevis jaunu pozīciju).
  */
@@ -68,10 +180,20 @@ export function findProjectRowForSagataveRow(
   sagataveRow: EstimateRowItem,
   rowIndex: number,
   sagataveItemCount: number,
+  sagataveItems: EstimateRowItem[],
 ): EstimateRowItem | undefined {
   const byIndex = projectItems[rowIndex];
   if (byIndex && rowsCorrespond(byIndex, sagataveRow)) {
     return byIndex;
+  }
+
+  if (isEstimateMultiPosition(sagataveRow)) {
+    return findMultiByNameOccurrence(
+      projectItems,
+      sagataveItems,
+      rowIndex,
+      sagataveRow,
+    );
   }
 
   const byCorrespondence = findRowByCorrespondence(projectItems, sagataveRow);
@@ -81,13 +203,70 @@ export function findProjectRowForSagataveRow(
 
   if (
     byIndex &&
-    sameRowKind(byIndex, sagataveRow) &&
+    isEstimateLineItem(byIndex) &&
+    isEstimateLineItem(sagataveRow) &&
     projectItems.length === sagataveItemCount
   ) {
     return byIndex;
   }
 
   return undefined;
+}
+
+/**
+ * Atrod projekta rindu sagataves rindai, ja tā vēl nav pāra ar citu sagataves rindu.
+ */
+export function findUnpairedProjectRowForSagataveRow(
+  projectItems: EstimateRowItem[],
+  sagataveRow: EstimateRowItem,
+  rowIndex: number,
+  sagataveItems: EstimateRowItem[],
+  usedProjectRowIds: ReadonlySet<string>,
+): EstimateRowItem | undefined {
+  const match = findProjectRowForSagataveRow(
+    projectItems,
+    sagataveRow,
+    rowIndex,
+    sagataveItems.length,
+    sagataveItems,
+  );
+
+  if (!match) {
+    return undefined;
+  }
+
+  const matchId = getRowItemId(match);
+  if (usedProjectRowIds.has(matchId)) {
+    return undefined;
+  }
+
+  return match;
+}
+
+/**
+ * Projekta rindu ID, kas vienā pret vienu atbilst sagataves rindām (secībā).
+ */
+export function collectOneToOnePairedProjectRowIds(
+  sagataveItems: EstimateRowItem[],
+  projectItems: EstimateRowItem[],
+): Set<string> {
+  const pairedIds = new Set<string>();
+
+  for (let rowIndex = 0; rowIndex < sagataveItems.length; rowIndex++) {
+    const match = findUnpairedProjectRowForSagataveRow(
+      projectItems,
+      sagataveItems[rowIndex],
+      rowIndex,
+      sagataveItems,
+      pairedIds,
+    );
+
+    if (match) {
+      pairedIds.add(getRowItemId(match));
+    }
+  }
+
+  return pairedIds;
 }
 
 /**
@@ -98,10 +277,20 @@ export function findSagataveRowForProjectRow(
   projectRow: EstimateRowItem,
   rowIndex: number,
   projectItemCount: number,
+  projectItems: EstimateRowItem[],
 ): EstimateRowItem | undefined {
   const byIndex = sagataveItems[rowIndex];
   if (byIndex && rowsCorrespond(byIndex, projectRow)) {
     return byIndex;
+  }
+
+  if (isEstimateMultiPosition(projectRow)) {
+    return findMultiByNameOccurrence(
+      sagataveItems,
+      projectItems,
+      rowIndex,
+      projectRow,
+    );
   }
 
   const byCorrespondence = findRowByCorrespondence(sagataveItems, projectRow);
@@ -111,7 +300,8 @@ export function findSagataveRowForProjectRow(
 
   if (
     byIndex &&
-    sameRowKind(byIndex, projectRow) &&
+    isEstimateLineItem(byIndex) &&
+    isEstimateLineItem(projectRow) &&
     sagataveItems.length === projectItemCount
   ) {
     return byIndex;

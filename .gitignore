@@ -8,3 +8,8 @@ dist/
 *.log
 .DS_Store
 next-env.d.ts
+
+# Accidental nested clone/copy of this repo
+/estimate-builder/
+
+*.code-workspace

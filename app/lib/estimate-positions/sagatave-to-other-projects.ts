@@ -3,6 +3,7 @@ import type { EstimateCategory } from "@/app/lib/estimates/types";
 import { hideEstimateStructureByNodeIds } from "@/app/lib/estimates/hidden-estimate-rows";
 import {
   mergeNewSagatavePositionsIntoProject,
+  pruneOrphanedHiddenSagataveSyncRows,
   sagataveHasNewPositionsForProject,
 } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
@@ -31,45 +32,55 @@ export function mergeMissingSagataveAsHiddenForProject(
   changed: boolean;
   addedNodeIds: string[];
 } {
+  const pruned = pruneOrphanedHiddenSagataveSyncRows(
+    projectCategories,
+    projectMeta,
+    sagataveSections,
+  );
+
+  let categories = pruned.categories;
+  let meta = pruned.meta;
+  const multiOptionLinks = projectMultiOptionLinks;
+
   if (
     sagataveSections.length === 0 ||
-    !sagataveHasNewPositionsForProject(sagataveSections, projectCategories)
+    !sagataveHasNewPositionsForProject(sagataveSections, categories)
   ) {
     return {
-      categories: projectCategories,
-      multiOptionLinks: projectMultiOptionLinks,
-      meta: projectMeta,
-      changed: false,
+      categories,
+      multiOptionLinks,
+      meta,
+      changed: pruned.changed,
       addedNodeIds: [],
     };
   }
 
   const merged = mergeNewSagatavePositionsIntoProject(
-    projectCategories,
-    projectMultiOptionLinks,
+    categories,
+    multiOptionLinks,
     sagataveSections,
     sagataveMultiOptionLinks,
   );
 
   if (merged.addedNodeIds.length === 0) {
     return {
-      categories: projectCategories,
-      multiOptionLinks: projectMultiOptionLinks,
-      meta: projectMeta,
-      changed: false,
+      categories,
+      multiOptionLinks,
+      meta,
+      changed: pruned.changed,
       addedNodeIds: [],
     };
   }
 
-  const categories = hideEstimateStructureByNodeIds(
+  categories = hideEstimateStructureByNodeIds(
     merged.categories,
     new Set(merged.addedNodeIds),
   );
-  const meta: EstimateMeta = {
-    ...projectMeta,
+  meta = {
+    ...meta,
     unacknowledgedSagataveStructureIds: Array.from(
       new Set([
-        ...(projectMeta.unacknowledgedSagataveStructureIds ?? []),
+        ...(meta.unacknowledgedSagataveStructureIds ?? []),
         ...merged.addedNodeIds,
       ]),
     ),

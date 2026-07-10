@@ -499,6 +499,7 @@ function collectSubcategoryChanges(
       projectRow,
       rowIndex,
       projectSubcategory.items.length,
+      projectSubcategory.items,
     );
     if (!sagataveRow) {
       continue;
@@ -557,6 +558,7 @@ export function listSagatavePositionChanges(
         projectRow,
         rowIndex,
         projectCategory.items.length,
+        projectCategory.items,
       );
       if (!sagataveRow) {
         continue;
@@ -802,6 +804,7 @@ function resolveRowContext(
     projectRow,
     path.rowIndex,
     projectItems.length,
+    projectItems,
   );
   if (!projectRow || !sagataveRow) {
     return null;

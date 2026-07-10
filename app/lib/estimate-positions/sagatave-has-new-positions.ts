@@ -4,6 +4,8 @@ import type {
   EstimateRowItem,
   EstimateSubcategory,
 } from "@/app/lib/estimates/types";
+import { isEstimateRowHidden } from "@/app/lib/estimates/hidden-estimate-rows";
+import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import {
   cloneCategory,
   cloneRowItem,
@@ -11,10 +13,18 @@ import {
   remapMultiOptionLinks,
 } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import {
-  findProjectRowForSagataveRow,
+  insertCategoryLevelItem,
+  insertCategoryLevelSubcategory,
+} from "@/app/lib/estimates/category-child-order";
+import {
+  buildSagataveMultiLabelCounts,
+  collectOneToOnePairedProjectRowIds,
+  findUnpairedProjectRowForSagataveRow,
+  getMultiLabelOccurrenceAtIndex,
   normalizeRowTitle,
   rowItemLabel,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
+import type { EstimateMeta } from "@/app/lib/projects/types";
 
 function normalizeTitle(title: string): string {
   return normalizeRowTitle(title);
@@ -52,28 +62,135 @@ function findProjectSubcategory(
   );
 }
 
-function findProjectRowItem(
+function countExistingSagataveRowPredecessors(
   projectItems: EstimateRowItem[],
-  sagataveRow: EstimateRowItem,
+  sagataveItems: EstimateRowItem[],
   rowIndex: number,
-  sagataveItemCount: number,
-): EstimateRowItem | undefined {
-  return findProjectRowForSagataveRow(
-    projectItems,
-    sagataveRow,
-    rowIndex,
-    sagataveItemCount,
+): number {
+  const usedProjectRowIds = new Set<string>();
+  let count = 0;
+
+  for (let index = 0; index < rowIndex; index++) {
+    const match = findUnpairedProjectRowForSagataveRow(
+      projectItems,
+      sagataveItems[index],
+      index,
+      sagataveItems,
+      usedProjectRowIds,
+    );
+
+    if (match) {
+      usedProjectRowIds.add(getRowItemId(match));
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function countExistingSagataveSubcategoryPredecessors(
+  projectSubcategories: EstimateSubcategory[],
+  sagataveSubcategories: EstimateSubcategory[],
+  subcategoryIndex: number,
+): number {
+  let count = 0;
+
+  for (let index = 0; index < subcategoryIndex; index++) {
+    if (
+      findProjectSubcategory(
+        projectSubcategories,
+        sagataveSubcategories[index],
+        index,
+      )
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function countExistingSagataveCategoryPredecessors(
+  projectCategories: EstimateCategory[],
+  sagataveSections: EstimateCategory[],
+  categoryIndex: number,
+): number {
+  let count = 0;
+
+  for (let index = 0; index < categoryIndex; index++) {
+    if (findProjectCategory(projectCategories, sagataveSections[index], index)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function replaceProjectCategory(
+  categories: EstimateCategory[],
+  nextCategory: EstimateCategory,
+): void {
+  const categoryIndex = categories.findIndex(
+    (category) => category.id === nextCategory.id,
   );
+
+  if (categoryIndex >= 0) {
+    categories[categoryIndex] = nextCategory;
+  }
 }
 
 function sagataveRowsMissingInProject(
   sagataveItems: EstimateRowItem[],
   projectItems: EstimateRowItem[],
 ): boolean {
-  return sagataveItems.some(
-    (row, rowIndex) =>
-      !findProjectRowItem(projectItems, row, rowIndex, sagataveItems.length),
-  );
+  const usedProjectRowIds = new Set<string>();
+
+  for (let rowIndex = 0; rowIndex < sagataveItems.length; rowIndex++) {
+    const match = findUnpairedProjectRowForSagataveRow(
+      projectItems,
+      sagataveItems[rowIndex],
+      rowIndex,
+      sagataveItems,
+      usedProjectRowIds,
+    );
+
+    if (!match) {
+      return true;
+    }
+
+    usedProjectRowIds.add(getRowItemId(match));
+  }
+
+  return false;
+}
+
+function isSagataveRowMissingInProject(
+  sagataveItems: EstimateRowItem[],
+  projectItems: EstimateRowItem[],
+  rowIndex: number,
+): boolean {
+  const usedProjectRowIds = new Set<string>();
+
+  for (let index = 0; index < sagataveItems.length; index++) {
+    const sagataveRow = sagataveItems[index];
+    const match = findUnpairedProjectRowForSagataveRow(
+      projectItems,
+      sagataveRow,
+      index,
+      sagataveItems,
+      usedProjectRowIds,
+    );
+
+    if (index === rowIndex) {
+      return !match;
+    }
+
+    if (match) {
+      usedProjectRowIds.add(getRowItemId(match));
+    }
+  }
+
+  return true;
 }
 
 function isStructureSelected(
@@ -87,15 +204,17 @@ function isMissingRowSelected(
   sagataveRow: EstimateRowItem,
   projectItems: EstimateRowItem[],
   rowIndex: number,
-  sagataveItemCount: number,
+  sagataveItems: EstimateRowItem[],
+  usedProjectRowIds: ReadonlySet<string>,
   selectedSagataveRowIds?: ReadonlySet<string>,
 ): boolean {
   if (
-    findProjectRowItem(
+    findUnpairedProjectRowForSagataveRow(
       projectItems,
       sagataveRow,
       rowIndex,
-      sagataveItemCount,
+      sagataveItems,
+      usedProjectRowIds,
     )
   ) {
     return false;
@@ -142,11 +261,10 @@ export function listMissingSagatavePositions(
     for (const [rowIndex, row] of sagataveCategory.items.entries()) {
       if (
         !projectCategory ||
-        !findProjectRowItem(
+        isSagataveRowMissingInProject(
+          sagataveCategory.items,
           projectCategory.items,
-          row,
           rowIndex,
-          sagataveCategory.items.length,
         )
       ) {
         missingCategoryItems.push({
@@ -191,11 +309,10 @@ export function listMissingSagatavePositions(
       for (const [rowIndex, row] of sagataveSubcategory.items.entries()) {
         if (
           !projectSubcategory ||
-          !findProjectRowItem(
+          isSagataveRowMissingInProject(
+            sagataveSubcategory.items,
             projectSubcategory.items,
-            row,
             rowIndex,
-            sagataveSubcategory.items.length,
           )
         ) {
           missingSubcategoryItems.push({
@@ -332,6 +449,167 @@ function mergeMultiOptionLinks(
   return [...projectLinks, ...appended];
 }
 
+function pruneExcessHiddenProjectRowItems(
+  sagataveItems: EstimateRowItem[],
+  projectItems: EstimateRowItem[],
+): {
+  items: EstimateRowItem[];
+  removedIds: string[];
+} {
+  const pairedIds = collectOneToOnePairedProjectRowIds(
+    sagataveItems,
+    projectItems,
+  );
+  const sagataveMultiLabelCounts = buildSagataveMultiLabelCounts(sagataveItems);
+  const removedIds: string[] = [];
+
+  const items = projectItems.filter((row, rowIndex) => {
+    const rowId = getRowItemId(row);
+
+    if (!isEstimateRowHidden(row) || pairedIds.has(rowId)) {
+      return true;
+    }
+
+    const multiOccurrence = getMultiLabelOccurrenceAtIndex(
+      projectItems,
+      rowIndex,
+    );
+
+    if (multiOccurrence) {
+      const sagataveCount =
+        sagataveMultiLabelCounts.get(multiOccurrence.label) ?? 0;
+
+      // Sagatavē šī multi vairs nav — projekta rinda paliek (arī paslēpta).
+      if (sagataveCount === 0) {
+        return true;
+      }
+
+      if (multiOccurrence.occurrence >= sagataveCount) {
+        removedIds.push(rowId);
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return { items, removedIds };
+}
+
+/**
+ * Noņem liekas paslēptās rindas, ko sagataves sinhronizācija pievienojusi kļūdaini
+ * (piem. otru „95mm”, ja sagatavē ir tikai viena).
+ */
+export function pruneOrphanedHiddenSagataveSyncRows(
+  projectCategories: EstimateCategory[],
+  projectMeta: EstimateMeta,
+  sagataveSections: EstimateCategory[],
+): {
+  categories: EstimateCategory[];
+  meta: EstimateMeta;
+  removedNodeIds: string[];
+  changed: boolean;
+} {
+  const unacknowledgedIds = new Set(
+    projectMeta.unacknowledgedSagataveStructureIds ?? [],
+  );
+
+  const categories = structuredClone(projectCategories);
+  const removedNodeIds: string[] = [];
+
+  for (const [categoryIndex, sagataveCategory] of sagataveSections.entries()) {
+    const projectCategory = findProjectCategory(
+      categories,
+      sagataveCategory,
+      categoryIndex,
+    );
+
+    if (!projectCategory) {
+      continue;
+    }
+
+    const categoryIndexInList = categories.findIndex(
+      (category) => category.id === projectCategory.id,
+    );
+    let currentCategory = projectCategory;
+
+    for (const [subcategoryIndex, sagataveSubcategory] of sagataveCategory.subcategories.entries()) {
+      const projectSubcategory = findProjectSubcategory(
+        currentCategory.subcategories,
+        sagataveSubcategory,
+        subcategoryIndex,
+      );
+
+      if (!projectSubcategory) {
+        continue;
+      }
+
+      const subcategoryIndexInCategory = currentCategory.subcategories.findIndex(
+        (subcategory) => subcategory.id === projectSubcategory.id,
+      );
+      const pruned = pruneExcessHiddenProjectRowItems(
+        sagataveSubcategory.items,
+        projectSubcategory.items,
+      );
+
+      if (pruned.removedIds.length === 0) {
+        continue;
+      }
+
+      removedNodeIds.push(...pruned.removedIds);
+      for (const removedId of pruned.removedIds) {
+        unacknowledgedIds.delete(removedId);
+      }
+
+      const subcategories = [...currentCategory.subcategories];
+      subcategories[subcategoryIndexInCategory] = {
+        ...projectSubcategory,
+        items: pruned.items,
+      };
+      currentCategory = { ...currentCategory, subcategories };
+
+      if (categoryIndexInList >= 0) {
+        categories[categoryIndexInList] = currentCategory;
+      }
+    }
+
+    const prunedCategoryItems = pruneExcessHiddenProjectRowItems(
+      sagataveCategory.items,
+      currentCategory.items,
+    );
+
+    if (prunedCategoryItems.removedIds.length > 0) {
+      removedNodeIds.push(...prunedCategoryItems.removedIds);
+      for (const removedId of prunedCategoryItems.removedIds) {
+        unacknowledgedIds.delete(removedId);
+      }
+
+      currentCategory = {
+        ...currentCategory,
+        items: prunedCategoryItems.items,
+      };
+
+      if (categoryIndexInList >= 0) {
+        categories[categoryIndexInList] = currentCategory;
+      }
+    }
+  }
+
+  const meta: EstimateMeta = { ...projectMeta };
+  if (unacknowledgedIds.size > 0) {
+    meta.unacknowledgedSagataveStructureIds = Array.from(unacknowledgedIds);
+  } else {
+    delete meta.unacknowledgedSagataveStructureIds;
+  }
+
+  return {
+    categories,
+    meta,
+    removedNodeIds,
+    changed: removedNodeIds.length > 0,
+  };
+}
+
 /**
  * Pievieno projekta tāmei tikai tās sagataves daļas, kuras vēl nav projektā.
  */
@@ -366,7 +644,8 @@ export function mergeNewSagatavePositionsIntoProject(
             row,
             [],
             rowIndex,
-            sagataveSubcategory.items.length,
+            sagataveSubcategory.items,
+            new Set(),
             selectedSagataveRowIds,
           ),
         );
@@ -384,7 +663,8 @@ export function mergeNewSagatavePositionsIntoProject(
           row,
           [],
           rowIndex,
-          sagataveCategory.items.length,
+          sagataveCategory.items,
+          new Set(),
           selectedSagataveRowIds,
         ),
       );
@@ -392,7 +672,12 @@ export function mergeNewSagatavePositionsIntoProject(
       if (partialSubcategories.length === 0 && selectedCategoryItems.length === 0) {
         if (isStructureSelected(sagataveCategory.id, selectedSagataveRowIds)) {
           const clonedCategory = cloneCategory(sagataveCategory, optionIdMap);
-          categories.push(clonedCategory);
+          const insertIndex = countExistingSagataveCategoryPredecessors(
+            categories,
+            sagataveSections,
+            categoryIndex,
+          );
+          categories.splice(insertIndex, 0, clonedCategory);
           addedNodeIds.push(...collectCategoryNodeIds(clonedCategory));
         }
         continue;
@@ -406,14 +691,21 @@ export function mergeNewSagatavePositionsIntoProject(
         },
         optionIdMap,
       );
-      categories.push(clonedCategory);
+      const insertIndex = countExistingSagataveCategoryPredecessors(
+        categories,
+        sagataveSections,
+        categoryIndex,
+      );
+      categories.splice(insertIndex, 0, clonedCategory);
       addedNodeIds.push(...collectCategoryNodeIds(clonedCategory));
       continue;
     }
 
+    let currentCategory = projectCategory;
+
     for (const [subcategoryIndex, sagataveSubcategory] of sagataveCategory.subcategories.entries()) {
       const projectSubcategory = findProjectSubcategory(
-        projectCategory.subcategories,
+        currentCategory.subcategories,
         sagataveSubcategory,
         subcategoryIndex,
       );
@@ -424,7 +716,8 @@ export function mergeNewSagatavePositionsIntoProject(
             row,
             [],
             rowIndex,
-            sagataveSubcategory.items.length,
+            sagataveSubcategory.items,
+            new Set(),
             selectedSagataveRowIds,
           ),
         );
@@ -437,7 +730,17 @@ export function mergeNewSagatavePositionsIntoProject(
               sagataveSubcategory,
               optionIdMap,
             );
-            projectCategory.subcategories.push(clonedSubcategory);
+            const subInsertIndex = countExistingSagataveSubcategoryPredecessors(
+              currentCategory.subcategories,
+              sagataveCategory.subcategories,
+              subcategoryIndex,
+            );
+            currentCategory = insertCategoryLevelSubcategory(
+              currentCategory,
+              clonedSubcategory,
+              subInsertIndex,
+            );
+            replaceProjectCategory(categories, currentCategory);
             addedNodeIds.push(...collectSubcategoryNodeIds(clonedSubcategory));
           }
           continue;
@@ -450,42 +753,105 @@ export function mergeNewSagatavePositionsIntoProject(
           },
           optionIdMap,
         );
-        projectCategory.subcategories.push(clonedSubcategory);
+        const subInsertIndex = countExistingSagataveSubcategoryPredecessors(
+          currentCategory.subcategories,
+          sagataveCategory.subcategories,
+          subcategoryIndex,
+        );
+        currentCategory = insertCategoryLevelSubcategory(
+          currentCategory,
+          clonedSubcategory,
+          subInsertIndex,
+        );
+        replaceProjectCategory(categories, currentCategory);
         addedNodeIds.push(...collectSubcategoryNodeIds(clonedSubcategory));
         continue;
       }
 
+      const subcategoryIndexInCategory = currentCategory.subcategories.findIndex(
+        (subcategory) => subcategory.id === projectSubcategory.id,
+      );
+      let currentSubcategory = projectSubcategory;
+      const usedProjectRowIds = new Set<string>();
+
       for (const [rowIndex, sagataveRow] of sagataveSubcategory.items.entries()) {
-        if (
-          isMissingRowSelected(
-            sagataveRow,
-            projectSubcategory.items,
-            rowIndex,
-            sagataveSubcategory.items.length,
-            selectedSagataveRowIds,
-          )
-        ) {
-          const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
-          projectSubcategory.items.push(clonedRow);
-          addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
+        const existingMatch = findUnpairedProjectRowForSagataveRow(
+          currentSubcategory.items,
+          sagataveRow,
+          rowIndex,
+          sagataveSubcategory.items,
+          usedProjectRowIds,
+        );
+
+        if (existingMatch) {
+          usedProjectRowIds.add(getRowItemId(existingMatch));
+          continue;
         }
+
+        if (
+          selectedSagataveRowIds &&
+          !selectedSagataveRowIds.has(sagataveRow.id)
+        ) {
+          continue;
+        }
+
+        const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
+        const insertIndex = countExistingSagataveRowPredecessors(
+          currentSubcategory.items,
+          sagataveSubcategory.items,
+          rowIndex,
+        );
+        const items = [...currentSubcategory.items];
+        items.splice(insertIndex, 0, clonedRow);
+        currentSubcategory = { ...currentSubcategory, items };
+        if (subcategoryIndexInCategory >= 0) {
+          const subcategories = [...currentCategory.subcategories];
+          subcategories[subcategoryIndexInCategory] = currentSubcategory;
+          currentCategory = { ...currentCategory, subcategories };
+          replaceProjectCategory(categories, currentCategory);
+        }
+        usedProjectRowIds.add(getRowItemId(clonedRow));
+        addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
       }
     }
 
+    const usedCategoryRowIds = new Set<string>();
+
     for (const [rowIndex, sagataveRow] of sagataveCategory.items.entries()) {
-      if (
-        isMissingRowSelected(
-          sagataveRow,
-          projectCategory.items,
-          rowIndex,
-          sagataveCategory.items.length,
-          selectedSagataveRowIds,
-        )
-      ) {
-        const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
-        projectCategory.items.push(clonedRow);
-        addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
+      const existingMatch = findUnpairedProjectRowForSagataveRow(
+        currentCategory.items,
+        sagataveRow,
+        rowIndex,
+        sagataveCategory.items,
+        usedCategoryRowIds,
+      );
+
+      if (existingMatch) {
+        usedCategoryRowIds.add(getRowItemId(existingMatch));
+        continue;
       }
+
+      if (
+        selectedSagataveRowIds &&
+        !selectedSagataveRowIds.has(sagataveRow.id)
+      ) {
+        continue;
+      }
+
+      const clonedRow = cloneRowItem(sagataveRow, optionIdMap);
+      const insertIndex = countExistingSagataveRowPredecessors(
+        currentCategory.items,
+        sagataveCategory.items,
+        rowIndex,
+      );
+      currentCategory = insertCategoryLevelItem(
+        currentCategory,
+        clonedRow,
+        insertIndex,
+      );
+      replaceProjectCategory(categories, currentCategory);
+      usedCategoryRowIds.add(getRowItemId(clonedRow));
+      addedNodeIds.push(...collectRowItemNodeIds(clonedRow));
     }
   }
 

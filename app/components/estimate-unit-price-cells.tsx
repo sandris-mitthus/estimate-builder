@@ -120,6 +120,7 @@ export function EstimateUnitPriceCells({
             ? staleCatalogPriceHints?.[field]
             : undefined;
         let tooltipLabel: string | null = staleHint ?? null;
+        let tooltipLabelClassName: string | undefined;
         if (!tooltipLabel && item) {
           const refs =
             field === "materials"
@@ -130,7 +131,8 @@ export function EstimateUnitPriceCells({
           if (refs.length === 1) {
             tooltipLabel = refs[0].name;
           } else if (refs.length > 1) {
-            tooltipLabel = refs.map((r) => r.name).join(", ");
+            tooltipLabel = refs.map((r) => r.name).join("\n");
+            tooltipLabelClassName = "whitespace-pre-line text-left";
           }
         }
         const cellClassName = staleHint
@@ -151,7 +153,12 @@ export function EstimateUnitPriceCells({
           <td key={field} className={cellClassName}>
             {readOnly ? (
               tooltipLabel ? (
-                <Tooltip label={tooltipLabel} className="w-full justify-center">
+                <Tooltip
+                  label={tooltipLabel}
+                  labelClassName={tooltipLabelClassName}
+                  align={tooltipLabelClassName ? "start" : "center"}
+                  className="w-full justify-center"
+                >
                   {amountSpan}
                 </Tooltip>
               ) : (

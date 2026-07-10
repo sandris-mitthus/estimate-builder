@@ -113,6 +113,7 @@ function ToggleSwitch({
         role="switch"
         aria-checked={checked}
         aria-labelledby={labelId}
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={onToggle}
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${
           checked ? "bg-sky-600" : "bg-zinc-200"
@@ -168,11 +169,11 @@ export function MaterialConsumptionBasisControl({
 
   useEffect(() => {
     setCustomVolumeActive(hasMaterialCustomConsumptionVolume(material));
-  }, [material]);
+  }, [material.consumptionVolumeAttachment, material.positionPriceId]);
 
   useEffect(() => {
     setManualConsumptionActive(material.manualConsumption === true);
-  }, [material]);
+  }, [material.manualConsumption, material.positionPriceId]);
 
   function handleCustomVolumeToggle(enabled: boolean) {
     if (!enabled) {
@@ -187,9 +188,6 @@ export function MaterialConsumptionBasisControl({
     }
 
     setCustomVolumeActive(true);
-    if (!hasCustomVolume) {
-      setVolumeModalOpen(true);
-    }
   }
 
   function handleManualConsumptionToggle(enabled: boolean) {
@@ -217,20 +215,16 @@ export function MaterialConsumptionBasisControl({
   }
 
   const consumptionControls = (
-    <div className="min-w-0 flex-1 overflow-hidden">
-      {!customVolumeActive || material.consumptionVolumeAttachment ? (
-        <ConsumptionValue
-          material={material}
-          item={item}
-          moduleSizeOptions={moduleSizeOptions}
-          onConsumptionChange={onConsumptionChange}
-        />
-      ) : null}
-    </div>
+    <ConsumptionValue
+      material={material}
+      item={item}
+      moduleSizeOptions={moduleSizeOptions}
+      onConsumptionChange={onConsumptionChange}
+    />
   );
 
   const toggleControls = (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
       {offerManualConsumptionToggle ? (
         <ToggleSwitch
           checked={manualConsumptionActive}
@@ -315,19 +309,14 @@ export function MaterialConsumptionBasisControl({
           </div>
         ) : null}
 
-        {canPickCustomVolume ? (
+        {canPickCustomVolume || offerManualConsumptionToggle ? (
           <div
-            className={`flex items-center justify-between gap-3 ${
+            className={`space-y-1.5 ${
               customVolumeActive ? "mt-2 border-t border-zinc-100 pt-2" : "mt-1.5"
             }`}
           >
             {consumptionControls}
-            {toggleControls}
-          </div>
-        ) : offerManualConsumptionToggle ? (
-          <div className="mt-1.5 flex items-center justify-between gap-3">
-            {consumptionControls}
-            {toggleControls}
+            <div className="flex justify-end">{toggleControls}</div>
           </div>
         ) : null}
       </div>
