@@ -24,23 +24,4 @@ jobs:
         run: npm ci
 
       - name: Run npm audit (high+)
-        run: npm audit --audit-level=high
-
-      - name: Check for known vulnerable packages
-        run: |
-          echo "Checking for packages with known vulnerabilities..."
-          npm audit --json | node -e "
-            const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-            const vulns = data.vulnerabilities ?? {};
-            const critical = Object.values(vulns).filter(v => v.severity === 'critical');
-            const high = Object.values(vulns).filter(v => v.severity === 'high');
-            if (critical.length > 0) {
-              console.error('CRITICAL vulnerabilities:', critical.map(v => v.name).join(', '));
-              process.exit(1);
-            }
-            if (high.length > 0) {
-              console.error('HIGH vulnerabilities:', high.map(v => v.name).join(', '));
-              process.exit(1);
-            }
-            console.log('No critical or high vulnerabilities found.');
-          "
+        run: npm run audit:check

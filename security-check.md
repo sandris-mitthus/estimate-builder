@@ -7,6 +7,32 @@
 
 ---
 
+## Atkarību audits v1.3.97 (2026-07-27)
+
+Fokusēta atkarību pārbaude pēc CI `security-audit` kritiena (5 HIGH). Aplikācijas koda drošības kontroles netika mainītas.
+
+| Advisory | Pakete | Rezultāts |
+|----------|--------|-----------|
+| GHSA-6gpp-xcg3-4w24 u.c. (9 advisories) | `next` 16.2.7 | ✅ LABOTS — `next` un `eslint-config-next` → **16.2.12** |
+| GHSA-r28c-9q8g-f849 | `postcss` 8.5.15 | ✅ LABOTS — `overrides.postcss` → `^8.5.18` |
+| GHSA-f88m-g3jw-g9cj | `sharp` 0.34.5 | ✅ LABOTS — `overrides.sharp` → `^0.35.0` (libvips CVE) |
+| GHSA-52cp-r559-cp3m | `js-yaml` 4.2.0 | ✅ LABOTS — `overrides.js-yaml` → `^4.3.0` |
+| GHSA-mh99-v99m-4gvg | `brace-expansion` | ⚠️ PIEŅEMTS — sk. zemāk |
+
+### `brace-expansion` — kāpēc pieņemts
+
+Advisory atzīmē **visas** versijas `<= 5.0.7` par ievainojamām, un pirmā labotā ir `5.0.8`. Tas nozīmē, ka `minimatch` 3.x un 5.x patērētājiem (`eslint-config-next` plugini, `exceljs` → `archiver`) **nav** nebreaking upgrade ceļa:
+
+- `brace-expansion@5` CommonJS eksportē objektu, nevis funkciju, tāpēc globāls override salauž `minimatch@3` (`expand is not a function`).
+- `eslint@10` noņemtu eslint core ķēdi, bet `eslint-config-next` bundlētais `eslint-plugin-react` ar to nestrādā (`contextOrFilename.getFilename is not a function`).
+- `exceljs@4.4.0` ir jaunākā versija un piesaista `archiver@^5`; arī `archiver@7` ir ievainojamajā diapazonā.
+
+Ietekme praksē: DoS caur speciāli veidotu glob brace patternu. Aplikācija nekad nepadod lietotāja ievadi kā glob patternu — `exceljs` tiek lietots tikai workbook rakstīšanai buferī, pārējais ir dev tooling.
+
+Advisory ir reģistrēts `scripts/audit-check.mjs` → `ACCEPTED_ADVISORIES` ar iemeslu un noņemšanas nosacījumu. CI (`npm run audit:check`) joprojām krīt pie **jebkura cita** HIGH/CRITICAL.
+
+---
+
 ## Ātrā pārbaude v1.3.63 (2026-06-30)
 
 | Kontrole | Rezultāts |

@@ -3,7 +3,7 @@
 Construction estimate editor for Latvian tenders — hierarchical categories, subcategories, and line items with unit prices (labor / materials / mechanisms), catalog hints, drag-and-drop reordering, configurable excluded-offer positions, workers, tools, and approved-project timeline planning. Next.js app with section-based navigation (projects, building modules, sagatave template, position catalog, excluded positions, workers, tools, timeline, users, settings).
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.96` — release history in [CHANGELOG.md](CHANGELOG.md)
+**Current version:** `1.3.97` — release history in [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -353,7 +353,7 @@ supabase/migrations/    # 001–130 (038–042 = system admin tables; 043–078 
 - [x] Darbinieki, instrumenti un laika grafiks — `/workers`, `/tools`, `/timeline` ar frontend moduļu gating, atsevišķām pārvaldības tiesībām un DB migrācijām
 - [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
 - [x] System admin sadaļas — uzņēmumi, lietotāji, default grupas, Docs pārvaldība, Todo dēlis, valodas, tulkojumi un sistēmas uzstādījumi
-- [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm audit` 0)
+- [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm run audit:check` bez neapstiprinātiem HIGH/CRITICAL)
 
 ---
 
@@ -364,10 +364,12 @@ Three GitHub Actions workflows run on every push and pull request:
 | Workflow | File | What it checks |
 |----------|------|----------------|
 | **Secret scan** | `.github/workflows/secret-scan.yml` | gitleaks — API keys, tokens, passwords in git history |
-| **Security audit** | `.github/workflows/security-audit.yml` | `npm audit` — HIGH and CRITICAL dependency vulnerabilities (`uuid` override `^11.1.1` caur `package.json`) |
+| **Security audit** | `.github/workflows/security-audit.yml` | `npm run audit:check` — HIGH and CRITICAL dependency vulnerabilities |
 | **Security smoke** | `.github/workflows/security-smoke.yml` | TypeScript, lint, production build, `requireAuth` on all actions, no `eval()`, security headers |
 
 > `GITLEAKS_LICENSE` repo secret is required only for **private** repositories (free for public repos).
+
+`npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`).
 
 Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.5 / 10**).
 

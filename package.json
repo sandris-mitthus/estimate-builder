@@ -1,6 +1,6 @@
 {
   "name": "estimate-builder",
-  "version": "1.3.96",
+  "version": "1.3.97",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -11,6 +11,7 @@
     "start": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next start -p 3100",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "audit:check": "node scripts/audit-check.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:test": "node scripts/test-supabase.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs"
@@ -24,7 +25,7 @@
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
     "exceljs": "^4.4.0",
-    "next": "16.2.7",
+    "next": "16.2.12",
     "pdfjs-dist": "^6.0.227",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -35,13 +36,15 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.7",
+    "eslint-config-next": "16.2.12",
     "pg": "^8.21.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "overrides": {
-    "postcss": "^8.5.10",
-    "uuid": "^11.1.1"
+    "postcss": "^8.5.18",
+    "uuid": "^11.1.1",
+    "sharp": "^0.35.0",
+    "js-yaml": "^4.3.0"
   }
 }

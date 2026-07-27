@@ -10,6 +10,15 @@ See [README.md](README.md) for features, setup and project structure.
 
 - (none)
 
+## v1.3.97
+
+**Atkarību drošības labojumi**
+
+- **`next` un `eslint-config-next` → 16.2.12** — novērstas 9 Next.js HIGH ievainojamības (middleware bypass, SSRF rewrites/Server Actions, cache confusion, Image Optimization DoS, Server Function endpoint atklāšana)
+- Jauni `overrides`: **`postcss` `^8.5.18`** (path traversal sourceMappingURL), **`sharp` `^0.35.0`** (libvips CVE-2026-33327/33328/35590/35591), **`js-yaml` `^4.3.0`** (merge-key CPU DoS)
+- **`npm run audit:check`** (`scripts/audit-check.mjs`) aizstāj inline audita loģiku `security-audit.yml` — krīt pie katra HIGH/CRITICAL advisory, izņemot skaidri pieņemtos ar iemeslu un noņemšanas nosacījumu
+- `brace-expansion` (GHSA-mh99-v99m-4gvg) pieņemts kā nelabojams — advisory atzīmē visas versijas `<= 5.0.7`, tāpēc `minimatch` 3.x/5.x patērētājiem nav nebreaking upgrade; pamatojums `security-check.md`
+
 ## v1.3.96
 
 **Individuāls apjoms multi-pozīcijām; dokumentācijas sadalīšana**
