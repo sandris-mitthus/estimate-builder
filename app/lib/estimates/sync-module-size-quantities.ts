@@ -258,7 +258,8 @@ export function syncLineItemQuantityFromModuleSize(
     item.moduleSizeAttachment,
   );
 
-  if (!attachment) {
+  // Individuālais apjoms ir stiprāks par moduļa piesaisti — ievadīto apjomu nepārraksta
+  if (!attachment || item.variableQuantity === true) {
     return item;
   }
 

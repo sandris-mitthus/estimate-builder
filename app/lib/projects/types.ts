@@ -77,10 +77,18 @@ export type EstimateMeta = {
 };
 
 export type ProjectEstimate = {
+  id?: string;
   title: string;
   meta: EstimateMeta;
   categories: EstimateCategory[];
   multiOptionLinks: MultiOptionLinkGroup[];
   /** ISO timestamp of when the estimate was last saved (`estimates.updated_at`). */
+  updatedAt?: string;
+};
+
+export type AdditionalWorkEstimateSummary = {
+  id: string;
+  title: string;
+  meta: EstimateMeta;
   updatedAt?: string;
 };

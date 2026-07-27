@@ -68,7 +68,11 @@ import { hasDefinedLaborLineItem } from "@/app/lib/positions/has-defined-labor";
 import {
   formatQuantityDisplay,
   isVariableQuantityLineItem,
+  isVariableQuantityMultiPosition,
+  resolveMultiPositionQuantity,
+  setMultiPositionQuantity,
 } from "@/app/lib/positions/variable-quantity";
+import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import type {
   EstimateLineItem,
   EstimateMultiPosition,
@@ -582,9 +586,13 @@ export function EstimateMultiPositionRow({
     highlightStaleCatalogPrices,
     plannedProfitPercent,
   );
-  const showQuantityInput =
-    selectedLineItem != null &&
-    isVariableQuantityLineItem(selectedLineItem, catalogPositions);
+  // Individuālais apjoms multi-pozīcijai ir globāls — viens visām opcijām
+  const variableQuantity = isVariableQuantityMultiPosition(
+    value,
+    catalogPositions,
+  );
+  const multiQuantity = resolveMultiPositionQuantity(value);
+  const showQuantityInput = variableQuantity;
   const selectedModuleSizeUnit =
     selectedLineItem != null && !showQuantityInput
       ? resolveCompositeLineItemDisplayUnit(selectedLineItem, moduleSizeOptions)
@@ -600,10 +608,14 @@ export function EstimateMultiPositionRow({
       : null;
   const hasAttachedQuantity =
     selectedLineItem != null &&
-    !selectedLineItem.variableQuantity &&
+    !variableQuantity &&
     hasModuleSizeAttachment(selectedLineItem) &&
     attachedQuantity != null;
-  const effectiveQuantity = attachedQuantity ?? selectedLineItem?.quantity ?? 0;
+  const quantityMissing =
+    showQuantityInput && selectedLineItem != null && multiQuantity <= 0;
+  const effectiveQuantity = variableQuantity
+    ? multiQuantity
+    : (attachedQuantity ?? selectedLineItem?.quantity ?? 0);
   const volumeVariable = showQuantityInput || hasAttachedQuantity;
   const volumeSum =
     showQuantityColumn && selectedLineItem
@@ -665,7 +677,7 @@ export function EstimateMultiPositionRow({
               ? "bg-emerald-50/80 hover:bg-emerald-50"
               : requiresAttention
                 ? estimateAttentionRowClassName
-              : showQuantityInput && selectedLineItem && selectedLineItem.quantity <= 0
+              : quantityMissing
                 ? "bg-red-50/60 hover:bg-red-50"
                 : "hover:bg-violet-50/30"
           }`}>
@@ -708,6 +720,7 @@ export function EstimateMultiPositionRow({
                         <span className={`text-xs font-normal ${requiresAttention ? "text-red-700" : "text-zinc-500"}`}>
                           {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                         </span>
+                        <PositionVariableQuantityIcon enabled={variableQuantity} />
                       </div>
                       <EstimateLineItemNote note={value.note} />
                       {requiresAttention ? (
@@ -772,20 +785,25 @@ export function EstimateMultiPositionRow({
                   <span className={`${metricReadOnly} text-zinc-700`}>
                     {formatQuantityDisplay(attachedQuantity)}
                   </span>
-                ) : showQuantityInput && selectedOption && selectedLineItem ? (
-                  <EstimateQuantityInput
-                    className={`${metricCellNum} ${selectedLineItem.quantity <= 0 ? "border-red-300 bg-red-50 text-red-700" : ""}`}
-                    value={selectedLineItem.quantity}
-                    onChange={(quantity) =>
-                      onChange(
-                        updateMultiOptionLineItem(value, selectedOption.id, {
-                          ...selectedLineItem,
-                          quantity,
-                        }),
-                      )
-                    }
-                    emptyValue={0}
-                  />
+                ) : showQuantityInput ? (
+                  allowOfferMultiEdit ? (
+                    <EstimateQuantityInput
+                      className={`${metricCellNum} ${quantityMissing ? "border-red-300 bg-red-50 text-red-700" : ""}`}
+                      value={multiQuantity}
+                      onChange={(quantity) =>
+                        onChange(setMultiPositionQuantity(value, quantity))
+                      }
+                      emptyValue={0}
+                    />
+                  ) : (
+                    <span
+                      className={`${metricReadOnly} ${multiQuantity <= 0 ? "text-red-500" : "text-zinc-700"}`}
+                    >
+                      {multiQuantity <= 0
+                        ? "—"
+                        : formatQuantityDisplay(multiQuantity)}
+                    </span>
+                  )
                 ) : (
                   <span className={`${metricReadOnly} text-zinc-300`}>—</span>
                 )}
@@ -906,6 +924,7 @@ export function EstimateMultiPositionRow({
                           >
                             {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
                           </button>
+                          <PositionVariableQuantityIcon enabled={variableQuantity} />
                         </div>
                         <EstimateLineItemNote note={value.note} />
                         {requiresAttention ? (

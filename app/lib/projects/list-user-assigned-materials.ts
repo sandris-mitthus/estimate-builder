@@ -8,6 +8,7 @@ import { parseEstimatePositionDocumentPayload } from "@/app/lib/estimate-positio
 import { normalizeUserId } from "@/app/lib/auth/normalize-person-name";
 import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { ESTIMATE_KIND_MAIN } from "@/app/lib/estimates/kind";
 import { getBuildingModulesByIds } from "@/app/lib/modules/repository";
 import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
@@ -240,6 +241,7 @@ export async function listUserAssignedMaterialGroups(
     .from("estimates")
     .select("project_id, meta, categories")
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .in("project_id", lockedProjects.map((project) => project.id));
 
   if (error || !data) {

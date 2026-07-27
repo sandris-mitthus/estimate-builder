@@ -30,6 +30,7 @@ import {
 import {
   acknowledgeSagataveStructureIntroAction,
   saveProjectEstimateAction,
+  saveAdditionalWorkEstimateAction,
   updateProjectEstimateDatesAction,
 } from "@/app/(protected)/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
@@ -248,6 +249,22 @@ import type { UserSummary } from "@/app/lib/users/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import { countPendingProjectMaterials } from "@/app/lib/projects/pending-project-materials";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
+
+const EMPTY_EXCLUDED_POSITIONS: ExcludedPosition[] = [];
+
+function excludedPositionsSyncKey(
+  estimateMode: "main" | "additional_work",
+  positions: ExcludedPosition[],
+): string {
+  if (estimateMode === "additional_work") {
+    return "__additional_work__";
+  }
+
+  return positions
+    .map((position) => `${position.id}:${position.sortOrder}:${position.name}`)
+    .join("|");
+}
+
 function getEstimateTableColCount(showQuantityColumn: boolean): number {
   return showQuantityColumn ? 15 : 9;
 }
@@ -2305,6 +2322,8 @@ function MetaField({
 
 type EstimateTableProps = {
   variant?: "full" | "tableOnly";
+  estimateMode?: "main" | "additional_work";
+  estimateId?: string;
   initialTitle?: string;
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
@@ -2328,6 +2347,8 @@ type EstimateTableProps = {
 
 export function EstimateTable({
   variant = "full",
+  estimateMode = "main",
+  estimateId,
   initialTitle = SAMPLE_TITLE,
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
@@ -2344,10 +2365,11 @@ export function EstimateTable({
   currency = null,
   sagataveSections = [],
   sagataveMultiOptionLinks = [],
-  globalExcludedPositions = [],
+  globalExcludedPositions = EMPTY_EXCLUDED_POSITIONS,
   users = [],
 }: EstimateTableProps = {}) {
   const { t } = useTranslations();
+  const isAdditionalWork = estimateMode === "additional_work";
   const { catalogPositions, refreshCatalogPositions } =
     useCatalogPositionsWithRefresh(initialCatalogPositions);
   const [title, setTitle] = useState(initialTitle);
@@ -2425,6 +2447,10 @@ export function EstimateTable({
     () => collectEstimateDocumentUnits(categories, moduleSizeOptions),
     [categories, moduleSizeOptions],
   );
+  const excludedPositionsPropKey = useMemo(
+    () => excludedPositionsSyncKey(estimateMode, globalExcludedPositions),
+    [estimateMode, globalExcludedPositions],
+  );
   const collapseDocumentId = project?.id ?? "__preview__";
   const {
     collapsedSectionIds,
@@ -2441,8 +2467,12 @@ export function EstimateTable({
   }, [initialMeta]);
 
   useEffect(() => {
+    if (estimateMode === "additional_work") {
+      return;
+    }
+
     setExcludedPositions(globalExcludedPositions);
-  }, [globalExcludedPositions]);
+  }, [estimateMode, excludedPositionsPropKey]);
 
   useEffect(() => {
     setModuleDataSpotlightDismissed(false);
@@ -2450,7 +2480,7 @@ export function EstimateTable({
   }, [project?.id]);
 
   function persistEstimateDates(dates: Pick<EstimateMeta, "date" | "deadline">) {
-    if (!project) return;
+    if (!project || isAdditionalWork) return;
 
     startSaveDatesTransition(async () => {
       await updateProjectEstimateDatesAction(project.id, dates);
@@ -2548,8 +2578,12 @@ export function EstimateTable({
 
   async function handleSave() {
     if (!project || isSaving || editorLocked) return;
+    if (isAdditionalWork && !estimateId) return;
 
-    const missingQuantityCount = collectEstimateLineItems(categories).filter(
+    // Multi-pozīcijām apjoms vajadzīgs tikai izvēlētajai opcijai
+    const missingQuantityCount = collectEstimateLineItems(categories, {
+      forTotals: true,
+    }).filter(
       (item) => isVariableQuantityLineItem(item, catalogPositions) && item.quantity <= 0,
     ).length;
 
@@ -2590,12 +2624,19 @@ export function EstimateTable({
       pricesFrozen: true,
     };
 
-    const result = await saveProjectEstimateAction(project.id, {
-      title,
-      meta: nextMeta,
-      categories: bakedCategories,
-      multiOptionLinks,
-    });
+    const result = isAdditionalWork
+      ? await saveAdditionalWorkEstimateAction(project!.id, estimateId!, {
+          title,
+          meta: nextMeta,
+          categories: bakedCategories,
+          multiOptionLinks,
+        })
+      : await saveProjectEstimateAction(project!.id, {
+          title,
+          meta: nextMeta,
+          categories: bakedCategories,
+          multiOptionLinks,
+        });
 
     setIsSaving(false);
 
@@ -2609,7 +2650,15 @@ export function EstimateTable({
         normalizePlannedProfitPercent(nextMeta.plannedProfitPercent ?? 0),
       );
       setSavedAt(savedAtIso);
-      showFeedback({ type: "success", text: t("estimate.feedback.saved", "Tāme saglabāta.") });
+      showFeedback({
+        type: "success",
+        text: isAdditionalWork
+          ? t(
+              "additional_work.feedback.saved",
+              "Papildu darbu tāme saglabāta.",
+            )
+          : t("estimate.feedback.saved", "Tāme saglabāta."),
+      });
     } else {
       showFeedback({ type: "error", text: translateActionError(t, result) });
     }
@@ -2669,6 +2718,7 @@ export function EstimateTable({
 
   const highlightSagatavePositionChanges = Boolean(
     project &&
+      !isAdditionalWork &&
       shouldShowStaleCatalogPriceWarnings(project.status) &&
       sagataveSections.length > 0,
   );
@@ -2885,6 +2935,183 @@ export function EstimateTable({
           />
         ) : null}
       </div>
+    );
+  }
+
+  if (isAdditionalWork && project) {
+    return (
+      <>
+        <div className="max-w-full space-y-4">
+          {project && estimateStatusLocked ? <ApprovedEstimateStatusLabel /> : null}
+
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                {editorLocked ? (
+                  <p className="text-xl font-semibold tracking-tight text-zinc-900">
+                    {title}
+                  </p>
+                ) : (
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    className="w-full border-0 bg-transparent text-xl font-semibold tracking-tight text-zinc-900 focus:outline-none"
+                    aria-label={t("estimate.title.aria", "Tāmes nosaukums")}
+                  />
+                )}
+              </div>
+              <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                  {t("common.total", "Kopā")}
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-white">
+                  {formatMoneyDisplay(totals.grand, currency)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <MetaField
+                label={t("projects.client_name", "Pasūtītāja vārds, uzvārds")}
+                value={meta.client}
+                readOnly={editorLocked}
+                onChange={(client) => setMeta({ ...meta, client })}
+              />
+              <MetaField
+                label={t("estimate.object", "Objekts")}
+                value={meta.project}
+                readOnly={editorLocked}
+                onChange={(projectAddress) =>
+                  setMeta({ ...meta, project: projectAddress })
+                }
+              />
+              <MetaField
+                label={t("estimate.planned_profit", "Plānotā peļņa")}
+                value={
+                  meta.plannedProfitPercent != null
+                    ? String(meta.plannedProfitPercent)
+                    : estimateStatusLocked
+                      ? "0"
+                      : ""
+                }
+                type="number"
+                suffix="%"
+                disabled={estimateStatusLocked}
+                readOnly={!estimateStatusLocked && editorLocked}
+                onChange={(raw) => {
+                  const parsed = parsePlannedProfitInput(raw);
+                  setMeta({
+                    ...meta,
+                    plannedProfitPercent: parsed > 0 ? parsed : undefined,
+                  });
+                }}
+              />
+              <MetaField
+                label={t("common.date", "Datums")}
+                type="date"
+                value={meta.date}
+                readOnly={datesReadOnly}
+                onChange={handleEstimateDateChange}
+              />
+              <MetaField
+                label={t("estimate.deadline.label", "Tāmes termiņš")}
+                type="date"
+                value={meta.deadline}
+                readOnly={datesReadOnly}
+                onChange={handleEstimateDeadlineChange}
+              />
+            </div>
+          </div>
+
+          {showPlannedProfitMissingNotice ? (
+            <div
+              role="status"
+              className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            >
+              <i
+                className="fas fa-info-circle mt-0.5 shrink-0 text-xs text-amber-700"
+                aria-hidden="true"
+              />
+              <p>
+                {t(
+                  "estimate.planned_profit.missing_notice",
+                  "Plānotā peļņa nav norādīta vai ir 0%. Vai tiešām vēlaties turpināt bez plānotās peļņas? Visas summas tabulā tiek rādītas bez peļņas piemērošanas.",
+                )}
+              </p>
+            </div>
+          ) : null}
+
+          {tablePanel}
+
+          <div className="flex w-full flex-col items-end gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {isDirty ? (
+                <span className="text-xs text-zinc-400">
+                  {t("common.unsaved_changes", "Nesaglabātas izmaiņas")}
+                </span>
+              ) : isEstimateSaved && savedAt ? (
+                <span className="text-xs text-zinc-400">
+                  {t("common.saved_at", "Saglabāts: {date}", {
+                    date: formatDisplayDateDdMmYy(savedAt),
+                  })}
+                </span>
+              ) : null}
+
+              {!editorLocked ? (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving || !isDirty}
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSaving
+                    ? t("actions.saving", "Saglabā…")
+                    : t("estimate.actions.save", "Saglabāt tāmi")}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {positionModalState ? (
+          <PositionModal
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setPositionModalState(null);
+              }
+            }}
+            value={positionModalState.item}
+            onSave={(next) => {
+              positionModalState.onSave(next);
+              setPositionModalState(null);
+            }}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            moduleSizeOptions={moduleSizeOptions}
+            estimateUnits={estimateUnits}
+          />
+        ) : null}
+        {multiPositionModalState ? (
+          <MultiPositionModal
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setMultiPositionModalState(null);
+              }
+            }}
+            value={multiPositionModalState.value}
+            onSave={(next) => multiPositionModalState.onSave(next)}
+            catalogPositions={catalogPositions}
+            defaultHourlyRate={defaultHourlyRate}
+            currency={currency}
+            moduleSizeOptions={moduleSizeOptions}
+            estimateUnits={estimateUnits}
+          />
+        ) : null}
+      </>
     );
   }
 
@@ -3203,7 +3430,7 @@ export function EstimateTable({
 
       {tablePanel}
 
-      {project ? (
+      {project && !isAdditionalWork ? (
         <ProjectExcludedPositionsPanel
           projectId={project.id}
           globalPositions={excludedPositions}

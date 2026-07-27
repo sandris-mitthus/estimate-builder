@@ -6,6 +6,7 @@ import {
   type ProjectStatus,
 } from "@/app/lib/projects/project-status";
 import type { EstimateMeta } from "@/app/lib/projects/types";
+import { ESTIMATE_KIND_MAIN } from "@/app/lib/estimates/kind";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
@@ -70,6 +71,7 @@ export async function ensureTimelineEntryForProject({
       .select("meta")
       .eq("company_id", companyId)
       .eq("project_id", projectId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN)
       .maybeSingle(),
   ]);
 

@@ -1,4 +1,5 @@
 import { defaultEstimateDeadline, projectCreatedDateIso } from "@/app/lib/estimates/sample-data";
+import { ESTIMATE_KIND_MAIN } from "@/app/lib/estimates/kind";
 import { resolveEstimateMeta } from "@/app/lib/estimates/resolve-estimate-meta";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
@@ -84,6 +85,7 @@ type ProjectRow = {
 };
 
 type EstimateRow = {
+  id?: string;
   title: string;
   meta: EstimateMeta;
   categories: EstimateCategory[];
@@ -253,6 +255,7 @@ async function parseEstimateRow(
   }
 
   return {
+    id: row.id,
     title: row.title || project.name,
     meta,
     categories: hasCategories ? parsed.sections : base!.categories,
@@ -304,8 +307,9 @@ export async function getProjectListBadges(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
-    .select("project_id, meta, categories, updated_at")
+    .select("id, project_id, meta, categories, updated_at")
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .in(
       "project_id",
       projects.map((project) => project.id),
@@ -540,9 +544,10 @@ export async function getProjectEstimateForProject(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
-    .select("title, meta, categories, updated_at")
+    .select("id, title, meta, categories, updated_at")
     .eq("project_id", project.id)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error) {
@@ -688,6 +693,7 @@ export async function createProject(
   const { error: estimateError } = await supabase.from("estimates").insert({
     company_id: companyId,
     project_id: project.id,
+    estimate_kind: ESTIMATE_KIND_MAIN,
     title: clientName,
     meta,
     categories,
@@ -776,6 +782,7 @@ export async function updateProject(
     .select("meta")
     .eq("project_id", input.id)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (estimateFetchError) {
@@ -795,7 +802,8 @@ export async function updateProject(
         },
       })
       .eq("project_id", input.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
     if (estimateError) {
       return { ok: false, error: "Neizdevās saglabāt tāmi." };
@@ -909,6 +917,7 @@ export async function updateProjectEstimateDates(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -925,7 +934,8 @@ export async function updateProjectEstimateDates(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt datumus." };
@@ -958,6 +968,7 @@ export async function updateProjectEstimatePlannedProfit(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -977,7 +988,8 @@ export async function updateProjectEstimatePlannedProfit(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt plānoto peļņu." };
@@ -1015,6 +1027,7 @@ export async function omitProjectExcludedPosition(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -1035,7 +1048,8 @@ export async function omitProjectExcludedPosition(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās noņemt pozīciju no projekta." };
@@ -1073,6 +1087,7 @@ export async function restoreProjectExcludedPosition(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -1094,7 +1109,8 @@ export async function restoreProjectExcludedPosition(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās atjaunot pozīciju projektā." };
@@ -1121,6 +1137,7 @@ async function omitExcludedPositionOnOtherProjectEstimates(
     .from("estimates")
     .select("project_id, meta")
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .neq("project_id", sourceProjectId);
 
   if (error) {
@@ -1146,7 +1163,8 @@ async function omitExcludedPositionOnOtherProjectEstimates(
         },
       })
       .eq("project_id", row.project_id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN);
   });
 
   const results = await Promise.all(updates);
@@ -1236,6 +1254,7 @@ export async function markProjectMaterialOrdered(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -1266,7 +1285,8 @@ export async function markProjectMaterialOrdered(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās atzīmēt materiālu kā pasūtītu." };
@@ -1338,6 +1358,7 @@ export async function assignProjectMaterialUser(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -1359,7 +1380,8 @@ export async function assignProjectMaterialUser(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās piešķirt materiālu lietotājam." };
@@ -1424,7 +1446,8 @@ export async function saveProjectEstimate(
     .from("estimates")
     .update({ title: payload.title, meta: payload.meta, categories })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt tāmi." };

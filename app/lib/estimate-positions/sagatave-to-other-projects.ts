@@ -1,5 +1,6 @@
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
+import { ESTIMATE_KIND_MAIN } from "@/app/lib/estimates/kind";
 import { hideEstimateStructureByNodeIds } from "@/app/lib/estimates/hidden-estimate-rows";
 import {
   mergeNewSagatavePositionsIntoProject,
@@ -129,6 +130,7 @@ export async function ensureHiddenSagataveStructureForProject(
     .select("title, meta, categories")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -158,7 +160,8 @@ export async function ensureHiddenSagataveStructureForProject(
       ),
     })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās sinhronizēt sagataves struktūru." };
@@ -203,6 +206,7 @@ export async function propagateSagataveStructureToOtherProjects(
       .select("meta, categories")
       .eq("project_id", project.id)
       .eq("company_id", companyId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN)
       .maybeSingle();
 
     if (estimateError || !estimate) {
@@ -232,7 +236,8 @@ export async function propagateSagataveStructureToOtherProjects(
         ),
       })
       .eq("project_id", project.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
     if (updateError) {
       return { ok: false, error: "Neizdevās sinhronizēt sagataves struktūru." };
@@ -262,6 +267,7 @@ export async function acknowledgeSagataveStructureIntro(
     .select("meta")
     .eq("project_id", projectId)
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .maybeSingle();
 
   if (error || !data) {
@@ -280,7 +286,8 @@ export async function acknowledgeSagataveStructureIntro(
     .from("estimates")
     .update({ meta })
     .eq("project_id", projectId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
   if (updateError) {
     return { ok: false, error: "Neizdevās saglabāt apstiprinājumu." };

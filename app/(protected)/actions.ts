@@ -6,6 +6,10 @@ import { requireAction } from "@/app/lib/auth/require-permission";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
+  createAdditionalWorkEstimate,
+  saveAdditionalWorkEstimate,
+} from "@/app/lib/additional-work-estimates/repository";
+import {
   createProject,
   createExcludedPositionFromProject,
   deleteProject,
@@ -156,6 +160,46 @@ export async function saveProjectEstimateAction(
     revalidatePath("/");
     revalidatePath("/estimate");
     revalidatePath(`/${projectId}`);
+  }
+
+  return result;
+}
+
+export async function createAdditionalWorkEstimateAction(projectId: string) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const user = await getCurrentUser();
+  const author = user ? mapUserDisplay(user).name : "";
+
+  const result = await createAdditionalWorkEstimate(projectId, author);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath(`/${projectId}/additional-work/${result.id}`);
+  }
+
+  return result;
+}
+
+export async function saveAdditionalWorkEstimateAction(
+  projectId: string,
+  estimateId: string,
+  payload: {
+    title: string;
+    meta: EstimateMeta;
+    categories: EstimateCategory[];
+    multiOptionLinks: MultiOptionLinkGroup[];
+  },
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await saveAdditionalWorkEstimate(projectId, estimateId, payload);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath(`/${projectId}/additional-work/${estimateId}`);
   }
 
   return result;

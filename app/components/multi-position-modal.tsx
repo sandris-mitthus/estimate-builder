@@ -14,6 +14,7 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
 import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
+import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
 import { LineItemAttentionToggle } from "@/app/components/line-item-attention-toggle";
@@ -71,6 +72,9 @@ type OptionDraft = {
   mechanisms: LineItemCatalogRef[];
   materialAddKey: number;
   mechanismAddKey: number;
+  /** Saglabātā mērvienība un apjoms — jāsaglabā, lai labošana nepārraksta projekta ievadi. */
+  unit: string;
+  quantity: number;
 };
 
 const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
@@ -91,6 +95,8 @@ function createOptionDraft(): OptionDraft {
     mechanisms: [],
     materialAddKey: 0,
     mechanismAddKey: 0,
+    unit: "gab.",
+    quantity: 1,
   };
 }
 
@@ -104,6 +110,9 @@ function deriveSharedState(value: EstimateMultiPosition) {
     attachment: first?.moduleSizeAttachment ?? null,
     manualUnitEnabled: first?.manualUnitEnabled === true,
     manualUnit: first?.manualUnit?.trim() ?? "",
+    variableQuantity: value.options.some(
+      (option) => option.lineItem.variableQuantity === true,
+    ),
     options:
       value.options.length > 0
         ? value.options.map<OptionDraft>((option) => ({
@@ -119,6 +128,8 @@ function deriveSharedState(value: EstimateMultiPosition) {
             mechanisms: resolveEffectiveMechanisms(option.lineItem),
             materialAddKey: 0,
             mechanismAddKey: 0,
+            unit: option.lineItem.unit,
+            quantity: option.lineItem.quantity,
           }))
         : [createOptionDraft()],
   };
@@ -132,6 +143,7 @@ function snapshot(state: {
   attachment: LineItemModuleSizeAttachment | null;
   manualUnitEnabled: boolean;
   manualUnit: string;
+  variableQuantity: boolean;
   options: OptionDraft[];
 }): string {
   return JSON.stringify({
@@ -142,6 +154,7 @@ function snapshot(state: {
     attachment: state.attachment,
     manualUnitEnabled: state.manualUnitEnabled,
     manualUnit: state.manualUnit.trim(),
+    variableQuantity: state.variableQuantity,
     options: state.options.map((option) => ({
       label: option.label.trim(),
       note: option.note.trim(),
@@ -154,40 +167,66 @@ function snapshot(state: {
   });
 }
 
+type SharedOptionSettings = {
+  attachment: LineItemModuleSizeAttachment | null;
+  manualUnitEnabled: boolean;
+  manualUnit: string;
+  variableQuantity: boolean;
+};
+
 function buildOptionPreviewLineItem(
   option: OptionDraft,
-  sharedAttachment: LineItemModuleSizeAttachment | null,
-  manualUnitEnabled: boolean,
-  manualUnit: string,
+  shared: SharedOptionSettings,
   moduleSizeOptions: BuildingModuleSizeOption[],
 ): EstimateLineItem {
   const partialItem: EstimateLineItem = {
     id: option.lineItemId,
     name: option.label,
     note: option.note.trim() || undefined,
-    unit: "gab.",
-    quantity: 1,
+    unit: option.unit || "gab.",
+    quantity: option.quantity,
     unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
     laborTimeNorm: option.timeNorm,
     customHourlyRateEnabled: option.customHourlyRateEnabled,
     customHourlyRate: option.customHourlyRate,
     materials: option.materials,
     mechanisms: option.mechanisms,
-    moduleSizeAttachment: sharedAttachment ?? undefined,
-    manualUnitEnabled: manualUnitEnabled ? true : undefined,
+    // Individuālais apjoms nav saistīts ar moduļa lielumu
+    moduleSizeAttachment: shared.variableQuantity
+      ? undefined
+      : (shared.attachment ?? undefined),
+    manualUnitEnabled: shared.manualUnitEnabled ? true : undefined,
     manualUnit:
-      manualUnitEnabled && manualUnit.trim() ? manualUnit.trim() : undefined,
+      shared.manualUnitEnabled && shared.manualUnit.trim()
+        ? shared.manualUnit.trim()
+        : undefined,
+    variableQuantity: shared.variableQuantity ? true : undefined,
   };
-  const unit = (() => {
-    if (manualUnitEnabled && manualUnit.trim()) {
-      return manualUnit.trim();
-    }
-    return (
-      resolveLineItemDisplayUnitFromModuleSize(partialItem, moduleSizeOptions) ??
-      "gab."
-    );
-  })();
-  return { ...partialItem, unit };
+
+  return {
+    ...partialItem,
+    unit: resolveOptionUnit(option, shared, partialItem, moduleSizeOptions),
+  };
+}
+
+function resolveOptionUnit(
+  option: OptionDraft,
+  shared: SharedOptionSettings,
+  partialItem: EstimateLineItem,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): string {
+  if (shared.variableQuantity) {
+    return option.materials[0]?.unit.trim() || option.unit.trim() || "gab.";
+  }
+
+  if (shared.manualUnitEnabled && shared.manualUnit.trim()) {
+    return shared.manualUnit.trim();
+  }
+
+  return (
+    resolveLineItemDisplayUnitFromModuleSize(partialItem, moduleSizeOptions) ??
+    "gab."
+  );
 }
 
 export function MultiPositionModal({
@@ -212,6 +251,7 @@ export function MultiPositionModal({
     useState<LineItemModuleSizeAttachment | null>(null);
   const [manualUnitEnabled, setManualUnitEnabled] = useState(false);
   const [manualUnit, setManualUnit] = useState("");
+  const [variableQuantity, setVariableQuantity] = useState(false);
   const [options, setOptions] = useState<OptionDraft[]>([createOptionDraft()]);
   const [initialSnapshot, setInitialSnapshot] = useState("");
   const [globalNoteError, setGlobalNoteError] = useState<string | undefined>();
@@ -229,6 +269,7 @@ export function MultiPositionModal({
     setAttachment(shared.attachment);
     setManualUnitEnabled(shared.manualUnitEnabled);
     setManualUnit(shared.manualUnit);
+    setVariableQuantity(shared.variableQuantity);
     setOptions(shared.options);
     setInitialSnapshot(snapshot(shared));
     setGlobalNoteError(undefined);
@@ -259,6 +300,7 @@ export function MultiPositionModal({
         attachment,
         manualUnitEnabled,
         manualUnit,
+        variableQuantity,
         options,
       }),
     [
@@ -269,10 +311,18 @@ export function MultiPositionModal({
       attachment,
       manualUnitEnabled,
       manualUnit,
+      variableQuantity,
       options,
     ],
   );
   const dirty = currentSnapshot !== initialSnapshot;
+
+  const sharedOptionSettings: SharedOptionSettings = {
+    attachment,
+    manualUnitEnabled,
+    manualUnit,
+    variableQuantity,
+  };
 
   function updateOption(optionId: string, updates: Partial<OptionDraft>) {
     setOptions((current) =>
@@ -472,17 +522,19 @@ export function MultiPositionModal({
 
   function optionUnitPrice(option: OptionDraft) {
     return deriveCompositeUnitPrice(
-      buildOptionPreviewLineItem(
-        option,
-        attachment,
-        manualUnitEnabled,
-        manualUnit,
-        moduleSizeOptions,
-      ),
+      buildOptionPreviewLineItem(option, sharedOptionSettings, moduleSizeOptions),
       catalogPositions,
       defaultHourlyRate,
       moduleSizeOptions,
     );
+  }
+
+  function handleVariableQuantityChange(enabled: boolean) {
+    setVariableQuantity(enabled);
+    // Ieslēdzot individuālo apjomu: notīra moduļa piesaisti visām opcijām
+    if (enabled) {
+      setAttachment(null);
+    }
   }
 
   function isMeaningfulOption(option: OptionDraft): boolean {
@@ -529,6 +581,10 @@ export function MultiPositionModal({
     const meaningful = options.filter(isMeaningfulOption);
     const finalOptions = meaningful.length > 0 ? meaningful : [options[0]];
 
+    // Individuālais apjoms ir globāls — visām opcijām viens un tas pats apjoms
+    const sharedQuantity =
+      finalOptions.find((option) => option.quantity > 0)?.quantity ?? 0;
+
     const builtOptions = finalOptions.map((option) => {
       const label = option.label.trim();
       const trimmedNote = option.note.trim();
@@ -536,8 +592,8 @@ export function MultiPositionModal({
         id: option.lineItemId,
         name: label,
         note: trimmedNote || undefined,
-        unit: "gab.",
-        quantity: 1,
+        unit: option.unit || "gab.",
+        quantity: variableQuantity ? sharedQuantity : option.quantity,
         laborTimeNorm: option.timeNorm,
         customHourlyRateEnabled: option.customHourlyRateEnabled,
         customHourlyRate: option.customHourlyRateEnabled
@@ -545,26 +601,23 @@ export function MultiPositionModal({
           : undefined,
         materials: option.materials,
         mechanisms: option.mechanisms,
-        moduleSizeAttachment: attachment ?? undefined,
+        moduleSizeAttachment: variableQuantity
+          ? undefined
+          : (attachment ?? undefined),
         manualUnitEnabled: manualUnitEnabled ? true : undefined,
         manualUnit:
           manualUnitEnabled && manualUnit.trim() ? manualUnit.trim() : undefined,
+        variableQuantity: variableQuantity ? true : undefined,
         unitPrice: { labor: 0, materials: 0, mechanisms: 0 },
       };
-      const resolvedUnit = (() => {
-        if (manualUnitEnabled && manualUnit.trim()) {
-          return manualUnit.trim();
-        }
-        return (
-          resolveLineItemDisplayUnitFromModuleSize(
-            partialItem,
-            moduleSizeOptions,
-          ) ?? "gab."
-        );
-      })();
       const lineItem: EstimateLineItem = {
         ...partialItem,
-        unit: resolvedUnit,
+        unit: resolveOptionUnit(
+          option,
+          sharedOptionSettings,
+          partialItem,
+          moduleSizeOptions,
+        ),
       };
       return {
         id: option.optionId,
@@ -687,6 +740,12 @@ export function MultiPositionModal({
           ) : null}
         </div>
 
+        <PositionVariableQuantityField
+          id={`multi-variable-quantity-${value.id}`}
+          enabled={variableQuantity}
+          onChange={handleVariableQuantityChange}
+        />
+
         <PositionManualUnitField
           id={`multi-manual-unit-${value.id}`}
           enabled={manualUnitEnabled}
@@ -696,25 +755,27 @@ export function MultiPositionModal({
           onUnitChange={setManualUnit}
         />
 
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <span className={labelClassName}>
-              {t("estimate.multi.module_size_quantity", "Apjoms no moduļa lieluma (vienots)")}
-            </span>
-            {attachment ? (
-              <AttachedModuleSizeLabel
-                attachment={attachment}
-                moduleSizeOptions={moduleSizeOptions}
-              />
-            ) : null}
+        {variableQuantity ? null : (
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className={labelClassName}>
+                {t("estimate.multi.module_size_quantity", "Apjoms no moduļa lieluma (vienots)")}
+              </span>
+              {attachment ? (
+                <AttachedModuleSizeLabel
+                  attachment={attachment}
+                  moduleSizeOptions={moduleSizeOptions}
+                />
+              ) : null}
+            </div>
+            <ModuleSizeAttachPicker
+              controlPrefix={`multi-attach-${value.id}`}
+              moduleSizeOptions={moduleSizeOptions}
+              attachment={attachment}
+              onChange={setAttachment}
+            />
           </div>
-          <ModuleSizeAttachPicker
-            controlPrefix={`multi-attach-${value.id}`}
-            moduleSizeOptions={moduleSizeOptions}
-            attachment={attachment}
-            onChange={setAttachment}
-          />
-        </div>
+        )}
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -878,9 +939,7 @@ export function MultiPositionModal({
                               material={mat}
                               item={buildOptionPreviewLineItem(
                                 option,
-                                attachment,
-                                manualUnitEnabled,
-                                manualUnit,
+                                sharedOptionSettings,
                                 moduleSizeOptions,
                               )}
                               moduleSizeOptions={moduleSizeOptions}
@@ -948,9 +1007,7 @@ export function MultiPositionModal({
                               mechanism={mech}
                               item={buildOptionPreviewLineItem(
                                 option,
-                                attachment,
-                                manualUnitEnabled,
-                                manualUnit,
+                                sharedOptionSettings,
                                 moduleSizeOptions,
                               )}
                               moduleSizeOptions={moduleSizeOptions}

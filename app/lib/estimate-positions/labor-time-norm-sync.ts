@@ -20,6 +20,7 @@ import {
   parseEstimatePositionDocumentPayload,
 } from "@/app/lib/estimate-positions/serialize-document";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { ESTIMATE_KIND_MAIN } from "@/app/lib/estimates/kind";
 import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
@@ -469,6 +470,7 @@ export async function propagateLaborTimeNormsFromProject(
     .from("estimates")
     .select("project_id, title, meta, categories")
     .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .in("project_id", eligibleProjectIds);
 
   if (estimatesError) {
@@ -505,7 +507,8 @@ export async function propagateLaborTimeNormsFromProject(
         .from("estimates")
         .update({ categories })
         .eq("project_id", row.project_id as string)
-        .eq("company_id", companyId);
+        .eq("company_id", companyId)
+        .eq("estimate_kind", ESTIMATE_KIND_MAIN);
 
       return { error };
     });

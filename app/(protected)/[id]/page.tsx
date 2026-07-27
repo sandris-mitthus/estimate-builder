@@ -2,6 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EstimateTable } from "@/app/components/estimate-table";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
+import { canPerformAction } from "@/app/lib/users/groups-repository";
+import { listAdditionalWorkEstimates } from "@/app/lib/additional-work-estimates/repository";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
+import { ProjectAdditionalWorkSection } from "@/app/components/project-additional-work-section";
 import {
   buildProjectModuleSizeOptions,
   syncCategoriesQuantitiesFromModuleSizes,
@@ -33,6 +38,9 @@ export default async function ProjectDetailPage({
 
   const { id } = await params;
   const { t } = await getServerTranslations();
+  const additionalWorkModuleEnabled = await isFrontendModuleEnabled(
+    FRONTEND_MODULE_KEYS.additionalWork,
+  );
   const [
     project,
     modules,
@@ -64,9 +72,12 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const [buildingModule, users] = await Promise.all([
+  const [buildingModule, users, additionalWorkEstimates] = await Promise.all([
     project.buildingModuleId ? getBuildingModule(project.buildingModuleId) : null,
     isProjectEstimateLocked(project.status) ? listUsers() : [],
+    additionalWorkModuleEnabled
+      ? listAdditionalWorkEstimates(project.id)
+      : Promise.resolve([]),
   ]);
 
   const moduleVisualizations = buildingModule
@@ -123,6 +134,15 @@ export default async function ProjectDetailPage({
         globalExcludedPositions={globalExcludedPositions}
         users={users}
       />
+      {additionalWorkModuleEnabled ? (
+        <div className="mt-8">
+          <ProjectAdditionalWorkSection
+            project={project}
+            estimates={additionalWorkEstimates}
+            canManage={canPerformAction(session.access, "estimate.save")}
+          />
+        </div>
+      ) : null}
     </main>
   );
 }

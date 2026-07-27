@@ -1,5 +1,8 @@
 import { addThousandSeparators, roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
-import type { EstimateLineItem } from "@/app/lib/estimates/types";
+import type {
+  EstimateLineItem,
+  EstimateMultiPosition,
+} from "@/app/lib/estimates/types";
 import { findCatalogPositionForLineItem } from "@/app/lib/positions/sync-from-estimate-line-items";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 
@@ -31,6 +34,50 @@ export function isVariableQuantityLineItem(
   }
   const position = findCatalogPositionForLineItem(item, catalogPositions);
   return position?.variableQuantity === true;
+}
+
+/**
+ * Multi-pozīcijai individuālais apjoms ir globāls — viens iestatījums visām opcijām.
+ * Karodziņš glabājas katras opcijas rindā, tāpēc pietiek, ja tas ir vismaz vienai.
+ */
+export function isVariableQuantityMultiPosition(
+  multi: EstimateMultiPosition,
+  catalogPositions: PositionPriceSummary[],
+): boolean {
+  return multi.options.some((option) =>
+    isVariableQuantityLineItem(option.lineItem, catalogPositions),
+  );
+}
+
+/** Multi-pozīcijas kopīgais apjoms — izvēlētās opcijas, citādi pirmās aizpildītās. */
+export function resolveMultiPositionQuantity(
+  multi: EstimateMultiPosition,
+): number {
+  const selected = multi.options.find(
+    (option) => option.id === multi.selectedOptionId,
+  );
+  if (selected) {
+    return selected.lineItem.quantity;
+  }
+
+  return (
+    multi.options.find((option) => option.lineItem.quantity > 0)?.lineItem
+      .quantity ?? 0
+  );
+}
+
+/** Uzstāda vienu apjomu visām multi-pozīcijas opcijām. */
+export function setMultiPositionQuantity(
+  multi: EstimateMultiPosition,
+  quantity: number,
+): EstimateMultiPosition {
+  return {
+    ...multi,
+    options: multi.options.map((option) => ({
+      ...option,
+      lineItem: { ...option.lineItem, quantity },
+    })),
+  };
 }
 
 export function hasAnyVariableQuantityPosition(
