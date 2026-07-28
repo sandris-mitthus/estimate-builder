@@ -4,11 +4,20 @@ All notable changes to **Estimate Builder** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-See [README.md](README.md) for features, setup and project structure.
+See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md](DEVELOPER.md) for the full technical documentation.
 
 ## Unreleased
 
 - (none)
+
+## v1.3.98
+
+**Dokumentācija sadalīta trīs failos**
+
+- **`README.md`** pārtaisīts par īsu komerciālu pārskatu (134 rindas): ko produkts dara, lietotājam redzamās funkcijas, uzstādīšana (env, Supabase, Vercel), tehnoloģijas un saites uz pārējiem dokumentiem
+- **`DEVELOPER.md`** (jauns) — pilnā tehniskā dokumentācija: visas funkcionalitātes sadaļas, projekta struktūra, DB shēma, CI/drošības pārbaudes, versionēšanas process, Cursor rules un roadmap
+- **`CHANGELOG.md`** ievadā saite arī uz `DEVELOPER.md`
+- Cursor rules atjaunināti: `readme-version-update.mdc` apraksta trīs failu sadalījumu un prasa `CHANGELOG.md` ierakstu + `DEVELOPER.md` sinhronizāciju; `github-version-commit.mdc` norāda uz `DEVELOPER.md` un iekļauj to release commit failos
 
 ## v1.3.97
 

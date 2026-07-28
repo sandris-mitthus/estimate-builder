@@ -5,14 +5,14 @@ alwaysApply: true
 
 # GitHub commits — version tag required
 
-When the user asks to **commit**, **push**, **update GitHub**, or similar, every release commit must follow the project convention documented in `README.md` → **Versioning & commits**.
+When the user asks to **commit**, **push**, **update GitHub**, or similar, every release commit must follow the project convention documented in `DEVELOPER.md` → **Versioning & commits**.
 
 ## Before commit
 
 1. **Shippable work** (features, fixes, migrations, notable UI) → run **README update** first (`.cursor/rules/readme-version-update.mdc`; default patch +0.0.1):
    - bump `package.json` `"version"`
    - add `## vX.Y.Z` at the top of the entry list in `CHANGELOG.md`
-   - update `**Current version:**` in `README.md`; sync Features / Project structure if behavior changed
+   - update `**Current version:**` in `README.md`; sync `DEVELOPER.md` (Features / Project structure / Roadmap) if behavior changed
 2. Read the final version from `package.json` — that is the tag for the commit message.
 3. **Verify the code** — run before `git commit` (fix failures; do not commit broken releases):
    ```bash
@@ -54,7 +54,7 @@ Fix subcategory border and drop indicator on cross-category moves. v1.0.1
 
 ## Push
 
-- Include `CHANGELOG.md`, `README.md` and `package.json` in the same commit when they were bumped for this release.
+- Include `CHANGELOG.md`, `README.md`, `DEVELOPER.md` and `package.json` in the same commit when they were updated for this release.
 - Do not push unless the user explicitly asks.
 - Re-run `npm run typecheck` and `npm run build` if code changed after the last successful check and before push.
-- There is **no GitHub Actions CI** yet — local checks above are the release gate.
+- GitHub Actions run secret scan, dependency audit and a security smoke build on push — local checks above still are the first release gate.

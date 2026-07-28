@@ -1,6 +1,6 @@
 ---
 description: When the user says "README update", bump patch version and add a CHANGELOG.md entry
-globs: README.md,CHANGELOG.md,package.json
+globs: README.md,DEVELOPER.md,CHANGELOG.md,package.json
 alwaysApply: false
 ---
 
@@ -8,10 +8,11 @@ alwaysApply: false
 
 When the user asks for a **README update** (e.g. `README update`, `@README.md update`, `update readme`), run a **release notes pass** — not typo-only edits unless they say so.
 
-**Two files, two jobs:**
+**Three files, three jobs:**
 
 - **`CHANGELOG.md`** — every release entry (`## vX.Y.Z`, newest first). This is the only place version history lives.
-- **`README.md`** — current state of the app only (features, setup, structure). No changelog entries; it just links to `CHANGELOG.md` and shows `**Current version:**`.
+- **`README.md`** — short commercial overview: what the product does, user-facing key features, getting started, tech stack, links to `DEVELOPER.md` and `CHANGELOG.md`, and `**Current version:**`. No changelog entries, no deep technical detail; keep it **under 150 lines**.
+- **`DEVELOPER.md`** — full technical documentation: feature behaviour, project structure, database schema, CI/security checks, versioning process, Cursor rules, roadmap. New technical detail goes here, not in `README.md`.
 
 ## Version bump (default: patch +0.0.1)
 
@@ -30,13 +31,14 @@ When the user asks for a **README update** (e.g. `README update`, `@README.md up
 2. **Changes since that version** — `git log`, `git diff`, uncommitted work. Group by theme (features, fixes, docs, infra).
 3. **Bump** `package.json` per table above.
 4. **README header** — `**Current version:** \`X.Y.Z\``.
-5. **`CHANGELOG.md`** (newest first, directly under `## Unreleased`):
+5. **`CHANGELOG.md`** (required, newest first, directly under `## Unreleased`):
    - Move `## Unreleased` bullets into the new `## vX.Y.Z`.
    - Document **all** shippable changes since the previous changelog version.
    - Optional **bold theme** line per section.
    - Reset `## Unreleased` to `- (none)`.
-6. **Sync README body** if behavior changed: Features, Environment, Project structure, Roadmap.
-7. **Commit/push** — only if the user explicitly asks; then follow `.cursor/rules/github-version-commit.mdc` (message ends with `. vX.Y.Z`).
+6. **Sync `DEVELOPER.md`** if behavior changed: Features, Project structure, Database schema, Roadmap, CI checks.
+7. **Sync `README.md`** only when the user-facing story or setup changed: key features, Environment, scripts, Supabase/Vercel steps. Keep it under 150 lines — move technical detail to `DEVELOPER.md` instead of growing the README.
+8. **Commit/push** — only if the user explicitly asks; then follow `.cursor/rules/github-version-commit.mdc` (message ends with `. vX.Y.Z`).
 
 ## Changelog entry format
 
