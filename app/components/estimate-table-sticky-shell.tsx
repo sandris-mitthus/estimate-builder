@@ -1,6 +1,7 @@
 "use client";
 
 import { SIDEBAR_LAYOUT_CHANGE_EVENT } from "@/app/lib/navigation/sidebar-cookie";
+import { syncStickyGroupRows } from "@/app/lib/estimates/sticky-group-rows";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 type EstimateTableStickyShellProps = {
@@ -78,6 +79,8 @@ export function EstimateTableStickyShell({
       } else {
         setPinStyle(null);
       }
+
+      syncStickyGroupRows(scope, nextHeaderHeight);
     };
 
     let stopLayoutSync = runLayoutSyncUpdates(update);

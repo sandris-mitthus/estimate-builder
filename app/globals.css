@@ -54,6 +54,19 @@ button:disabled,
   min-width: 0;
 }
 
+/* Kategoriju un subkategoriju rindas paliek redzamas zem tabulas galvenes.
+   `top` ritināšanas laikā uzstāda estimate-table-sticky-shell. */
+.estimate-table-scroll-scope [data-estimate-sticky-group] > tr > td {
+  position: sticky;
+  z-index: 11;
+}
+
+.estimate-table-scroll-scope [data-estimate-sticky-group="category"] > tr > td {
+  z-index: 12;
+  /* bg-zinc-200/90 uz balta fona — sticky rindas fons nedrīkst būt caurspīdīgs. */
+  background-color: #e7e7e9;
+}
+
 @media (min-width: 768px) {
   .page {
     padding: 2rem 1.5rem 3rem var(--app-content-inset-left);

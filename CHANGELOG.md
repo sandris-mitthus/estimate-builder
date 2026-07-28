@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.99
+
+**Sticky kategoriju un subkategoriju rindas sagatavē**
+
+- Sagataves tāmē (`/estimate`) kategorijas un subkategorijas rinda paliek piespraustas zem tabulas galvenes, kamēr ritina to saturu, un tiek nomainītas, tiklīdz sākas nākamā grupa; subkategorija izslīd augšup arī tad, ja pēc tās seko kategorijas tiešās pozīcijas
+- Jauns `app/lib/estimates/sticky-group-rows.ts` pārrēķina rindu `top` vērtības; `EstimateTableStickyShell` izsauc to tajā pašā scroll/resize ciklā, kas piesprauž kolonnu galveni
+- Tabulas karte pārgāja no `overflow-hidden` uz `overflow-clip` — `hidden` veidoja ritināšanas konteineru un atslēdza `position: sticky`
+
 ## v1.3.98
 
 **Dokumentācija sadalīta trīs failos**

@@ -598,6 +598,7 @@ function SectionRow({
       style={rowStyle}
       onMouseEnter={sectionGroupHover?.onSectionGroupEnter}
       onMouseLeave={sectionGroupHover?.onSectionGroupLeave}
+      data-estimate-sticky-group={isCategory ? "category" : "subcategory"}
       className={`${isCategory ? "category-row" : "subcategory-row"} ${showDropLine ? dropLineClass : ""}`}
     >
     <tr>
@@ -862,6 +863,11 @@ function SubcategoryBlock({
           />
         ),
       )}
+      <tbody aria-hidden="true" data-estimate-sticky-group-end="">
+        <tr>
+          <td colSpan={FULL_COL_COUNT} className="h-0 p-0" />
+        </tr>
+      </tbody>
     </>
   );
 }
@@ -1543,7 +1549,9 @@ export function EstimatePositionTable({
 
   return (
     <div className="max-w-full space-y-4">
-      <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      {/* overflow-clip, nevis overflow-hidden: hidden veidotu ritināšanas
+          konteineru un atslēgtu sticky kategoriju rindas. */}
+      <div className="min-w-0 max-w-full overflow-clip rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <SectionTitleFocusProvider>
         <div className={readOnly ? "pointer-events-none opacity-80" : undefined}>
           <PositionModalProvider openPositionModal={openPositionModal}>
