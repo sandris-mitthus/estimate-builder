@@ -17,7 +17,10 @@ import {
   estimateAttentionRowClassName,
 } from "@/app/components/line-item-attention-toggle";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
-import { patchRequiresAttention } from "@/app/lib/estimates/attention-budget";
+import {
+  patchRequiresAttention,
+  resolveAttentionBudgetAmount,
+} from "@/app/lib/estimates/attention-budget";
 import { DeleteButton } from "@/app/components/delete-button";
 import { RestoreButton } from "@/app/components/restore-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
@@ -179,8 +182,11 @@ function resolveDisplayUnitPrice(
 
 function EmptyHeaderMetricCells({
   showQuantityColumn = false,
+  unitPriceTotalContent,
 }: {
   showQuantityColumn?: boolean;
+  /** Saturs vienības cenas "Kopā" šūnā (piem. aptuvenais budžets). */
+  unitPriceTotalContent?: ReactNode;
 }) {
   const styles = getEstimateNumericStyles(showQuantityColumn);
   const metricCell = showQuantityColumn
@@ -191,16 +197,15 @@ function EmptyHeaderMetricCells({
     <>
       <td className={metricCell} />
       {showQuantityColumn ? <td className={metricCell} /> : null}
-      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => (
-        <td
-          key={index}
-          className={
-            index === UNIT_PRICE_COLUMN_COUNT - 1
-              ? styles.cellTotal
-              : metricCell
-          }
-        />
-      ))}
+      {Array.from({ length: UNIT_PRICE_COLUMN_COUNT }).map((_, index) => {
+        const isTotal = index === UNIT_PRICE_COLUMN_COUNT - 1;
+
+        return (
+          <td key={index} className={isTotal ? styles.cellTotal : metricCell}>
+            {isTotal ? unitPriceTotalContent : null}
+          </td>
+        );
+      })}
       {showQuantityColumn ? (
         <EmptyVolumePriceCells
           cellClassName={styles.volumeCell}
@@ -617,8 +622,15 @@ export function EstimateMultiPositionRow({
     ? multiQuantity
     : (attachedQuantity ?? selectedLineItem?.quantity ?? 0);
   const volumeVariable = showQuantityInput || hasAttachedQuantity;
+  const multiAttentionBudget = resolveAttentionBudgetAmount(value);
+  const rowAttentionBudget =
+    multiAttentionBudget > 0
+      ? multiAttentionBudget
+      : resolveAttentionBudgetAmount(selectedLineItem);
+  const showBudgetInTotalCell =
+    value.requiresAttention === true && mode === "offer" && showQuantityColumn;
   const volumeSum =
-    showQuantityColumn && selectedLineItem
+    showQuantityColumn && selectedLineItem && rowAttentionBudget <= 0
       ? resolveLineItemVolumeSum(
           effectiveQuantity,
           displayPrices,
@@ -723,7 +735,7 @@ export function EstimateMultiPositionRow({
                         <PositionVariableQuantityIcon enabled={variableQuantity} />
                       </div>
                       <EstimateLineItemNote note={value.note} />
-                      {requiresAttention ? (
+                      {requiresAttention && !showBudgetInTotalCell ? (
                         <EstimateAttentionBudgetControl
                           id={`attention-budget-multi-offer-${value.id}`}
                           value={value.attentionBudget}
@@ -732,8 +744,11 @@ export function EstimateMultiPositionRow({
                           readOnly={!allowOfferMultiEdit}
                           onChange={
                             allowOfferMultiEdit
-                              ? (attentionBudget) =>
-                                  onChange({ ...value, attentionBudget })
+                              ? (nextBudget) =>
+                                  onChange({
+                                    ...value,
+                                    attentionBudget: nextBudget,
+                                  })
                               : undefined
                           }
                         />
@@ -843,6 +858,24 @@ export function EstimateMultiPositionRow({
                 staleCatalogPriceHints={selectedStaleCatalogPriceHints}
                 compact
                 deemphasizeBreakdown={selectedShowOnlyTotalPrice}
+                attentionBudget={rowAttentionBudget}
+                attentionBudgetEditor={
+                  showBudgetInTotalCell ? (
+                    <EstimateAttentionBudgetControl
+                      id={`attention-budget-multi-total-${value.id}`}
+                      value={value.attentionBudget}
+                      currency={currency}
+                      cell
+                      readOnly={!allowOfferMultiEdit}
+                      onChange={
+                        allowOfferMultiEdit
+                          ? (nextBudget) =>
+                              onChange({ ...value, attentionBudget: nextBudget })
+                          : undefined
+                      }
+                    />
+                  ) : undefined
+                }
               />
             ) : null}
             <td className={rowActionCell}>
@@ -927,17 +960,6 @@ export function EstimateMultiPositionRow({
                           <PositionVariableQuantityIcon enabled={variableQuantity} />
                         </div>
                         <EstimateLineItemNote note={value.note} />
-                        {requiresAttention ? (
-                          <EstimateAttentionBudgetControl
-                            id={`attention-budget-multi-${value.id}`}
-                            value={value.attentionBudget}
-                            currency={currency}
-                            compact
-                            onChange={(attentionBudget) =>
-                              onChange({ ...value, attentionBudget })
-                            }
-                          />
-                        ) : null}
                       </div>
                       <IconActionButton
                         label={t("estimate.multi.edit", "Labot multi-pozīciju")}
@@ -950,7 +972,22 @@ export function EstimateMultiPositionRow({
                   </div>
                 </div>
               </td>
-              <EmptyHeaderMetricCells showQuantityColumn={showQuantityColumn} />
+              <EmptyHeaderMetricCells
+                showQuantityColumn={showQuantityColumn}
+                unitPriceTotalContent={
+                  requiresAttention ? (
+                    <EstimateAttentionBudgetControl
+                      id={`attention-budget-multi-total-${value.id}`}
+                      value={value.attentionBudget}
+                      currency={currency}
+                      cell
+                      onChange={(nextBudget) =>
+                        onChange({ ...value, attentionBudget: nextBudget })
+                      }
+                    />
+                  ) : undefined
+                }
+              />
               <td className={rowActionCell}>
                 <div className={estimateLineItemActionsInnerClassName}>
                   <LineItemAttentionToggle

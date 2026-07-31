@@ -320,17 +320,6 @@ function LineItemRow({
                 <PositionVariableQuantityIcon enabled={item.variableQuantity ?? false} />
               </div>
               <EstimateLineItemNote note={item.note} />
-              {requiresAttention ? (
-                <EstimateAttentionBudgetControl
-                  id={`attention-budget-${item.id}`}
-                  value={item.attentionBudget}
-                  currency={currency}
-                  compact
-                  onChange={(attentionBudget) =>
-                    onChange({ ...item, attentionBudget })
-                  }
-                />
-              ) : null}
               {missingModuleSize ? (
                 <span className="text-xs text-red-500">
                   {t("estimate.module_size.missing", "Nav pievienots moduļa apjoms")}
@@ -367,6 +356,19 @@ function LineItemRow({
           moduleSizeOptions,
         )}
         deemphasizeBreakdown={showOnlyTotalPrice}
+        attentionBudgetEditor={
+          requiresAttention ? (
+            <EstimateAttentionBudgetControl
+              id={`attention-budget-total-${item.id}`}
+              value={item.attentionBudget}
+              currency={currency}
+              cell
+              onChange={(nextBudget) =>
+                onChange({ ...item, attentionBudget: nextBudget })
+              }
+            />
+          ) : undefined
+        }
         onTimeNormChange={(laborTimeNorm) =>
           onChange(
             patchLineItemLaborTimeNorm(

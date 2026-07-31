@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
+import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
   formatAttentionBudgetDisplay,
@@ -17,6 +18,8 @@ type EstimateAttentionBudgetControlProps = {
   onChange?: (value: number | undefined) => void;
   readOnly?: boolean;
   compact?: boolean;
+  /** Tabulas kopsummas šūnā — tikai skaitlis, bez etiķetes un valūtas sufiksa. */
+  cell?: boolean;
 };
 
 export function EstimateAttentionBudgetControl({
@@ -26,6 +29,7 @@ export function EstimateAttentionBudgetControl({
   onChange,
   readOnly = false,
   compact = false,
+  cell = false,
 }: EstimateAttentionBudgetControlProps) {
   const { t } = useTranslations();
   const [draft, setDraft] = useState(() => formatAttentionBudgetInputValue(value));
@@ -37,6 +41,55 @@ export function EstimateAttentionBudgetControl({
   }, [value]);
 
   const displayValue = formatAttentionBudgetDisplay(value, currency);
+
+  function commitDraft(nextDraft: string) {
+    if (!onChange) {
+      return;
+    }
+    const parsed = parseAttentionBudgetInput(nextDraft);
+    setDraft(formatAttentionBudgetInputValue(parsed));
+    onChange(parsed);
+  }
+
+  if (cell) {
+    const cellText = formatAttentionBudgetInputValue(value);
+
+    if (readOnly || !onChange) {
+      return (
+        <Tooltip label={label} className="block w-full min-w-0">
+          <span
+            className={`block w-full truncate px-1 py-0.5 text-center text-xs font-semibold leading-tight tabular-nums ${
+              cellText ? "text-red-600" : "text-red-300"
+            }`}
+          >
+            {cellText || "—"}
+          </span>
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip label={label} className="block w-full min-w-0">
+        <input
+          id={id}
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          placeholder="0.00"
+          aria-label={label}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => commitDraft(draft)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitDraft(draft);
+            }
+          }}
+          className="w-full min-w-0 rounded border border-red-200 bg-white px-1 py-0.5 text-center text-xs font-semibold leading-tight tabular-nums text-red-700 transition placeholder:font-normal placeholder:text-red-300 focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-500/10"
+        />
+      </Tooltip>
+    );
+  }
 
   if (readOnly) {
     if (!displayValue) {
@@ -52,15 +105,6 @@ export function EstimateAttentionBudgetControl({
 
   if (!onChange) {
     return null;
-  }
-
-  function commitDraft(nextDraft: string) {
-    if (!onChange) {
-      return;
-    }
-    const parsed = parseAttentionBudgetInput(nextDraft);
-    setDraft(formatAttentionBudgetInputValue(parsed));
-    onChange(parsed);
   }
 
   if (compact) {

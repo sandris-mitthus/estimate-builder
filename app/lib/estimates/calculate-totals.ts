@@ -8,11 +8,15 @@ import {
   isCompositeLineItem,
 } from "@/app/lib/estimates/composite-line-item";
 import { normalizeLineItemModuleSizeAttachment } from "@/app/lib/estimates/module-size-attachment";
-import { collectRowLineItems } from "@/app/lib/estimates/multi-position";
+import {
+  collectRowLineItems,
+  splitRowsForTotals,
+} from "@/app/lib/estimates/multi-position";
 import { buildUnitPriceForCatalogPosition } from "@/app/lib/positions/apply-catalog-to-line-item";
 import type {
   EstimateCategory,
   EstimateLineItem,
+  EstimateRowItem,
   PriceBreakdown,
 } from "@/app/lib/estimates/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
@@ -21,6 +25,8 @@ export type EstimateTotals = {
   labor: number;
   materials: number;
   mechanisms: number;
+  /** Aptuveno budžetu summa — bez sadalījuma, bet ieskaitīta `grand`. */
+  attentionBudget: number;
   grand: number;
 };
 
@@ -139,6 +145,28 @@ export function collectEstimateLineItems(
   return items;
 }
 
+function collectEstimateRows(categories: EstimateCategory[]): EstimateRowItem[] {
+  const rows: EstimateRowItem[] = [];
+
+  for (const category of categories) {
+    if (category.hiddenInEstimate) {
+      continue;
+    }
+
+    rows.push(...category.items);
+
+    for (const subcategory of category.subcategories) {
+      if (subcategory.hiddenInEstimate) {
+        continue;
+      }
+
+      rows.push(...subcategory.items);
+    }
+  }
+
+  return rows;
+}
+
 export function calculateEstimateTotals(
   categories: EstimateCategory[],
   catalogPositions: PositionPriceSummary[] = [],
@@ -150,11 +178,15 @@ export function calculateEstimateTotals(
     labor: 0,
     materials: 0,
     mechanisms: 0,
+    attentionBudget: 0,
     grand: 0,
   };
   const catalogById = buildCatalogPositionMap(catalogPositions);
+  const { items, attentionBudget } = splitRowsForTotals(
+    collectEstimateRows(categories),
+  );
 
-  for (const item of collectEstimateLineItems(categories, { forTotals: true })) {
+  for (const item of items) {
     const breakdown = resolveLineItemBreakdown(
       item,
       catalogPositions,
@@ -167,6 +199,8 @@ export function calculateEstimateTotals(
     totals.mechanisms += breakdown.mechanisms;
   }
 
-  totals.grand = totals.labor + totals.materials + totals.mechanisms;
+  totals.attentionBudget = attentionBudget;
+  totals.grand =
+    totals.labor + totals.materials + totals.mechanisms + attentionBudget;
   return totals;
 }

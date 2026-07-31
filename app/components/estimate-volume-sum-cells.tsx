@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   formatAmountDisplay,
   isAmountDisplayEmpty,
@@ -124,6 +125,8 @@ export function VolumeSumCells({
   rowBgClassName,
   preLaborSummary,
   deemphasizeBreakdown = false,
+  attentionBudget = 0,
+  attentionBudgetEditor,
 }: {
   values: PriceBreakdown | null;
   laborWorkloadHours?: number | null;
@@ -135,6 +138,10 @@ export function VolumeSumCells({
   preLaborSummary?: CollapsedSectionSummaryParts;
   /** UI: samazina uzmanību sadalījuma kolonnām (eksportā joprojām paslēpj). */
   deemphasizeBreakdown?: boolean;
+  /** Aptuvenais budžets — pieskaitās "Kopā" šūnai, bet nav sadalījumā. */
+  attentionBudget?: number;
+  /** Rediģējams budžeta lauks "Kopā" šūnā aprēķinātās summas vietā. */
+  attentionBudgetEditor?: ReactNode;
 }) {
   const styles = getEstimateNumericStyles(compact);
   const readOnlyNum = styles.readOnly;
@@ -149,7 +156,8 @@ export function VolumeSumCells({
     true,
   );
   const staleVolumeCell = `${styles.volumeCell} bg-red-100 ring-1 ring-inset ring-red-300 max-w-0 overflow-hidden`;
-  const total = values ? sumBreakdown(values) : 0;
+  const total = (values ? sumBreakdown(values) : 0) + attentionBudget;
+  const hasTotal = values != null || attentionBudget > 0;
   const workloadText =
     laborWorkloadHours != null && laborWorkloadHours > 0
       ? formatTimeNormDisplay(laborWorkloadHours)
@@ -212,7 +220,9 @@ export function VolumeSumCells({
         );
       })}
       <td className={volumeCellTotal}>
-        {summary ? (
+        {attentionBudgetEditor ? (
+          attentionBudgetEditor
+        ) : summary ? (
           <SummaryAmount
             value={total}
             readOnlyNum={readOnlyNum}
@@ -220,8 +230,12 @@ export function VolumeSumCells({
             summary={summary}
           />
         ) : (
-          <span className={volumeAmountClassName(readOnlyNum, total, true, summary)}>
-            {values ? formatAmountDisplay(total) : "—"}
+          <span
+            className={`${volumeAmountClassName(readOnlyNum, total, true, summary)}${
+              values == null && attentionBudget > 0 ? " text-red-600" : ""
+            }`}
+          >
+            {hasTotal ? formatAmountDisplay(total) : "—"}
           </span>
         )}
       </td>

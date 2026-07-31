@@ -1,6 +1,6 @@
 import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
 import { applyPlannedProfitPercent } from "@/app/lib/estimates/planned-profit";
-import { collectRowLineItems } from "@/app/lib/estimates/multi-position";
+import { splitRowsForTotals } from "@/app/lib/estimates/multi-position";
 import {
   hasModuleSizeAttachment,
   resolveLineItemDisplayQuantityFromModuleSize,
@@ -26,6 +26,8 @@ import { isVariableQuantityLineItem } from "@/app/lib/positions/variable-quantit
 export type SectionVolumeTotals = {
   volumeSum: PriceBreakdown | null;
   laborWorkloadHours: number | null;
+  /** Aptuveno budžetu summa — bez sadalījuma, pieskaitāma sekcijas kopsummai. */
+  attentionBudget: number;
 };
 
 type CalculateSectionVolumeTotalsOptions = {
@@ -59,8 +61,9 @@ export function calculateRowsVolumeTotals(
 ): SectionVolumeTotals {
   let volumeSum: PriceBreakdown | null = null;
   let laborWorkloadHours: number | null = null;
+  const { items, attentionBudget } = splitRowsForTotals(rows);
 
-  for (const item of collectRowLineItems(rows, { forTotals: true })) {
+  for (const item of items) {
     const attachedQuantity = resolveLineItemDisplayQuantityFromModuleSize(
       item,
       moduleSizeOptions,
@@ -111,7 +114,7 @@ export function calculateRowsVolumeTotals(
     }
   }
 
-  return { volumeSum, laborWorkloadHours };
+  return { volumeSum, laborWorkloadHours, attentionBudget };
 }
 
 export function calculateSubcategoryVolumeTotals(

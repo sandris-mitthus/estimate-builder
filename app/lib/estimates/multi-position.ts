@@ -1,4 +1,6 @@
 import { createLineItem } from "@/app/lib/estimates/create-empty";
+import { resolveAttentionBudgetAmount } from "@/app/lib/estimates/attention-budget";
+import { roundToTwoDecimals } from "@/app/lib/estimates/calculate-line";
 import {
   resolveEffectiveMaterials,
   resolveEffectiveMechanisms,
@@ -399,6 +401,60 @@ export function collectRowLineItems(
   }
 
   return items;
+}
+
+export type RowsTotalsSplit = {
+  /** Pozīcijas, kurām kopsummu rēķina no cenām. */
+  items: EstimateLineItem[];
+  /** Aptuveno budžetu summa — aizstāj attiecīgo rindu aprēķināto cenu. */
+  attentionBudget: number;
+};
+
+/**
+ * Sadala rindas kopsummām: pozīcijas ar norādītu aptuveno budžetu neietekmē
+ * cenu sadalījumu, bet to budžets tiek summēts atsevišķi.
+ */
+export function splitRowsForTotals(rows: EstimateRowItem[]): RowsTotalsSplit {
+  const items: EstimateLineItem[] = [];
+  let attentionBudget = 0;
+
+  for (const row of rows) {
+    if (isEstimateRowHidden(row)) {
+      continue;
+    }
+
+    if (isEstimateLineItem(row)) {
+      const budget = resolveAttentionBudgetAmount(row);
+      if (budget > 0) {
+        attentionBudget += budget;
+        continue;
+      }
+
+      items.push(row);
+      continue;
+    }
+
+    const multiBudget = resolveAttentionBudgetAmount(row);
+    if (multiBudget > 0) {
+      attentionBudget += multiBudget;
+      continue;
+    }
+
+    const selected = resolveSelectedMultiLineItem(row);
+    if (!selected) {
+      continue;
+    }
+
+    const selectedBudget = resolveAttentionBudgetAmount(selected);
+    if (selectedBudget > 0) {
+      attentionBudget += selectedBudget;
+      continue;
+    }
+
+    items.push(selected);
+  }
+
+  return { items, attentionBudget: roundToTwoDecimals(attentionBudget) };
 }
 
 export function updateRowItemById(

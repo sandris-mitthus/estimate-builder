@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   formatAmountDisplay,
   isAmountDisplayEmpty,
@@ -36,6 +37,10 @@ type EstimateUnitPriceCellsProps = {
   compact?: boolean;
   /** UI: samazina uzmanību sadalījuma kolonnām (eksportā joprojām paslēpj). */
   deemphasizeBreakdown?: boolean;
+  /** Aptuvenais budžets — pieskaitās "Kopā" šūnai, bet nav sadalījumā. */
+  attentionBudget?: number;
+  /** Rediģējams budžeta lauks "Kopā" šūnā aprēķinātās summas vietā. */
+  attentionBudgetEditor?: ReactNode;
 };
 
 export function EstimateUnitPriceCells({
@@ -48,6 +53,8 @@ export function EstimateUnitPriceCells({
   staleCatalogPriceHints,
   compact = false,
   deemphasizeBreakdown = false,
+  attentionBudget = 0,
+  attentionBudgetEditor,
 }: EstimateUnitPriceCellsProps) {
   const { t } = useTranslations();
   const styles = getEstimateNumericStyles(compact);
@@ -60,7 +67,7 @@ export function EstimateUnitPriceCells({
     deemphasizeBreakdown,
   );
 
-  const total = sumBreakdown(values);
+  const total = sumBreakdown(values) + attentionBudget;
   const showLaborBreakdown = item != null && isCompositeLineItem(item);
   const timeNormText =
     showLaborBreakdown && item.laborTimeNorm != null && item.laborTimeNorm > 0
@@ -180,15 +187,19 @@ export function EstimateUnitPriceCells({
         );
       })}
       <td className={unitPriceCellTotal}>
-        <span
-          className={`${readOnlyNum} ${
-            isAmountDisplayEmpty(total)
-              ? "text-zinc-300"
-              : "font-medium text-zinc-900"
-          }`}
-        >
-          {formatAmountDisplay(total)}
-        </span>
+        {attentionBudgetEditor ?? (
+          <span
+            className={`${readOnlyNum} ${
+              isAmountDisplayEmpty(total)
+                ? "text-zinc-300"
+                : attentionBudget > 0
+                  ? "font-medium text-red-600"
+                  : "font-medium text-zinc-900"
+            }`}
+          >
+            {formatAmountDisplay(total)}
+          </span>
+        )}
       </td>
     </>
   );

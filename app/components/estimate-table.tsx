@@ -104,6 +104,7 @@ import {
   estimateAttentionRowClassName,
 } from "@/app/components/line-item-attention-toggle";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
+import { resolveAttentionBudgetAmount } from "@/app/lib/estimates/attention-budget";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
 import { LineItemTotalOnlyToggle } from "@/app/components/line-item-total-only-toggle";
 import { EstimateUnitPriceCells } from "@/app/components/estimate-unit-price-cells";
@@ -528,17 +529,22 @@ function LineItemRow({
       )
     : undefined;
   const volumeVariable = showQuantityInput || hasAttachedQuantity;
-  const volumeSum = showQuantityColumn
-    ? resolveLineItemVolumeSum(
-        effectiveQuantity,
-        displayUnitPrice,
-        volumeVariable,
-      )
-    : null;
+  const requiresAttention = item.requiresAttention === true;
+  const attentionBudget = resolveAttentionBudgetAmount(item);
+  /** Budžets aizstāj aprēķināto cenu, tāpēc sadalījums paliek tukšs. */
+  const budgetReplacesPrice = attentionBudget > 0;
+  const showBudgetInTotalCell = requiresAttention && showQuantityColumn;
+  const volumeSum =
+    showQuantityColumn && !budgetReplacesPrice
+      ? resolveLineItemVolumeSum(
+          effectiveQuantity,
+          displayUnitPrice,
+          volumeVariable,
+        )
+      : null;
   const laborWorkloadHours = showQuantityColumn
     ? resolveLaborWorkloadHours(effectiveQuantity, item, volumeVariable)
     : null;
-  const requiresAttention = item.requiresAttention === true;
   const showOnlyTotalPrice = item.showOnlyTotalPrice === true;
   const totalOnlyToggleClass = showOnlyTotalPrice
     ? "opacity-100"
@@ -589,7 +595,7 @@ function LineItemRow({
                     {compositeRowLabel}
                   </button>
                   <EstimateLineItemNote note={item.note} />
-                  {requiresAttention ? (
+                  {requiresAttention && !showBudgetInTotalCell ? (
                     <EstimateAttentionBudgetControl
                       id={`attention-budget-${item.id}`}
                       value={item.attentionBudget}
@@ -599,8 +605,8 @@ function LineItemRow({
                       onChange={
                         estimateLocked
                           ? undefined
-                          : (attentionBudget) =>
-                              onChange({ ...item, attentionBudget })
+                          : (nextBudget) =>
+                              onChange({ ...item, attentionBudget: nextBudget })
                       }
                     />
                   ) : null}
@@ -618,10 +624,12 @@ function LineItemRow({
                 currency={currency}
                 className={`${nameInput} ${indentName ? subcategoryItemNameIndent : ""}`}
                 footer={
-                  isComposite || item.note?.trim() || requiresAttention ? (
+                  isComposite ||
+                  item.note?.trim() ||
+                  (requiresAttention && !showBudgetInTotalCell) ? (
                     <>
                       <EstimateLineItemNote note={item.note} />
-                      {requiresAttention ? (
+                      {requiresAttention && !showBudgetInTotalCell ? (
                         <EstimateAttentionBudgetControl
                           id={`attention-budget-inline-${item.id}`}
                           value={item.attentionBudget}
@@ -631,8 +639,8 @@ function LineItemRow({
                           onChange={
                             estimateLocked
                               ? undefined
-                              : (attentionBudget) =>
-                                  onChange({ ...item, attentionBudget })
+                              : (nextBudget) =>
+                                  onChange({ ...item, attentionBudget: nextBudget })
                           }
                         />
                       ) : null}
@@ -788,6 +796,24 @@ function LineItemRow({
           staleCatalogPriceHints={staleCatalogPriceHints}
           compact
           deemphasizeBreakdown={showOnlyTotalPrice}
+          attentionBudget={attentionBudget}
+          attentionBudgetEditor={
+            showBudgetInTotalCell ? (
+              <EstimateAttentionBudgetControl
+                id={`attention-budget-total-${item.id}`}
+                value={item.attentionBudget}
+                currency={currency}
+                cell
+                readOnly={estimateLocked}
+                onChange={
+                  estimateLocked
+                    ? undefined
+                    : (nextBudget) =>
+                        onChange({ ...item, attentionBudget: nextBudget })
+                }
+              />
+            ) : undefined
+          }
         />
       ) : null}
       <td className="border-b border-zinc-100 px-1 py-0.5 align-middle">
@@ -1136,6 +1162,7 @@ function SectionRow({
           <VolumeSumCells
             values={volumeTotals?.volumeSum ?? null}
             laborWorkloadHours={volumeTotals?.laborWorkloadHours ?? null}
+            attentionBudget={volumeTotals?.attentionBudget ?? 0}
             compact
             summary
             rowBgClassName={rowBgClassName}

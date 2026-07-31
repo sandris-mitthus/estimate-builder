@@ -15,6 +15,23 @@ export function normalizeAttentionBudget(
   return roundToTwoDecimals(value);
 }
 
+/**
+ * Aptuvenā budžeta summa, kas aizstāj rindas aprēķināto cenu kopsummās.
+ * Atgriež `0`, ja rindai nav uzmanības karodziņa vai budžets nav norādīts.
+ */
+export function resolveAttentionBudgetAmount(
+  row:
+    | { requiresAttention?: boolean; attentionBudget?: number }
+    | null
+    | undefined,
+): number {
+  if (!row || row.requiresAttention !== true) {
+    return 0;
+  }
+
+  return normalizeAttentionBudget(row.attentionBudget) ?? 0;
+}
+
 export function parseAttentionBudgetInput(value: string): number | undefined {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   if (!normalized) {

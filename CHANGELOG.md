@@ -10,6 +10,15 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.100
+
+**Aptuvenais budžets kopsummas kolonnā**
+
+- **Aptuvens budžets** vairs nav ievade zem pozīcijas nosaukuma — tas ir attiecīgās tabulas **Kopā** šūnā: projekta tāmē **Apjoma cena → Kopā**, sagatavē **Vienības cena → Kopā** (jauns `cell` variants `estimate-attention-budget-control.tsx`, sarkans lauks ar tooltip)
+- Budžets **aizstāj** rindas aprēķināto cenu un tiek ieskaitīts subkategorijas, kategorijas un tāmes kopsummā; sadalījums **Darbs / Materiāli / Mehānismi** paliek tukšs, jo budžetam nav komponentu (`splitRowsForTotals` — `multi-position.ts`)
+- `EstimateTotals` un `SectionVolumeTotals` ieguva lauku `attentionBudget`; `calculateEstimateTotals` `grand` un `calculateRowsVolumeTotals` tagad rēķina budžetus atsevišķi no cenām, tāpēc arī PDF/Excel galasummas sakrīt ar ekrānā redzamo
+- Multi-pozīcijām priekšroka ir pašas multi budžetam; ja tā nav, tiek ņemts izvēlētās opcijas budžets (`resolveAttentionBudgetAmount`)
+
 ## v1.3.99
 
 **Sticky kategoriju un subkategoriju rindas sagatavē**
