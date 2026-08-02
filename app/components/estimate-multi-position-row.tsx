@@ -701,7 +701,6 @@ export function EstimateMultiPositionRow({
                   {dragHandle}
                 </span>
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <select
                         className={`${cellInput} cursor-pointer text-zinc-800`}
@@ -776,16 +775,6 @@ export function EstimateMultiPositionRow({
                         </ul>
                       ) : null}
                     </div>
-                    {allowOfferMultiEdit ? (
-                      <IconActionButton
-                        label={t("estimate.multi.edit", "Labot multi-pozīciju")}
-                        icon="fas fa-pen"
-                        variant="edit"
-                        onClick={() => setEditOpen(true)}
-                        className="opacity-0 group-hover/multi:opacity-100"
-                      />
-                    ) : null}
-                  </div>
                 </div>
               </div>
             </td>
@@ -909,6 +898,13 @@ export function EstimateMultiPositionRow({
                         className={totalOnlyToggleClass}
                       />
                     ) : null}
+                    <IconActionButton
+                      label={t("estimate.multi.edit", "Labot multi-pozīciju")}
+                      icon="fas fa-pen"
+                      variant="edit"
+                      onClick={() => setEditOpen(true)}
+                      className="opacity-0 group-hover/multi:opacity-100"
+                    />
                     <DeleteButton
                       label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
                       onClick={onDelete}
@@ -939,35 +935,26 @@ export function EstimateMultiPositionRow({
                   <div
                     className={`min-w-0 flex-1 space-y-2 py-1 ${indentName ? subcategoryItemNameIndent : ""}`}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
-                            Multi
-                          </span>
-                          {requiresAttention ? <EstimateAttentionIcon /> : null}
-                          <button
-                            type="button"
-                            onClick={() => setEditOpen(true)}
-                            className={`text-left text-sm font-medium transition hover:underline ${
-                              requiresAttention
-                                ? "text-red-800 hover:text-red-900"
-                                : "text-zinc-900 hover:text-violet-700"
-                            }`}
-                          >
-                            {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
-                          </button>
-                          <PositionVariableQuantityIcon enabled={variableQuantity} />
-                        </div>
-                        <EstimateLineItemNote note={value.note} />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                          Multi
+                        </span>
+                        {requiresAttention ? <EstimateAttentionIcon /> : null}
+                        <button
+                          type="button"
+                          onClick={() => setEditOpen(true)}
+                          className={`text-left text-sm font-medium transition hover:underline ${
+                            requiresAttention
+                              ? "text-red-800 hover:text-red-900"
+                              : "text-zinc-900 hover:text-violet-700"
+                          }`}
+                        >
+                          {value.name.trim() || t("estimate.multi.fallback_name", "Multi-pozīcija")}
+                        </button>
+                        <PositionVariableQuantityIcon enabled={variableQuantity} />
                       </div>
-                      <IconActionButton
-                        label={t("estimate.multi.edit", "Labot multi-pozīciju")}
-                        icon="fas fa-pen"
-                        variant="edit"
-                        onClick={() => setEditOpen(true)}
-                        className="opacity-0 group-hover/multi:opacity-100"
-                      />
+                      <EstimateLineItemNote note={value.note} />
                     </div>
                   </div>
                 </div>
@@ -1005,11 +992,20 @@ export function EstimateMultiPositionRow({
                       className="opacity-100"
                     />
                   ) : (
-                    <DeleteButton
-                      label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
-                      onClick={onDelete}
-                      className="opacity-0 group-hover/multi:opacity-100"
-                    />
+                    <>
+                      <IconActionButton
+                        label={t("estimate.multi.edit", "Labot multi-pozīciju")}
+                        icon="fas fa-pen"
+                        variant="edit"
+                        onClick={() => setEditOpen(true)}
+                        className="opacity-0 group-hover/multi:opacity-100"
+                      />
+                      <DeleteButton
+                        label={t("estimate.multi.delete", "Dzēst multi-pozīciju")}
+                        onClick={onDelete}
+                        className="opacity-0 group-hover/multi:opacity-100"
+                      />
+                    </>
                   )}
                 </div>
               </td>

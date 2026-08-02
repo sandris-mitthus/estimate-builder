@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.103
+
+**Multi-pozīcijas labošanas poga darbību kolonnā**
+
+- Multi-pozīcijas **Labot** (pildspalva) pārvietota no nosaukuma blakus uz labo darbību kolonnu **pirms Dzēst** — tāpat kā parastajām pozīcijām (sagatave un piedāvājums)
+
 ## v1.3.102
 
 **Sanmezgli, apjoma +/- / ×2 un neitrāli logu/durvju apzīmējumi**
