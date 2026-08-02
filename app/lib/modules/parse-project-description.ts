@@ -9,6 +9,8 @@ import {
   type ProjectDescriptionFormState,
   type RoofGutterEdge,
   type RoofPlaneEntry,
+  type SanitaryRoomEntry,
+  type WindowEntry,
 } from "@/app/lib/modules/project-description-types";
 import { isGablePedimentFoundationPlaneKey } from "@/app/lib/modules/foundation-plane-options";
 
@@ -50,6 +52,20 @@ function parseDoorEntry(value: unknown): DoorEntry | null {
   return {
     ...opening,
     exteriorWall: row.exteriorWall === true,
+  };
+}
+
+function parseWindowEntry(value: unknown): WindowEntry | null {
+  const opening = parseOpeningEntry(value);
+  if (!opening) {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    ...opening,
+    showcase: row.showcase === true,
   };
 }
 
@@ -114,6 +130,34 @@ function parseRoofPlanes(value: unknown): RoofPlaneEntry[] {
   return value
     .map(parseRoofPlaneEntry)
     .filter((entry): entry is RoofPlaneEntry => entry != null);
+}
+
+function parseSanitaryRoomEntry(value: unknown): SanitaryRoomEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  if (typeof row.id !== "string") {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    name: typeof row.name === "string" ? row.name : "",
+    lengthM: typeof row.lengthM === "string" ? row.lengthM : "",
+    widthM: typeof row.widthM === "string" ? row.widthM : "",
+  };
+}
+
+function parseSanitaryRooms(value: unknown): SanitaryRoomEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(parseSanitaryRoomEntry)
+    .filter((entry): entry is SanitaryRoomEntry => entry != null);
 }
 
 function parseGablePedimentEntry(value: unknown): GablePedimentEntry | null {
@@ -256,6 +300,7 @@ export function parseProjectDescriptionFormState(
       readStringField(row, "foundationDepthM") || migrated?.foundationDepthM || "",
     foundationHeightM:
       readStringField(row, "foundationHeightM") || migrated?.foundationHeightM || "",
+    livingAreaM2: readStringField(row, "livingAreaM2"),
     foundationLShape: row.foundationLShape === true,
     foundationExtensionWidthM:
       readStringField(row, "foundationExtensionWidthM") ||
@@ -276,14 +321,15 @@ export function parseProjectDescriptionFormState(
     interiorWallLengthM: readStringField(row, "interiorWallLengthM"),
     windows: Array.isArray(row.windows)
       ? row.windows
-          .map(parseOpeningEntry)
-          .filter((entry): entry is OpeningEntry => entry != null)
+          .map(parseWindowEntry)
+          .filter((entry): entry is WindowEntry => entry != null)
       : [],
     doors: Array.isArray(row.doors)
       ? row.doors.map(parseDoorEntry).filter((entry): entry is DoorEntry => entry != null)
       : [],
     gablePediments: parseGablePediments(row.gablePediments),
     roofPlanes: parseRoofPlanes(row.roofPlanes),
+    sanitaryRooms: parseSanitaryRooms(row.sanitaryRooms),
     coldWaterLengthM: readStringField(row, "coldWaterLengthM"),
     hotWaterLengthM: readStringField(row, "hotWaterLengthM"),
     recirculationLengthM: readStringField(row, "recirculationLengthM"),

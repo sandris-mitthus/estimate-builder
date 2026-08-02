@@ -6,6 +6,8 @@ export type ModuleSizeSummaryItem = {
   unit: string | null;
   /** Tikai tiešie ievades lielumi — korekcija neietekmē citas rindas. */
   adjustable: boolean;
+  /** Lietotāja ievadītās vērtības tulkojuma parametriem (piem. sanmezgla nosaukums). */
+  labelParams?: Record<string, string | number>;
 };
 
 export type ModuleSizeSummarySection = {

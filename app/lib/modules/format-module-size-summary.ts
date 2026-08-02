@@ -15,9 +15,12 @@ import {
   calculateNetFoundationVolumeM3,
   calculateRoofPlane,
   calculateRoofTotals,
+  calculateSanitaryRoom,
+  calculateSanitaryRoomTotals,
   calculateTotalCrossSectionVolumeM3,
   calculateWalls,
   openingAreaM2,
+  openingPerimeterM,
 } from "@/app/lib/modules/project-description-calculations";
 import {
   getFoundationPlaneOptionLabel,
@@ -28,6 +31,7 @@ import type {
   OpeningEntry,
   ProjectDescriptionFormState,
   RoofPlaneEntry,
+  SanitaryRoomEntry,
 } from "@/app/lib/modules/project-description-types";
 
 type Translate = (
@@ -66,6 +70,7 @@ function pushInput(
   label: string,
   value: string,
   unit: string,
+  labelParams?: Record<string, string | number>,
 ) {
   if (!hasDimension(value)) {
     return;
@@ -78,6 +83,7 @@ function pushInput(
     numericValue: parseDimensionInput(value),
     unit,
     adjustable: true,
+    labelParams,
   });
 }
 
@@ -87,6 +93,7 @@ function pushCalculated(
   label: string,
   value: number,
   unit: string,
+  labelParams?: Record<string, string | number>,
 ) {
   if (isAmountDisplayEmpty(value)) {
     return;
@@ -101,6 +108,7 @@ function pushCalculated(
     numericValue: roundedValue,
     unit,
     adjustable: false,
+    labelParams,
   });
 }
 
@@ -131,6 +139,7 @@ function pushText(
   key: string,
   label: string,
   value: string,
+  labelParams?: Record<string, string | number>,
 ) {
   if (!value.trim()) {
     return;
@@ -143,6 +152,7 @@ function pushText(
     numericValue: null,
     unit: null,
     adjustable: false,
+    labelParams,
   });
 }
 
@@ -179,6 +189,13 @@ function buildFoundationSection(
   pushInput(items, "foundation.width", "Platums (m)", state.foundationWidthM, "m");
   pushInput(items, "foundation.depth", "Dziļums (m)", state.foundationDepthM, "m");
   pushInput(items, "foundation.height", "Augstums (m)", state.foundationHeightM, "m");
+  pushInput(
+    items,
+    "foundation.living-area",
+    "Dzīvojamā platība (m²)",
+    state.livingAreaM2,
+    "m²",
+  );
 
   const footprint = calculateFoundationFootprint(
     state.foundationWidthM,
@@ -380,12 +397,25 @@ function buildWindowsSection(
 
   activeWindows.forEach((entry, index) => {
     const prefix = `windows.${index}`;
-    const labelPrefix = entry.mark.trim() || `Logu veids ${index + 1}`;
-    pushText(items, `${prefix}.mark`, `${labelPrefix} — marka`, entry.mark);
+    // Sagatavē rāda kārtas numuru, nevis marku (katrā modulī marķējums var atšķirties).
+    const labelPrefix = `Logi ${index + 1}`;
     pushInput(items, `${prefix}.height`, `${labelPrefix} — augstums (m)`, entry.heightM, "m");
     pushInput(items, `${prefix}.width`, `${labelPrefix} — platums (m)`, entry.widthM, "m");
     pushCount(items, `${prefix}.count`, `${labelPrefix} — skaits`, entry.count);
+    pushText(
+      items,
+      `${prefix}.type`,
+      `${labelPrefix} — tips`,
+      entry.showcase ? "Vitrīna" : "Logs",
+    );
     pushCalculated(items, `${prefix}.area`, `${labelPrefix} — laukums`, openingAreaM2(entry), "m²");
+    pushCalculated(
+      items,
+      `${prefix}.perimeter`,
+      `${labelPrefix} — kopējais perimetrs`,
+      openingPerimeterM(entry),
+      "m",
+    );
   });
 
   return { title: "Logi", items };
@@ -403,8 +433,8 @@ function buildDoorsSection(
 
   activeDoors.forEach((entry, index) => {
     const prefix = `doors.${index}`;
-    const labelPrefix = entry.mark.trim() || `Durvju veids ${index + 1}`;
-    pushText(items, `${prefix}.mark`, `${labelPrefix} — marka`, entry.mark);
+    // Sagatavē rāda kārtas numuru, nevis marku (katrā modulī marķējums var atšķirties).
+    const labelPrefix = `Durvis ${index + 1}`;
     pushInput(items, `${prefix}.height`, `${labelPrefix} — augstums (m)`, entry.heightM, "m");
     pushInput(items, `${prefix}.width`, `${labelPrefix} — platums (m)`, entry.widthM, "m");
     pushCount(items, `${prefix}.count`, `${labelPrefix} — skaits`, entry.count);
@@ -415,6 +445,13 @@ function buildDoorsSection(
       entry.exteriorWall ? "Ārsienu siena" : "Starpsienu siena",
     );
     pushCalculated(items, `${prefix}.area`, `${labelPrefix} — laukums`, openingAreaM2(entry), "m²");
+    pushCalculated(
+      items,
+      `${prefix}.perimeter`,
+      `${labelPrefix} — kopējais perimetrs`,
+      openingPerimeterM(entry),
+      "m",
+    );
   });
 
   return { title: "Durvis", items };
@@ -448,6 +485,54 @@ function buildRoofSection(
   pushCalculated(items, "roof.total-downpipe", "Kopējais noteku garums", roofTotals.totalDownpipeLengthM, "m");
 
   return { title: "Jumts", items };
+}
+
+function hasSanitaryRoomData(entry: SanitaryRoomEntry): boolean {
+  return (
+    hasDimension(entry.name) ||
+    hasDimension(entry.lengthM) ||
+    hasDimension(entry.widthM)
+  );
+}
+
+function buildSanitaryRoomsSection(
+  state: ProjectDescriptionFormState,
+): ModuleSizeSummarySection | null {
+  const activeRooms = state.sanitaryRooms.filter(hasSanitaryRoomData);
+  if (activeRooms.length === 0) {
+    return null;
+  }
+
+  const items: ModuleSizeSummaryItem[] = [];
+
+  activeRooms.forEach((entry, index) => {
+    const prefix = `sanitary.${index}`;
+    // Sagatavē un tāmē rāda kārtas numuru, nevis moduļa lokālo nosaukumu
+    // (katrā modulī WC/vannas istaba var saukties citādi).
+    const roomIndex = index + 1;
+    const labelPrefix = `Sanmezgls ${roomIndex}`;
+    const labelParams = { room: labelPrefix, index: roomIndex };
+    const calc = calculateSanitaryRoom(entry, state.floorHeightM);
+
+    pushInput(items, `${prefix}.length`, `${labelPrefix} — garums (m)`, entry.lengthM, "m", labelParams);
+    pushInput(items, `${prefix}.width`, `${labelPrefix} — platums (m)`, entry.widthM, "m", labelParams);
+    pushCalculated(items, `${prefix}.perimeter`, `${labelPrefix} — perimetrs`, calc.perimeterM, "m", labelParams);
+    pushCalculated(items, `${prefix}.wall-area`, `${labelPrefix} — sienu laukums`, calc.wallAreaM2, "m²", labelParams);
+    pushCalculated(items, `${prefix}.floor-area`, `${labelPrefix} — grīdas laukums`, calc.floorAreaM2, "m²", labelParams);
+  });
+
+  if (activeRooms.length > 1) {
+    const totals = calculateSanitaryRoomTotals(activeRooms, state.floorHeightM);
+    pushCalculated(items, "sanitary.total-perimeter", "Sanmezglu kopējais perimetrs", totals.perimeterM, "m");
+    pushCalculated(items, "sanitary.total-wall-area", "Sanmezglu kopējais sienu laukums", totals.wallAreaM2, "m²");
+    pushCalculated(items, "sanitary.total-floor-area", "Sanmezglu kopējais grīdas laukums", totals.floorAreaM2, "m²");
+  }
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return { title: "Sanmezgli", items };
 }
 
 function buildPlumbingSection(
@@ -494,6 +579,7 @@ export function buildModuleSizeSummarySections(
     buildWindowsSection(state),
     buildDoorsSection(state),
     buildRoofSection(state),
+    buildSanitaryRoomsSection(state),
     buildPlumbingSection(state),
   ].filter((section): section is ModuleSizeSummarySection => section != null);
 }
@@ -506,6 +592,7 @@ function translateSummaryTitle(title: string, t: Translate): string {
     Logi: "project_description.summary.windows.title",
     Durvis: "project_description.summary.doors.title",
     Jumts: "project_description.summary.roof.title",
+    Sanmezgli: "project_description.section.sanitary",
     Ūdensapgāde: "project_description.summary.plumbing.title",
   };
 
@@ -518,6 +605,7 @@ function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): strin
     "foundation.width": "project_description.summary.foundation.width",
     "foundation.depth": "project_description.summary.foundation.depth",
     "foundation.height": "project_description.summary.foundation.height",
+    "foundation.living-area": "project_description.summary.foundation.living_area",
     "foundation.extension-width": "project_description.summary.foundation.extension_width",
     "foundation.extension-depth": "project_description.summary.foundation.extension_depth",
     "foundation.shared-edge": "project_description.summary.foundation.shared_edge",
@@ -539,6 +627,9 @@ function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): strin
     "walls.exterior-net": "project_description.summary.walls.exterior_net",
     "walls.interior-net": "project_description.summary.walls.interior_net",
     "walls.gable-total": "project_description.summary.walls.gable_total",
+    "sanitary.total-perimeter": "project_description.sanitary.total_perimeter",
+    "sanitary.total-wall-area": "project_description.sanitary.total_wall_area",
+    "sanitary.total-floor-area": "project_description.sanitary.total_floor_area",
     "roof.total-area": "project_description.summary.roof.total_area",
     "roof.total-gutter": "project_description.summary.roof.total_gutter",
     "roof.total-downpipe": "project_description.summary.roof.total_downpipe",
@@ -568,12 +659,30 @@ function translateSummaryLabel(item: ModuleSizeSummaryItem, t: Translate): strin
     });
   }
 
-  const openingMatch = item.key.match(/^(windows|doors)\.(\d+)\.(mark|height|width|count|placement|area)$/);
+  const openingMatch = item.key.match(
+    /^(windows|doors)\.(\d+)\.(mark|height|width|count|placement|type|area|perimeter)$/,
+  );
   if (openingMatch) {
     const [, group, rawIndex, field] = openingMatch;
     return t(`project_description.summary.${group}.item_${field}`, item.label, {
       index: Number(rawIndex) + 1,
     });
+  }
+
+  const sanitaryMatch = item.key.match(
+    /^sanitary\.(\d+)\.(length|width|perimeter|wall-area|floor-area)$/,
+  );
+  if (sanitaryMatch) {
+    const [, rawIndex, field] = sanitaryMatch;
+    const index = Number(rawIndex) + 1;
+    const room = t("project_description.sanitary.item", "Sanmezgls {index}", {
+      index,
+    });
+    return t(
+      `project_description.summary.sanitary.item_${field.replace("-", "_")}`,
+      item.label,
+      { index, room },
+    );
   }
 
   const roofMatch = item.key.match(/^roof\.(\d+)\.(width|height|count|area|gutter|downpipe)$/);
@@ -594,6 +703,15 @@ function translateSummaryValue(item: ModuleSizeSummaryItem, t: Translate): strin
     }
     if (item.value === "Starpsienu siena") {
       return t("project_description.summary.doors.interior_wall", item.value);
+    }
+  }
+
+  if (item.key.match(/^windows\.\d+\.type$/)) {
+    if (item.value === "Vitrīna") {
+      return t("project_description.summary.windows.showcase", item.value);
+    }
+    if (item.value === "Logs") {
+      return t("project_description.summary.windows.regular", item.value);
     }
   }
 

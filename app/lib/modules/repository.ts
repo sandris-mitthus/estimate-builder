@@ -167,7 +167,7 @@ export async function listBuildingModuleSizeOptions(): Promise<
   }
 
   return (data as BuildingModuleRow[])
-    .map((row) => {
+    .map((row): BuildingModuleSizeOption | null => {
       const projectDescription = parseProjectDescriptionFormState(
         row.project_description,
       );
@@ -180,7 +180,8 @@ export async function listBuildingModuleSizeOptions(): Promise<
         name: row.name,
         sections: buildModuleSizeSummarySections(projectDescription),
         projectDescription,
-      } satisfies BuildingModuleSizeOption;
+        exampleOnly: true,
+      };
     })
     .filter((entry): entry is BuildingModuleSizeOption => entry != null);
 }

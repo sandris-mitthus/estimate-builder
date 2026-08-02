@@ -13,6 +13,7 @@ import type {
   GablePedimentEntry,
   OpeningEntry,
   RoofPlaneEntry,
+  SanitaryRoomEntry,
 } from "@/app/lib/modules/project-description-types";
 
 function parseDimension(value: string): number {
@@ -37,6 +38,15 @@ function parseCount(value: string): number {
 
 export function openingAreaM2(entry: OpeningEntry): number {
   return parseDimension(entry.heightM) * parseDimension(entry.widthM) * parseCount(entry.count);
+}
+
+/** Ailas kopējais perimetrs: 2 × (augstums + platums) × skaits. */
+export function openingPerimeterM(entry: OpeningEntry): number {
+  const height = parseDimension(entry.heightM);
+  const width = parseDimension(entry.widthM);
+  const count = parseCount(entry.count);
+
+  return roundToTwoDecimals(2 * (height + width) * count);
 }
 
 export function sumOpeningAreaM2(entries: OpeningEntry[]): number {
@@ -268,6 +278,55 @@ export function calculateWalls(
     totalNetWallAreaM2: roundToTwoDecimals(
       netExteriorWallAreaM2 + netInteriorWallAreaM2,
     ),
+  };
+}
+
+export type SanitaryRoomCalculations = {
+  perimeterM: number;
+  wallAreaM2: number;
+  floorAreaM2: number;
+};
+
+/**
+ * Sanmezgls: perimetrs = 2 × (garums + platums); sienas = perimetrs × stāvu augstums;
+ * grīda = garums × platums. Augstums nāk no sienu sadaļas `floorHeightM`.
+ */
+export function calculateSanitaryRoom(
+  entry: SanitaryRoomEntry,
+  floorHeightM: string,
+): SanitaryRoomCalculations {
+  const lengthM = parseDimension(entry.lengthM);
+  const widthM = parseDimension(entry.widthM);
+  const heightM = parseDimension(floorHeightM);
+  const perimeterM = 2 * (lengthM + widthM);
+
+  return {
+    perimeterM: roundToTwoDecimals(perimeterM),
+    wallAreaM2: roundToTwoDecimals(perimeterM * heightM),
+    floorAreaM2: roundToTwoDecimals(lengthM * widthM),
+  };
+}
+
+export function calculateSanitaryRoomTotals(
+  entries: SanitaryRoomEntry[],
+  floorHeightM: string,
+): SanitaryRoomCalculations {
+  const totals = entries.reduce<SanitaryRoomCalculations>(
+    (sum, entry) => {
+      const calc = calculateSanitaryRoom(entry, floorHeightM);
+      return {
+        perimeterM: sum.perimeterM + calc.perimeterM,
+        wallAreaM2: sum.wallAreaM2 + calc.wallAreaM2,
+        floorAreaM2: sum.floorAreaM2 + calc.floorAreaM2,
+      };
+    },
+    { perimeterM: 0, wallAreaM2: 0, floorAreaM2: 0 },
+  );
+
+  return {
+    perimeterM: roundToTwoDecimals(totals.perimeterM),
+    wallAreaM2: roundToTwoDecimals(totals.wallAreaM2),
+    floorAreaM2: roundToTwoDecimals(totals.floorAreaM2),
   };
 }
 

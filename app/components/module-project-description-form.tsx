@@ -14,6 +14,8 @@ import {
   calculateNetFoundationVolumeM3,
   calculateRoofPlane,
   calculateRoofTotals,
+  calculateSanitaryRoom,
+  calculateSanitaryRoomTotals,
   calculateTotalCrossSectionVolumeM3,
   calculateWalls,
 } from "@/app/lib/modules/project-description-calculations";
@@ -31,6 +33,7 @@ import {
   createDoorEntry,
   createGablePedimentEntry,
   createRoofPlaneEntry,
+  createSanitaryRoomEntry,
   createWindowEntry,
   type DoorEntry,
   type FoundationCrossSectionEntry,
@@ -38,6 +41,8 @@ import {
   type OpeningEntry,
   type ProjectDescriptionFormState,
   type RoofPlaneEntry,
+  type SanitaryRoomEntry,
+  type WindowEntry,
 } from "@/app/lib/modules/project-description-types";
 import {
   formatAmountDisplay,
@@ -489,6 +494,94 @@ function RoofPlaneRow({
   );
 }
 
+function SanitaryRoomRow({
+  entry,
+  index,
+  floorHeightM,
+  onChange,
+  onDelete,
+}: {
+  entry: SanitaryRoomEntry;
+  index: number;
+  floorHeightM: string;
+  onChange: (next: SanitaryRoomEntry) => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslations();
+  const calc = calculateSanitaryRoom(entry, floorHeightM);
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-zinc-500">
+          {t("project_description.sanitary.item", "Sanmezgls {index}", {
+            index: index + 1,
+          })}
+        </span>
+        <DeleteButton
+          label={t("project_description.sanitary.delete", "Dzēst sanmezglu {index}", {
+            index: index + 1,
+          })}
+          onClick={onDelete}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label={t("common.name", "Nosaukums")} id={`sanitary-name-${entry.id}`}>
+          <MarkInput
+            id={`sanitary-name-${entry.id}`}
+            value={entry.name}
+            onChange={(name) => onChange({ ...entry, name })}
+            placeholder={t("project_description.sanitary.name_placeholder", "WC")}
+          />
+        </Field>
+
+        <Field
+          label={t("project_description.field.length_m", "Garums (m)")}
+          id={`sanitary-length-${entry.id}`}
+        >
+          <DimensionInput
+            id={`sanitary-length-${entry.id}`}
+            value={entry.lengthM}
+            onChange={(lengthM) => onChange({ ...entry, lengthM })}
+            placeholder="2,4"
+          />
+        </Field>
+
+        <Field
+          label={t("project_description.field.width_m", "Platums (m)")}
+          id={`sanitary-width-${entry.id}`}
+        >
+          <DimensionInput
+            id={`sanitary-width-${entry.id}`}
+            value={entry.widthM}
+            onChange={(widthM) => onChange({ ...entry, widthM })}
+            placeholder="1,6"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <CalculatedField
+          label={t("project_description.sanitary.perimeter", "Perimetrs")}
+          value={calc.perimeterM}
+          unit="m"
+        />
+        <CalculatedField
+          label={t("project_description.sanitary.wall_area", "Sienu laukums")}
+          value={calc.wallAreaM2}
+          unit="m²"
+        />
+        <CalculatedField
+          label={t("project_description.sanitary.floor_area", "Grīdas laukums")}
+          value={calc.floorAreaM2}
+          unit="m²"
+        />
+      </div>
+    </div>
+  );
+}
+
 function CompactToggle({
   id,
   enabled,
@@ -633,6 +726,30 @@ function ExteriorWallToggle({
   );
 }
 
+function ShowcaseWindowToggle({
+  id,
+  enabled,
+  onChange,
+}: {
+  id: string;
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  const { t } = useTranslations();
+
+  return (
+    <ToggleSwitch
+      id={id}
+      label={t(
+        "project_description.windows.showcase",
+        "Vitrīna (īpašas stikla durvis)",
+      )}
+      enabled={enabled}
+      onChange={onChange}
+    />
+  );
+}
+
 type ModuleProjectDescriptionFormProps = {
   initialProjectDescription: ProjectDescriptionFormState;
   onSave: (
@@ -761,7 +878,7 @@ export function ModuleProjectDescriptionForm({
     setForm((current) => ({ ...current, gablePediments: nextPediments }));
   }
 
-  function updateWindows(nextWindows: OpeningEntry[]) {
+  function updateWindows(nextWindows: WindowEntry[]) {
     setForm((current) => ({ ...current, windows: nextWindows }));
   }
 
@@ -776,6 +893,15 @@ export function ModuleProjectDescriptionForm({
   const roofTotals = useMemo(
     () => calculateRoofTotals(form.roofPlanes, form.floorHeightM),
     [form.floorHeightM, form.roofPlanes],
+  );
+
+  function updateSanitaryRooms(nextRooms: SanitaryRoomEntry[]) {
+    setForm((current) => ({ ...current, sanitaryRooms: nextRooms }));
+  }
+
+  const sanitaryTotals = useMemo(
+    () => calculateSanitaryRoomTotals(form.sanitaryRooms, form.floorHeightM),
+    [form.floorHeightM, form.sanitaryRooms],
   );
 
   return (
@@ -817,6 +943,22 @@ export function ModuleProjectDescriptionForm({
                   setForm((current) => ({ ...current, foundationHeightM }))
                 }
                 placeholder="0,4"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label={t("project_description.field.living_area_m2", "Dzīvojamā platība (m²)")}
+              id="living-area"
+            >
+              <DimensionInput
+                id="living-area"
+                value={form.livingAreaM2}
+                onChange={(livingAreaM2) =>
+                  setForm((current) => ({ ...current, livingAreaM2 }))
+                }
+                placeholder="96"
               />
             </Field>
           </div>
@@ -1119,11 +1261,26 @@ export function ModuleProjectDescriptionForm({
                   markPlaceholder="L1"
                   onChange={(next) =>
                     updateWindows(
-                      form.windows.map((item) => (item.id === entry.id ? next : item)),
+                      form.windows.map((item) =>
+                        item.id === entry.id ? { ...item, ...next } : item,
+                      ),
                     )
                   }
                   onDelete={() =>
                     updateWindows(form.windows.filter((item) => item.id !== entry.id))
+                  }
+                  extra={
+                    <ShowcaseWindowToggle
+                      id={`window-showcase-${entry.id}`}
+                      enabled={entry.showcase}
+                      onChange={(showcase) =>
+                        updateWindows(
+                          form.windows.map((item) =>
+                            item.id === entry.id ? { ...item, showcase } : item,
+                          ),
+                        )
+                      }
+                    />
                   }
                 />
               ))}
@@ -1245,6 +1402,81 @@ export function ModuleProjectDescriptionForm({
                 label={t("project_description.roof.total_downpipe_length", "Kopējais noteku garums")}
                 value={roofTotals.totalDownpipeLengthM}
                 unit="m"
+              />
+            </div>
+          ) : null}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <SectionHeading>
+              {t("project_description.section.sanitary", "Sanmezgli")}
+            </SectionHeading>
+            <button
+              type="button"
+              onClick={() =>
+                updateSanitaryRooms([...form.sanitaryRooms, createSanitaryRoomEntry()])
+              }
+              className="shrink-0 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+            >
+              {t("project_description.sanitary.add", "+ Pievienot sanmezglu")}
+            </button>
+          </div>
+
+          {form.sanitaryRooms.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              {t("project_description.sanitary.empty", "Nav pievienotu sanmezglu.")}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {form.sanitaryRooms.map((entry, index) => (
+                <SanitaryRoomRow
+                  key={entry.id}
+                  entry={entry}
+                  index={index}
+                  floorHeightM={form.floorHeightM}
+                  onChange={(next) =>
+                    updateSanitaryRooms(
+                      form.sanitaryRooms.map((item) =>
+                        item.id === entry.id ? next : item,
+                      ),
+                    )
+                  }
+                  onDelete={() =>
+                    updateSanitaryRooms(
+                      form.sanitaryRooms.filter((item) => item.id !== entry.id),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          )}
+
+          {form.sanitaryRooms.length > 1 ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <CalculatedField
+                label={t(
+                  "project_description.sanitary.total_perimeter",
+                  "Sanmezglu kopējais perimetrs",
+                )}
+                value={sanitaryTotals.perimeterM}
+                unit="m"
+              />
+              <CalculatedField
+                label={t(
+                  "project_description.sanitary.total_wall_area",
+                  "Sanmezglu kopējais sienu laukums",
+                )}
+                value={sanitaryTotals.wallAreaM2}
+                unit="m²"
+              />
+              <CalculatedField
+                label={t(
+                  "project_description.sanitary.total_floor_area",
+                  "Sanmezglu kopējais grīdas laukums",
+                )}
+                value={sanitaryTotals.floorAreaM2}
+                unit="m²"
               />
             </div>
           ) : null}

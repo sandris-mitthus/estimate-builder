@@ -10,6 +10,24 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.102
+
+**Sanmezgli, apjoma +/- / ×2 un neitrāli logu/durvju apzīmējumi**
+
+- **Sanmezgli** — jauna sadaļa **Projekta aprakstā** (nosaukums, garums, platums); perimetrs, sienu m² (no stāvu augstuma) un grīdas m² pieejami kā apjomi sagatavē/tāmē; migrācija `135`
+- **Apjomu kombinēšana ar zīmi** — pie papildu piesaistītā apjoma pirms slēdža zaļš **+** / sarkans **−**; kopsumma ir summa vai starpība (`itemSigns` uz `moduleSizeAttachment`)
+- **×2** — kompakta poga pie ieslēgta apjoma (piem. starpsienu garums abām pusēm); blāva, kad neaktīva; migrācija `136`
+- **Durvis / Logi pie apjomiem** — rāda **Durvis 1**, **Logi 1** utt., nevis moduļa marku/nosaukumu; logiem slēdzis **Vitrīna** (īpašas stikla durvis ar citu izcenojumu); migrācijas `137`, `138`
+
+## v1.3.101
+
+**Moduļa lielumi: dzīvojamā platība, ailu perimetrs un skaidrāka izvēle**
+
+- **Dzīvojamā platība (m²)** — jauna ievade moduļa un individuāla projekta **Projekta apraksta** sadaļā **Pamats** (`livingAreaM2`); pieejama arī kā apjoms tāmes pozīcijai (`foundation.living-area`) ar +/- korekciju; migrācija `132`
+- **Kopējais perimetrs katram logu un durvju veidam** — aprēķināts kā `2 × (augstums + platums) × skaits` (`openingPerimeterM`) un pievienots definēto apjomu sarakstam sadaļās **Logi** un **Durvis**; migrācija `133`
+- **Apjoms no moduļa lieluma** — kategorijas vairs neaizveras, atverot nākamo, tāpēc apjomus var atzīmēt no vairākām sadaļām pēc kārtas; sadaļas ar atzīmētiem apjomiem atveras automātiski
+- **Sagatavē noņemts moduļa nosaukums** un tā vietā redzama piezīme, ka skaitļi ir tikai piemērs no viena moduļa, bet tāmē apjoms tiks rēķināts no attiecīgā projekta moduļa (`BuildingModuleSizeOption.exampleOnly`); vecās piesaistes atpazīst pēc lieluma atslēgas, nevis pēc `moduleId`; migrācija `134`
+
 ## v1.3.100
 
 **Aptuvenais budžets kopsummas kolonnā**

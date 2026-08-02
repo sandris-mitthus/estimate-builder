@@ -7,6 +7,8 @@ import {
 import {
   getLineItemModuleSizeAdjustments,
   getLineItemModuleSizeItemKeys,
+  getLineItemModuleSizeItemMultiplier,
+  getLineItemModuleSizeItemSign,
   normalizeLineItemModuleSizeAttachment,
 } from "@/app/lib/estimates/module-size-attachment";
 import type {
@@ -14,6 +16,7 @@ import type {
   EstimateLineItem,
   EstimateRowItem,
   LineItemModuleSizeAttachment,
+  ModuleSizeItemSign,
 } from "@/app/lib/estimates/types";
 import {
   buildAdjustedModuleSizeSummarySections,
@@ -114,6 +117,38 @@ function resolveSummaryItemsFromAttachment(
     .filter((item): item is ModuleSizeSummaryItem => item != null);
 }
 
+function resolveSignedSummaryItemsFromAttachment(
+  attachment: LineItemModuleSizeAttachment,
+  projectDescription: ProjectDescriptionFormState,
+): {
+  item: ModuleSizeSummaryItem;
+  sign: ModuleSizeItemSign;
+  multiplier: number;
+}[] {
+  const sections = buildAttachmentSummarySections(attachment, projectDescription);
+
+  return getLineItemModuleSizeItemKeys(attachment)
+    .map((itemKey) => {
+      const item = findModuleSizeSummaryItem(sections, itemKey);
+      return item
+        ? {
+            item,
+            sign: getLineItemModuleSizeItemSign(attachment, itemKey),
+            multiplier: getLineItemModuleSizeItemMultiplier(attachment, itemKey),
+          }
+        : null;
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        item: ModuleSizeSummaryItem;
+        sign: ModuleSizeItemSign;
+        multiplier: number;
+      } => entry != null,
+    );
+}
+
 function resolveSummaryItemFromAttachment(
   attachment: LineItemModuleSizeAttachment,
   projectDescription: ProjectDescriptionFormState,
@@ -125,13 +160,17 @@ export function resolveQuantityFromModuleSizeAttachment(
   attachment: LineItemModuleSizeAttachment,
   projectDescription: ProjectDescriptionFormState,
 ): number | null {
-  const items = resolveSummaryItemsFromAttachment(attachment, projectDescription);
+  const entries = resolveSignedSummaryItemsFromAttachment(
+    attachment,
+    projectDescription,
+  );
   let total = 0;
   let hasValue = false;
 
-  for (const item of items) {
+  for (const { item, sign, multiplier } of entries) {
     if (item.numericValue != null && Number.isFinite(item.numericValue)) {
-      total += item.numericValue;
+      const amount = item.numericValue * multiplier;
+      total += sign === "-" ? -amount : amount;
       hasValue = true;
     }
   }

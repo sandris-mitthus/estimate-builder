@@ -10,6 +10,11 @@ export type DoorEntry = OpeningEntry & {
   exteriorWall: boolean;
 };
 
+/** Logs; `showcase` = vitrīna (īpašas stikla durvis ar citu izcenojumu). */
+export type WindowEntry = OpeningEntry & {
+  showcase: boolean;
+};
+
 /** Kura L veida papildu pamata plakne piegulst pamatam. */
 export type FoundationAttachmentPlane = "width" | "depth";
 
@@ -46,10 +51,19 @@ export type GablePedimentEntry = {
   foundationPlaneKey: GablePedimentFoundationPlaneKey | "";
 };
 
+/** Sanmezgls (WC, vannas istaba) — telpas izmēri; sienu augstums no `floorHeightM`. */
+export type SanitaryRoomEntry = {
+  id: string;
+  name: string;
+  lengthM: string;
+  widthM: string;
+};
+
 export type ProjectDescriptionFormState = {
   foundationWidthM: string;
   foundationDepthM: string;
   foundationHeightM: string;
+  livingAreaM2: string;
   foundationLShape: boolean;
   foundationExtensionWidthM: string;
   foundationExtensionDepthM: string;
@@ -58,10 +72,11 @@ export type ProjectDescriptionFormState = {
   floorHeightM: string;
   exteriorWallLengthM: string;
   interiorWallLengthM: string;
-  windows: OpeningEntry[];
+  windows: WindowEntry[];
   doors: DoorEntry[];
   gablePediments: GablePedimentEntry[];
   roofPlanes: RoofPlaneEntry[];
+  sanitaryRooms: SanitaryRoomEntry[];
   coldWaterLengthM: string;
   hotWaterLengthM: string;
   recirculationLengthM: string;
@@ -87,13 +102,14 @@ export function createCrossSectionEntry(): FoundationCrossSectionEntry {
   };
 }
 
-export function createWindowEntry(): OpeningEntry {
+export function createWindowEntry(): WindowEntry {
   return {
     id: crypto.randomUUID(),
     mark: "",
     heightM: "",
     widthM: "",
     count: "1",
+    showcase: false,
   };
 }
 
@@ -130,6 +146,15 @@ export function createRoofPlaneEntry(): RoofPlaneEntry {
   };
 }
 
+export function createSanitaryRoomEntry(): SanitaryRoomEntry {
+  return {
+    id: crypto.randomUUID(),
+    name: "",
+    lengthM: "",
+    widthM: "",
+  };
+}
+
 export function createGablePedimentEntry(): GablePedimentEntry {
   return {
     id: crypto.randomUUID(),
@@ -144,6 +169,7 @@ export function createEmptyProjectDescriptionFormState(): ProjectDescriptionForm
     foundationWidthM: "",
     foundationDepthM: "",
     foundationHeightM: "",
+    livingAreaM2: "",
     foundationLShape: false,
     foundationExtensionWidthM: "",
     foundationExtensionDepthM: "",
@@ -156,6 +182,7 @@ export function createEmptyProjectDescriptionFormState(): ProjectDescriptionForm
     doors: [],
     gablePediments: [],
     roofPlanes: [],
+    sanitaryRooms: [],
     coldWaterLengthM: "",
     hotWaterLengthM: "",
     recirculationLengthM: "",

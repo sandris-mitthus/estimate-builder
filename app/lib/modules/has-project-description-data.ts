@@ -28,6 +28,7 @@ export function hasProjectDescriptionData(
     hasDimension(state.foundationWidthM) ||
     hasDimension(state.foundationDepthM) ||
     hasDimension(state.foundationHeightM) ||
+    hasDimension(state.livingAreaM2) ||
     hasDimension(state.foundationExtensionWidthM) ||
     hasDimension(state.foundationExtensionDepthM) ||
     hasDimension(state.floorHeightM) ||
@@ -70,10 +71,21 @@ export function hasProjectDescriptionData(
     return true;
   }
 
-  return state.roofPlanes.some(
-    (plane) =>
-      hasDimension(plane.widthM) ||
-      hasDimension(plane.heightM) ||
-      plane.count.trim().replace(/\D/g, "").length > 0,
+  if (
+    state.roofPlanes.some(
+      (plane) =>
+        hasDimension(plane.widthM) ||
+        hasDimension(plane.heightM) ||
+        plane.count.trim().replace(/\D/g, "").length > 0,
+    )
+  ) {
+    return true;
+  }
+
+  return state.sanitaryRooms.some(
+    (room) =>
+      hasDimension(room.name) ||
+      hasDimension(room.lengthM) ||
+      hasDimension(room.widthM),
   );
 }

@@ -4,13 +4,23 @@ export type PriceBreakdown = {
   mechanisms: number;
 };
 
+/** Katras papildu piesaistītās atslēgas zīme kopsummā. */
+export type ModuleSizeItemSign = "+" | "-";
+
 /** Piesaistīts moduļa lielums tāmes rindai (var piesaistīt vairākus, ja vienāda mērvienība). */
 export type LineItemModuleSizeAttachment = {
   moduleId: string;
   /** Pirmā piesaistītā atslēga — atpakaļsaderībai un primārais rādītājs. */
   itemKey: string;
-  /** Visas piesaistītās atslēgas; daudzums = to skaitlisko vērtību summa. */
+  /** Visas piesaistītās atslēgas; daudzums = to vērtību summa/starpība pēc `itemSigns`. */
   itemKeys?: string[];
+  /** Zīme katrai papildu atslēgai; glabā tikai `-`, pirmā atslēga vienmēr ir `+`. */
+  itemSigns?: Record<string, ModuleSizeItemSign>;
+  /**
+   * Reizinātājs katrai piesaistītajai atslēgai (piem. 2 — abām sienas pusēm).
+   * Glabā tikai vērtības > 1; noklusējums ir 1.
+   */
+  itemMultipliers?: Record<string, number>;
   /** Korekcijas (+) pēc summary atslēgas — tikai šai tāmes pozīcijai. */
   adjustments?: Record<string, string>;
 };

@@ -6,6 +6,7 @@ import type {
   EstimateLineItem,
   EstimateRowItem,
   LineItemModuleSizeAttachment,
+  ModuleSizeItemSign,
 } from "@/app/lib/estimates/types";
 import type { EstimatePositionSection } from "@/app/lib/estimate-positions/types";
 import { hasModuleSizeAdjustment } from "@/app/lib/modules/module-size-value";
@@ -64,10 +65,96 @@ export function getLineItemModuleSizeItemKeys(
   return uniqueKeys;
 }
 
+/**
+ * Atgriež tikai atņemamās atslēgas. Pirmā piesaistītā atslēga vienmēr ir bāze (`+`),
+ * tāpēc tai zīmi neglabā.
+ */
+function normalizeModuleSizeItemSigns(
+  itemKeys: readonly string[],
+  itemSigns: Record<string, ModuleSizeItemSign> | undefined,
+): Record<string, ModuleSizeItemSign> | undefined {
+  if (!itemSigns) {
+    return undefined;
+  }
+
+  const normalized: Record<string, ModuleSizeItemSign> = {};
+  for (const key of itemKeys.slice(1)) {
+    if (itemSigns[key] === "-") {
+      normalized[key] = "-";
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+export function getLineItemModuleSizeItemSigns(
+  attachment: LineItemModuleSizeAttachment,
+): Record<string, ModuleSizeItemSign> {
+  return {
+    ...normalizeModuleSizeItemSigns(
+      getLineItemModuleSizeItemKeys(attachment),
+      attachment.itemSigns,
+    ),
+  };
+}
+
+/** Atslēgas zīme kopsummā; pirmā piesaistītā atslēga vienmēr ir `+`. */
+export function getLineItemModuleSizeItemSign(
+  attachment: LineItemModuleSizeAttachment,
+  itemKey: string,
+): ModuleSizeItemSign {
+  return getLineItemModuleSizeItemSigns(attachment)[itemKey] ?? "+";
+}
+
+function normalizeModuleSizeItemMultipliers(
+  itemKeys: readonly string[],
+  itemMultipliers: Record<string, number> | undefined,
+): Record<string, number> | undefined {
+  if (!itemMultipliers) {
+    return undefined;
+  }
+
+  const normalized: Record<string, number> = {};
+  for (const key of itemKeys) {
+    const value = itemMultipliers[key];
+    if (
+      typeof value === "number" &&
+      Number.isFinite(value) &&
+      value > 1 &&
+      value <= 99
+    ) {
+      normalized[key] = Math.round(value);
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+export function getLineItemModuleSizeItemMultipliers(
+  attachment: LineItemModuleSizeAttachment,
+): Record<string, number> {
+  return {
+    ...normalizeModuleSizeItemMultipliers(
+      getLineItemModuleSizeItemKeys(attachment),
+      attachment.itemMultipliers,
+    ),
+  };
+}
+
+/** Reizinātājs atslēgai; noklusējums 1. */
+export function getLineItemModuleSizeItemMultiplier(
+  attachment: LineItemModuleSizeAttachment,
+  itemKey: string,
+): number {
+  return getLineItemModuleSizeItemMultipliers(attachment)[itemKey] ?? 1;
+}
+
 export function createLineItemModuleSizeAttachment(
   moduleId: string,
   itemKeys: string[],
   adjustments: Record<string, string> = {},
+  itemSigns: Record<string, ModuleSizeItemSign> = {},
+  itemMultipliers: Record<string, number> = {},
 ): LineItemModuleSizeAttachment | null {
   const uniqueKeys = getLineItemModuleSizeItemKeys({
     moduleId,
@@ -89,6 +176,11 @@ export function createLineItemModuleSizeAttachment(
     moduleId,
     itemKey: uniqueKeys[0],
     itemKeys: uniqueKeys,
+    itemSigns: normalizeModuleSizeItemSigns(uniqueKeys, itemSigns),
+    itemMultipliers: normalizeModuleSizeItemMultipliers(
+      uniqueKeys,
+      itemMultipliers,
+    ),
     adjustments:
       Object.keys(normalizedAdjustments).length > 0
         ? normalizedAdjustments
@@ -107,6 +199,8 @@ export function normalizeLineItemModuleSizeAttachment(
     moduleId?: unknown;
     itemKey?: unknown;
     itemKeys?: unknown;
+    itemSigns?: unknown;
+    itemMultipliers?: unknown;
     adjustment?: unknown;
     adjustments?: unknown;
   };
@@ -135,6 +229,28 @@ export function normalizeLineItemModuleSizeAttachment(
 
   const uniqueKeys = [...new Set(itemKeys)];
 
+  const itemSigns: Record<string, ModuleSizeItemSign> = {};
+  if (record.itemSigns && typeof record.itemSigns === "object") {
+    for (const [key, entry] of Object.entries(
+      record.itemSigns as Record<string, unknown>,
+    )) {
+      if (entry === "-") {
+        itemSigns[key] = "-";
+      }
+    }
+  }
+
+  const itemMultipliers: Record<string, number> = {};
+  if (record.itemMultipliers && typeof record.itemMultipliers === "object") {
+    for (const [key, entry] of Object.entries(
+      record.itemMultipliers as Record<string, unknown>,
+    )) {
+      if (typeof entry === "number" && Number.isFinite(entry) && entry > 1) {
+        itemMultipliers[key] = entry;
+      }
+    }
+  }
+
   const adjustments: Record<string, string> = {};
 
   if (record.adjustments && typeof record.adjustments === "object") {
@@ -159,6 +275,8 @@ export function normalizeLineItemModuleSizeAttachment(
     record.moduleId,
     uniqueKeys,
     adjustments,
+    itemSigns,
+    itemMultipliers,
   ) ?? undefined;
 }
 

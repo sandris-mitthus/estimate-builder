@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
 import {
   createAttachItemStateKey,
   defaultModuleSizeAttachItemState,
   type ModuleSizeAttachItemState,
 } from "@/app/lib/estimates/module-size-attachment";
+import type { ModuleSizeItemSign } from "@/app/lib/estimates/types";
 import type { ModuleSizeSummaryItem } from "@/app/lib/modules/module-size-summary-types";
 import { sanitizeQuantityInputString } from "@/app/lib/positions/variable-quantity";
 
@@ -19,9 +21,95 @@ type ModuleSizeAttachItemRowProps = {
   /** Sākotnējā vērtība pirms pārrēķina (perimetrs, tilpums u.c.). */
   baseDisplayValue?: string;
   state: ModuleSizeAttachItemState;
+  /** Zīme kopsummā — rāda tikai papildu piesaistītajiem lielumiem. */
+  quantitySign?: ModuleSizeItemSign;
+  onQuantitySignChange?: (sign: ModuleSizeItemSign) => void;
+  /** Vai apjomu reizināt ar 2 (piem. abām sienas pusēm). */
+  doubleQuantity?: boolean;
+  onDoubleQuantityChange?: (doubled: boolean) => void;
   onEnabledChange: (enabled: boolean) => void;
   onAdjustmentChange: (adjustment: string) => void;
 };
+
+/** Kompakta ×2 poga — piem. grīdlīstes abām starpsienas pusēm. */
+function DoubleQuantityToggle({
+  enabled,
+  onChange,
+  label,
+}: {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+  label: string;
+}) {
+  const { t } = useTranslations();
+
+  return (
+    <Tooltip
+      label={t(
+        "modules.sizes.double_quantity_hint",
+        "Reizināt ar 2 (abām pusēm)",
+      )}
+    >
+      <button
+        type="button"
+        aria-pressed={enabled}
+        aria-label={`${label} — ${t(
+          "modules.sizes.double_quantity_hint",
+          "Reizināt ar 2 (abām pusēm)",
+        )}`}
+        onClick={() => onChange(!enabled)}
+        className={`inline-flex h-5 min-w-7 items-center justify-center rounded-md px-1 text-[11px] font-bold leading-none tabular-nums transition ${
+          enabled
+            ? "bg-violet-600 text-white"
+            : "bg-transparent text-zinc-300 hover:bg-zinc-100 hover:text-zinc-500"
+        }`}
+      >
+        ×2
+      </button>
+    </Tooltip>
+  );
+}
+
+/** Zaļš + / sarkans - pirms slēdža: vai lielumu pieskaita vai atņem kopsummai. */
+function QuantitySignToggle({
+  sign,
+  onChange,
+  label,
+}: {
+  sign: ModuleSizeItemSign;
+  onChange: (sign: ModuleSizeItemSign) => void;
+  label: string;
+}) {
+  const { t } = useTranslations();
+  const isSubtract = sign === "-";
+
+  return (
+    <Tooltip
+      label={
+        isSubtract
+          ? t("actions.switch_to_add", "Pārslēgt uz saskaitīšanu")
+          : t("actions.switch_to_subtract", "Pārslēgt uz atņemšanu")
+      }
+    >
+      <button
+        type="button"
+        aria-label={`${label} — ${
+          isSubtract
+            ? t("actions.switch_to_add", "Pārslēgt uz saskaitīšanu")
+            : t("actions.switch_to_subtract", "Pārslēgt uz atņemšanu")
+        }`}
+        onClick={() => onChange(isSubtract ? "+" : "-")}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-sm font-bold leading-none transition ${
+          isSubtract
+            ? "bg-red-50 text-red-600 hover:bg-red-100"
+            : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+        }`}
+      >
+        {sign}
+      </button>
+    </Tooltip>
+  );
+}
 
 function CompactAttachSwitch({
   id,
@@ -73,6 +161,10 @@ export function ModuleSizeAttachItemRow({
   item,
   baseDisplayValue,
   state,
+  quantitySign,
+  onQuantitySignChange,
+  doubleQuantity,
+  onDoubleQuantityChange,
   onEnabledChange,
   onAdjustmentChange,
 }: ModuleSizeAttachItemRowProps) {
@@ -108,18 +200,42 @@ export function ModuleSizeAttachItemRow({
     emitAdjustment(nextSign, inputValue);
   }
 
+  const showQuantitySign = quantitySign != null && onQuantitySignChange != null;
+  const showDoubleToggle =
+    state.enabled && onDoubleQuantityChange != null;
+
   return (
     <li
-      className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 rounded-lg px-1 py-1.5 text-sm transition ${
+      className={`grid grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 rounded-lg px-1 py-1.5 text-sm transition ${
         state.enabled ? "bg-violet-50/80 ring-1 ring-inset ring-violet-200" : ""
       }`}
     >
+      {showQuantitySign ? (
+        <QuantitySignToggle
+          sign={quantitySign}
+          onChange={onQuantitySignChange}
+          label={item.label}
+        />
+      ) : (
+        <span className="w-5 shrink-0" aria-hidden="true" />
+      )}
+
       <CompactAttachSwitch
         id={controlId}
         enabled={state.enabled}
         onChange={onEnabledChange}
         label={item.label}
       />
+
+      {showDoubleToggle ? (
+        <DoubleQuantityToggle
+          enabled={doubleQuantity === true}
+          onChange={onDoubleQuantityChange}
+          label={item.label}
+        />
+      ) : (
+        <span className="w-7 shrink-0" aria-hidden="true" />
+      )}
 
       <span
         className="min-w-0 cursor-pointer select-none text-zinc-600"

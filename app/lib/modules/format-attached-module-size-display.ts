@@ -1,6 +1,8 @@
 import {
   getLineItemModuleSizeAdjustments,
   getLineItemModuleSizeItemKeys,
+  getLineItemModuleSizeItemMultiplier,
+  getLineItemModuleSizeItemSign,
 } from "@/app/lib/estimates/module-size-attachment";
 import {
   buildAdjustedModuleSizeSummarySections,
@@ -58,6 +60,18 @@ function findSummaryItemInSections(
   return null;
 }
 
+/** Savieno vairāku piesaistīto lielumu tekstus ar to zīmēm: "A + B - C". */
+function joinWithSigns(
+  parts: string[],
+  entries: { sign: "+" | "-" }[],
+): string {
+  return parts
+    .map((part, index) =>
+      index === 0 ? part : `${entries[index].sign} ${part}`,
+    )
+    .join(" ");
+}
+
 export function resolveAttachedModuleSizeDetail(
   attachment: LineItemModuleSizeAttachment,
   moduleSizeOptions: BuildingModuleSizeOption[],
@@ -72,22 +86,49 @@ export function resolveAttachedModuleSizeDetail(
 
   const itemKeys = getLineItemModuleSizeItemKeys(attachment);
   const resolvedItems = itemKeys
-    .map((itemKey) => findSummaryItemInSections(sections, itemKey))
+    .map((itemKey) => {
+      const found = findSummaryItemInSections(sections, itemKey);
+      return found
+        ? {
+            ...found,
+            sign: getLineItemModuleSizeItemSign(attachment, itemKey),
+            multiplier: getLineItemModuleSizeItemMultiplier(attachment, itemKey),
+          }
+        : null;
+    })
     .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
   if (resolvedItems.length === 0) {
     return null;
   }
 
-  if (resolvedItems.length === 1) {
-    const { section, item } = resolvedItems[0];
-    return { sectionTitle: section.title, label: item.label, value: item.value };
+  function formatItemLabel(label: string, multiplier: number): string {
+    return multiplier > 1 ? `${label} ×${multiplier}` : label;
   }
 
-  const labels = resolvedItems.map((entry) => entry.item.label);
-  const numericValues = resolvedItems
-    .map((entry) => entry.item.numericValue)
-    .filter((value): value is number => value != null && Number.isFinite(value));
+  if (resolvedItems.length === 1) {
+    const { section, item, multiplier } = resolvedItems[0];
+    const value =
+      item.numericValue != null &&
+      Number.isFinite(item.numericValue) &&
+      multiplier > 1 &&
+      item.unit
+        ? `${formatAmountDisplay(item.numericValue * multiplier)} ${item.unit}`
+        : item.value;
+    return {
+      sectionTitle: section.title,
+      label: formatItemLabel(item.label, multiplier),
+      value,
+    };
+  }
+
+  const signedNumericValues = resolvedItems
+    .map((entry) =>
+      entry.item.numericValue != null && Number.isFinite(entry.item.numericValue)
+        ? (entry.sign === "-" ? -1 : 1) * entry.item.numericValue * entry.multiplier
+        : null,
+    )
+    .filter((value): value is number => value != null);
   const units = [
     ...new Set(
       resolvedItems
@@ -100,11 +141,16 @@ export function resolveAttachedModuleSizeDetail(
   ];
 
   const value =
-    numericValues.length > 0 && units.length === 1
+    signedNumericValues.length > 0 && units.length === 1
       ? `${formatAmountDisplay(
-          numericValues.reduce((total, current) => total + current, 0),
+          signedNumericValues.reduce((total, current) => total + current, 0),
         )} ${units[0]}`
-      : resolvedItems.map((entry) => entry.item.value).join(" + ");
+      : joinWithSigns(
+          resolvedItems.map((entry) =>
+            formatItemLabel(entry.item.value, entry.multiplier),
+          ),
+          resolvedItems,
+        );
 
   return {
     sectionTitle:
@@ -112,7 +158,12 @@ export function resolveAttachedModuleSizeDetail(
         ? sectionTitles[0]
         : t?.("modules.sizes.multiple_sections", "Moduļa lielumi") ??
           "Moduļa lielumi",
-    label: labels.join(" + "),
+    label: joinWithSigns(
+      resolvedItems.map((entry) =>
+        formatItemLabel(entry.item.label, entry.multiplier),
+      ),
+      resolvedItems,
+    ),
     value,
   };
 }

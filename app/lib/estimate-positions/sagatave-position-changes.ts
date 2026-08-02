@@ -2,7 +2,11 @@ import {
   isEstimateLineItem,
   isEstimateMultiPosition,
 } from "@/app/lib/estimates/multi-position";
-import { getLineItemModuleSizeItemKeys } from "@/app/lib/estimates/module-size-attachment";
+import {
+  getLineItemModuleSizeItemKeys,
+  getLineItemModuleSizeItemMultipliers,
+  getLineItemModuleSizeItemSigns,
+} from "@/app/lib/estimates/module-size-attachment";
 import { resolveLineItemStoredDisplayUnit } from "@/app/lib/estimates/sync-module-size-quantities";
 import type {
   EstimateCategory,
@@ -181,11 +185,16 @@ function normalizeModuleSizeAttachment(
   }
 
   const itemKeys = getLineItemModuleSizeItemKeys(attachment);
+  const itemSigns = getLineItemModuleSizeItemSigns(attachment);
+  const itemMultipliers = getLineItemModuleSizeItemMultipliers(attachment);
 
   return {
     moduleId: attachment.moduleId,
     itemKey: itemKeys[0] ?? attachment.itemKey,
     itemKeys,
+    itemSigns: Object.keys(itemSigns).length > 0 ? itemSigns : undefined,
+    itemMultipliers:
+      Object.keys(itemMultipliers).length > 0 ? itemMultipliers : undefined,
     adjustments: normalizeModuleSizeAdjustments(attachment.adjustments),
   };
 }

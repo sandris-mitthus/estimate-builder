@@ -8,10 +8,15 @@ import {
   findModuleSizeSummaryItem,
 } from "@/app/lib/modules/apply-module-size-adjustments";
 import { translateModuleSizeSummarySections } from "@/app/lib/modules/format-module-size-summary";
-import type { LineItemModuleSizeAttachment } from "@/app/lib/estimates/types";
+import type {
+  LineItemModuleSizeAttachment,
+  ModuleSizeItemSign,
+} from "@/app/lib/estimates/types";
 import {
   createLineItemModuleSizeAttachment,
   getLineItemModuleSizeItemKeys,
+  getLineItemModuleSizeItemMultipliers,
+  getLineItemModuleSizeItemSigns,
 } from "@/app/lib/estimates/module-size-attachment";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { ModuleSizeSummaryItem } from "@/app/lib/modules/module-size-summary-types";
@@ -25,18 +30,18 @@ type ModuleSizeAttachPickerProps = {
 
 const EMPTY_ATTACHED_ITEM_KEYS: string[] = [];
 
-/** Atgriež sadaļas nosaukumu, kurā atrodas dotais `itemKey`, vai `null`. */
-function findSectionForItemKey(
+/** Atgriež sadaļu nosaukumus, kuros atrodas kāda no dotajām `itemKeys`. */
+function findSectionTitlesForItemKeys(
   sections: { title: string; items: { key: string }[] }[],
-  itemKey: string | undefined,
-): string | null {
-  if (!itemKey) return null;
-  for (const section of sections) {
-    if (section.items.some((item) => item.key === itemKey)) {
-      return section.title;
-    }
+  itemKeys: readonly string[],
+): string[] {
+  if (itemKeys.length === 0) {
+    return [];
   }
-  return null;
+
+  return sections
+    .filter((section) => section.items.some((item) => itemKeys.includes(item.key)))
+    .map((section) => section.title);
 }
 
 function findBaseSummaryItem(
@@ -57,14 +62,21 @@ function ModuleCard({
   module,
   attachment,
   onChange,
+  showModuleName = true,
+  matchAnyModule = false,
 }: {
   controlPrefix: string;
   module: BuildingModuleSizeOption;
   attachment: LineItemModuleSizeAttachment | null;
   onChange: (attachment: LineItemModuleSizeAttachment | null) => void;
+  /** Sagatavē modulis ir tikai piemērs, tāpēc nosaukumu nerāda. */
+  showModuleName?: boolean;
+  /** Piesaisti atpazīst pēc atslēgām arī tad, ja tā glabā cita moduļa id. */
+  matchAnyModule?: boolean;
 }) {
   const { t } = useTranslations();
-  const isAttachedModule = attachment?.moduleId === module.id;
+  const isAttachedModule =
+    attachment != null && (matchAnyModule || attachment.moduleId === module.id);
   const attachedKeysSignature =
     isAttachedModule && attachment
       ? getLineItemModuleSizeItemKeys(attachment).join(",")
@@ -75,6 +87,21 @@ function ModuleCard({
     }
     return attachedKeysSignature.split(",");
   }, [attachedKeysSignature]);
+
+  const attachedItemSigns = useMemo(
+    () =>
+      isAttachedModule && attachment
+        ? getLineItemModuleSizeItemSigns(attachment)
+        : {},
+    [attachment, isAttachedModule],
+  );
+  const attachedItemMultipliers = useMemo(
+    () =>
+      isAttachedModule && attachment
+        ? getLineItemModuleSizeItemMultipliers(attachment)
+        : {},
+    [attachment, isAttachedModule],
+  );
 
   // Lokālais korekciju stāvoklis — darbojas arī pirms kāda elementa piesaistīšanas.
   const [localAdjustments, setLocalAdjustments] = useState<Record<string, string>>(
@@ -118,31 +145,42 @@ function ModuleCard({
     [displaySections, t],
   );
 
-  const [openSection, setOpenSection] = useState<string | null>(() =>
-    isAttachedModule
-      ? findSectionForItemKey(module.sections, attachedItemKeys[0])
-      : null,
+  const attachedSectionTitles = useMemo(
+    () =>
+      isAttachedModule
+        ? findSectionTitlesForItemKeys(module.sections, attachedItemKeys)
+        : [],
+    [attachedItemKeys, isAttachedModule, module.sections],
   );
 
-  // Kad mainās piesaistītais modulis vai atslēgas — atver attiecīgo sadaļu.
+  const [openSections, setOpenSections] = useState<string[]>(attachedSectionTitles);
+
+  // Sadaļas ar piesaistītiem elementiem atveras automātiski un paliek atvērtas,
+  // kad lietotājs atver vēl kādu citu sadaļu.
   useEffect(() => {
-    if (!isAttachedModule) {
-      return;
-    }
-    setOpenSection(
-      findSectionForItemKey(module.sections, attachedItemKeys[0]),
-    );
-  }, [attachedItemKeys, isAttachedModule, module.sections]);
+    setOpenSections((current) => {
+      const missing = attachedSectionTitles.filter(
+        (title) => !current.includes(title),
+      );
+      return missing.length > 0 ? [...current, ...missing] : current;
+    });
+  }, [attachedSectionTitles]);
 
   function toggleSection(title: string) {
-    setOpenSection((current) => (current === title ? null : title));
+    setOpenSections((current) =>
+      current.includes(title)
+        ? current.filter((entry) => entry !== title)
+        : [...current, title],
+    );
   }
 
   if (module.sections.length === 0) {
     return (
       <li className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
-        <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
-        <p className="mt-2 text-sm text-zinc-500">
+        {showModuleName ? (
+          <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
+        ) : null}
+        <p className={`text-sm text-zinc-500${showModuleName ? " mt-2" : ""}`}>
           {t("modules.sizes.empty_for_module", "Nav definētu lielumu šim modulim.")}
         </p>
       </li>
@@ -151,10 +189,12 @@ function ModuleCard({
 
   return (
     <li className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
-      <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
-      <div className="mt-3 space-y-1">
+      {showModuleName ? (
+        <div className="text-sm font-semibold text-zinc-900">{module.name}</div>
+      ) : null}
+      <div className={`space-y-1${showModuleName ? " mt-3" : ""}`}>
         {module.sections.map((section, sectionIndex) => {
-          const isOpen = openSection === section.title;
+          const isOpen = openSections.includes(section.title);
           const translatedSection = translatedBaseSections[sectionIndex] ?? section;
           return (
             <section key={section.title}>
@@ -188,6 +228,14 @@ function ModuleCard({
                     const currentAdjustments = isAttachedModule
                       ? (attachment?.adjustments ?? {})
                       : localAdjustments;
+                    // Pirmais piesaistītais lielums ir bāze — zīmi rāda tikai nākamajiem.
+                    const isBaseAttachedItem = attachedItemKeys[0] === baseItem.key;
+                    const quantitySign: ModuleSizeItemSign | undefined =
+                      enabled && !isBaseAttachedItem
+                        ? (attachedItemSigns[baseItem.key] ?? "+")
+                        : undefined;
+                    const doubleQuantity =
+                      enabled && (attachedItemMultipliers[baseItem.key] ?? 1) >= 2;
 
                     return (
                       <ModuleSizeAttachItemRow
@@ -196,6 +244,50 @@ function ModuleCard({
                         item={displayItem}
                         baseDisplayValue={baseDisplayValue}
                         state={{ enabled, adjustment }}
+                        quantitySign={quantitySign}
+                        onQuantitySignChange={
+                          quantitySign
+                            ? (nextSign) => {
+                                const nextAttachment =
+                                  createLineItemModuleSizeAttachment(
+                                    module.id,
+                                    attachedItemKeys,
+                                    currentAdjustments,
+                                    { ...attachedItemSigns, [baseItem.key]: nextSign },
+                                    attachedItemMultipliers,
+                                  );
+                                if (nextAttachment) {
+                                  onChange(nextAttachment);
+                                }
+                              }
+                            : undefined
+                        }
+                        doubleQuantity={doubleQuantity}
+                        onDoubleQuantityChange={
+                          enabled
+                            ? (doubled) => {
+                                const nextMultipliers = {
+                                  ...attachedItemMultipliers,
+                                };
+                                if (doubled) {
+                                  nextMultipliers[baseItem.key] = 2;
+                                } else {
+                                  delete nextMultipliers[baseItem.key];
+                                }
+                                const nextAttachment =
+                                  createLineItemModuleSizeAttachment(
+                                    module.id,
+                                    attachedItemKeys,
+                                    currentAdjustments,
+                                    attachedItemSigns,
+                                    nextMultipliers,
+                                  );
+                                if (nextAttachment) {
+                                  onChange(nextAttachment);
+                                }
+                              }
+                            : undefined
+                        }
                         onEnabledChange={(nextEnabled) => {
                           if (nextEnabled) {
                             const currentKeys = isAttachedModule
@@ -227,6 +319,8 @@ function ModuleCard({
                               module.id,
                               nextKeys,
                               currentAdjustments,
+                              attachedItemSigns,
+                              attachedItemMultipliers,
                             );
                             if (nextAttachment) {
                               onChange(nextAttachment);
@@ -250,6 +344,8 @@ function ModuleCard({
                             module.id,
                             nextKeys,
                             currentAdjustments,
+                            attachedItemSigns,
+                            attachedItemMultipliers,
                           );
                           if (nextAttachment) {
                             onChange(nextAttachment);
@@ -303,17 +399,35 @@ export function ModuleSizeAttachPicker({
     );
   }
 
+  // Sagatavē lielumi ir tikai piemērs — rāda vienu sarakstu bez moduļa nosaukuma.
+  const isExample = moduleSizeOptions[0].exampleOnly === true;
+  const visibleOptions = isExample
+    ? [moduleSizeOptions[0]]
+    : moduleSizeOptions;
+
   return (
-    <ul className="space-y-4">
-      {moduleSizeOptions.map((module) => (
-        <ModuleCard
-          key={module.id}
-          controlPrefix={controlPrefix}
-          module={module}
-          attachment={attachment}
-          onChange={onChange}
-        />
-      ))}
-    </ul>
+    <div className="space-y-3">
+      {isExample ? (
+        <p className="text-xs text-zinc-500">
+          {t(
+            "modules.sizes.example_note",
+            "Skaitļi šeit ir tikai piemērs no viena moduļa. Katrā tāmē apjoms tiks aprēķināts no tā projekta moduļa lielumiem.",
+          )}
+        </p>
+      ) : null}
+      <ul className="space-y-4">
+        {visibleOptions.map((module) => (
+          <ModuleCard
+            key={module.id}
+            controlPrefix={controlPrefix}
+            module={module}
+            attachment={attachment}
+            onChange={onChange}
+            showModuleName={!isExample}
+            matchAnyModule={isExample}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }

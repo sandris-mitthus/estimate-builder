@@ -12,6 +12,7 @@ import type {
   OpeningEntry,
   ProjectDescriptionFormState,
   RoofPlaneEntry,
+  SanitaryRoomEntry,
 } from "@/app/lib/modules/project-description-types";
 
 function hasDimension(value: string): boolean {
@@ -98,6 +99,14 @@ function hasRoofPlaneData(plane: RoofPlaneEntry): boolean {
   );
 }
 
+function hasSanitaryRoomData(entry: SanitaryRoomEntry): boolean {
+  return (
+    hasDimension(entry.name) ||
+    hasDimension(entry.lengthM) ||
+    hasDimension(entry.widthM)
+  );
+}
+
 function hasGablePedimentData(entry: GablePedimentEntry): boolean {
   return (
     hasDimension(entry.heightM) ||
@@ -138,12 +147,12 @@ function updateCrossSectionField(
   };
 }
 
-function updateOpeningField(
-  entries: OpeningEntry[],
+function updateOpeningField<T extends OpeningEntry>(
+  entries: T[],
   index: number,
   field: "heightM" | "widthM" | "count",
   adjustment: string,
-): OpeningEntry[] {
+): T[] {
   const activeEntry = entries.filter(hasOpeningData)[index];
   if (!activeEntry) {
     return entries;
@@ -243,6 +252,11 @@ function applySingleItemKeyAdjustment(
           state.foundationHeightM,
           adjustment,
         ),
+      };
+    case "foundation.living-area":
+      return {
+        ...state,
+        livingAreaM2: applyDimensionAdjustment(state.livingAreaM2, adjustment),
       };
     case "foundation.extension-width":
       return {
@@ -365,6 +379,32 @@ function applySingleItemKeyAdjustment(
     return {
       ...state,
       roofPlanes: updateRoofPlaneField(state.roofPlanes, index, field, adjustment),
+    };
+  }
+
+  const sanitaryMatch = /^sanitary\.(\d+)\.(length|width)$/.exec(itemKey);
+  if (sanitaryMatch) {
+    const index = Number.parseInt(sanitaryMatch[1] ?? "", 10);
+    const fieldMap = {
+      length: "lengthM",
+      width: "widthM",
+    } as const;
+    const field = fieldMap[sanitaryMatch[2] as keyof typeof fieldMap];
+    const activeEntry = state.sanitaryRooms.filter(hasSanitaryRoomData)[index];
+    if (!activeEntry) {
+      return state;
+    }
+
+    return {
+      ...state,
+      sanitaryRooms: state.sanitaryRooms.map((entry) =>
+        entry.id === activeEntry.id
+          ? {
+              ...entry,
+              [field]: applyDimensionAdjustment(entry[field], adjustment),
+            }
+          : entry,
+      ),
     };
   }
 

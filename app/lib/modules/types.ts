@@ -27,6 +27,11 @@ export type BuildingModuleSizeOption = {
   name: string;
   sections: ModuleSizeSummarySection[];
   projectDescription: ProjectDescriptionFormState;
+  /**
+   * Sagatavē lielumi ir tikai piemērs no kataloga moduļa — tāmē apjoms vienmēr
+   * tiek rēķināts no attiecīgā projekta moduļa.
+   */
+  exampleOnly?: boolean;
 };
 
 export type ModuleContentBlock = {
