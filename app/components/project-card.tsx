@@ -28,11 +28,12 @@ function resolveProjectModuleName(
     return fallbackName;
   }
 
-  return (
-    moduleNameById?.get(buildingModuleId) ??
-    modules.find((module) => module.id === buildingModuleId)?.name ??
-    fallbackName
-  );
+  const module = modules.find((entry) => entry.id === buildingModuleId);
+  const name =
+    moduleNameById?.get(buildingModuleId) ?? module?.name ?? fallbackName;
+  const note = module?.note?.trim() ?? "";
+
+  return note ? `${name} (${note})` : name;
 }
 
 function ContactRow({

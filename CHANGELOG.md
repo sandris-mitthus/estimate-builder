@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.106
+
+**Projektu saraksts — moduļa piezīme**
+
+- Projektu kartē aiz moduļa nosaukuma iekavās rādās moduļa **Piezīme**, ja tā ir aizpildīta (piem. `Modulis (Spogulis)`)
+
 ## v1.3.105
 
 **Papildu darbu tāme — sagataves hinti un PDF/Excel eksports**
