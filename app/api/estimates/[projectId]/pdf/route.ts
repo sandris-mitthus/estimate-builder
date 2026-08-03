@@ -2,11 +2,17 @@
 
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
+import { getAdditionalWorkEstimate } from "@/app/lib/additional-work-estimates/repository";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { EstimatePdfDocument } from "@/app/lib/exports/estimate-pdf";
-import { fetchLogoAsset, fetchVisualizationImages } from "@/app/lib/exports/pdf-image-fetch";
+import {
+  fetchLogoAsset,
+  fetchVisualizationImages,
+  type PdfImageAsset,
+} from "@/app/lib/exports/pdf-image-fetch";
+import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { resolveProjectExcludedPositions } from "@/app/lib/excluded-positions/resolve-project-excluded-positions";
 import { listPositionPrices } from "@/app/lib/positions/repository";
@@ -14,11 +20,13 @@ import {
   getProject,
   getProjectEstimateForProject,
 } from "@/app/lib/projects/repository";
+import type { ProjectEstimate } from "@/app/lib/projects/types";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { getBuildingModule } from "@/app/lib/modules/repository";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { syncSubcategoryOfferVisibilityFromSagatave } from "@/app/lib/estimate-positions/sync-subcategory-offer-visibility";
 import { getServerTranslations } from "@/app/lib/i18n/server";
+import type { EstimateCategory } from "@/app/lib/estimates/types";
 
 function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
   const sanitized = value
@@ -31,7 +39,7 @@ function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   const user = await getCurrentUser();
@@ -49,54 +57,66 @@ export async function GET(
   }
 
   const { projectId } = await params;
+  const estimateId = new URL(request.url).searchParams.get("estimateId");
 
-  const [{ t }, project, catalogPositions, companySettings, globalExcludedPositions] =
-    await Promise.all([
-      getServerTranslations(),
-      getProject(projectId),
-      listPositionPrices(),
-      getCompanySettings(),
-      listExcludedPositions(),
-    ]);
+  const [{ t }, project, catalogPositions, companySettings] = await Promise.all([
+    getServerTranslations(),
+    getProject(projectId),
+    listPositionPrices(),
+    getCompanySettings(),
+  ]);
 
   if (!project) {
     return new Response("Not found", { status: 404 });
   }
 
-  const estimate = await getProjectEstimateForProject(
-    project,
-    companySettings.estimateValidityDays,
-  );
+  let estimate: ProjectEstimate | null;
+  let categoriesForOffer: EstimateCategory[];
+  let excludedPositions: ExcludedPosition[] = [];
+  let visualizationImages: PdfImageAsset[] = [];
 
-  if (!estimate) {
-    return new Response("Not found", { status: 404 });
+  const [buildingModule, logo] = await Promise.all([
+    project.buildingModuleId
+      ? getBuildingModule(project.buildingModuleId)
+      : Promise.resolve(null),
+    fetchLogoAsset(),
+  ]);
+
+  if (estimateId) {
+    estimate = await getAdditionalWorkEstimate(projectId, estimateId);
+    if (!estimate) {
+      return new Response("Not found", { status: 404 });
+    }
+    categoriesForOffer = estimate.categories;
+  } else {
+    const [mainEstimate, globalExcludedPositions, sagatave] = await Promise.all([
+      getProjectEstimateForProject(project, companySettings.estimateValidityDays),
+      listExcludedPositions(),
+      ensureDefaultEstimatePosition(),
+    ]);
+
+    if (!mainEstimate) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    estimate = mainEstimate;
+    categoriesForOffer = syncSubcategoryOfferVisibilityFromSagatave(
+      estimate.categories,
+      sagatave.sections,
+    );
+    excludedPositions = resolveProjectExcludedPositions(
+      globalExcludedPositions,
+      estimate.meta.excludedPositionIdsOmitted,
+    );
+
+    const moduleVisualizations = buildingModule
+      ? buildingModule.visualizationBlocks
+      : project.visualizationBlocks;
+    visualizationImages = await fetchVisualizationImages(moduleVisualizations);
   }
-
-  const buildingModule = project.buildingModuleId
-    ? await getBuildingModule(project.buildingModuleId)
-    : null;
 
   const displayModuleName =
     buildingModule?.name ?? t("projects.individual_project", "Individuāls projekts");
-  const moduleVisualizations = buildingModule
-    ? buildingModule.visualizationBlocks
-    : project.visualizationBlocks;
-
-  const [logo, visualizationImages, sagatave] = await Promise.all([
-    fetchLogoAsset(),
-    fetchVisualizationImages(moduleVisualizations),
-    ensureDefaultEstimatePosition(),
-  ]);
-
-  const categoriesForOffer = syncSubcategoryOfferVisibilityFromSagatave(
-    estimate.categories,
-    sagatave.sections,
-  );
-
-  const excludedPositions = resolveProjectExcludedPositions(
-    globalExcludedPositions,
-    estimate.meta.excludedPositionIdsOmitted,
-  );
 
   const buffer = await renderToBuffer(
     createElement(EstimatePdfDocument, {
@@ -121,10 +141,12 @@ export async function GET(
   );
 
   const filenamePrefix = sanitizeDownloadFilenamePart(
-    t("exports.filename.offer", "piedavajums"),
+    estimateId
+      ? estimate.title || t("exports.filename.offer", "piedavajums")
+      : t("exports.filename.offer", "piedavajums"),
     "piedavajums",
   );
-  const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.pdf`;
+  const filename = `${filenamePrefix}-${(estimateId ?? projectId).slice(0, 8)}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

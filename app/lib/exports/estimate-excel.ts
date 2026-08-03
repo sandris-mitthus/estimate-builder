@@ -156,15 +156,19 @@ export async function buildEstimateExcel(
   ws.addRow([
     tx("exports.excel.date_label", "Datums:"),
     formatDisplayDateDdMmYyyy(meta.date),
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    tx("exports.excel.deadline_label", "Termiņš:"),
-    formatDisplayDateDdMmYyyy(meta.deadline),
+    ...(meta.deadline
+      ? [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          tx("exports.excel.deadline_label", "Termiņš:"),
+          formatDisplayDateDdMmYyyy(meta.deadline),
+        ]
+      : []),
   ]);
   ws.addRow([]); // empty spacer
 

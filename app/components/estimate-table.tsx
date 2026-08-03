@@ -16,7 +16,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -70,6 +72,15 @@ import {
 } from "@/app/lib/estimates/planned-profit";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
 import {
+  createAdditionalWorkCompositePosition,
+  enableAdditionalWorkManualQuantity,
+  ensureAdditionalWorkManualQuantities,
+} from "@/app/lib/estimates/additional-work-quantity";
+import {
+  collectPositionTemplates,
+  mergePositionTemplates,
+} from "@/app/lib/estimates/position-templates";
+import {
   createLineItem,
   createSubcategory,
 } from "@/app/lib/estimates/create-empty";
@@ -82,7 +93,7 @@ import {
 } from "@/app/lib/estimates/sample-data";
 import { serializeEstimatePositionDocument } from "@/app/lib/estimate-positions/serialize-document";
 import { normalizeEstimatePositionSection } from "@/app/lib/estimate-positions/create-empty";
-import { resolveEstimateGroupTitle } from "@/app/lib/estimates/resolve-group-title";
+import { resolveEstimateGroupTitleInput } from "@/app/lib/estimates/resolve-group-title";
 import { collectEstimateDocumentUnits } from "@/app/lib/estimates/collect-estimate-document-units";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import {
@@ -222,6 +233,7 @@ import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import {
   createMultiPosition,
   getRowItemId,
+  isBlankLineItem,
   isEstimateMultiPosition,
   resolveLineItemDisplayName,
   updateRowItemById,
@@ -250,6 +262,13 @@ import type { UserSummary } from "@/app/lib/users/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import { countPendingProjectMaterials } from "@/app/lib/projects/pending-project-materials";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
+
+/** Papildu darbu tāmē apjoms vienmēr ievadāms manuāli (bez moduļa piesaistes). */
+const ForceManualQuantityContext = createContext(false);
+
+function useForceManualQuantity(): boolean {
+  return useContext(ForceManualQuantityContext);
+}
 
 const EMPTY_EXCLUDED_POSITIONS: ExcludedPosition[] = [];
 
@@ -472,6 +491,7 @@ function LineItemRow({
 }) {
   const { t } = useTranslations();
   const { openPositionModal } = usePositionModal();
+  const forceManualQuantity = useForceManualQuantity();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
   const numericStyles = getEstimateNumericStyles(showQuantityColumn);
   const metricUnitCellClass = showQuantityColumn
@@ -486,29 +506,32 @@ function LineItemRow({
   const isCatalogLinked = catalogPosition != null;
   const isComposite = isCompositeLineItem(item);
   const displayName = catalogPosition?.name ?? item.name;
-  const compositeResolvedName = isComposite
-    ? resolveLineItemDisplayName(item)
-    : null;
-  const compositeIsUnnamed = compositeResolvedName === "—";
-  const compositeRowLabel = compositeResolvedName
-    ? compositeIsUnnamed
-      ? t("positions.unnamed", "Nenosaukta pozīcija")
-      : compositeResolvedName
-    : null;
   const displayUnit = resolveEstimateRowDisplayUnit(
     item,
     moduleSizeOptions ?? [],
     catalogPosition?.unit,
   );
   const unitOptions = getEstimateUnitOptions(item.unit);
-  const showQuantityInput = isVariableQuantityLineItem(item, catalogPositions);
+  const showQuantityInput =
+    forceManualQuantity || isVariableQuantityLineItem(item, catalogPositions);
   const quantityMissing = showQuantityInput && item.quantity <= 0;
+  const usePositionModalEditor = allowCompositeEdit && (forceManualQuantity || isComposite);
+  const modalRowResolvedName = isComposite
+    ? resolveLineItemDisplayName(item)
+    : displayName.trim() || null;
+  const modalRowIsUnnamed = !modalRowResolvedName || modalRowResolvedName === "—";
+  const modalRowLabel = modalRowIsUnnamed
+    ? t("positions.unnamed", "Nenosaukta pozīcija")
+    : modalRowResolvedName;
   const attachedQuantity = resolveLineItemDisplayQuantityFromModuleSize(
     item,
     moduleSizeOptions,
   );
   const hasAttachedQuantity =
-    !item.variableQuantity && hasModuleSizeAttachment(item) && attachedQuantity != null;
+    !forceManualQuantity &&
+    !item.variableQuantity &&
+    hasModuleSizeAttachment(item) &&
+    attachedQuantity != null;
   const effectiveQuantity = attachedQuantity ?? item.quantity;
   const displayUnitPrice = applyPlannedProfitPercent(
     highlightStaleCatalogPrices
@@ -581,18 +604,18 @@ function LineItemRow({
               <EstimateAttentionIcon className="relative top-[5px]" />
             ) : null}
             <span className="min-w-0 flex-1">
-              {allowCompositeEdit && isComposite ? (
+              {usePositionModalEditor ? (
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     onClick={() => openPositionModal(item, onChange)}
                     className={`block w-full text-left text-sm transition hover:underline ${nameInput} ${indentName ? subcategoryItemNameIndent : ""} ${
-                      compositeIsUnnamed
+                      modalRowIsUnnamed
                         ? "italic text-zinc-400"
                         : "font-medium text-zinc-900 hover:text-sky-700"
                     }`}
                   >
-                    {compositeRowLabel}
+                    {modalRowLabel}
                   </button>
                   <EstimateLineItemNote note={item.note} />
                   {requiresAttention && !showBudgetInTotalCell ? (
@@ -610,10 +633,12 @@ function LineItemRow({
                       }
                     />
                   ) : null}
-                  <AttachedModuleSizeLabel
-                    attachment={item.moduleSizeAttachment}
-                    moduleSizeOptions={moduleSizeOptions ?? []}
-                  />
+                  {!forceManualQuantity ? (
+                    <AttachedModuleSizeLabel
+                      attachment={item.moduleSizeAttachment}
+                      moduleSizeOptions={moduleSizeOptions ?? []}
+                    />
+                  ) : null}
                 </div>
               ) : (
               <EstimateLineItemNameField
@@ -681,19 +706,22 @@ function LineItemRow({
                   onChange(withPrices);
                   onSyncCatalogPosition(withPrices);
                 }}
-                onCatalogSelect={(position) =>
+                onCatalogSelect={(position) => {
+                  const linked = applyCatalogPositionToLineItem(
+                    item,
+                    position,
+                    defaultHourlyRate,
+                  );
                   onChange(
-                    applyCatalogPositionToLineItem(
-                      item,
-                      position,
-                      defaultHourlyRate,
-                    ),
-                  )
-                }
+                    forceManualQuantity
+                      ? enableAdditionalWorkManualQuantity(linked)
+                      : linked,
+                  );
+                }}
               />
               )}
             </span>
-            {showQuantityColumn && !estimateLocked && item.variableQuantity ? (
+            {forceManualQuantity ? null : showQuantityColumn && !estimateLocked && item.variableQuantity ? (
               <Tooltip label={t("estimate.quantity.remove_individual", "Noņemt individuālo apjomu")}>
                 <button
                   type="button"
@@ -709,20 +737,11 @@ function LineItemRow({
             ) : (
               <PositionVariableQuantityIcon enabled={showQuantityInput} />
             )}
-            {allowCompositeEdit && isComposite ? (
-              <IconActionButton
-                label={t("positions.edit.title", "Labot pozīciju")}
-                icon="fas fa-pen"
-                variant="edit"
-                onClick={() => openPositionModal(item, onChange)}
-                className="relative top-[5px] shrink-0 opacity-0 group-hover:opacity-100"
-              />
-            ) : null}
           </span>
         </div>
       </td>
       <td className={metricUnitCellClass}>
-        {isCatalogLinked || isComposite ? (
+        {isCatalogLinked || isComposite || forceManualQuantity ? (
           <span className={`${metricReadOnly} text-zinc-700`}>
             {displayUnit.trim() || "—"}
           </span>
@@ -759,7 +778,13 @@ function LineItemRow({
               <EstimateQuantityInput
                 className={`${metricCellNum} ${quantityMissing ? "border-red-300 bg-red-50 text-red-700 placeholder-red-300" : ""}`}
                 value={item.quantity}
-                onChange={(quantity) => onChange({ ...item, quantity })}
+                onChange={(quantity) =>
+                  onChange(
+                    forceManualQuantity
+                      ? enableAdditionalWorkManualQuantity({ ...item, quantity })
+                      : { ...item, quantity },
+                  )
+                }
                 emptyValue={0}
               />
             )
@@ -837,11 +862,22 @@ function LineItemRow({
                 className="opacity-100"
               />
             ) : (
-              <DeleteButton
-                label={t("positions.delete.action", "Dzēst pozīciju")}
-                onClick={onDelete}
-                className="opacity-0 group-hover:opacity-100"
-              />
+              <>
+                {usePositionModalEditor ? (
+                  <IconActionButton
+                    label={t("positions.edit.title", "Labot pozīciju")}
+                    icon="fas fa-pen"
+                    variant="edit"
+                    onClick={() => openPositionModal(item, onChange)}
+                    className="opacity-0 group-hover:opacity-100"
+                  />
+                ) : null}
+                <DeleteButton
+                  label={t("positions.delete.action", "Dzēst pozīciju")}
+                  onClick={onDelete}
+                  className="opacity-0 group-hover:opacity-100"
+                />
+              </>
             )}
           </>
         )}
@@ -1332,6 +1368,8 @@ function SubcategoryBlock({
   parentSectionHover?: SectionGroupHoverHandlers;
 }) {
   const { t } = useTranslations();
+  const forceManualQuantity = useForceManualQuantity();
+  const { openPositionModal } = usePositionModal();
   const subcategoryHover = useSectionGroupHover();
   const sectionGroupHover = mergeSectionGroupHoverHandlers(
     subcategoryHover,
@@ -1376,6 +1414,23 @@ function SubcategoryBlock({
     );
   }
 
+  function handleAddItem() {
+    if (forceManualQuantity) {
+      openPositionModal(createAdditionalWorkCompositePosition(), (saved) =>
+        withExpandedContent((current) => ({
+          ...current,
+          items: [...current.items, saved],
+        })),
+      );
+      return;
+    }
+
+    withExpandedContent((current) => ({
+      ...current,
+      items: [...current.items, createLineItem()],
+    }));
+  }
+
   if (!showHiddenEstimateRows && isEstimateSubcategoryHidden(subcategory)) {
     return null;
   }
@@ -1389,7 +1444,7 @@ function SubcategoryBlock({
         colSpan={colSpan}
         kind="subcategory"
         placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
-        value={resolveEstimateGroupTitle(subcategory)}
+        value={resolveEstimateGroupTitleInput(subcategory)}
         onChange={(title) => onChange({ ...subcategory, title })}
         estimateLocked={estimateLocked}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(subcategory.id)}
@@ -1410,12 +1465,7 @@ function SubcategoryBlock({
                 ? undefined
                 : handleAddMulti
             }
-            onAddItem={() =>
-              withExpandedContent((current) => ({
-                ...current,
-                items: [...current.items, createLineItem()],
-              }))
-            }
+            onAddItem={handleAddItem}
             onDelete={onDelete}
           />
         }
@@ -1562,6 +1612,8 @@ function CategoryBlock({
   expandSection: (sectionId: string) => void;
 }) {
   const { t } = useTranslations();
+  const forceManualQuantity = useForceManualQuantity();
+  const { openPositionModal } = usePositionModal();
   const { requestFocus } = useSectionTitleFocus() ?? {};
   const categoryHover = useSectionGroupHover();
   const plannedProfitPercent = useEstimatePlannedProfitPercent();
@@ -1608,6 +1660,34 @@ function CategoryBlock({
     );
   }
 
+  function handleAddItem() {
+    if (forceManualQuantity) {
+      openPositionModal(createAdditionalWorkCompositePosition(), (saved) =>
+        withExpandedContent((current) =>
+          appendCategoryChild(
+            {
+              ...current,
+              items: [...current.items, saved],
+            },
+            { kind: "item", id: getRowItemId(saved) },
+          ),
+        ),
+      );
+      return;
+    }
+
+    const item = createLineItem();
+    withExpandedContent((current) =>
+      appendCategoryChild(
+        {
+          ...current,
+          items: [...current.items, item],
+        },
+        { kind: "item", id: getRowItemId(item) },
+      ),
+    );
+  }
+
   if (!showHiddenEstimateRows && isEstimateCategoryHidden(category)) {
     return null;
   }
@@ -1621,7 +1701,7 @@ function CategoryBlock({
         colSpan={colSpan}
         kind="category"
         placeholder={t("estimate.placeholder.category", "Kategorijas nosaukums")}
-        value={resolveEstimateGroupTitle(category)}
+        value={resolveEstimateGroupTitleInput(category)}
         onChange={(title) => onChange({ ...category, title })}
         estimateLocked={estimateLocked}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(category.id)}
@@ -1654,18 +1734,7 @@ function CategoryBlock({
                 ? undefined
                 : handleAddMulti
             }
-            onAddItem={() => {
-              const item = createLineItem();
-              withExpandedContent((current) =>
-                appendCategoryChild(
-                  {
-                    ...current,
-                    items: [...current.items, item],
-                  },
-                  { kind: "item", id: getRowItemId(item) },
-                ),
-              );
-            }}
+            onAddItem={handleAddItem}
             onDelete={onDelete}
           />
         }
@@ -2400,9 +2469,13 @@ export function EstimateTable({
   const { catalogPositions, refreshCatalogPositions } =
     useCatalogPositionsWithRefresh(initialCatalogPositions);
   const [title, setTitle] = useState(initialTitle);
-  const [meta, setMeta] = useState(initialMeta);
-  const [categories, setCategories] = useState<EstimateCategory[]>(
-    initialCategories,
+  const [meta, setMeta] = useState(() =>
+    isAdditionalWork ? { ...initialMeta, deadline: "" } : initialMeta,
+  );
+  const [categories, setCategories] = useState<EstimateCategory[]>(() =>
+    isAdditionalWork
+      ? ensureAdditionalWorkManualQuantities(initialCategories)
+      : initialCategories,
   );
   const [multiOptionLinks, setMultiOptionLinks] = useState<
     MultiOptionLinkGroup[]
@@ -2423,7 +2496,13 @@ export function EstimateTable({
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
   const [isExcelDownloading, setIsExcelDownloading] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
-    serializeEstimatePositionDocument(initialTitle, initialCategories, initialMultiOptionLinks),
+    serializeEstimatePositionDocument(
+      initialTitle,
+      isAdditionalWork
+        ? ensureAdditionalWorkManualQuantities(initialCategories)
+        : initialCategories,
+      initialMultiOptionLinks,
+    ),
   );
   const [savedPlannedProfitPercent, setSavedPlannedProfitPercent] = useState(() =>
     normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
@@ -2456,9 +2535,16 @@ export function EstimateTable({
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       refreshCatalogPositions();
-      setPositionModalState({ item, onSave });
+      setPositionModalState({
+        item: isAdditionalWork
+          ? enableAdditionalWorkManualQuantity(item)
+          : item,
+        onSave: isAdditionalWork
+          ? (next) => onSave(enableAdditionalWorkManualQuantity(next))
+          : onSave,
+      });
     },
-    [refreshCatalogPositions],
+    [isAdditionalWork, refreshCatalogPositions],
   );
   const openMultiPositionModal = useCallback(
     (
@@ -2474,6 +2560,17 @@ export function EstimateTable({
     () => collectEstimateDocumentUnits(categories, moduleSizeOptions),
     [categories, moduleSizeOptions],
   );
+  const positionTemplates = useMemo(() => {
+    const fromSagatave = collectPositionTemplates(sagataveSections);
+    if (!isAdditionalWork) {
+      return fromSagatave;
+    }
+
+    return mergePositionTemplates(
+      fromSagatave,
+      collectPositionTemplates(categories),
+    );
+  }, [isAdditionalWork, sagataveSections, categories]);
   const excludedPositionsPropKey = useMemo(
     () => excludedPositionsSyncKey(estimateMode, globalExcludedPositions),
     [estimateMode, globalExcludedPositions],
@@ -2515,6 +2612,11 @@ export function EstimateTable({
   }
 
   function handleEstimateDateChange(date: string) {
+    if (isAdditionalWork) {
+      setMeta({ ...meta, date, deadline: "" });
+      return;
+    }
+
     const deadline = date
       ? defaultEstimateDeadline(date, estimateValidityDays)
       : meta.deadline;
@@ -2611,7 +2713,10 @@ export function EstimateTable({
     const missingQuantityCount = collectEstimateLineItems(categories, {
       forTotals: true,
     }).filter(
-      (item) => isVariableQuantityLineItem(item, catalogPositions) && item.quantity <= 0,
+      (item) =>
+        !isBlankLineItem(item) &&
+        isVariableQuantityLineItem(item, catalogPositions) &&
+        item.quantity <= 0,
     ).length;
 
     if (missingQuantityCount > 0) {
@@ -2643,25 +2748,29 @@ export function EstimateTable({
       catalogPositions,
       defaultHourlyRate,
     );
+    const categoriesToSave = isAdditionalWork
+      ? ensureAdditionalWorkManualQuantities(bakedCategories)
+      : bakedCategories;
 
     const savedAtIso = new Date().toISOString();
     const nextMeta = {
       ...meta,
       savedAt: savedAtIso,
       pricesFrozen: true,
+      ...(isAdditionalWork ? { deadline: "" } : {}),
     };
 
     const result = isAdditionalWork
       ? await saveAdditionalWorkEstimateAction(project!.id, estimateId!, {
           title,
           meta: nextMeta,
-          categories: bakedCategories,
+          categories: categoriesToSave,
           multiOptionLinks,
         })
       : await saveProjectEstimateAction(project!.id, {
           title,
           meta: nextMeta,
-          categories: bakedCategories,
+          categories: categoriesToSave,
           multiOptionLinks,
         });
 
@@ -2669,9 +2778,9 @@ export function EstimateTable({
 
     if (result.ok) {
       setMeta(nextMeta);
-      setCategories(bakedCategories);
+      setCategories(categoriesToSave);
       setSavedSnapshot(
-        serializeEstimatePositionDocument(title, bakedCategories, multiOptionLinks),
+        serializeEstimatePositionDocument(title, categoriesToSave, multiOptionLinks),
       );
       setSavedPlannedProfitPercent(
         normalizePlannedProfitPercent(nextMeta.plannedProfitPercent ?? 0),
@@ -2887,6 +2996,7 @@ export function EstimateTable({
     <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <SectionTitleFocusProvider>
       <EstimatePlannedProfitProvider percent={plannedProfitPercent}>
+        <ForceManualQuantityContext.Provider value={isAdditionalWork}>
         <PositionModalProvider openPositionModal={openPositionModal}>
           <EstimateDndTable
             categories={categories}
@@ -2915,6 +3025,7 @@ export function EstimateTable({
             expandSection={expandSection}
           />
         </PositionModalProvider>
+        </ForceManualQuantityContext.Provider>
       </EstimatePlannedProfitProvider>
       </SectionTitleFocusProvider>
     </div>
@@ -2942,6 +3053,8 @@ export function EstimateTable({
             currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             estimateUnits={estimateUnits}
+            positionTemplates={positionTemplates}
+            forceManualQuantity={isAdditionalWork}
           />
         ) : null}
         {multiPositionModalState ? (
@@ -3041,13 +3154,6 @@ export function EstimateTable({
                 readOnly={datesReadOnly}
                 onChange={handleEstimateDateChange}
               />
-              <MetaField
-                label={t("estimate.deadline.label", "Tāmes termiņš")}
-                type="date"
-                value={meta.deadline}
-                readOnly={datesReadOnly}
-                onChange={handleEstimateDeadlineChange}
-              />
             </div>
           </div>
 
@@ -3085,6 +3191,69 @@ export function EstimateTable({
                 </span>
               ) : null}
 
+              {!isDirty &&
+              isEstimateSaved &&
+              savedAt &&
+              canExportEstimate &&
+              estimateId ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={isPdfDownloading}
+                    onClick={() =>
+                      handleFileDownload(
+                        `/api/estimates/${project.id}/pdf?estimateId=${encodeURIComponent(estimateId)}`,
+                        setIsPdfDownloading,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPdfDownloading ? (
+                      <i
+                        className="fas fa-circle-notch fa-spin text-red-500 text-xs"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <i
+                        className="fas fa-file-pdf text-red-500 text-xs"
+                        aria-hidden="true"
+                      />
+                    )}
+                    PDF
+                    <span className="text-xs text-zinc-400">
+                      {t("estimate.export.offer_suffix", "(piedāvājums)")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExcelDownloading}
+                    onClick={() =>
+                      handleFileDownload(
+                        `/api/estimates/${project.id}/excel?estimateId=${encodeURIComponent(estimateId)}`,
+                        setIsExcelDownloading,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isExcelDownloading ? (
+                      <i
+                        className="fas fa-circle-notch fa-spin text-green-600 text-xs"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <i
+                        className="fas fa-file-excel text-green-600 text-xs"
+                        aria-hidden="true"
+                      />
+                    )}
+                    Excel
+                    <span className="text-xs text-zinc-400">
+                      {t("estimate.export.estimate_suffix", "(tāme)")}
+                    </span>
+                  </button>
+                </>
+              ) : null}
+
               {!editorLocked ? (
                 <button
                   type="button"
@@ -3119,6 +3288,8 @@ export function EstimateTable({
             currency={currency}
             moduleSizeOptions={moduleSizeOptions}
             estimateUnits={estimateUnits}
+            positionTemplates={positionTemplates}
+            forceManualQuantity={isAdditionalWork}
           />
         ) : null}
         {multiPositionModalState ? (
@@ -3591,6 +3762,8 @@ export function EstimateTable({
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
+          positionTemplates={positionTemplates}
+          forceManualQuantity={isAdditionalWork}
         />
       ) : null}
       {multiPositionModalState ? (

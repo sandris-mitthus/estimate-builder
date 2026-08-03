@@ -119,7 +119,7 @@ English routes, Latvian labels:
 - **Paslēptās pozīcijas** — projekta tāmē **Dzēst** (arī multi) **paslēpj** rindu, kategoriju vai subkategoriju (`hiddenInEstimate`), neizņem no datiem; paslēptās nav kopsummās, PDF/Excel; sagataves sinhronizācija un kataloga cenas joprojām attiecas; poga **Rādīt noņemtās (N)** / **Paslēpt noņemtās**; paslēptās rindas — pelēks fons, blāvs teksts; **↺ Atjaunot** (`hidden-estimate-rows.ts`, `restore-button.tsx`); migrācija `119`
 - Editable estimate number in meta when set
 - **Neiekļautās pozīcijas** — bloks **zem tāmes tabulas** (rādās vienmēr, arī tukšs saraksts); **Pievienot pozīciju** pievieno globālajam sarakstam un šī projekta piedāvājumam; pārējos projektos jaunā pozīcija automātiski **noņemta** no piedāvājuma (`excludedPositionIdsOmitted`); drag-and-drop secība maina globālo `sort_order`; **×** noņem tikai no **šī projekta**; poga **Rādīt noņemtās (N)** ar atjaunošanu; numerācija secīga tikai redzamajām rindām; **Kopēt** projektu kopē arī noņemšanas sarakstu; apstiprinātā tāmē — tikai lasāms; migrācijas `120`, `125`
-- **Papildu darbu tāmes** (ja `module_additional_work` ieslēgts) — zem līguma tāmes sadaļa ar **Izveidot papildu darbu tāmi**; katram projektam vairākas neatkarīgas tāmes darbiem, kas nav līgumā; glabājas `estimates` ar `estimate_kind = additional_work` (paralēli galvenajai `main` tāmei); redaktors `/[id]/additional-work/[estimateId]` — tukša tabula no nulles, bez sagataves sinhronizācijas, neiekļauto pozīciju un materiālu delegācijas; migrācijas `129`–`130`
+- **Papildu darbu tāmes** (ja `module_additional_work` ieslēgts) — zem līguma tāmes sadaļa ar **Izveidot papildu darbu tāmi**; katram projektam vairākas neatkarīgas tāmes darbiem, kas nav līgumā; glabājas `estimates` ar `estimate_kind = additional_work` (paralēli galvenajai `main` tāmei); redaktors `/[id]/additional-work/[estimateId]` — tukša tabula no nulles, bez sagataves sinhronizācijas, neiekļauto pozīciju un materiālu delegācijas; **meta tikai ar datumu** (bez derīguma termiņa); pozīciju pievienošana/labošana caur `PositionModal` kā sagatavē; nosaukuma laukā **hinti no sagataves** (izvēle aizpilda kompozīto pozīciju); **apjoms vienmēr manuāls** katrai pozīcijai (`additional-work-quantity.ts`, `variableQuantity`); pēc saglabāšanas **PDF/Excel** ar `?estimateId=`; migrācijas `129`–`130`, `139`
 
 ### Data
 
@@ -174,8 +174,8 @@ app/
 ├── docs/              # Public documentation alias for wiki
 ├── wiki/              # Public documentation page
 ├── api/
-│   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums)
-│   ├── estimates/[projectId]/excel/  # Authenticated Excel download (Tāme)
+│   ├── estimates/[projectId]/pdf/    # Authenticated PDF download (Piedāvājums); ?estimateId= for additional_work
+│   ├── estimates/[projectId]/excel/  # Authenticated Excel download (Tāme); ?estimateId= for additional_work
 │   ├── projects/[projectId]/         # Authenticated DELETE (project.delete)
 │   ├── company/logo/       # Authenticated company logo proxy (private bucket)
 │   ├── geo/calling-code/   # IP → phone country code (auth required)
@@ -194,7 +194,7 @@ app/
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, project-structure-to-sagatave, sagatave-to-other-projects, sagatave-structure-intro-entries, sagatave-has-new-positions, sagatave-row-matching, sagatave-position-changes, project-estimate-base, sync-subcategory-offer-visibility, labor-time-norm-sync, sections-use-module-size-options, default sagatave
 │   ├── excluded-positions/  # repository, resolve-project-excluded-positions, merge-visible-reorder (global list + per-project omissions)
 │   ├── frontend-modules/  # site_frontend_modules CRUD, nav gating helpers, module_todo_list / module_additional_work flags
-│   ├── estimates/      # calculate-totals (resolveEstimateLineItemPrices), kind (main | additional_work), line-item-export-visibility, hidden-estimate-rows (soft-hide project rows), estimate-table-numeric-styles (compact project table cells), resolve-group-title, planned-profit, attention-budget, category-child-order, aggregate-project-materials, material-consumption-basis, collect-estimate-document-units, calculate-line (addThousandSeparators, formatDecimalDisplay), format-money, multi-position, composite-line-item, sync-module-size-quantities, units, …
+│   ├── estimates/      # calculate-totals (resolveEstimateLineItemPrices), kind (main | additional_work), additional-work-quantity (manual qty for additional_work), position-templates (sagatave name hints → full composite fill), line-item-export-visibility, hidden-estimate-rows (soft-hide project rows), estimate-table-numeric-styles (compact project table cells), resolve-group-title (+ TitleInput without trim), planned-profit, attention-budget, category-child-order, aggregate-project-materials, material-consumption-basis, collect-estimate-document-units, calculate-line (addThousandSeparators, formatDecimalDisplay), format-money, multi-position, composite-line-item, sync-module-size-quantities, units, …
 │   ├── exports/        # estimate-pdf.tsx, estimate-excel.ts (exceljs), pdf-image-fetch.ts
 │   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-catalog-positions-with-refresh, use-collapsed-estimate-sections, use-assigned-materials-banner-expanded
 │   ├── form/           # input invalid styles
@@ -216,7 +216,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–138 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–115 = worker photo/tool history, project delete, planned profit notices, sagatave sync UI translations, module plumbing lengths; 119–126 = hidden rows, excluded positions project UX, sagatave structure sync, section row tooltips; 129–131 = additional work estimates + module_additional_work seed; 132–138 = module living area, window/door perimeter, sagatave example note, sanitary rooms, ×2 multiplier, door/window index labels, window showcase)
+supabase/migrations/    # 001–139 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–115 = worker photo/tool history, project delete, planned profit notices, sagatave sync UI translations, module plumbing lengths; 119–126 = hidden rows, excluded positions project UX, sagatave structure sync, section row tooltips; 129–131 = additional work estimates + module_additional_work seed; 132–138 = module living area, window/door perimeter, sagatave example note, sanitary rooms, ×2 multiplier, door/window index labels, window showcase; 139 = position template name search translation)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```

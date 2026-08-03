@@ -10,6 +10,23 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.105
+
+**Papildu darbu tāme — sagataves hinti un PDF/Excel eksports**
+
+- PositionModal nosaukumā **hinti no sagataves** — izvēloties aizpilda nosaukumu, materiālus, mehānismus, laika normu u.c. (sagatave un papildu tāme); `position-templates.ts`, `position-template-name-field.tsx`; migrācija `139`
+- Papildu darbu tāmē pēc saglabāšanas pieejamas **PDF** un **Excel** pogas (`?estimateId=`); API maršruti atbalsta papildu tāmes eksportu
+- Labošanas poga papildu/kompozītās pozīcijās pārvietota uz darbību kolonnu **pirms Dzēst**
+
+## v1.3.104
+
+**Papildu darbu tāme — manuāls apjoms, pozīciju modālis un tikai datums**
+
+- Papildu darbu tāmē katrai pozīcijai **manuāli ievadāms apjoms** (objekta-specifisks; `variableQuantity`), kopsummas reizina ar daudzumu; helpers `additional-work-quantity.ts`
+- **Pievienot / labot pozīciju** atver to pašu `PositionModal` kā sagatavē (nosaukums, materiāli, mehānismi, laika norma)
+- Papildu tāmē ir tikai **datums** (bez derīguma termiņa); jaunām tāmēm termiņš netiek iestatīts, saglabājot esošās — notīrās; Excel termiņu rāda tikai ja aizpildīts
+- Kategoriju un subkategoriju nosaukumos var rakstīt **ar atstarpēm** (`resolveEstimateGroupTitleInput` bez `trim` ievades laikā)
+
 ## v1.3.103
 
 **Multi-pozīcijas labošanas poga darbību kolonnā**

@@ -3,13 +3,13 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.103`
+**Current version:** `1.3.105`
 
 ---
 
 ## Key features
 
-- **Projects and offers** — create a project, fill in the client and object details, and get an estimate cloned from your template; copy an existing project when the next job is similar
+- **Projects and offers** — create a project, fill in the client and object details, and get an estimate cloned from your template; copy an existing project when the next job is similar; optional **additional work** estimates for work outside the main contract (date only, manual quantities per position)
 - **Estimate editor** — Excel-style table with categories, subcategories, positions and multi-choice positions; drag-and-drop reordering, collapsible sections, and totals that recalculate as you type
 - **Price catalog** — one company-wide list of materials and mechanisms with unit prices, supplier details and full price history; estimates warn you when catalog prices have changed
 - **Reusable template (Sagatave)** — build the structure once; new positions added in a project flow back to the template, and template changes can be pulled into existing projects

@@ -29,7 +29,8 @@ import {
 import { saveEstimatePositionDocumentAction } from "@/app/(protected)/estimate/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useCatalogPositionsWithRefresh } from "@/app/lib/hooks/use-catalog-positions-with-refresh";
-import { resolveEstimateGroupTitle } from "@/app/lib/estimates/resolve-group-title";
+import { collectPositionTemplates } from "@/app/lib/estimates/position-templates";
+import { resolveEstimateGroupTitleInput } from "@/app/lib/estimates/resolve-group-title";
 import { EstimateSectionRowActions } from "@/app/components/estimate-section-row-actions";
 import { EstimateSectionActionsCell } from "@/app/components/estimate-section-actions-cell";
 import { EstimateTableStickyShell } from "@/app/components/estimate-table-sticky-shell";
@@ -790,7 +791,7 @@ function SubcategoryBlock({
         dragLabel={t("estimate.drag.subcategory", "Pārvietot subkategoriju")}
         kind="subcategory"
         placeholder={t("estimate.placeholder.subcategory", "Subkategorijas nosaukums")}
-        value={resolveEstimateGroupTitle(subcategory)}
+        value={resolveEstimateGroupTitleInput(subcategory)}
         onChange={(title) => onChange({ ...subcategory, title })}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
@@ -959,7 +960,7 @@ function SectionBlock({
         dragLabel={t("estimate.drag.section", "Pārvietot tāmes pozīciju")}
         kind="category"
         placeholder={t("estimate.placeholder.section", "Tāmes pozīcijas grupas nosaukums")}
-        value={resolveEstimateGroupTitle(section)}
+        value={resolveEstimateGroupTitleInput(section)}
         onChange={(title) => onChange({ ...section, title })}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
@@ -1490,6 +1491,11 @@ export function EstimatePositionTable({
     [refreshCatalogPositions],
   );
 
+  const positionTemplates = useMemo(
+    () => collectPositionTemplates(sections),
+    [sections],
+  );
+
   function handleSave() {
     if (!isDirty || isSaving) {
       return;
@@ -1617,6 +1623,7 @@ export function EstimatePositionTable({
           currency={currency}
           moduleSizeOptions={moduleSizeOptions}
           estimateUnits={estimateUnits}
+          positionTemplates={positionTemplates}
           allowAttentionFlagEdit
         />
       ) : null}

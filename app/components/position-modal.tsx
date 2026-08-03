@@ -14,6 +14,7 @@ import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { ModuleSizeAttachPicker } from "@/app/components/module-size-attach-picker";
 import { PositionCustomHourlyRateField } from "@/app/components/position-custom-hourly-rate-field";
 import { PositionManualUnitField } from "@/app/components/position-manual-unit-field";
+import { PositionTemplateNameField } from "@/app/components/position-template-name-field";
 import { PositionVariableQuantityField } from "@/app/components/position-variable-quantity-field";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateAttentionBudgetControl } from "@/app/components/estimate-attention-budget-control";
@@ -33,6 +34,9 @@ import {
   resolveEffectiveMechanisms,
 } from "@/app/lib/estimates/composite-line-item";
 import { buildManualUnitSelectOptions } from "@/app/lib/estimates/collect-estimate-document-units";
+import {
+  applyPositionTemplateToDraft,
+} from "@/app/lib/estimates/position-templates";
 import {
   resolveLineItemDisplayUnitFromModuleSize,
 } from "@/app/lib/estimates/sync-module-size-quantities";
@@ -59,6 +63,10 @@ type PositionModalProps = {
   moduleSizeOptions: BuildingModuleSizeOption[];
   estimateUnits?: string[];
   allowAttentionFlagEdit?: boolean;
+  /** Esošās sagataves / tāmes pozīcijas nosaukuma hintiem. */
+  positionTemplates?: EstimateLineItem[];
+  /** Papildu darbu tāmē — hinta izvēle ieslēdz manuālo apjomu. */
+  forceManualQuantity?: boolean;
 };
 
 const labelClassName = "mb-1 block text-sm font-medium text-zinc-700";
@@ -105,6 +113,8 @@ export function PositionModal({
   moduleSizeOptions,
   estimateUnits = [],
   allowAttentionFlagEdit = false,
+  positionTemplates = [],
+  forceManualQuantity = false,
 }: PositionModalProps) {
   const { t } = useTranslations();
   const isSystemAdmin = useIsSystemAdmin();
@@ -128,6 +138,22 @@ export function PositionModal({
     setMechanismAddKey((k) => k + 1);
     setNoteError(undefined);
   }, [open, value]);
+
+  const availableTemplates = useMemo(
+    () => positionTemplates.filter((item) => item.id !== draft.id),
+    [positionTemplates, draft.id],
+  );
+
+  function handleTemplateSelect(template: EstimateLineItem) {
+    setDraft(
+      applyPositionTemplateToDraft(draft, template, {
+        forceManualQuantity,
+      }),
+    );
+    setMaterialAddKey((k) => k + 1);
+    setMechanismAddKey((k) => k + 1);
+    setNoteError(undefined);
+  }
 
   const materialPositions = useMemo(
     () => catalogPositions.filter((position) => position.costType === "materials"),
@@ -360,12 +386,16 @@ export function PositionModal({
           <div className="space-y-3">
             <label className="block">
               <span className={labelClassName}>{t("common.name", "Nosaukums")}</span>
-              <input
-                type="text"
+              <PositionTemplateNameField
                 value={draft.name}
-                onChange={(event) => patch({ name: event.target.value })}
+                onNameChange={(name) => patch({ name })}
+                onTemplateSelect={handleTemplateSelect}
+                templates={availableTemplates}
                 className={inputClassName}
-                placeholder={t("positions.modal.name_placeholder", "piem. Sienas mūrēšana")}
+                placeholder={t(
+                  "positions.modal.name_search_placeholder",
+                  "Meklēt sagataves pozīciju vai ievadīt jaunu",
+                )}
                 autoFocus
               />
             </label>

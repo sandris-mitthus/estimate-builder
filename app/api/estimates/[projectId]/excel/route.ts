@@ -1,5 +1,6 @@
 "use server";
 
+import { getAdditionalWorkEstimate } from "@/app/lib/additional-work-estimates/repository";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
@@ -20,7 +21,7 @@ function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   const user = await getCurrentUser();
@@ -38,12 +39,17 @@ export async function GET(
   }
 
   const { projectId } = await params;
-  const [{ t }, estimate, catalogPositions, companySettings] = await Promise.all([
+  const estimateId = new URL(request.url).searchParams.get("estimateId");
+
+  const [{ t }, catalogPositions, companySettings] = await Promise.all([
     getServerTranslations(),
-    getProjectEstimate(projectId),
     listPositionPrices(),
     getCompanySettings(),
   ]);
+
+  const estimate = estimateId
+    ? await getAdditionalWorkEstimate(projectId, estimateId)
+    : await getProjectEstimate(projectId);
 
   if (!estimate) {
     return new Response("Not found", { status: 404 });
@@ -61,10 +67,12 @@ export async function GET(
   );
 
   const filenamePrefix = sanitizeDownloadFilenamePart(
-    t("exports.filename.estimate", "tame"),
+    estimateId
+      ? estimate.title || t("exports.filename.estimate", "tame")
+      : t("exports.filename.estimate", "tame"),
     "tame",
   );
-  const filename = `${filenamePrefix}-${projectId.slice(0, 8)}.xlsx`;
+  const filename = `${filenamePrefix}-${(estimateId ?? projectId).slice(0, 8)}.xlsx`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

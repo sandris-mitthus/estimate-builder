@@ -1,4 +1,3 @@
-import { defaultEstimateDeadline } from "@/app/lib/estimates/sample-data";
 import {
   ESTIMATE_KIND_ADDITIONAL_WORK,
   ESTIMATE_KIND_MAIN,
@@ -17,7 +16,6 @@ import type {
   EstimateMeta,
   ProjectEstimate,
 } from "@/app/lib/projects/types";
-import { getCompanySettings } from "@/app/lib/settings/repository";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { todayIsoDate } from "@/app/lib/format-display-date";
@@ -157,17 +155,14 @@ export async function createAdditionalWorkEstimate(
   const nextNumber = existing.length + 1;
   const title = `Papildu darbi #${nextNumber}`;
 
-  const companySettings = await getCompanySettings();
   const estimateDate = todayIsoDate();
   const meta: EstimateMeta = {
     client: project.name,
     project: project.address,
     author,
     date: estimateDate,
-    deadline: defaultEstimateDeadline(
-      estimateDate,
-      companySettings.estimateValidityDays,
-    ),
+    /** Papildu darbu tāmēm ir tikai datums, bez derīguma termiņa. */
+    deadline: "",
     number: "",
   };
 

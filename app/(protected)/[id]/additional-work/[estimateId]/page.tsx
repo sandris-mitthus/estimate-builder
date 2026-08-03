@@ -5,6 +5,7 @@ import {
   getAdditionalWorkEstimate,
 } from "@/app/lib/additional-work-estimates/repository";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
+import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
 import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { getProject } from "@/app/lib/projects/repository";
@@ -32,12 +33,14 @@ export default async function AdditionalWorkEstimatePage({
   }
 
   const { t } = await getServerTranslations();
-  const [project, companySettings, catalogPositions, estimate] = await Promise.all([
-    getProject(projectId),
-    getCompanySettings(),
-    listPositionPrices(),
-    getAdditionalWorkEstimate(projectId, estimateId),
-  ]);
+  const [project, companySettings, catalogPositions, estimate, sagatave] =
+    await Promise.all([
+      getProject(projectId),
+      getCompanySettings(),
+      listPositionPrices(),
+      getAdditionalWorkEstimate(projectId, estimateId),
+      ensureDefaultEstimatePosition(),
+    ]);
 
   if (!project || !estimate) {
     notFound();
@@ -75,6 +78,7 @@ export default async function AdditionalWorkEstimatePage({
         catalogPositions={catalogPositions}
         defaultHourlyRate={companySettings.defaultHourlyRate}
         currency={companySettings.currency}
+        sagataveSections={sagatave.sections}
       />
     </main>
   );

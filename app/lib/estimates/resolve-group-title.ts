@@ -1,4 +1,23 @@
-/** Kategorijas / subkategorijas nosaukums — atbalsta veco `name` lauku JSON datos. */
+/**
+ * Kategorijas / subkategorijas nosaukums ievades laukam — bez `trim`,
+ * lai rakstīšanas laikā nepazustu atstarpes.
+ * Atbalsta veco `name` lauku JSON datos.
+ */
+export function resolveEstimateGroupTitleInput(
+  value: { title?: string; name?: string } | null | undefined,
+): string {
+  if (typeof value?.title === "string") {
+    return value.title;
+  }
+
+  if (typeof value?.name === "string") {
+    return value.name;
+  }
+
+  return "";
+}
+
+/** Kategorijas / subkategorijas nosaukums — ar `trim` (rādīšanai / normalizācijai). */
 export function resolveEstimateGroupTitle(
   value: { title?: string; name?: string } | null | undefined,
 ): string {
