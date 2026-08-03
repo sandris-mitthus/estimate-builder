@@ -28,10 +28,12 @@ function resolveProjectModuleName(
     return fallbackName;
   }
 
-  const module = modules.find((entry) => entry.id === buildingModuleId);
+  const buildingModule = modules.find((entry) => entry.id === buildingModuleId);
   const name =
-    moduleNameById?.get(buildingModuleId) ?? module?.name ?? fallbackName;
-  const note = module?.note?.trim() ?? "";
+    moduleNameById?.get(buildingModuleId) ??
+    buildingModule?.name ??
+    fallbackName;
+  const note = buildingModule?.note?.trim() ?? "";
 
   return note ? `${name} (${note})` : name;
 }

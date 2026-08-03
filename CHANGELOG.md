@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.107
+
+**Lint — project card module variable**
+
+- `project-card.tsx`: pārdēvēts lokālais `module` uz `buildingModule`, lai izvairītos no `@next/next/no-assign-module-variable` CI kļūdas
+
 ## v1.3.106
 
 **Projektu saraksts — moduļa piezīme**
