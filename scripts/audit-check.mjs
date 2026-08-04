@@ -12,20 +12,7 @@ import { execFileSync } from "node:child_process";
  * Never add an advisory here without checking that the vulnerable code path is
  * unreachable from user input.
  */
-const ACCEPTED_ADVISORIES = [
-  {
-    url: "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
-    package: "brace-expansion",
-    reason:
-      "DoS through crafted glob brace patterns. Reachable only from dev tooling " +
-      "(eslint-config-next plugins) and from exceljs -> archiver zip creation; the app " +
-      "never turns user input into a glob pattern. The advisory marks every version " +
-      "<= 5.0.7 vulnerable, so minimatch 3.x/5.x consumers have no non-breaking upgrade, " +
-      "and forcing brace-expansion 5.x breaks minimatch's CommonJS entry point.",
-    removeWhen:
-      "eslint-config-next ships eslint-plugin-* on minimatch >= 10 and exceljs updates archiver.",
-  },
-];
+const ACCEPTED_ADVISORIES = [];
 
 const BLOCKING_SEVERITIES = new Set(["high", "critical"]);
 

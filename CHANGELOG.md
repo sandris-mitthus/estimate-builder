@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.109
+
+**Security — brace-expansion overrides**
+
+- `package.json` overrides `brace-expansion` uz labotajām same-major versijām (`1.1.18` / `2.1.4` / `5.0.9`); noņemts novecojis ACCEPTED ieraksts `audit-check.mjs`
+
 ## v1.3.108
 
 **Papildu darbu tāmes dzēšana un sagataves multi izcelšana**

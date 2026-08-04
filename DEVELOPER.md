@@ -235,7 +235,7 @@ Three GitHub Actions workflows run on every push and pull request:
 
 > `GITLEAKS_LICENSE` repo secret is required only for **private** repositories (free for public repos).
 
-`npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`).
+`npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`, `brace-expansion` same-major patches).
 
 Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.5 / 10**).
 
