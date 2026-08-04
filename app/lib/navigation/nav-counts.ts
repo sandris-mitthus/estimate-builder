@@ -67,6 +67,20 @@ async function countVisibleProjects(companyId: string): Promise<number> {
   return result.error ? 0 : (result.count ?? 0);
 }
 
+async function countIncompleteBuildingModules(companyId: string): Promise<number> {
+  if (!isSupabaseAdminConfigured()) {
+    return 0;
+  }
+
+  const supabase = createAdminClient();
+  const result = (await supabase
+    .from("building_modules")
+    .select("*", { count: "exact", head: true })
+    .eq("company_id", companyId)
+    .eq("module_data_complete", false)) as CountQuery;
+  return result.error ? 0 : (result.count ?? 0);
+}
+
 async function countActiveLanguageTranslations(languageCode: string): Promise<number> {
   if (!isSupabaseAdminConfigured()) {
     return 0;
@@ -131,19 +145,28 @@ export async function getNavigationCounts({
     return {};
   }
 
-  const [projects, modules, positions, excludedPositions, todo, users] =
-    await Promise.all([
-      countVisibleProjects(companyId),
-      countCompanyRows("building_modules", companyId),
-      countCompanyRows("position_prices", companyId),
-      countCompanyRows("excluded_positions", companyId),
-      countCompanyUserRows("todo_tasks", companyId, user.id),
-      countCompanyRows("company_users", companyId),
-    ]);
+  const [
+    projects,
+    modules,
+    modulesIncomplete,
+    positions,
+    excludedPositions,
+    todo,
+    users,
+  ] = await Promise.all([
+    countVisibleProjects(companyId),
+    countCompanyRows("building_modules", companyId),
+    countIncompleteBuildingModules(companyId),
+    countCompanyRows("position_prices", companyId),
+    countCompanyRows("excluded_positions", companyId),
+    countCompanyUserRows("todo_tasks", companyId, user.id),
+    countCompanyRows("company_users", companyId),
+  ]);
 
   return {
     projects,
     modules,
+    modules_incomplete: modulesIncomplete,
     positions,
     excluded_positions: excludedPositions,
     todo,

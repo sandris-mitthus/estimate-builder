@@ -98,11 +98,15 @@ function DimensionInput({
   value,
   onChange,
   placeholder,
+  invalid = false,
+  describedBy,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   return (
     <input
@@ -114,7 +118,9 @@ function DimensionInput({
       onChange={(event) =>
         onChange(sanitizeQuantityInputString(event.target.value))
       }
-      className={`${formInputFullWidthClass} ${formInputClassName()}`}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      className={`${formInputFullWidthClass} ${formInputClassName(invalid)}`}
     />
   );
 }
@@ -904,6 +910,9 @@ export function ModuleProjectDescriptionForm({
     [form.floorHeightM, form.sanitaryRooms],
   );
 
+  const livingAreaMissing = form.livingAreaM2.trim().length === 0;
+  const livingAreaErrorId = "living-area-error";
+
   return (
     <section className="min-w-0">
       <h2 className="text-sm font-semibold text-zinc-900">
@@ -948,10 +957,19 @@ export function ModuleProjectDescriptionForm({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field
-              label={t("project_description.field.living_area_m2", "Dzīvojamā platība (m²)")}
-              id="living-area"
-            >
+            <label htmlFor="living-area" className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-zinc-700">
+                {t(
+                  "project_description.field.living_area_m2",
+                  "Dzīvojamā platība (m²)",
+                )}
+                {livingAreaMissing ? (
+                  <i
+                    className="fas fa-exclamation-circle text-amber-500"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </span>
               <DimensionInput
                 id="living-area"
                 value={form.livingAreaM2}
@@ -959,8 +977,22 @@ export function ModuleProjectDescriptionForm({
                   setForm((current) => ({ ...current, livingAreaM2 }))
                 }
                 placeholder="96"
+                invalid={livingAreaMissing}
+                describedBy={livingAreaMissing ? livingAreaErrorId : undefined}
               />
-            </Field>
+              {livingAreaMissing ? (
+                <p
+                  id={livingAreaErrorId}
+                  className="mt-1 text-sm text-amber-700"
+                  role="status"
+                >
+                  {t(
+                    "project_description.validation.living_area_required",
+                    "Ievadi dzīvojamo platību.",
+                  )}
+                </p>
+              ) : null}
+            </label>
           </div>
 
           <ToggleSwitch

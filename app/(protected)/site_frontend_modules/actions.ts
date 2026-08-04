@@ -22,7 +22,6 @@ function revalidateFrontendModulePaths(moduleKey: string) {
     revalidatePath("/tasks");
     revalidatePath("/workers");
     revalidatePath("/tools");
-    revalidatePath("/timeline");
     revalidatePath("/timeline-graph");
   }
 }

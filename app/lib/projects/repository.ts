@@ -47,7 +47,6 @@ import {
   deleteDelegatedMaterialTodoTask,
   upsertDelegatedMaterialTodoTask,
 } from "@/app/lib/todo/repository";
-import { ensureTimelineEntryForProject } from "@/app/lib/timeline/repository";
 import {
   getProjectById as getSampleProjectById,
   SAMPLE_PROJECTS,
@@ -880,14 +879,6 @@ export async function updateProjectStatus(
     }
 
     return { ok: false, error: "Neizdevās atjaunināt projekta statusu." };
-  }
-
-  if (status === "approved" || status === "completed") {
-    await ensureTimelineEntryForProject({
-      companyId,
-      projectId,
-      projectCreatedAt: project.createdAt,
-    });
   }
 
   return { ok: true };

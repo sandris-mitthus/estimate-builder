@@ -1,6 +1,6 @@
 {
   "name": "estimate-builder",
-  "version": "1.3.112",
+  "version": "1.3.113",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -14,7 +14,7 @@
     "audit:check": "node scripts/audit-check.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:test": "node scripts/test-supabase.mjs",
-    "postinstall": "node scripts/copy-pdf-worker.mjs"
+    "postinstall": "node scripts/copy-pdf-worker.mjs && node scripts/patch-next-app-page-require.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

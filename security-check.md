@@ -31,7 +31,7 @@
 | Apgabals | Drošības secinājums |
 |----------|---------------------|
 | Laika grafiks (`/timeline-graph`) | ✅ Lapa + reorder aiz nav + frontend moduļa; DB order tabula ar RLS deny; company-scoped ownership filtrs reorderā |
-| Termiņu grafiks pārdēvēšana | ✅ Tikai UI/nav labels; `/timeline` auth un `timeline.manage` nemainās |
+| Termiņu grafiks (`module_timeline`) noņemts | ✅ Migrācija `154` — tabula, modulis, permissions un unikālie tulkojumi dzēsti; `/timeline` koda nav |
 | Papildu darbu tāmes + dzēšana | ✅ Mutācijas aiz `estimate.save`; PDF/Excel ar `estimateId` joprojām aiz `estimate.export` |
 | Atkarību pin (`next` 16.2.12, postcss/sharp/js-yaml/brace-expansion) | ✅ HIGH advisories novērsti vai pinned; `audit:check` tīrs bez ACCEPTED ierakstiem |
 | `project_material_assignments` / materiāli | ✅ Modelis saglabāts (RLS deny + service-role repository) |
@@ -86,7 +86,7 @@ Advisory ir reģistrēts `scripts/audit-check.mjs` → `ACCEPTED_ADVISORIES` ar 
 | Jaunā `project_material_assignments` tabula | ✅ Migrācija `103_project_material_assignments.sql`; RLS enabled + restrictive deny policy anon/authenticated klientiem; backfill no esošā `estimates.meta` |
 | Storage / proxy | ✅ Privātie bucketi; `logo`, `asset`, `workers/photo` proxy prasa auth; module asset proxy pārbauda company path prefix un tagad ir rate limit |
 | PDF/Excel eksports | ✅ Auth + `estimate.export`; rate limit; `Content-Disposition` filename sanitizēts; PDF attēlu ielādei ir skaita/izmēra/kopējā apjoma/concurrency limiti |
-| Timeline / materiālu performance izmaiņas | ✅ Drošības robežas nemainās: timeline ieraksti tiek veidoti server-side statusa maiņā; materiālu piešķīrumi paliek service-role repository slānī ar RLS deny tabulu |
+| Materiālu performance izmaiņas | ✅ Materiālu piešķīrumi paliek service-role repository slānī ar RLS deny tabulu |
 | XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` aplikācijas kodā |
 | Hardcoded secrets | ✅ Nav atrasti `sk_live_`, `sk_test_`, service-role JWT, `password="..."` vai `secret="..."` patterni `app/` kodā |
 | npm audit (moderate+) | ✅ **0 vulnerabilities** (`npm audit --audit-level=moderate`) |

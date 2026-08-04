@@ -184,7 +184,6 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Ievadi instrumenta numuru.": "tools.validation.number_required",
   "Ievadi instrumenta nosaukumu.": "tools.validation.name_required",
   "Instruments ar šo numuru jau eksistē.": "errors.tool_number_exists",
-  "Beigu datumam jābūt pēc sākuma datuma.": "timeline.validation.date_order",
   "Foto nedrīkst būt lielāks par 5 MB.": "errors.worker_photo_too_large",
   "Neizdevās pievienot darbinieku.": "errors.worker_create_failed",
   "Neizdevās saglabāt darbinieku.": "errors.worker_save_failed",
@@ -194,7 +193,6 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās dzēst instrumentu.": "errors.tool_delete_failed",
   "Neizdevās ielādēt instrumenta vēsturi.":
     "errors.tool_history_load_failed",
-  "Neizdevās saglabāt laika grafiku.": "errors.timeline_save_failed",
 };
 
 export function translateActionError(

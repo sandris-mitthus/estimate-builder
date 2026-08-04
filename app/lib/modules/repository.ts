@@ -54,6 +54,9 @@ function mapBuildingModuleSummary(row: BuildingModuleRow): BuildingModuleSummary
 
   const visualizationBlocks = parseModuleContentBlocks(row.visualization_blocks);
   const projectBlocks = parseModuleContentBlocks(row.project_blocks);
+  const projectDescription = parseProjectDescriptionFormState(
+    row.project_description,
+  );
 
   return {
     id: row.id,
@@ -62,6 +65,7 @@ function mapBuildingModuleSummary(row: BuildingModuleRow): BuildingModuleSummary
     moduleDataComplete: isBuildingModuleDataComplete({
       visualizationBlocks,
       projectBlocks,
+      projectDescription,
     }),
   };
 }
@@ -203,7 +207,9 @@ export async function getBuildingModule(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, note, outline, visualization_blocks, project_blocks, project_description")
+    .select(
+      "id, name, note, outline, visualization_blocks, project_blocks, project_description, module_data_complete",
+    )
     .eq("id", id)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -215,7 +221,9 @@ export async function getBuildingModule(
   if (error && isMissingColumnError(error, "project_description")) {
     const legacy = await supabase
       .from("building_modules")
-      .select("id, name, note, outline, visualization_blocks, project_blocks")
+      .select(
+        "id, name, note, outline, visualization_blocks, project_blocks, module_data_complete",
+      )
       .eq("id", id)
       .eq("company_id", companyId)
       .maybeSingle();
@@ -264,7 +272,9 @@ export async function getBuildingModulesByIds(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("building_modules")
-    .select("id, name, note, outline, visualization_blocks, project_blocks, project_description")
+    .select(
+      "id, name, note, outline, visualization_blocks, project_blocks, project_description, module_data_complete",
+    )
     .eq("company_id", companyId)
     .in("id", uniqueIds);
 

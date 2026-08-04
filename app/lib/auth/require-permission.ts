@@ -52,15 +52,14 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
   const hrefs: string[] = [];
   const navKeys: NavPermissionKey[] = [
     "projects",
+    "timeline_graph",
     "modules",
     "estimate",
     "positions",
     "excluded_positions",
-    "todo",
     "workers",
     "tools",
-    "timeline",
-    "timeline_graph",
+    "todo",
     "users",
     "settings",
   ];
@@ -74,7 +73,6 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
     todo: "/tasks",
     workers: "/workers",
     tools: "/tools",
-    timeline: "/timeline",
     timeline_graph: "/timeline-graph",
     users: "/users",
     user_groups: "/users/groups",

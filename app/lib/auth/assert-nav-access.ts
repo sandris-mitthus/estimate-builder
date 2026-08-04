@@ -89,15 +89,14 @@ export async function assertUserGroupsPageAccess(): Promise<
 
 const NAV_PERMISSION_KEYS_FOR_MENU: Exclude<NavPermissionKey, "user_groups">[] = [
   "projects",
+  "timeline_graph",
   "modules",
   "estimate",
   "positions",
   "excluded_positions",
-  "todo",
   "workers",
   "tools",
-  "timeline",
-  "timeline_graph",
+  "todo",
   "users",
   "settings",
 ];
@@ -147,10 +146,6 @@ export function pathnameToNavKey(pathname: string): NavPermissionKey | null {
 
   if (pathname === "/tools") {
     return "tools";
-  }
-
-  if (pathname === "/timeline") {
-    return "timeline";
   }
 
   if (pathname === "/timeline-graph") {

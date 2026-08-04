@@ -17,8 +17,12 @@ export function parseProjectModuleBlocks(row: {
 export function isIndividualProjectModuleDataComplete(project: {
   visualizationBlocks: ModuleContentBlock[];
   projectBlocks: ModuleContentBlock[];
+  projectDescription?: { livingAreaM2?: string };
 }): boolean {
+  const livingAreaM2 = project.projectDescription?.livingAreaM2?.trim() ?? "";
   return (
-    project.visualizationBlocks.length > 0 && project.projectBlocks.length > 0
+    project.visualizationBlocks.length > 0 &&
+    project.projectBlocks.length > 0 &&
+    livingAreaM2.length > 0
   );
 }

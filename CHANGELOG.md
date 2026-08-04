@@ -10,6 +10,15 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.113
+
+**Navigācija, Termiņu grafika noņemšana, moduļu kompletums**
+
+- Noņemts `module_timeline` / Termiņu grafiks (`/timeline`, `company_timeline_entries`, migrācija `154`); `module_timeline_graph` atjaunots DB pēc kļūdainās `153` (`155`)
+- Sidebar: **Laika grafiks** virs Ēku moduļiem; **Tasks** apakšā virs Lietotāji; **Tāme** grupa (Sagatave / Pozīcijas / Neiekļautās) ar virsrakstu un atdalītājiem (`nav.group.estimate`, `156`)
+- `module_data_complete` prasa arī dzīvojamo platību; sidebar brīdinājums nekompletiem moduļiem (`151`–`152`)
+- Postinstall patch pret Next.js 16.2 Turbopack `require is not defined` (`scripts/patch-next-app-page-require.mjs`)
+
 ## v1.3.112
 
 **Moduļu kopēšana un piezīme projekta selectā**

@@ -13,10 +13,10 @@ export function ModuleMissingDataIcon() {
       labelClassName="max-w-none whitespace-nowrap"
     >
       <span
-        className="inline-flex shrink-0 items-center text-red-600"
+        className="inline-flex shrink-0 items-center text-amber-500"
         aria-label={label}
       >
-        <i className="fas fa-house-damage text-sm" aria-hidden="true" />
+        <i className="fas fa-exclamation-circle text-sm" aria-hidden="true" />
       </span>
     </Tooltip>
   );

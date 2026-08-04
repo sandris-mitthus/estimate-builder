@@ -1,14 +1,13 @@
 export const NAV_PERMISSION_KEYS = [
   "projects",
+  "timeline_graph",
   "modules",
   "estimate",
   "positions",
   "excluded_positions",
-  "todo",
   "workers",
   "tools",
-  "timeline",
-  "timeline_graph",
+  "todo",
   "users",
   "user_groups",
   "settings",
@@ -40,7 +39,6 @@ export const ACTION_PERMISSION_KEYS = [
   "materials.order",
   "workers.manage",
   "tools.manage",
-  "timeline.manage",
   "timeline_graph.manage",
 ] as const;
 
@@ -68,7 +66,6 @@ export const NAV_PERMISSION_LABELS: Record<NavPermissionKey, string> = {
   todo: "Darāmo darbu saraksts",
   workers: "Darbinieki",
   tools: "Instrumenti",
-  timeline: "Termiņu grafiks",
   timeline_graph: "Laika grafiks",
   users: "Lietotāji",
   user_groups: "Grupas un tiesības",
@@ -84,7 +81,6 @@ export const NAV_PERMISSION_HREFS: Record<NavPermissionKey, string> = {
   todo: "/tasks",
   workers: "/workers",
   tools: "/tools",
-  timeline: "/timeline",
   timeline_graph: "/timeline-graph",
   users: "/users",
   user_groups: "/users/groups",
@@ -137,7 +133,6 @@ export const ACTION_PERMISSION_GROUPS: {
     keys: [
       "workers.manage",
       "tools.manage",
-      "timeline.manage",
       "timeline_graph.manage",
     ],
   },
@@ -182,7 +177,6 @@ export const ACTION_PERMISSION_LABELS: Record<ActionPermissionKey, string> = {
   "materials.order": "Atzīmēt materiālus kā pasūtītus",
   "workers.manage": "Pārvaldīt darbiniekus",
   "tools.manage": "Pārvaldīt instrumentus",
-  "timeline.manage": "Pārvaldīt termiņu grafiku",
   "timeline_graph.manage": "Mainīt laika grafika prioritāti",
 };
 
@@ -260,7 +254,6 @@ export const DEFAULT_GROUP_DEFINITIONS: {
         todo: true,
         workers: true,
         tools: true,
-        timeline: true,
         timeline_graph: true,
         users: false,
         user_groups: false,
@@ -290,7 +283,6 @@ export const DEFAULT_GROUP_DEFINITIONS: {
         "materials.order": false,
         "workers.manage": false,
         "tools.manage": false,
-        "timeline.manage": false,
         "timeline_graph.manage": false,
       },
     },

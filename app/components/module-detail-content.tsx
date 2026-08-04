@@ -1,6 +1,8 @@
 "use client";
 
 import { ModuleDataEditorPanel } from "@/app/components/module-data-editor-panel";
+import { ModuleMissingDataIcon } from "@/app/components/module-missing-data-icon";
+import { isBuildingModuleDataComplete } from "@/app/lib/modules/building-module-data";
 import type { BuildingModuleDetail } from "@/app/lib/modules/types";
 
 type ModuleDetailContentProps = {
@@ -8,12 +10,20 @@ type ModuleDetailContentProps = {
 };
 
 export function ModuleDetailContent({ module }: ModuleDetailContentProps) {
+  const moduleDataComplete =
+    typeof module.moduleDataComplete === "boolean"
+      ? module.moduleDataComplete
+      : isBuildingModuleDataComplete(module);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-          {module.name}
-        </h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+            {module.name}
+          </h1>
+          {!moduleDataComplete ? <ModuleMissingDataIcon /> : null}
+        </div>
         {module.note ? (
           <p className="-mt-0.5 text-[0.7875rem] leading-5 text-zinc-500">
             {module.note}

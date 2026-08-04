@@ -36,7 +36,59 @@ const DEFAULT_TODO_COUNT = 3;
 const SYSTEM_ADMIN_BOTTOM_NAV_KEYS = new Set<NavItem["key"]>([
   "system_admin:site_settings",
 ]);
-const USER_BOTTOM_NAV_KEYS = new Set<NavItem["key"]>(["users", "settings"]);
+const USER_BOTTOM_NAV_KEYS = new Set<NavItem["key"]>([
+  "todo",
+  "users",
+  "settings",
+]);
+const ESTIMATE_NAV_GROUP_KEYS = new Set<NavPermissionKey>([
+  "estimate",
+  "positions",
+  "excluded_positions",
+]);
+
+type TopNavEntry =
+  | { kind: "item"; item: NavItem }
+  | {
+      kind: "group";
+      id: string;
+      labelKey: string;
+      fallbackLabel: string;
+      items: NavItem[];
+    };
+
+function buildTopNavEntries(items: NavItem[]): TopNavEntry[] {
+  const entries: TopNavEntry[] = [];
+  let estimateGroup: NavItem[] = [];
+
+  const flushEstimateGroup = () => {
+    if (estimateGroup.length === 0) {
+      return;
+    }
+
+    entries.push({
+      kind: "group",
+      id: "estimate",
+      labelKey: "nav.group.estimate",
+      fallbackLabel: "Tāme",
+      items: estimateGroup,
+    });
+    estimateGroup = [];
+  };
+
+  for (const item of items) {
+    if (ESTIMATE_NAV_GROUP_KEYS.has(item.key as NavPermissionKey)) {
+      estimateGroup.push(item);
+      continue;
+    }
+
+    flushEstimateGroup();
+    entries.push({ kind: "item", item });
+  }
+
+  flushEstimateGroup();
+  return entries;
+}
 
 const ALL_NAV_ITEMS: PermissionNavItem[] = [
   {
@@ -45,6 +97,13 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     icon: "fas fa-folder-open",
     labelKey: "nav.projects",
     fallbackLabel: "Projekti",
+  },
+  {
+    key: "timeline_graph",
+    href: "/timeline-graph",
+    icon: "fas fa-chart-line",
+    labelKey: "nav.timeline_graph",
+    fallbackLabel: "Laika grafiks",
   },
   {
     key: "modules",
@@ -75,13 +134,6 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     fallbackLabel: "Neiekļautās pozīcijas",
   },
   {
-    key: "todo",
-    href: "/tasks",
-    icon: "fas fa-clipboard-list",
-    labelKey: "nav.todo",
-    fallbackLabel: "Darāmo darbu saraksts",
-  },
-  {
     key: "workers",
     href: "/workers",
     icon: "fas fa-id-card",
@@ -96,18 +148,11 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     fallbackLabel: "Instrumenti",
   },
   {
-    key: "timeline",
-    href: "/timeline",
-    icon: "fas fa-chart-gantt",
-    labelKey: "nav.timeline",
-    fallbackLabel: "Termiņu grafiks",
-  },
-  {
-    key: "timeline_graph",
-    href: "/timeline-graph",
-    icon: "fas fa-chart-line",
-    labelKey: "nav.timeline_graph",
-    fallbackLabel: "Laika grafiks",
+    key: "todo",
+    href: "/tasks",
+    icon: "fas fa-clipboard-list",
+    labelKey: "nav.todo",
+    fallbackLabel: "Darāmo darbu saraksts",
   },
   {
     key: "users",
@@ -276,6 +321,47 @@ function NavCountBadge({
       className={`pointer-events-none absolute right-1 top-1 z-10 min-h-[18px] min-w-[18px] px-1 text-[9px] leading-[18px] ${baseClassName} ${collapsedToneClassName}`}
     >
       {formatNavCount(count)}
+    </span>
+  );
+}
+
+function NavWarningBadge({
+  active,
+  expanded,
+  label,
+}: {
+  active: boolean;
+  expanded: boolean;
+  label: string;
+}) {
+  const baseClassName =
+    "inline-flex size-5 items-center justify-center rounded-full text-[11px] font-bold leading-none";
+  const expandedToneClassName = active
+    ? "bg-amber-300 text-amber-950 ring-1 ring-amber-200/80"
+    : "bg-amber-100 text-amber-700 ring-1 ring-amber-200/80";
+  const collapsedToneClassName = active
+    ? "bg-amber-300 text-amber-950 shadow-sm ring-1 ring-amber-100"
+    : "bg-amber-500 text-white shadow-sm";
+
+  if (expanded) {
+    return (
+      <Tooltip label={label} className="ml-auto inline-flex shrink-0">
+        <span
+          className={`${baseClassName} ${expandedToneClassName}`}
+          aria-label={label}
+        >
+          !
+        </span>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <span
+      className={`pointer-events-none absolute right-1 top-1 z-10 ${baseClassName} ${collapsedToneClassName}`}
+      aria-label={label}
+    >
+      !
     </span>
   );
 }
@@ -677,10 +763,25 @@ export function AppNav({
       pendingNavigation?.href === item.href &&
       pendingNavigation.pathname === pathname;
     const label = t(item.labelKey, item.fallbackLabel);
+    const modulesIncomplete =
+      item.key === "modules" ? (navCounts.modules_incomplete ?? 0) : 0;
+    const showModulesWarning = modulesIncomplete > 0;
+    const modulesWarningLabel = t(
+      "modules.nav.incomplete_warning",
+      "Dažiem moduļiem trūkst vizualizāciju vai projekta failu",
+    );
     const count =
       item.key === "system_admin:todo"
         ? todoCount
-        : (navCounts[item.key] ?? null);
+        : showModulesWarning
+          ? null
+          : (navCounts[item.key] ?? null);
+    const tooltipLabel = showModulesWarning
+      ? `${label} — ${modulesWarningLabel}`
+      : label;
+    const ariaLabel = showModulesWarning
+      ? `${label}. ${modulesWarningLabel}`
+      : label;
 
     const navLink = (
       <Link
@@ -704,7 +805,7 @@ export function AppNav({
           setPendingNavigation({ href: item.href, pathname });
         }}
         aria-disabled={isPending}
-        aria-label={label}
+        aria-label={ariaLabel}
         className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl text-[13px] transition-all duration-200 ${
           isActive
             ? "bg-blue-700 font-semibold text-white shadow-sm shadow-blue-900/20"
@@ -729,7 +830,13 @@ export function AppNav({
           />
         )}
         {menuExpanded ? <span>{label}</span> : null}
-        {typeof count === "number" ? (
+        {showModulesWarning ? (
+          <NavWarningBadge
+            active={isActive}
+            expanded={menuExpanded}
+            label={modulesWarningLabel}
+          />
+        ) : typeof count === "number" ? (
           <NavCountBadge
             count={count}
             active={isActive}
@@ -744,7 +851,7 @@ export function AppNav({
       : "relative inline-flex shrink-0";
 
     return showNavTooltips ? (
-      <Tooltip key={item.href} label={label} className={itemWrapperClassName} align="start">
+      <Tooltip key={item.href} label={tooltipLabel} className={itemWrapperClassName} align="start">
         {navLink}
       </Tooltip>
     ) : (
@@ -804,7 +911,40 @@ export function AppNav({
               : "w-[52px] items-center overflow-y-auto overflow-x-visible py-0.5"
           }`}
         >
-          {topNavItems.map((item) => renderNavItem(item))}
+          {buildTopNavEntries(topNavItems).map((entry) => {
+            if (entry.kind === "item") {
+              return renderNavItem(entry.item);
+            }
+
+            return (
+              <div
+                key={entry.id}
+                className={
+                  menuExpanded
+                    ? "flex w-full flex-col gap-1.5"
+                    : "flex w-full flex-col items-center gap-1.5"
+                }
+              >
+                {menuExpanded ? (
+                  <div className="mx-2 mt-1 border-b border-zinc-200/90 px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                    {t(entry.labelKey, entry.fallbackLabel)}
+                  </div>
+                ) : (
+                  <div
+                    className="w-7 border-t border-zinc-200/90"
+                    aria-hidden="true"
+                  />
+                )}
+                {entry.items.map((item) => renderNavItem(item))}
+                <div
+                  className={`border-t border-zinc-200/90 ${
+                    menuExpanded ? "mx-2 mb-1" : "w-7"
+                  }`}
+                  aria-hidden="true"
+                />
+              </div>
+            );
+          })}
         </nav>
 
         <div className="mt-auto flex w-full shrink-0 flex-col items-center gap-2">
