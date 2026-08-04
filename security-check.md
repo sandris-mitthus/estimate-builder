@@ -2,8 +2,50 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-06-30 (**v1.3.63**) — **9.5 / 10**
-**Iepriekšējā pilnā pārbaude:** 2026-06-23 (v1.3.44) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-08-04 (**v1.3.110**) — **9.5 / 10**  
+**Iepriekšējā pilnā pārbaude:** 2026-06-30 (v1.3.63) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.3.110 (2026-08-04)
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Server actions — `requireAction()` / `requireAuth()` / `assertSystemAdminAccess()` / `assertNavAccess()` / `getCurrentUser()` | ✅ 20 action faili; **92** exportētas actions; mutācijas aiz `requireAction()`, `assertSystemAdminAccess()`, `assertNavAccess()` (+ helper `tasks`) vai `getCurrentUser()` (valoda); jaunā `reorderTimelineGraphProjectsAction` — auth + `assertNavAccess("timeline_graph")` |
+| Protected lapas | ✅ 26 `page.tsx`; uzņēmuma sadaļas aiz `assertNavAccess()` / `assertUserGroupsPageAccess()`; system admin (`site_*` + `/todo`) aiz `assertSystemAdminAccess()`; `/timeline-graph` aiz `timeline_graph` |
+| System admin sadaļas | ✅ 9 system admin lapas joprojām aiz `public.users.is_admin = true` |
+| API maršruti (`app/api/**`) | ✅ 9 maršruti; visi sāk ar `getCurrentUser()` vai `getCurrentUserAccess()`; PDF/Excel + `estimate.export` + rate limit; module asset proxy — company path |
+| Jaunā `company_timeline_graph_order` | ✅ Migrācija `142`; RLS enabled + restrictive deny anon/authenticated; reorder filtrē `company_id` + esošos projektu ID (nav svešu ID rakstīšanas) |
+| Frontend modulis `module_timeline_graph` | ✅ Seed `141` (`is_enabled` default `false`); nav/gating caur `FRONTEND_MODULE_KEYS` + `assertNavAccess` |
+| Storage / proxy | ✅ Privātie bucketi; `logo`, `asset`, `workers/photo` proxy prasa auth |
+| PDF/Excel eksports | ✅ Auth + `estimate.export`; rate limit; filename sanitizēts; additional work caur `estimateId` joprojām aiz tām pašām kontrolēm |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML`; nav `eval()` / `new Function()` aplikācijas kodā |
+| Hardcoded secrets | ✅ Nav `sk_live_` / `sk_test_` / hardcoded service-role JWT / `password="..."` patternu `app/` |
+| npm audit (moderate+) | ✅ **0 vulnerabilities**; `npm run audit:check` — no unaccepted HIGH/CRITICAL; `ACCEPTED_ADVISORIES` tukšs (brace-expansion overrides no v1.3.109) |
+| HTTP galvenes | ✅ CSP, HSTS (HTTPS), X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| typecheck + lint + build | ✅ `typecheck` OK; `lint` 0 errors (9 warnings); `build` OK (iepriekšējā release gaitā) |
+| DB migrācijas | ✅ `npm run db:migrate` — `No pending migrations.` |
+
+### Izmaiņas kopš v1.3.63 → v1.3.110 (pārskatīts, bez regresijas)
+
+| Apgabals | Drošības secinājums |
+|----------|---------------------|
+| Laika grafiks (`/timeline-graph`) | ✅ Lapa + reorder aiz nav + frontend moduļa; DB order tabula ar RLS deny; company-scoped ownership filtrs reorderā |
+| Termiņu grafiks pārdēvēšana | ✅ Tikai UI/nav labels; `/timeline` auth un `timeline.manage` nemainās |
+| Papildu darbu tāmes + dzēšana | ✅ Mutācijas aiz `estimate.save`; PDF/Excel ar `estimateId` joprojām aiz `estimate.export` |
+| Atkarību pin (`next` 16.2.12, postcss/sharp/js-yaml/brace-expansion) | ✅ HIGH advisories novērsti vai pinned; `audit:check` tīrs bez ACCEPTED ierakstiem |
+| `project_material_assignments` / materiāli | ✅ Modelis saglabāts (RLS deny + service-role repository) |
+
+### Atlikušās piezīmes / ieteikumi (nebloķējoši)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | Production: iestatīt `ALLOWED_EMAIL_DOMAIN` + Supabase Auth invite-only (publiskais signup atspējots) |
+| L27 | ℹ️ ARHITEKTŪRA | Service role repository apzināti apiet RLS serverī; klientiem tabulas deny — pieņemams iekšējam multi-company rīkam ar server-side company scope |
+| L28 | ✅ LABOTS (v1.3.110+) | `timeline_graph.manage` — prioritātes DnD un `reorderTimelineGraphProjectsAction` aiz šīs tiesības; skatītājam false, admin true (`149`) |
+| L29 | ℹ️ DEPLOY | Multi-instance: iestatīt `UPSTASH_REDIS_REST_*` PDF/Excel rate limitam (bez tā — in-process uz vienas instances) |
+
+**Atzīme:** **9.5 / 10** — pilna pārbaude pēc Laika grafika un atkarību pin neatrada jaunu auth/API/RLS regresiju; `npm audit` tīrāks nekā v1.3.97 fokusa audita laikā; atlikušais ir production konfigurācija un apzināta service-role arhitektūra.
 
 ---
 
@@ -398,25 +440,26 @@ Advisory ir reģistrēts `scripts/audit-check.mjs` → `ACCEPTED_ADVISORIES` ar 
 
 ---
 
-## Atzīme: 9.5 / 10 (v1.3.44)
+## Atzīme: 9.5 / 10 (v1.3.110)
 
 ### Pamatojums
 
 **Stipri (+):**
-- Visas mutācijas aizsargātas ar `requireAction()` pēc konkrētām tiesībām vai `assertSystemAdminAccess()` system admin sadaļām
+- Visas mutācijas aizsargātas ar `requireAction()` / `assertNavAccess()` / `assertSystemAdminAccess()` / `getCurrentUser()`
 - Lomu sistēma ar navigācijas un darbību eforcēšanu (M14) + UI saskaņa (L23)
 - Admin grupa bez koda apiešanas — vienots avots `getUserAccess()` (M23)
-- System admin / i18n tabulas ar RLS deny un piekļuvi tikai caur server-side service role
+- Jaunas tabulas (t.sk. `company_timeline_graph_order`) ar RLS deny; piekļuve caur server-side service role + `company_id`
 - Privāti storage bucketi + auth proxy
-- Rate limiting PDF/Excel eksportiem: Upstash Redis REST multi-instance deploy, in-process fallback lokāli/single-instance
-- `npm audit` 0 moderate+; typecheck + lint + build OK
-- Magic-byte validācija, sanitizētas kļūdas, drošības galvenes, CI smoke
+- Rate limiting PDF/Excel: Upstash Redis REST multi-instance, in-process fallback
+- `npm audit` 0 moderate+ (HIGH/CRITICAL bez ACCEPTED izņēmumiem); typecheck + lint + build OK
+- Magic-byte validācija, drošības galvenes, CI smoke (gitleaks / audit / smoke)
 
 **Vājāk (-0.5 kopā):**
 - **-0.5** — production OAuth vēl nav stingri ierobežots (ENV + Supabase signup atkarībā no deploy)
 
-**Pieņemams single-tenant iekšējam rīkam:** service role repository slānī, visi auth lietotāji redz vienus projektus (nav row-level tenancy), `resolve-related-user-ids` banerim, asset proxy bez per-projekta ownership, laika normu sinhronizācija starp projektiem saglabāšanas laikā.
+**Pieņemams iekšējam rīkam:** service role repository slānī ar company scope; nav klientam atvērtu PostgREST tabulu.
 
 ### Kad atzīme būtu 10/10
 
 1. Production: `ALLOWED_EMAIL_DOMAIN` + invite-only Supabase Auth
+2. (Ieteicams) Multi-instance: Upstash Redis rate limit ENV

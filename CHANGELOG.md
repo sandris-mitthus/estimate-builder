@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.111
+
+**Laika grafiks — tiesības un režģa UX**
+
+- `timeline_graph.manage` — prioritātes DnD tikai ar šo tiesību; skatītājs var tikai skatīt (migrācija `149`)
+- Kalendāra dienu vertikālās līnijas, kategoriju/subkategoriju horizontālie atdalītāji un violets fons subkategoriju rindām
+
 ## v1.3.110
 
 **Laika grafiks — darbietilpības plāns pēc prioritātes**

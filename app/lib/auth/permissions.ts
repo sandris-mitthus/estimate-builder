@@ -41,6 +41,7 @@ export const ACTION_PERMISSION_KEYS = [
   "workers.manage",
   "tools.manage",
   "timeline.manage",
+  "timeline_graph.manage",
 ] as const;
 
 export type ActionPermissionKey = (typeof ACTION_PERMISSION_KEYS)[number];
@@ -133,7 +134,12 @@ export const ACTION_PERMISSION_GROUPS: {
   {
     titleKey: "permissions.groups.workforce",
     title: "Darbinieki un instrumenti",
-    keys: ["workers.manage", "tools.manage", "timeline.manage"],
+    keys: [
+      "workers.manage",
+      "tools.manage",
+      "timeline.manage",
+      "timeline_graph.manage",
+    ],
   },
   {
     titleKey: "permissions.groups.users_groups",
@@ -176,7 +182,8 @@ export const ACTION_PERMISSION_LABELS: Record<ActionPermissionKey, string> = {
   "materials.order": "Atzīmēt materiālus kā pasūtītus",
   "workers.manage": "Pārvaldīt darbiniekus",
   "tools.manage": "Pārvaldīt instrumentus",
-  "timeline.manage": "Pārvaldīt laika grafiku",
+  "timeline.manage": "Pārvaldīt termiņu grafiku",
+  "timeline_graph.manage": "Mainīt laika grafika prioritāti",
 };
 
 export function createFullPermissions(enabled = true): PermissionSet {
@@ -284,6 +291,7 @@ export const DEFAULT_GROUP_DEFINITIONS: {
         "workers.manage": false,
         "tools.manage": false,
         "timeline.manage": false,
+        "timeline_graph.manage": false,
       },
     },
   },

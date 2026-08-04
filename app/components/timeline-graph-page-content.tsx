@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { reorderTimelineGraphProjectsAction } from "@/app/(protected)/timeline-graph/actions";
+import { useActionPermission } from "@/app/components/action-permissions-context";
 import { DragHandle } from "@/app/components/drag-handle";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { SectionPage } from "@/app/components/section-page";
@@ -88,7 +89,7 @@ function CalendarDayHeaders({ days }: { days: string[] }) {
           return (
             <div
               key={day}
-              className={`flex items-center justify-center border-r border-zinc-100 text-[11px] tabular-nums ${
+              className={`flex items-center justify-center border-r border-zinc-200 text-[11px] tabular-nums ${
                 weekend ? "bg-zinc-100/80 text-zinc-400" : "text-zinc-600"
               }`}
               style={{ width: DAY_WIDTH_PX }}
@@ -109,8 +110,8 @@ function DayGrid({ days, rowKey }: { days: string[]; rowKey: string }) {
       {days.map((day) => (
         <div
           key={`${rowKey}-${day}`}
-          className={`border-r border-zinc-50 ${
-            isWeekendIso(day) ? "bg-zinc-50/70" : ""
+          className={`border-r border-zinc-200 ${
+            isWeekendIso(day) ? "bg-zinc-50/80" : ""
           }`}
           style={{ width: DAY_WIDTH_PX }}
         />
@@ -174,27 +175,38 @@ function ChildRow({
     start: formatDisplayDateDdMmYy(child.startIso),
     end: formatDisplayDateDdMmYy(child.endIso),
   });
+  const isSubcategory = child.kind === "subcategory";
+  const rowBg = isSubcategory
+    ? confirmed
+      ? "bg-violet-50/70"
+      : "bg-violet-50/40"
+    : confirmed
+      ? "bg-white"
+      : "bg-zinc-50/30";
+  const stickyBg = isSubcategory
+    ? confirmed
+      ? "bg-violet-50"
+      : "bg-violet-50/70"
+    : confirmed
+      ? "bg-white"
+      : "bg-zinc-50";
 
   return (
     <div
-      className={`flex border-b border-zinc-50 ${SECTION_ROW_HEIGHT_CLASS} ${
-        confirmed ? "bg-white" : "bg-zinc-50/30"
-      }`}
+      className={`flex border-b border-zinc-200 ${SECTION_ROW_HEIGHT_CLASS} ${rowBg}`}
     >
       <div
-        className={`sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-zinc-200 px-3 ${
-          confirmed ? "bg-white" : "bg-zinc-50"
-        }`}
+        className={`sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-zinc-200 px-3 ${stickyBg}`}
         style={{ width: PROJECT_COL_PX }}
       >
         <span className="inline-block w-6 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1 pl-7">
           <p
             className={`truncate text-xs ${
-              confirmed ? "text-zinc-600" : "text-zinc-400"
+              confirmed ? "text-zinc-700" : "text-zinc-400"
             }`}
           >
-            <span className="mr-1 text-zinc-300">↳</span>
+            <span className="mr-1 text-violet-300">↳</span>
             {label}
           </p>
         </div>
@@ -250,7 +262,7 @@ function CategoryBlock({
   return (
     <>
       <div
-        className={`flex border-b border-zinc-50 ${SECTION_ROW_HEIGHT_CLASS} ${
+        className={`flex border-b border-zinc-200 ${SECTION_ROW_HEIGHT_CLASS} ${
           confirmed ? "bg-white" : "bg-zinc-50/30"
         }`}
       >
@@ -340,6 +352,7 @@ function CategoryBlock({
 function SortableProjectBlock({
   project,
   days,
+  canManage,
   expanded,
   expandedCategoryIds,
   onToggleProject,
@@ -347,6 +360,7 @@ function SortableProjectBlock({
 }: {
   project: ScheduledTimelineGraphProject;
   days: string[];
+  canManage: boolean;
   expanded: boolean;
   expandedCategoryIds: ReadonlySet<string>;
   onToggleProject: () => void;
@@ -363,7 +377,7 @@ function SortableProjectBlock({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: project.id });
+  } = useSortable({ id: project.id, disabled: !canManage });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -396,11 +410,15 @@ function SortableProjectBlock({
           }`}
           style={{ width: PROJECT_COL_PX }}
         >
-          <DragHandle
-            label={t("timeline_graph.drag", "Mainīt prioritāti")}
-            attributes={attributes}
-            listeners={listeners}
-          />
+          {canManage ? (
+            <DragHandle
+              label={t("timeline_graph.drag", "Mainīt prioritāti")}
+              attributes={attributes}
+              listeners={listeners}
+            />
+          ) : (
+            <span className="inline-block w-6 shrink-0" aria-hidden="true" />
+          )}
           {hasCategories ? (
             <button
               type="button"
@@ -499,6 +517,7 @@ export function TimelineGraphPageContent({
   projects: initialProjects,
 }: TimelineGraphPageContentProps) {
   const { t } = useTranslations();
+  const canManage = useActionPermission("timeline_graph.manage");
   const dndId = useId();
   const calendarStartIso = useMemo(() => todayIsoDate(), []);
   const { showFeedback, clearFeedback } = useFeedbackToast();
@@ -556,7 +575,7 @@ export function TimelineGraphPageContent({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id || isPending) {
+    if (!canManage || !over || active.id === over.id || isPending) {
       return;
     }
 
@@ -595,10 +614,17 @@ export function TimelineGraphPageContent({
   return (
     <SectionPage
       title={t("nav.timeline_graph", "Laika grafiks")}
-      subtitle={t(
-        "timeline_graph.page.subtitle",
-        "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Velc projektu, lai mainītu prioritāti.",
-      )}
+      subtitle={
+        canManage
+          ? t(
+              "timeline_graph.page.subtitle",
+              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Velc projektu, lai mainītu prioritāti.",
+            )
+          : t(
+              "timeline_graph.page.subtitle_readonly",
+              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas.",
+            )
+      }
     >
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
@@ -672,6 +698,7 @@ export function TimelineGraphPageContent({
                         key={project.id}
                         project={project}
                         days={days}
+                        canManage={canManage}
                         expanded={!collapsedProjectIds.has(project.id)}
                         expandedCategoryIds={expandedCategoryIds}
                         onToggleProject={() => handleToggleProject(project.id)}

@@ -1,21 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
-import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { requireAction } from "@/app/lib/auth/require-permission";
 import { reorderTimelineGraphProjects } from "@/app/lib/timeline-graph/repository";
-
-const DENIED = { ok: false as const, error: "Nav autorizācijas." };
 
 export async function reorderTimelineGraphProjectsAction(
   projectIds: string[],
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return DENIED;
+  const { denied } = await requireAction("timeline_graph.manage");
+  if (denied) {
+    return denied;
   }
-
-  await assertNavAccess("timeline_graph");
 
   const result = await reorderTimelineGraphProjects(projectIds);
 
