@@ -114,6 +114,88 @@ export async function uploadModuleBlockFile(
   return uploadScopedBlockFile("module", moduleId, kind, file);
 }
 
+function extensionFromBlock(
+  block: ModuleContentBlock,
+  kind: ModuleBlockKind,
+): string {
+  const fileName = block.storagePath.split("/").pop() ?? "";
+  const dot = fileName.lastIndexOf(".");
+  if (dot >= 0 && dot < fileName.length - 1) {
+    return fileName.slice(dot + 1);
+  }
+
+  if (kind === "project") {
+    return "pdf";
+  }
+
+  return getImageExtension(block.mimeType) ?? "bin";
+}
+
+/** Copy module asset files into a new module folder with fresh block IDs. */
+export async function copyModuleContentBlocks(
+  blocks: ModuleContentBlock[],
+  targetModuleId: string,
+  kind: ModuleBlockKind,
+): Promise<
+  | { ok: true; blocks: ModuleContentBlock[] }
+  | { ok: false; error: string; copiedPaths: string[] }
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return {
+      ok: false,
+      error: "Datubāze nav konfigurēta.",
+      copiedPaths: [],
+    };
+  }
+
+  if (blocks.length === 0) {
+    return { ok: true, blocks: [] };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return {
+      ok: false,
+      error: "Uzņēmums nav atrasts.",
+      copiedPaths: [],
+    };
+  }
+
+  const supabase = createAdminClient();
+  const root = storageRoot("module", targetModuleId, companyId);
+  const copiedPaths: string[] = [];
+  const nextBlocks: ModuleContentBlock[] = [];
+
+  for (const block of blocks) {
+    const blockId = crypto.randomUUID();
+    const extension = extensionFromBlock(block, kind);
+    const storagePath = `${root}/${blockFolder(kind)}/${blockId}.${extension}`;
+
+    const { error: copyError } = await supabase.storage
+      .from(MODULE_ASSETS_BUCKET)
+      .copy(block.storagePath, storagePath);
+
+    if (copyError) {
+      return {
+        ok: false,
+        error: "Neizdevās nokopēt moduļa failus.",
+        copiedPaths,
+      };
+    }
+
+    copiedPaths.push(storagePath);
+    nextBlocks.push({
+      id: blockId,
+      title: block.title,
+      mimeType: block.mimeType,
+      storagePath,
+      fileUrl: moduleAssetProxyUrl(storagePath),
+    });
+  }
+
+  return { ok: true, blocks: nextBlocks };
+}
+
 export async function uploadProjectBlockFile(
   projectId: string,
   kind: ModuleBlockKind,

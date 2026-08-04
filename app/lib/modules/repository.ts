@@ -1,4 +1,5 @@
 import {
+  copyModuleContentBlocks,
   deleteAllModuleBlockFiles,
   deleteModuleBlockFiles,
   uploadModuleBlockFile,
@@ -18,6 +19,7 @@ import type {
   BuildingModuleDetail,
   BuildingModuleSizeOption,
   BuildingModuleSummary,
+  CopyBuildingModuleInput,
   CreateBuildingModuleInput,
   ModuleBlockKind,
   UpdateBuildingModuleBlocksInput,
@@ -331,6 +333,113 @@ export async function createBuildingModule(
   }
 
   return { ok: true, id: data.id };
+}
+
+export async function copyBuildingModule(
+  input: CopyBuildingModuleInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const name = input.name.trim();
+  const note = normalizeNote(input.note);
+  const validationError = validateName(name);
+
+  if (validationError) {
+    return { ok: false, error: validationError };
+  }
+
+  const noteError = validateNote(note);
+  if (noteError) {
+    return { ok: false, error: noteError };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const source = await getBuildingModule(input.sourceId);
+  if (!source) {
+    return { ok: false, error: "Modulis nav atrasts." };
+  }
+
+  const created = await createBuildingModule({ name, note });
+  if (!created.ok) {
+    return created;
+  }
+
+  const newId = created.id;
+  const copiedPaths: string[] = [];
+
+  async function rollbackCopy() {
+    if (copiedPaths.length > 0) {
+      await deleteModuleBlockFiles(copiedPaths);
+    }
+    await deleteBuildingModule(newId);
+  }
+
+  const visualizationCopy = await copyModuleContentBlocks(
+    source.visualizationBlocks,
+    newId,
+    "visualization",
+  );
+  if (!visualizationCopy.ok) {
+    copiedPaths.push(...visualizationCopy.copiedPaths);
+    await rollbackCopy();
+    return { ok: false, error: visualizationCopy.error };
+  }
+  copiedPaths.push(...visualizationCopy.blocks.map((block) => block.storagePath));
+
+  const projectCopy = await copyModuleContentBlocks(
+    source.projectBlocks,
+    newId,
+    "project",
+  );
+  if (!projectCopy.ok) {
+    copiedPaths.push(...projectCopy.copiedPaths);
+    await rollbackCopy();
+    return { ok: false, error: projectCopy.error };
+  }
+  copiedPaths.push(...projectCopy.blocks.map((block) => block.storagePath));
+
+  const supabase = createAdminClient();
+  const payload = {
+    outline: structuredClone(source.outline),
+    visualization_blocks: visualizationCopy.blocks,
+    project_blocks: projectCopy.blocks,
+    project_description: structuredClone(source.projectDescription),
+  };
+
+  const { error } = await supabase
+    .from("building_modules")
+    .update(payload)
+    .eq("id", newId)
+    .eq("company_id", companyId);
+
+  if (error && isMissingColumnError(error, "project_description")) {
+    const { project_description: _ignored, ...legacyPayload } = payload;
+    const legacy = await supabase
+      .from("building_modules")
+      .update(legacyPayload)
+      .eq("id", newId)
+      .eq("company_id", companyId);
+
+    if (legacy.error) {
+      await rollbackCopy();
+      return { ok: false, error: "Neizdevās nokopēt moduli." };
+    }
+
+    return { ok: true, id: newId };
+  }
+
+  if (error) {
+    await rollbackCopy();
+    return { ok: false, error: "Neizdevās nokopēt moduli." };
+  }
+
+  return { ok: true, id: newId };
 }
 
 export async function updateBuildingModule(

@@ -52,6 +52,11 @@ function moduleSelectionFromProject(project: ProjectSummary): string {
   return INDIVIDUAL_PROJECT_MODULE;
 }
 
+function formatModuleOptionLabel(module: BuildingModuleSummary): string {
+  const note = module.note.trim();
+  return note ? `${module.name} (${note})` : module.name;
+}
+
 function moduleLabelFromSelection(
   moduleSelection: string,
   modules: BuildingModuleSummary[],
@@ -61,10 +66,12 @@ function moduleLabelFromSelection(
     return individualProjectLabel;
   }
 
-  return (
-    modules.find((module) => module.id === moduleSelection)?.name ??
-    individualProjectLabel
-  );
+  const selected = modules.find((module) => module.id === moduleSelection);
+  if (!selected) {
+    return individualProjectLabel;
+  }
+
+  return formatModuleOptionLabel(selected);
 }
 
 function formFromProject(project: ProjectSummary): {
@@ -400,7 +407,7 @@ export function ProjectFormModal({
               <option value="">{t("validation.module_required", "Izvēlies moduli.")}</option>
               {modules.map((module) => (
                 <option key={module.id} value={module.id}>
-                  {module.name}
+                  {formatModuleOptionLabel(module)}
                 </option>
               ))}
               <option value={INDIVIDUAL_PROJECT_MODULE}>

@@ -67,6 +67,10 @@ export type CreateBuildingModuleInput = {
   note?: string;
 };
 
+export type CopyBuildingModuleInput = CreateBuildingModuleInput & {
+  sourceId: string;
+};
+
 export type UpdateBuildingModuleInput = CreateBuildingModuleInput & {
   id: string;
 };

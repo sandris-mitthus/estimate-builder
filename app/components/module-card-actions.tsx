@@ -6,6 +6,7 @@ import { deleteBuildingModuleAction } from "@/app/(protected)/modules/actions";
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { useActionPermission } from "@/app/components/action-permissions-context";
+import { ModuleCopyModal } from "@/app/components/module-copy-modal";
 import { ModuleFormModal } from "@/app/components/module-form-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -17,6 +18,7 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
   const canManage = useActionPermission("modules.manage");
   const { showFeedback } = useFeedbackToast();
   const { t } = useTranslations();
+  const [copyOpen, setCopyOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -57,6 +59,12 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
     <>
       <div className="flex shrink-0 items-center gap-0.5">
         <IconActionButton
+          label={t("actions.copy", "Kopēt")}
+          icon="fas fa-copy"
+          variant="copy"
+          onClick={() => setCopyOpen(true)}
+        />
+        <IconActionButton
           label={t("actions.edit", "Labot")}
           icon="fas fa-pen"
           variant="edit"
@@ -69,6 +77,12 @@ export function ModuleCardActions({ module }: { module: BuildingModuleSummary })
           onClick={() => setDeleteOpen(true)}
         />
       </div>
+
+      <ModuleCopyModal
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        module={module}
+      />
 
       <ModuleFormModal
         open={editOpen}

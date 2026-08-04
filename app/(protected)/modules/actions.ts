@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAction } from "@/app/lib/auth/require-permission";
 import {
+  copyBuildingModule,
   createBuildingModule,
   deleteBuildingModule,
   removeBuildingModuleBlock,
@@ -12,6 +13,7 @@ import {
   uploadBuildingModuleBlock,
 } from "@/app/lib/modules/repository";
 import type {
+  CopyBuildingModuleInput,
   CreateBuildingModuleInput,
   ModuleBlockKind,
   UpdateBuildingModuleBlocksInput,
@@ -35,6 +37,20 @@ export async function createBuildingModuleAction(input: CreateBuildingModuleInpu
 
   if (result.ok) {
     revalidateModules();
+  }
+
+  return result;
+}
+
+export async function copyBuildingModuleAction(input: CopyBuildingModuleInput) {
+  const { denied } = await requireAction("modules.manage");
+  if (denied) return denied;
+
+  const result = await copyBuildingModule(input);
+
+  if (result.ok) {
+    revalidateModules();
+    revalidateModuleDetail(result.id);
   }
 
   return result;

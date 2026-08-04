@@ -75,6 +75,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.labor_norm_estimates_load_failed",
   "Neizdevās dzēst moduli.": "errors.module_delete_failed",
   "Neizdevās pievienot moduli.": "errors.module_create_failed",
+  "Neizdevās nokopēt moduli.": "errors.module_copy_failed",
+  "Neizdevās nokopēt moduļa failus.": "errors.module_files_copy_failed",
   "Neizdevās pievienot pozīciju.": "errors.position_create_failed",
   "Neizdevās pievienot tāmes pozīciju.": "errors.estimate_position_create_failed",
   "Neizdevās saglabāt moduli.": "errors.module_save_failed",

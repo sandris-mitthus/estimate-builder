@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.112
+
+**Moduļu kopēšana un piezīme projekta selectā**
+
+- Ēku moduļu kartē **Kopēt** — jauns modulis ar nosaukumu/piezīmi, nokopētiem vizualizāciju/PDF failiem, outline un projekta aprakstu (`copyBuildingModule`, migrācija `150`)
+- Jauna projekta / labošanas **Modulis** selectā piezīme iekavās aiz nosaukuma (kā projektu kartēs)
+
 ## v1.3.111
 
 **Laika grafiks — tiesības un režģa UX**
