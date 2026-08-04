@@ -84,6 +84,7 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās saglabāt projekta aprakstu.":
     "errors.project_description_save_failed",
   "Neizdevās saglabāt secību.": "errors.sort_order_save_failed",
+  "Nav projektu secībai.": "errors.timeline_graph_projects_required",
   "Neizdevās saglabāt tāmes pozīciju.":
     "errors.estimate_position_save_failed",
   "Neizdevās augšupielādēt failu.": "errors.file_upload_failed",

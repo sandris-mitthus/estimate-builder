@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.110
+
+**Laika grafiks — darbietilpības plāns pēc prioritātes**
+
+- Jauns modulis `module_timeline_graph` un lapa `/timeline-graph` (**Laika grafiks**): projekti pēc DnD prioritātes, joslas no tāmes darbietilpības (apjoms × laika norma), 1 d = 8 c/h; brīvdienas netiek ieskaitītas
+- Kategorijas / subkategorijas un pašu projektu var sakļaut vienā rindā; neapstiprinātie projekti ar aptuvenu joslu; vecais `/timeline` pārdēvēts par **Termiņu grafiks**
+- Migrācijas `141`–`148` (modulis, `company_timeline_graph_order`, tulkojumi)
+
 ## v1.3.109
 
 **Security — brace-expansion overrides**

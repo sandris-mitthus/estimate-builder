@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.109`
+**Current version:** `1.3.110`
 
 ---
 
@@ -17,7 +17,7 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Offer control** — hide positions or prices from the client offer, show only a total for selected rows, and keep a list of works explicitly not included in the offer
 - **PDF and Excel export** — branded PDF offer with your company details, logo and visualizations; Excel spreadsheet with the full price breakdown and VAT
 - **Approved projects** — material list with budget prices and an ordered/not-ordered status, plus assignment of materials to specific people with a reminder banner until everything is ordered
-- **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a timeline of approved projects
+- **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, a deadline timeline for approved projects, and a labor workload schedule (Laika grafiks) ordered by project priority
 - **Teams and permissions** — several companies in one system, user groups that control what each person sees and may do, invitations, and access blocking
 - **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app

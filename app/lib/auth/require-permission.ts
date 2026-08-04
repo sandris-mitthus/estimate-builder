@@ -60,6 +60,7 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
     "workers",
     "tools",
     "timeline",
+    "timeline_graph",
     "users",
     "settings",
   ];
@@ -74,6 +75,7 @@ export function resolveAllowedNavHrefs(access: UserAccess | null): string[] {
     workers: "/workers",
     tools: "/tools",
     timeline: "/timeline",
+    timeline_graph: "/timeline-graph",
     users: "/users",
     user_groups: "/users/groups",
     settings: "/settings",

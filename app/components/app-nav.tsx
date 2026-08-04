@@ -100,6 +100,13 @@ const ALL_NAV_ITEMS: PermissionNavItem[] = [
     href: "/timeline",
     icon: "fas fa-chart-gantt",
     labelKey: "nav.timeline",
+    fallbackLabel: "Termiņu grafiks",
+  },
+  {
+    key: "timeline_graph",
+    href: "/timeline-graph",
+    icon: "fas fa-chart-line",
+    labelKey: "nav.timeline_graph",
     fallbackLabel: "Laika grafiks",
   },
   {

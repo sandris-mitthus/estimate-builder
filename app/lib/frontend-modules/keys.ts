@@ -5,6 +5,7 @@ export const FRONTEND_MODULE_KEYS = {
   workers: "module_workers",
   tools: "module_tools",
   timeline: "module_timeline",
+  timelineGraph: "module_timeline_graph",
   additionalWork: "module_additional_work",
 } as const;
 
@@ -19,4 +20,5 @@ export const NAV_FRONTEND_MODULE_KEYS: Partial<
   workers: FRONTEND_MODULE_KEYS.workers,
   tools: FRONTEND_MODULE_KEYS.tools,
   timeline: FRONTEND_MODULE_KEYS.timeline,
+  timeline_graph: FRONTEND_MODULE_KEYS.timelineGraph,
 };

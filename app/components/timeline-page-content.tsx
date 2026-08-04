@@ -275,7 +275,7 @@ export function TimelinePageContent({ initialEntries }: TimelinePageContentProps
 
   return (
     <SectionPage
-      title={t("nav.timeline", "Laika grafiks")}
+      title={t("nav.timeline", "Termiņu grafiks")}
       subtitle={t(
         "timeline.page.subtitle",
         "Apstiprinātie projekti parādās sarkanā laika grafikā.",

@@ -23,6 +23,7 @@ function revalidateFrontendModulePaths(moduleKey: string) {
     revalidatePath("/workers");
     revalidatePath("/tools");
     revalidatePath("/timeline");
+    revalidatePath("/timeline-graph");
   }
 }
 

@@ -135,3 +135,29 @@ export function calculateCategoryVolumeTotals(
 
   return calculateRowsVolumeTotals(rows, options);
 }
+
+/** Summētā darbietilpība (c/h) visai tāmei — tāpat kā tabulas apjoma kolonnā. */
+export function calculateEstimateLaborWorkloadHours(
+  categories: EstimateCategory[],
+  options: CalculateSectionVolumeTotalsOptions,
+): number {
+  const rows: EstimateRowItem[] = [];
+
+  for (const category of categories) {
+    if (category.hiddenInEstimate) {
+      continue;
+    }
+
+    rows.push(...category.items);
+
+    for (const subcategory of category.subcategories) {
+      if (subcategory.hiddenInEstimate) {
+        continue;
+      }
+
+      rows.push(...subcategory.items);
+    }
+  }
+
+  return calculateRowsVolumeTotals(rows, options).laborWorkloadHours ?? 0;
+}

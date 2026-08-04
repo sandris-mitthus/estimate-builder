@@ -97,6 +97,7 @@ const NAV_PERMISSION_KEYS_FOR_MENU: Exclude<NavPermissionKey, "user_groups">[] =
   "workers",
   "tools",
   "timeline",
+  "timeline_graph",
   "users",
   "settings",
 ];
@@ -150,6 +151,10 @@ export function pathnameToNavKey(pathname: string): NavPermissionKey | null {
 
   if (pathname === "/timeline") {
     return "timeline";
+  }
+
+  if (pathname === "/timeline-graph") {
+    return "timeline_graph";
   }
 
   if (pathname === "/" || /^\/[^/]+$/.test(pathname)) {
