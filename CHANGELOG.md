@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.108
+
+**Papildu darbu tāmes dzēšana un sagataves multi izcelšana**
+
+- Papildu darbu tāmju sarakstā blakus **Atvērt** — **Dzēst** ar apstiprinājuma modāli; rinda pazūd uzreiz (optimistiski), backend dzēš `estimates` ierakstu; migrācija `140`
+- Sagatavē multi-pozīcijas un to apakšopcijas ar vieglu violetu fonu, lai vieglāk atšķirt no parastajām pozīcijām
+
 ## v1.3.107
 
 **Lint — project card module variable**

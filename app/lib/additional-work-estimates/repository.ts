@@ -240,4 +240,44 @@ export async function saveAdditionalWorkEstimate(
   return { ok: true };
 }
 
+export async function deleteAdditionalWorkEstimate(
+  projectId: string,
+  estimateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const editable = await assertAdditionalWorkEditable(projectId);
+  if (!editable.ok) {
+    return editable;
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return { ok: false, error: "Uzņēmums nav atrasts." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .delete()
+    .eq("id", estimateId)
+    .eq("project_id", projectId)
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_ADDITIONAL_WORK)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: "Neizdevās dzēst papildu darbu tāmi." };
+  }
+
+  if (!data) {
+    return { ok: false, error: "Papildu darbu tāme nav atrasta." };
+  }
+
+  return { ok: true };
+}
+
 export { ESTIMATE_KIND_MAIN };

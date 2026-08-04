@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { createAdditionalWorkEstimateAction } from "@/app/(protected)/actions";
+import { useEffect, useState } from "react";
+import {
+  createAdditionalWorkEstimateAction,
+  deleteAdditionalWorkEstimateAction,
+} from "@/app/(protected)/actions";
+import { ConfirmModal } from "@/app/components/confirm-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { IconActionButton } from "@/app/components/icon-action-button";
 import { useTranslations } from "@/app/components/translations-provider";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import type { AdditionalWorkEstimateSummary } from "@/app/lib/projects/types";
@@ -26,8 +31,16 @@ export function ProjectAdditionalWorkSection({
   const { t } = useTranslations();
   const router = useRouter();
   const { showFeedback, clearFeedback } = useFeedbackToast();
+  const [visibleEstimates, setVisibleEstimates] = useState(estimates);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] =
+    useState<AdditionalWorkEstimateSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const editorLocked = isProjectEstimateLocked(project.status) || !canManage;
+
+  useEffect(() => {
+    setVisibleEstimates(estimates);
+  }, [estimates]);
 
   async function handleCreate() {
     if (editorLocked || isCreating) return;
@@ -51,6 +64,41 @@ export function ProjectAdditionalWorkSection({
       ),
     });
     router.push(`/${project.id}/additional-work/${result.id}`);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget || isDeleting) return;
+
+    const target = deleteTarget;
+    const previousEstimates = visibleEstimates;
+
+    setIsDeleting(true);
+    clearFeedback();
+    setDeleteTarget(null);
+    setVisibleEstimates((current) =>
+      current.filter((estimate) => estimate.id !== target.id),
+    );
+
+    const result = await deleteAdditionalWorkEstimateAction(
+      project.id,
+      target.id,
+    );
+    setIsDeleting(false);
+
+    if (!result.ok) {
+      setVisibleEstimates(previousEstimates);
+      showFeedback({ type: "error", text: translateActionError(t, result) });
+      return;
+    }
+
+    showFeedback({
+      type: "success",
+      text: t(
+        "additional_work.feedback.deleted",
+        "Papildu darbu tāme dzēsta.",
+      ),
+    });
+    router.refresh();
   }
 
   return (
@@ -89,7 +137,7 @@ export function ProjectAdditionalWorkSection({
       </div>
 
       <div className="mt-4 space-y-2">
-        {estimates.length === 0 ? (
+        {visibleEstimates.length === 0 ? (
           <p className="text-sm text-zinc-500">
             {t(
               "additional_work.list.empty",
@@ -97,7 +145,7 @@ export function ProjectAdditionalWorkSection({
             )}
           </p>
         ) : (
-          estimates.map((estimate) => (
+          visibleEstimates.map((estimate) => (
             <div
               key={estimate.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3"
@@ -116,17 +164,63 @@ export function ProjectAdditionalWorkSection({
                   </p>
                 ) : null}
               </div>
-              <Link
-                href={`/${project.id}/additional-work/${estimate.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                {t("additional_work.actions.open", "Atvērt")}
-                <i className="fas fa-arrow-right text-xs" aria-hidden="true" />
-              </Link>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Link
+                  href={`/${project.id}/additional-work/${estimate.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                >
+                  {t("additional_work.actions.open", "Atvērt")}
+                  <i className="fas fa-arrow-right text-xs" aria-hidden="true" />
+                </Link>
+                {!editorLocked ? (
+                  <IconActionButton
+                    label={t("actions.delete", "Dzēst")}
+                    icon="fas fa-trash"
+                    variant="delete"
+                    onClick={() => setDeleteTarget(estimate)}
+                  />
+                ) : null}
+              </div>
             </div>
           ))
         )}
       </div>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setDeleteTarget(null);
+          }
+        }}
+        title={t(
+          "additional_work.delete.title",
+          "Dzēst papildu darbu tāmi?",
+        )}
+        description={
+          <>
+            <p>
+              {t(
+                "additional_work.delete.description",
+                "Tāme tiks neatgriezeniski dzēsta.",
+              )}
+            </p>
+            {deleteTarget ? (
+              <p className="mt-2 font-medium text-zinc-900">
+                {deleteTarget.title}
+              </p>
+            ) : null}
+          </>
+        }
+        confirmLabel={
+          isDeleting
+            ? t("actions.deleting", "Dzēš…")
+            : t("actions.delete", "Dzēst")
+        }
+        confirmVariant="danger"
+        onConfirm={() => void handleConfirmDelete()}
+        blocking={isDeleting}
+      />
     </section>
   );
 }

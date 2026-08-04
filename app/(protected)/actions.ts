@@ -7,6 +7,7 @@ import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { DEFAULT_CALLING_CODE } from "@/app/lib/geo/country-calling-codes";
 import {
   createAdditionalWorkEstimate,
+  deleteAdditionalWorkEstimate,
   saveAdditionalWorkEstimate,
 } from "@/app/lib/additional-work-estimates/repository";
 import {
@@ -196,6 +197,23 @@ export async function saveAdditionalWorkEstimateAction(
   if (denied) return denied;
 
   const result = await saveAdditionalWorkEstimate(projectId, estimateId, payload);
+
+  if (result.ok) {
+    revalidatePath(`/${projectId}`);
+    revalidatePath(`/${projectId}/additional-work/${estimateId}`);
+  }
+
+  return result;
+}
+
+export async function deleteAdditionalWorkEstimateAction(
+  projectId: string,
+  estimateId: string,
+) {
+  const { denied } = await requireAction("estimate.save");
+  if (denied) return denied;
+
+  const result = await deleteAdditionalWorkEstimate(projectId, estimateId);
 
   if (result.ok) {
     revalidatePath(`/${projectId}`);

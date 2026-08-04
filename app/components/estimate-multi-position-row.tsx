@@ -98,6 +98,9 @@ const rowActionCellInner = "flex justify-end";
 const hiddenEstimateRowBodyClass =
   "[&_td:not(:last-child)]:opacity-55 [&_td:not(:last-child)]:pointer-events-none [&_td:not(:last-child)]:select-none";
 const hiddenEstimateRowClass = "bg-zinc-100/90 hover:bg-zinc-100/90";
+/** Soft tint so sagatave multi rows and option sub-rows stand out from regular positions. */
+const multiTemplateRowBgClass = "bg-violet-50/60 hover:bg-violet-50/85";
+const multiTemplateOptionRowBgClass = "bg-violet-50/45";
 
 function updateMultiOptionLineItem(
   multi: EstimateMultiPosition,
@@ -360,7 +363,7 @@ function MultiOptionSubRow({
       ? "bg-red-50/60"
       : missingTimeNorm
         ? "bg-amber-50/60"
-        : "bg-violet-50/20";
+        : multiTemplateOptionRowBgClass;
 
   return (
     <tr
@@ -919,7 +922,7 @@ export function EstimateMultiPositionRow({
         ) : (
           <>
             <tr
-              className={`hover:bg-violet-50/30 ${
+              className={`${multiTemplateRowBgClass} ${
                 requiresAttention ? estimateAttentionRowClassName : ""
               }`}
             >
