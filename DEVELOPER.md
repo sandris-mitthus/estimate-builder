@@ -10,7 +10,7 @@ Product overview and setup instructions: [README.md](README.md). Release history
 
 ### Authentication
 
-- **Google OAuth** via Supabase — unauthenticated users see a dedicated `/login` screen with the configured `site_settings` system name/slogan, a Google sign-in button, a documentation link to `/docs`, and a language dropdown when more than one UI language is active (anonymous choice stored in `eb_language` cookie)
+- **Google OAuth** via Supabase — unauthenticated users see a dedicated `/login` screen with the configured `site_settings` system name/slogan, a Google sign-in button, a centered legal footer, and a language dropdown when more than one UI language is active (anonymous choice stored in `eb_language` cookie); the `/docs` link is hidden behind `SHOW_DOCS_LINK` in `login-gate.tsx` until the public documentation content is ready
 - OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
 - Root login redirects to `/auth/callback` without `?next=/`, so Supabase Redirect URLs can match the exact callback URL in both localhost and Vercel
 - OAuth fallback in `proxy.ts` / `update-session.ts` redirects provider returns from `/?code=...` to `/auth/callback?code=...`, so Supabase Site URL fallback still completes the session
@@ -18,6 +18,16 @@ Product overview and setup instructions: [README.md](README.md). Release history
 - Session refresh via `proxy.ts` on every request
 - **Sidebar navigation:** fixed left menu with the configured system name in the header, icon-only collapsed mode persisted in cookie `eb_sidebar_collapsed`, expandable text labels, tooltips while collapsed, count badges on key nav links; company nav order puts **Laika grafiks** under Projekti, groups **Sagatave / Pozīcijas / Neiekļautās** under a **Tāme** label (separator under the label and after the group; `nav.group.estimate`), and pins **Tasks / Lietotāji / Uzstādījumi** at the bottom above the language selector; signed-in user avatar/name, **Sistēmas administrators** label for system admins, active company name for non-system-admin users, and a user dropdown with settings placeholder + sign-out
 - **Globālais materiālu baneris** — zem izvēlnes, ja ielogotajam lietotājam ir nepasūtīti **viņam piešķirti** materiāli (`assigned-materials-banner.tsx`); ielādējas pēc lapas parādīšanas caur `/api/assigned-materials` un sāk no normalizētās `project_material_assignments` tabulas, lai sākotnējā SSR navigācija negaida smagos projektu/tāmju JSON vaicājumus; saistītie konti ar vienādu normalizētu vārdu (`resolveRelatedUserIds` + `listUsers`); projekta tabula ar pasūtīšanas darbībām; vairāki projekti — pārslēgšana ar bultām; **sakļaujams** (virsraksts **Jums piešķirti materiāli pasūtīšanai** paliek redzams); gluda animācija; stāvoklis cookie `eb_assigned_materials_banner_collapsed_{userId}`
+
+### Legal pages, footer and cookie consent
+
+- **Publiskās juridiskās lapas** — `/privacy`, `/terms`, `/cookies` dzīvo `app/(legal)/` route grupā ar savu layout (atpakaļsaite, sadaļu navigācija, kājene); ceļi ir `PUBLIC_PATHS` sarakstā `update-session.ts`, tāpēc tie atveras gan ielogotam, gan anonīmam lietotājam vienā un tajā pašā URL
+- **Saturs pilnībā tulkojumu atslēgās** — `app/lib/legal/documents.ts` būvē sadaļas no `legal.privacy.*`, `legal.terms.*`, `legal.cookies.*`; privātuma politikā ir VDAR 13. panta obligātie punkti (pārzinis, datu kategorijas, mērķi ar pantiem, saņēmēji, nodošana ārpus EEZ, termiņi, tiesības, drošība, automatizētas lēmumu pieņemšanas neesamība), noteikumos — patērētāja 14 dienu atteikums un piekritība; pārziņa rekvizīti (`legal.common.controller_*`) ir vietturi, ko administrators aizpilda `/site_translations` bez deploy
+- **Sīkdatņu reģistrs** — `app/lib/legal/cookie-registry.ts` uztur pilnu sarakstu (nosaukums, kategorija, mērķis, glabāšanas laiks), ko `/cookies` renderē tabulā; jaunu sīkdatni pievienojot, jāatjaunina arī šis reģistrs
+- **Piekrišanas modelis** — `app/lib/consent/cookie-consent.ts` definē kategorijas `necessary` / `preferences` / `analytics` / `marketing`, versionētu `eb_cookie_consent` sīkdatni (6 mēneši) un `isPreferenceCookieName`; `COOKIE_CONSENT_VERSION` palielināšana padara vecās piekrišanas nederīgas un liek prasīt vēlreiz
+- **Slēdži reāli darbojas** — ērtības sīkdatnes rakstāmas tikai caur `writePreferenceCookie` (`app/lib/consent/client.ts`), ko izmanto `app-nav.tsx`, `collapsed-sections-cookie.ts` un `assigned-materials-banner-cookie.ts`; bez piekrišanas izmaiņa dzīvo tikai līdz pārlādei, bet pēc atsaukšanas `purgePreferenceCookies` uzreiz izdzēš jau saglabātās. `eb_language` un Supabase auth sīkdatnes ir obligātās (ePrivacy izņēmums), analytics/marketing kategorijām pagaidām nav patērētāju — jaunus skriptus liek aiz `useCookieConsent().isAllowed(category)`
+- **UI** — `CookieConsentProvider` (root layout) tur stāvokli un renderē `CookieConsentDialog`: baneris bez aizvēršanas krustiņa, kamēr izvēle nav izdarīta, un iestatījumu modālis ar slēdžiem; `SiteFooter` (sistēmā, login ekrānā, docs un juridiskajās lapās) rāda politiku saites un **Sīkdatņu iestatījumi**, kas atver moduli atkārtoti (`layout="spread" | "centered"`)
+- **Root layout** ietver `TranslationsProvider`, tāpēc arī publiskās lapas un consent UI saņem `t()`, un `<html lang>` seko aktīvajai valodai
 
 ### Multi-company users, groups and permissions
 
@@ -169,6 +179,7 @@ app/
 │   ├── site_translations/ # Translation key CRUD and live search
 │   ├── todo/          # System admin local todo board (two columns + DnD)
 │   └── settings/
+├── (legal)/           # Public legal pages (privacy/, terms/, cookies/) + shared layout with footer
 ├── docs/              # Public documentation alias for wiki
 ├── wiki/              # Public documentation page
 ├── api/
@@ -183,12 +194,13 @@ app/
 ├── auth/
 │   ├── callback/       # OAuth code exchange
 │   └── auth-code-error/
-├── components/         # UI (estimate-table, project-additional-work-section, line-item-total-only-toggle, estimate-table-sticky-shell, estimate-table-header-label, restore-button, project-excluded-positions-panel, sync-sagatave-changes-modal, restore-sagatave-positions-modal, material-consumption-basis-control, mechanism-basis-control, line-item-catalog-ref-sortable-list, mechanism-quantity-control, modal-stack-context, public-docs-view, site-docs-manager, navigation-loading-context, action-permissions-context, project-materials-table, …)
+├── components/         # UI (estimate-table, project-additional-work-section, line-item-total-only-toggle, estimate-table-sticky-shell, estimate-table-header-label, restore-button, project-excluded-positions-panel, sync-sagatave-changes-modal, restore-sagatave-positions-modal, material-consumption-basis-control, mechanism-basis-control, line-item-catalog-ref-sortable-list, mechanism-quantity-control, modal-stack-context, public-docs-view, site-docs-manager, navigation-loading-context, action-permissions-context, project-materials-table, site-footer, cookie-consent-provider/context/dialog, cookie-settings-link, cookie-registry-table, legal-document-view, legal-controller-details, legal-nav, …)
 ├── lib/
 │   ├── additional-work-estimates/  # list/create/save/delete additional work estimates (estimate_kind = additional_work)
 │   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
 │   ├── companies/      # current company resolution and bootstrap company id
-│   ├── client/         # cookie read/write helpers
+│   ├── client/         # cookie read/write/delete helpers
+│   ├── consent/        # cookie-consent categories + versioned consent cookie, consent-aware preference cookie writer and purge
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, project-structure-to-sagatave, sagatave-to-other-projects, sagatave-structure-intro-entries, sagatave-has-new-positions, sagatave-row-matching, sagatave-position-changes, project-estimate-base, sync-subcategory-offer-visibility, labor-time-norm-sync, sections-use-module-size-options, default sagatave
 │   ├── excluded-positions/  # repository, resolve-project-excluded-positions, merge-visible-reorder (global list + per-project omissions)
 │   ├── frontend-modules/  # site_frontend_modules CRUD, nav gating helpers, module_todo_list / module_additional_work flags
@@ -198,6 +210,7 @@ app/
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country calling codes, IP detect
 │   ├── modules/        # repository (incl. copyBuildingModule), outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (company-scoped module-assets + copyModuleContentBlocks), file-validation
+│   ├── legal/          # privacy/terms/cookie policy content builders + cookie registry table rows
 │   ├── navigation/     # sidebar cookie + layout-change event, nav count badges and navigation helpers
 │   ├── positions/      # repository (listPositionPricesForHydration, listPositionPricesForHints), catalog-positions-differ, apply-catalog-to-line-item, sync-from-estimate-line-items (catalog lookup), sync-estimate-line-items-to-catalog (batch update), has-defined-labor, variable-quantity, stale-catalog-price, filter-positions
 │   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
@@ -215,7 +228,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–162 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–115 = worker photo/tool history, project delete, planned profit notices, sagatave sync UI translations, module plumbing lengths; 119–126 = hidden rows, excluded positions project UX, sagatave structure sync, section row tooltips; 129–131 = additional work estimates + module_additional_work seed; 132–138 = module living area, window/door perimeter, sagatave example note, sanitary rooms, ×2 multiplier, door/window index labels, window showcase; 139 = position template name search; 140 = additional work delete translations; 141–149 = module_timeline_graph, company_timeline_graph_order, timeline-graph UI translations + timeline_graph.manage; 150 = module copy; 151–152 = module incomplete nav warning + livingArea in module_data_complete; 153–155 = timeline_graph accidental remove/restore; 154 = remove module_timeline; 156 = nav.group.estimate; 157 = additional_work.loading; 158 = company_timeline_graph_people; 159–162 = parallel pairing + UI translations)
+supabase/migrations/    # 001–163 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–115 = worker photo/tool history, project delete, planned profit notices, sagatave sync UI translations, module plumbing lengths; 119–126 = hidden rows, excluded positions project UX, sagatave structure sync, section row tooltips; 129–131 = additional work estimates + module_additional_work seed; 132–138 = module living area, window/door perimeter, sagatave example note, sanitary rooms, ×2 multiplier, door/window index labels, window showcase; 139 = position template name search; 140 = additional work delete translations; 141–149 = module_timeline_graph, company_timeline_graph_order, timeline-graph UI translations + timeline_graph.manage; 150 = module copy; 151–152 = module incomplete nav warning + livingArea in module_data_complete; 153–155 = timeline_graph accidental remove/restore; 154 = remove module_timeline; 156 = nav.group.estimate; 157 = additional_work.loading; 158 = company_timeline_graph_people; 159–162 = parallel pairing + UI translations; 163 = legal pages, footer and cookie consent translations)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
@@ -322,6 +335,7 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 - [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm run audit:check` bez neapstiprinātiem HIGH/CRITICAL)
 - [x] Moduļa lielumi — **Dzīvojamā platība** (m²; arī `module_data_complete`), logu/durvju **kopējais perimetrs**, vairākas vienlaikus atvērtas sadaļas apjoma izvēlē un sagataves piemēra piezīme bez moduļa nosaukuma
 - [x] Sanmezgli projekta aprakstā; apjomu **+/-** un **×2**; logu/durvju/sanmezglu neitrāli kārtas numuri; logu **Vitrīna** slēdzis
+- [x] Juridiskās lapas un sīkdatņu piekrišana — `/privacy`, `/terms`, `/cookies` publiski pieejami, kājene visos skatos, kategoriju slēdži ar reālu preferenču sīkdatņu bloķēšanu un dzēšanu (`163`)
 
 ---
 

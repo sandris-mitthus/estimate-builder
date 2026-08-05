@@ -25,7 +25,15 @@ function purgeForeignSupabaseCookies(
   }
 }
 
-const PUBLIC_PATHS = ["/auth/", "/auth/auth-code-error", "/docs", "/wiki"];
+const PUBLIC_PATHS = [
+  "/auth/",
+  "/auth/auth-code-error",
+  "/docs",
+  "/wiki",
+  "/privacy",
+  "/terms",
+  "/cookies",
+];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));

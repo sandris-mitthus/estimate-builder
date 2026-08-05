@@ -1,4 +1,5 @@
-import { readCookie, writeCookie } from "@/app/lib/client/cookies";
+import { readCookie } from "@/app/lib/client/cookies";
+import { writePreferenceCookie } from "@/app/lib/consent/client";
 import {
   categoryDragId,
   itemDragId,
@@ -61,7 +62,7 @@ export function writeCollapsedSectionIds(
   documentId: string,
   sectionIds: ReadonlySet<string>,
 ): void {
-  writeCookie(cookieName(documentId), JSON.stringify([...sectionIds]));
+  writePreferenceCookie(cookieName(documentId), JSON.stringify([...sectionIds]));
 }
 
 export function collectVisibleSectionDragIds(

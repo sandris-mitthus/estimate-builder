@@ -22,3 +22,22 @@ export function writeCookie(
 
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeDays * 86400}; SameSite=Lax`;
 }
+
+export function deleteCookie(name: string): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+export function listCookieNames(): string[] {
+  if (typeof document === "undefined") {
+    return [];
+  }
+
+  return document.cookie
+    .split(";")
+    .map((entry) => entry.split("=")[0]?.trim() ?? "")
+    .filter(Boolean);
+}

@@ -3,6 +3,7 @@ import { ActionPermissionsProvider } from "@/app/components/action-permissions-c
 import { AppNav } from "@/app/components/app-nav";
 import { AssignedMaterialsBannerLoader } from "@/app/components/assigned-materials-banner-loader";
 import { LoginGate } from "@/app/components/login-gate";
+import { SiteFooter } from "@/app/components/site-footer";
 import { SystemAdminProvider } from "@/app/components/system-admin-context";
 import { TranslationsProvider } from "@/app/components/translations-provider";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
@@ -162,10 +163,11 @@ export default async function ProtectedLayout({
             />
             <div
               data-app-main
-              className="min-w-0 w-full pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
+              className="flex min-h-screen min-w-0 w-full flex-col pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
             >
               {currentUser && currentUserId ? <AssignedMaterialsBannerLoader /> : null}
-              {children}
+              <div className="min-w-0 flex-1">{children}</div>
+              <SiteFooter systemName={siteSettings.systemName} />
             </div>
           </div>
         </TranslationsProvider>

@@ -1,4 +1,5 @@
-import { readCookie, writeCookie } from "@/app/lib/client/cookies";
+import { readCookie } from "@/app/lib/client/cookies";
+import { writePreferenceCookie } from "@/app/lib/consent/client";
 
 const COOKIE_PREFIX = "eb_assigned_materials_banner_collapsed";
 
@@ -26,5 +27,5 @@ export function writeAssignedMaterialsBannerCollapsed(
     return;
   }
 
-  writeCookie(cookieName(trimmedUserId), collapsed ? "1" : "0");
+  writePreferenceCookie(cookieName(trimmedUserId), collapsed ? "1" : "0");
 }

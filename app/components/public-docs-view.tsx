@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { SiteFooter } from "@/app/components/site-footer";
 import type {
   SiteDocCategorySummary,
   SiteDocSummary,
@@ -296,6 +297,11 @@ export function PublicDocsView({
             </div>
           )}
         </section>
+
+        <SiteFooter
+          systemName={systemName}
+          className="mt-12 lg:ml-[20rem]"
+        />
       </div>
     </main>
   );

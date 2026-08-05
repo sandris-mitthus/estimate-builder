@@ -13,7 +13,7 @@ import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 import type { UserDisplay } from "@/app/lib/auth/map-user-display";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 import { signOut } from "@/app/lib/auth/sign-out";
-import { writeCookie } from "@/app/lib/client/cookies";
+import { writePreferenceCookie } from "@/app/lib/consent/client";
 import type { NavCountMap } from "@/app/lib/navigation/nav-counts";
 import { SIDEBAR_COLLAPSED_COOKIE, SIDEBAR_LAYOUT_CHANGE_EVENT } from "@/app/lib/navigation/sidebar-cookie";
 
@@ -750,7 +750,7 @@ export function AppNav({
 
   function updateManualCollapsed(collapsed: boolean) {
     setManualCollapsed(collapsed);
-    writeCookie(SIDEBAR_COLLAPSED_COOKIE, collapsed ? "1" : "0");
+    writePreferenceCookie(SIDEBAR_COLLAPSED_COOKIE, collapsed ? "1" : "0");
     window.dispatchEvent(new Event(SIDEBAR_LAYOUT_CHANGE_EVENT));
   }
 

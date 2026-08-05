@@ -10,6 +10,15 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.117
+
+**Juridiskās lapas, sīkdatņu piekrišana un kājene**
+
+- Jaunas publiskās lapas `/privacy`, `/terms`, `/cookies` (`app/(legal)/`) ar VDAR/ePrivacy saturu; strādā gan ielogotam, gan anonīmam lietotājam (`PUBLIC_PATHS`); tulkojumi `lv` + `en` (migrācija `163`)
+- Sīkdatņu piekrišanas baneris ar kategoriju slēdžiem — neobligātās izslēgtas pēc noklusējuma, „Piekrist visām” un „Atteikt neobligātās” vienādi prominentas; preferenču atsaukšana uzreiz dzēš `eb_sidebar_collapsed`, `eb_estimate_collapsed_*` un `eb_assigned_materials_banner_collapsed_*`
+- `SiteFooter` ar saitēm uz politikām un **Sīkdatņu iestatījumi** sistēmā, pieslēgšanās ekrānā, dokumentācijā un juridiskajās lapās; `TranslationsProvider` pārcelts uz root layout, `<html lang>` seko aktīvajai valodai
+- Pieslēgšanās ekrānā paslēpta **Dokumentācija** saite, kamēr publiskā dokumentācija nav sakārtota
+
 ## v1.3.116
 
 **Laika grafiks — cilvēku skaits un paralēlie darbi**

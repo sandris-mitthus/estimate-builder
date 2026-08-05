@@ -4,11 +4,15 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { SiteFooter } from "@/app/components/site-footer";
 import { signInWithGoogle } from "@/app/lib/auth/sign-in-with-google";
 import { useTranslations } from "@/app/components/translations-provider";
 import { writeCookie } from "@/app/lib/client/cookies";
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
+
+/** Publiskā dokumentācija vēl nav sakārtota — saite paslēpta, līdz saturs ir gatavs. */
+const SHOW_DOCS_LINK = false;
 
 const backgroundCards = [
   "left-[3%] top-[6%] rotate-[-14deg]",
@@ -53,7 +57,7 @@ export function LoginGate({
   }
 
   return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f4f5] px-4 py-10">
+    <main className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#f4f4f5] px-4 py-10">
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top,#ffffff_0%,#f4f4f5_45%,#e4e4e7_100%)]" />
       <div className="absolute inset-0 -z-10 blur-[5px]" aria-hidden="true">
         {backgroundCards.map((className, index) => (
@@ -90,13 +94,22 @@ export function LoginGate({
             ? t("auth.signing_in", "Signing in...")
             : t("auth.google_sign_in", "Continue with Google")}
         </button>
-        <Link
-          href="/docs"
-          className="mt-5 inline-flex items-center justify-center text-sm font-semibold text-zinc-500 transition hover:text-zinc-900"
-        >
-          {t("auth.login.view_system_docs", "Dokumentācija")}
-        </Link>
+        {SHOW_DOCS_LINK ? (
+          <Link
+            href="/docs"
+            className="mt-5 inline-flex items-center justify-center text-sm font-semibold text-zinc-500 transition hover:text-zinc-900"
+          >
+            {t("auth.login.view_system_docs", "Dokumentācija")}
+          </Link>
+        ) : null}
       </section>
+
+      <SiteFooter
+        systemName={systemName}
+        bordered={false}
+        layout="centered"
+        className="relative mt-9 w-full"
+      />
     </main>
   );
 }
