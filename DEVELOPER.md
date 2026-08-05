@@ -230,6 +230,7 @@ scripts/                # db:migrate, db:test, copy-pdf-worker.mjs
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
 supabase/migrations/    # 001–163 (038–042 = system admin tables; 043–078 = UI/docs translation seeds; 077 = site docs; 079–084 = user todo board; 087–090 = site_frontend_modules + module_todo_list seed; 091–096 = workers/tools/timeline modules; 097–115 = worker photo/tool history, project delete, planned profit notices, sagatave sync UI translations, module plumbing lengths; 119–126 = hidden rows, excluded positions project UX, sagatave structure sync, section row tooltips; 129–131 = additional work estimates + module_additional_work seed; 132–138 = module living area, window/door perimeter, sagatave example note, sanitary rooms, ×2 multiplier, door/window index labels, window showcase; 139 = position template name search; 140 = additional work delete translations; 141–149 = module_timeline_graph, company_timeline_graph_order, timeline-graph UI translations + timeline_graph.manage; 150 = module copy; 151–152 = module incomplete nav warning + livingArea in module_data_complete; 153–155 = timeline_graph accidental remove/restore; 154 = remove module_timeline; 156 = nav.group.estimate; 157 = additional_work.loading; 158 = company_timeline_graph_people; 159–162 = parallel pairing + UI translations; 163 = legal pages, footer and cookie consent translations)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
+.gitleaks.toml          # default rules + i18n translation key allowlist
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
 ```
 
@@ -246,6 +247,12 @@ Three GitHub Actions workflows run on every push and pull request:
 | **Security smoke** | `.github/workflows/security-smoke.yml` | TypeScript, lint, production build, `requireAuth` on all actions, no `eval()`, security headers |
 
 > `GITLEAKS_LICENSE` repo secret is required only for **private** repositories (free for public repos).
+
+`.gitleaks.toml` extends the default rule set (`useDefault = true`) and adds a single allowlist: the `generic-api-key` rule treats long i18n keys such as `key: "legal.privacy.retention.p1"` as secrets once they pass its entropy threshold. The allowlist regex only matches dot-separated lowercase identifiers, so JWTs, hex digests and provider tokens are still reported. To reproduce a CI run locally:
+
+```bash
+gitleaks detect --redact -v --exit-code=2 --log-opts=-1
+```
 
 `npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`, `brace-expansion` same-major patches).
 

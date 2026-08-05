@@ -10,6 +10,11 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.118
+
+- `.gitleaks.toml` — secret scan no longer fails on i18n translation keys that the `generic-api-key` rule misread as credentials; all default rules stay active
+- GitHub Actions `checkout` and `setup-node` bumped to `v5` (Node 24) to clear the Node 20 deprecation notice
+
 ## v1.3.117
 
 **Juridiskās lapas, sīkdatņu piekrišana un kājene**
