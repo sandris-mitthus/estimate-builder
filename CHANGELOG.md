@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.114
+
+**Papildu darbu tāmes — ielādes overlay**
+
+- **Atvērt** (un pēc izveides) rāda pilnekrāna loading animāciju, kamēr tiek ielādēta papildu darbu tāme (`NavigationLoadingProvider`, `additional_work.loading`, migrācija `157`)
+
 ## v1.3.113
 
 **Navigācija, Termiņu grafika noņemšana, moduļu kompletums**

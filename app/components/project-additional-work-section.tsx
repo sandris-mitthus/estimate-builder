@@ -10,6 +10,11 @@ import {
 import { ConfirmModal } from "@/app/components/confirm-modal";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { IconActionButton } from "@/app/components/icon-action-button";
+import {
+  isPlainPrimaryNavigationClick,
+  NavigationLoadingProvider,
+  useNavigationLoading,
+} from "@/app/components/navigation-loading-context";
 import { useTranslations } from "@/app/components/translations-provider";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import type { AdditionalWorkEstimateSummary } from "@/app/lib/projects/types";
@@ -23,13 +28,24 @@ type ProjectAdditionalWorkSectionProps = {
   canManage: boolean;
 };
 
-export function ProjectAdditionalWorkSection({
+export function ProjectAdditionalWorkSection(
+  props: ProjectAdditionalWorkSectionProps,
+) {
+  return (
+    <NavigationLoadingProvider>
+      <ProjectAdditionalWorkSectionContent {...props} />
+    </NavigationLoadingProvider>
+  );
+}
+
+function ProjectAdditionalWorkSectionContent({
   project,
   estimates,
   canManage,
 }: ProjectAdditionalWorkSectionProps) {
   const { t } = useTranslations();
   const router = useRouter();
+  const { beginNavigation } = useNavigationLoading();
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [visibleEstimates, setVisibleEstimates] = useState(estimates);
   const [isCreating, setIsCreating] = useState(false);
@@ -37,10 +53,20 @@ export function ProjectAdditionalWorkSection({
     useState<AdditionalWorkEstimateSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const editorLocked = isProjectEstimateLocked(project.status) || !canManage;
+  const loadingMessage = t(
+    "additional_work.loading",
+    "Ielādē papildu darbu tāmi…",
+  );
 
   useEffect(() => {
     setVisibleEstimates(estimates);
   }, [estimates]);
+
+  function openEstimate(estimateId: string) {
+    const href = `/${project.id}/additional-work/${estimateId}`;
+    beginNavigation(href, loadingMessage);
+    router.push(href);
+  }
 
   async function handleCreate() {
     if (editorLocked || isCreating) return;
@@ -63,7 +89,7 @@ export function ProjectAdditionalWorkSection({
         "Papildu darbu tāme izveidota.",
       ),
     });
-    router.push(`/${project.id}/additional-work/${result.id}`);
+    openEstimate(result.id);
   }
 
   async function handleConfirmDelete() {
@@ -145,44 +171,58 @@ export function ProjectAdditionalWorkSection({
             )}
           </p>
         ) : (
-          visibleEstimates.map((estimate) => (
-            <div
-              key={estimate.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-zinc-900">{estimate.title}</p>
-                {estimate.meta.savedAt || estimate.updatedAt ? (
-                  <p className="text-xs text-zinc-500">
-                    {estimate.meta.savedAt
-                      ? t("common.saved_at", "Saglabāts: {date}", {
-                          date: formatDisplayDateDdMmYy(estimate.meta.savedAt),
-                        })
-                      : estimate.updatedAt
-                        ? formatDisplayDateDdMmYy(estimate.updatedAt)
-                        : null}
-                  </p>
-                ) : null}
+          visibleEstimates.map((estimate) => {
+            const href = `/${project.id}/additional-work/${estimate.id}`;
+
+            return (
+              <div
+                key={estimate.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-zinc-900">{estimate.title}</p>
+                  {estimate.meta.savedAt || estimate.updatedAt ? (
+                    <p className="text-xs text-zinc-500">
+                      {estimate.meta.savedAt
+                        ? t("common.saved_at", "Saglabāts: {date}", {
+                            date: formatDisplayDateDdMmYy(estimate.meta.savedAt),
+                          })
+                        : estimate.updatedAt
+                          ? formatDisplayDateDdMmYy(estimate.updatedAt)
+                          : null}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Link
+                    href={href}
+                    onClick={(event) => {
+                      if (!isPlainPrimaryNavigationClick(event)) {
+                        return;
+                      }
+
+                      beginNavigation(href, loadingMessage);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    {t("additional_work.actions.open", "Atvērt")}
+                    <i
+                      className="fas fa-arrow-right text-xs"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                  {!editorLocked ? (
+                    <IconActionButton
+                      label={t("actions.delete", "Dzēst")}
+                      icon="fas fa-trash"
+                      variant="delete"
+                      onClick={() => setDeleteTarget(estimate)}
+                    />
+                  ) : null}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Link
-                  href={`/${project.id}/additional-work/${estimate.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-                >
-                  {t("additional_work.actions.open", "Atvērt")}
-                  <i className="fas fa-arrow-right text-xs" aria-hidden="true" />
-                </Link>
-                {!editorLocked ? (
-                  <IconActionButton
-                    label={t("actions.delete", "Dzēst")}
-                    icon="fas fa-trash"
-                    variant="delete"
-                    onClick={() => setDeleteTarget(estimate)}
-                  />
-                ) : null}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
