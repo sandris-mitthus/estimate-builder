@@ -29,7 +29,7 @@ export default async function PrivacyPolicyPage() {
   ]);
 
   const content = getPrivacyPolicyContent(t, settings.systemName);
-  const controller = getLegalControllerDetails(t, settings.systemName);
+  const controller = getLegalControllerDetails(t, settings);
 
   return (
     <LegalDocumentView

@@ -30,6 +30,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Grupas nosaukums nav norādīts.": "errors.group_name_required",
   "Ievadi sistēmas nosaukumu.": "site_settings.validation.system_name_required",
   "Ievadi sistēmas sloganu.": "site_settings.validation.slogan_required",
+  "Ievadi derīgu pārziņa e-pasta adresi.":
+    "site_settings.validation.controller_email_invalid",
   "Ievadi nosaukumu.": "validation.name_required",
   "Ievadi e-pasta adresi.": "validation.email_required",
   "Ievadi derīgu e-pasta adresi.": "validation.email_invalid",

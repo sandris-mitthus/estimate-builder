@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.119
+
+- Data controller name, registration number, registered address and contact email are now edited in **Sistēmas uzstādījumi** instead of translation keys, and flow straight into the privacy policy
+- Fixed the controller row in the privacy policy showing the raw `legal.common.controller_name` key; an unfilled detail now reads "Nav norādīts" and an empty name falls back to the system name
+- Migration `164` adds the `site_settings` controller columns and removes the obsolete placeholder translations
+
 ## v1.3.118
 
 - `.gitleaks.toml` — secret scan no longer fails on i18n translation keys that the `generic-api-key` rule misread as credentials; all default rules stay active

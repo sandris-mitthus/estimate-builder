@@ -8,6 +8,7 @@ import {
   SITE_TRANSLATIONS_CACHE_TAG,
 } from "@/app/lib/i18n/cache-tags";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import {
   DEFAULT_GROUP_DEFINITIONS,
   normalizePermissionSet,
@@ -77,6 +78,10 @@ type GlobalSiteSettingsRow = {
   id: number;
   system_name: string;
   slogan: string;
+  controller_name: string;
+  controller_registration_number: string;
+  controller_address: string;
+  controller_email: string;
   updated_at: string;
 };
 
@@ -159,12 +164,20 @@ export type SiteCompanyUserSummary = {
 export type SiteSettingsSummary = {
   systemName: string;
   slogan: string;
+  controllerName: string;
+  controllerRegistrationNumber: string;
+  controllerAddress: string;
+  controllerEmail: string;
   updatedAt: string;
 };
 
 export type SiteSettingsInput = {
   systemName: string;
   slogan: string;
+  controllerName: string;
+  controllerRegistrationNumber: string;
+  controllerAddress: string;
+  controllerEmail: string;
 };
 
 export type SiteUserGroupSummary = UserGroupSummary & {
@@ -247,6 +260,10 @@ export type SiteDocReorderItem = {
 export const DEFAULT_SITE_SETTINGS: SiteSettingsSummary = {
   systemName: "Estimate Builder",
   slogan: "Tāmes piedāvājumu veidošana",
+  controllerName: "",
+  controllerRegistrationNumber: "",
+  controllerAddress: "",
+  controllerEmail: "",
   updatedAt: "",
 };
 
@@ -1415,10 +1432,17 @@ export async function updateUserActiveLanguageCode({
   return { ok: true };
 }
 
+const SITE_SETTINGS_COLUMNS =
+  "id, system_name, slogan, controller_name, controller_registration_number, controller_address, controller_email, updated_at";
+
 function mapGlobalSiteSettingsRow(row: GlobalSiteSettingsRow): SiteSettingsSummary {
   return {
     systemName: row.system_name,
     slogan: row.slogan,
+    controllerName: row.controller_name ?? "",
+    controllerRegistrationNumber: row.controller_registration_number ?? "",
+    controllerAddress: row.controller_address ?? "",
+    controllerEmail: row.controller_email ?? "",
     updatedAt: row.updated_at,
   };
 }
@@ -1431,7 +1455,7 @@ async function getSiteSettingsUncached(): Promise<SiteSettingsSummary> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("site_settings")
-    .select("id, system_name, slogan, updated_at")
+    .select(SITE_SETTINGS_COLUMNS)
     .eq("id", 1)
     .maybeSingle();
 
@@ -1461,6 +1485,10 @@ export async function saveSiteSettings(
 
   const systemName = settings.systemName.trim();
   const slogan = settings.slogan.trim();
+  const controllerName = settings.controllerName.trim();
+  const controllerRegistrationNumber = settings.controllerRegistrationNumber.trim();
+  const controllerAddress = settings.controllerAddress.trim();
+  const controllerEmail = settings.controllerEmail.trim();
 
   if (!systemName) {
     return { ok: false, error: "Ievadi sistēmas nosaukumu." };
@@ -1468,6 +1496,10 @@ export async function saveSiteSettings(
 
   if (!slogan) {
     return { ok: false, error: "Ievadi sistēmas sloganu." };
+  }
+
+  if (controllerEmail && !isValidEmail(controllerEmail)) {
+    return { ok: false, error: "Ievadi derīgu pārziņa e-pasta adresi." };
   }
 
   const supabase = createAdminClient();
@@ -1478,10 +1510,14 @@ export async function saveSiteSettings(
         id: 1,
         system_name: systemName,
         slogan,
+        controller_name: controllerName,
+        controller_registration_number: controllerRegistrationNumber,
+        controller_address: controllerAddress,
+        controller_email: controllerEmail,
       },
       { onConflict: "id" },
     )
-    .select("id, system_name, slogan, updated_at")
+    .select(SITE_SETTINGS_COLUMNS)
     .single();
 
   if (error || !data) {

@@ -48,18 +48,26 @@ export function getLegalUpdatedAt(t: Translate): string {
   return t("legal.common.updated_at", "05.08.2026");
 }
 
+export type LegalControllerSettings = {
+  systemName: string;
+  controllerName: string;
+  controllerRegistrationNumber: string;
+  controllerAddress: string;
+  controllerEmail: string;
+};
+
 export function getLegalControllerDetails(
   t: Translate,
-  systemName: string,
+  settings: LegalControllerSettings,
 ): LegalControllerDetails {
+  const notProvided = t("legal.controller.not_configured", "Nav norādīts");
+  const orNotProvided = (value: string) => value.trim() || notProvided;
+
   return {
-    name: t("legal.common.controller_name", systemName),
-    registrationNumber: t(
-      "legal.common.controller_registration_number",
-      "[reģistrācijas numurs]",
-    ),
-    address: t("legal.common.controller_address", "[juridiskā adrese]"),
-    email: t("legal.common.controller_email", "[e-pasta adrese]"),
+    name: settings.controllerName.trim() || settings.systemName,
+    registrationNumber: orNotProvided(settings.controllerRegistrationNumber),
+    address: orNotProvided(settings.controllerAddress),
+    email: orNotProvided(settings.controllerEmail),
     supervisoryAuthority: t(
       "legal.common.supervisory_authority",
       "Datu valsts inspekcija (www.dvi.gov.lv)",
