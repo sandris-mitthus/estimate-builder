@@ -1,11 +1,13 @@
 import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
 import { calculateRowsVolumeTotals } from "@/app/lib/estimates/calculate-section-volume-totals";
+import { getRowItemId } from "@/app/lib/estimates/multi-position";
 import type {
   EstimateCategory,
   EstimateRowItem,
 } from "@/app/lib/estimates/types";
 import type { BuildingModuleSizeOption } from "@/app/lib/modules/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
+import { normalizeTimelineGraphPeopleCount } from "@/app/lib/timeline-graph/people-count";
 import type {
   TimelineGraphCategory,
   TimelineGraphChildSection,
@@ -57,18 +59,20 @@ export function buildTimelineGraphCategories(
         return;
       }
 
-      const hours = workloadForRows(pendingDirectItems, options);
+      const batch = pendingDirectItems;
       pendingDirectItems = [];
+      const hours = workloadForRows(batch, options);
       if (hours <= 0) {
         return;
       }
 
       children.push({
-        id: `${category.id}:direct:${children.length}`,
+        id: `${category.id}:direct:${getRowItemId(batch[0]!)}`,
         kind: "direct",
         /** UI tulko kā „Pozīcijas” — tiešās kategorijas pozīcijas. */
         title: "",
         laborWorkloadHours: hours,
+        peopleCount: normalizeTimelineGraphPeopleCount(1),
       });
     };
 
@@ -94,6 +98,7 @@ export function buildTimelineGraphCategories(
         kind: "subcategory",
         title: child.subcategory.title.trim() || "—",
         laborWorkloadHours: hours,
+        peopleCount: normalizeTimelineGraphPeopleCount(1),
       });
     }
 
@@ -112,6 +117,7 @@ export function buildTimelineGraphCategories(
       id: category.id,
       title: categoryTitle,
       laborWorkloadHours,
+      peopleCount: normalizeTimelineGraphPeopleCount(1),
       children,
     });
   }

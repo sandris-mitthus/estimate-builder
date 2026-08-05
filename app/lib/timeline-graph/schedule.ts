@@ -1,5 +1,6 @@
 import { todayIsoDate } from "@/app/lib/format-display-date";
 import { roundQuantity } from "@/app/lib/positions/variable-quantity";
+import { normalizeTimelineGraphPeopleCount } from "@/app/lib/timeline-graph/people-count";
 import type {
   TimelineGraphCategory,
   TimelineGraphChildSection,
@@ -39,6 +40,22 @@ export type ScheduledTimelineGraphProject = Omit<
   durationDays: number;
   dayOffset: number;
   categories: ScheduledTimelineGraphCategory[];
+};
+
+type ScheduleBlock = {
+  startIso: string;
+  endIso: string;
+  durationDays: number;
+  dayOffset: number;
+};
+
+type FlattenedWorkUnit = {
+  sectionId: string;
+  categoryId: string | null;
+  laborWorkloadHours: number;
+  peopleCount: number;
+  parallelGroupId?: string;
+  child: TimelineGraphChildSection | null;
 };
 
 function parseIsoDay(value: string): Date {
@@ -103,25 +120,50 @@ function addWorkDays(startIso: string, workDaysToAdd: number): string {
   return current;
 }
 
-/** Cik darba dienu vajag šai darbietilpībai. */
-export function resolveWorkloadDurationDays(laborWorkloadHours: number): number {
+/** Cik darba dienu vajag šai darbietilpībai (cilvēku skaits saīsina kalendāru). */
+export function resolveWorkloadDurationDays(
+  laborWorkloadHours: number,
+  peopleCount = 1,
+): number {
   if (!Number.isFinite(laborWorkloadHours) || laborWorkloadHours <= 0) {
     return 1;
   }
 
+  const people = normalizeTimelineGraphPeopleCount(peopleCount);
   return Math.max(
     1,
-    Math.ceil(laborWorkloadHours / TIMELINE_GRAPH_HOURS_PER_DAY),
+    Math.ceil(laborWorkloadHours / (TIMELINE_GRAPH_HOURS_PER_DAY * people)),
   );
 }
 
-/** Darbietilpība kā pilnas dienas + atlikušās stundas (1 d = 8 c/h). */
-export function formatWorkloadDaysAndHours(laborWorkloadHours: number): string {
+/**
+ * Efektīvā darbietilpība kalendārā — kopējās c/h dalītas ar cilvēku skaitu.
+ * (Kopējais darba apjoms stundās nemainās; grafikā saīsinās ilgums.)
+ */
+export function resolveEffectiveWorkloadHours(
+  laborWorkloadHours: number,
+  peopleCount = 1,
+): number {
   if (!Number.isFinite(laborWorkloadHours) || laborWorkloadHours <= 0) {
+    return 0;
+  }
+
+  const people = normalizeTimelineGraphPeopleCount(peopleCount);
+  return laborWorkloadHours / people;
+}
+
+/** Darbietilpība kā pilnas dienas + atlikušās stundas (1 d = 8 c/h). */
+export function formatWorkloadDaysAndHours(
+  laborWorkloadHours: number,
+  peopleCount = 1,
+): string {
+  const totalHours = roundQuantity(
+    resolveEffectiveWorkloadHours(laborWorkloadHours, peopleCount),
+  );
+  if (totalHours <= 0) {
     return "—";
   }
 
-  const totalHours = roundQuantity(laborWorkloadHours);
   const days = Math.floor(totalHours / TIMELINE_GRAPH_HOURS_PER_DAY);
   const hours = roundQuantity(totalHours - days * TIMELINE_GRAPH_HOURS_PER_DAY);
 
@@ -141,19 +183,14 @@ export function formatWorkloadDaysAndHours(laborWorkloadHours: number): string {
   return `${hoursLabel} h`;
 }
 
-function scheduleBlock(
+function scheduleBlockAt(
   laborWorkloadHours: number,
-  cursor: string,
+  startCursor: string,
   calendarStartIso: string,
-): {
-  startIso: string;
-  endIso: string;
-  durationDays: number;
-  dayOffset: number;
-  nextCursor: string;
-} {
-  const workDays = resolveWorkloadDurationDays(laborWorkloadHours);
-  const startIso = ensureWorkdayIso(cursor);
+  peopleCount = 1,
+): ScheduleBlock {
+  const workDays = resolveWorkloadDurationDays(laborWorkloadHours, peopleCount);
+  const startIso = ensureWorkdayIso(startCursor);
   const endIso =
     workDays <= 1 ? startIso : addWorkDays(startIso, workDays - 1);
 
@@ -162,34 +199,222 @@ function scheduleBlock(
     endIso,
     durationDays: calendarInclusiveSpan(startIso, endIso),
     dayOffset: calendarDayOffset(calendarStartIso, startIso),
-    nextCursor: nextWorkdayAfter(endIso),
   };
 }
 
-function spanFromChildren(
-  children: ScheduledTimelineGraphChild[],
-  fallbackHours: number,
-  cursor: string,
+function laterIso(left: string, right: string): string {
+  return calendarDayOffset(left, right) >= 0 ? right : left;
+}
+
+function earlierIso(left: string, right: string): string {
+  return calendarDayOffset(left, right) >= 0 ? left : right;
+}
+
+function categoryHasSubcategories(
+  category: Pick<TimelineGraphCategory, "children">,
+): boolean {
+  return category.children.some((child) => child.kind === "subcategory");
+}
+
+function advanceStartCursor(current: string, afterEndIso: string): string {
+  const next = nextWorkdayAfter(afterEndIso);
+  return calendarDayOffset(current, next) > 0 ? next : current;
+}
+
+function scheduleUnitBlock(
+  unit: FlattenedWorkUnit,
+  startIso: string,
+  calendarStartIso: string,
+  blocksBySectionId: Map<string, ScheduleBlock>,
+): ScheduleBlock {
+  const block = scheduleBlockAt(
+    unit.laborWorkloadHours,
+    startIso,
+    calendarStartIso,
+    unit.peopleCount,
+  );
+  blocksBySectionId.set(unit.sectionId, block);
+  return block;
+}
+
+/**
+ * Plāno vienu projektu.
+ * - Kategorijas var sākties paralēli (category.parallelGroupId) — nesagaida
+ *   iepriekšējo kategoriju; starp projektiem pārklāšanās nav.
+ * - Apakšdarbi kategorijā iet secīgi; to pašu var sapārot savā starpā.
+ */
+function scheduleProjectWaves(
+  project: TimelineGraphProject,
+  projectCursor: string,
   calendarStartIso: string,
 ): {
-  startIso: string;
-  endIso: string;
-  durationDays: number;
-  dayOffset: number;
   nextCursor: string;
+  projectStartIso: string;
+  projectEndIso: string;
+  blocksBySectionId: Map<string, ScheduleBlock>;
 } {
-  if (children.length === 0) {
-    return scheduleBlock(fallbackHours, cursor, calendarStartIso);
+  const blocksBySectionId = new Map<string, ScheduleBlock>();
+  const categoryGroupStartById = new Map<string, string>();
+  let nextCategoryStart = ensureWorkdayIso(projectCursor);
+  let latestEndIso: string | null = null;
+  let projectStartIso = nextCategoryStart;
+  let projectEndIso = nextCategoryStart;
+  let started = false;
+
+  if (project.categories.length === 0) {
+    const block = scheduleUnitBlock(
+      {
+        sectionId: project.id,
+        categoryId: null,
+        laborWorkloadHours: project.laborWorkloadHours,
+        peopleCount: project.peopleCount,
+        parallelGroupId: project.parallelGroupId,
+        child: null,
+      },
+      nextCategoryStart,
+      calendarStartIso,
+      blocksBySectionId,
+    );
+    return {
+      nextCursor: nextWorkdayAfter(block.endIso),
+      projectStartIso: block.startIso,
+      projectEndIso: block.endIso,
+      blocksBySectionId,
+    };
   }
 
-  const startIso = children[0]!.startIso;
-  const endIso = children[children.length - 1]!.endIso;
+  for (const category of project.categories) {
+    const hasSubcategories = categoryHasSubcategories(category);
+    const categoryGroupId = category.parallelGroupId?.trim() || undefined;
+
+    let categoryStart: string;
+    if (categoryGroupId && categoryGroupStartById.has(categoryGroupId)) {
+      categoryStart = categoryGroupStartById.get(categoryGroupId)!;
+    } else {
+      categoryStart = nextCategoryStart;
+      if (categoryGroupId) {
+        categoryGroupStartById.set(categoryGroupId, categoryStart);
+      }
+    }
+
+    const units: FlattenedWorkUnit[] = hasSubcategories
+      ? category.children.map((child) => ({
+          sectionId: child.id,
+          categoryId: category.id,
+          laborWorkloadHours: child.laborWorkloadHours,
+          peopleCount: child.peopleCount,
+          parallelGroupId: child.parallelGroupId,
+          child,
+        }))
+      : [
+          {
+            sectionId: category.id,
+            categoryId: category.id,
+            laborWorkloadHours: category.laborWorkloadHours,
+            peopleCount: category.peopleCount,
+            parallelGroupId: category.parallelGroupId,
+            child: null,
+          },
+        ];
+
+    let sequentialStart = categoryStart;
+    const unitGroupStartById = new Map<string, string>();
+    let categoryEndIso = categoryStart;
+
+    for (const unit of units) {
+      if (blocksBySectionId.has(unit.sectionId)) {
+        continue;
+      }
+
+      // Leaf kategorija: sākums = kategorijas (iesk. paralēlās grupas) sākums.
+      // Ar apakškategorijām: bērnu savstarpējā sapārošana + secība kategorijā.
+      let startIso: string;
+      if (!hasSubcategories) {
+        startIso = categoryStart;
+      } else {
+        const unitGroupId = unit.parallelGroupId?.trim() || undefined;
+        if (unitGroupId && unitGroupStartById.has(unitGroupId)) {
+          startIso = unitGroupStartById.get(unitGroupId)!;
+        } else {
+          startIso = sequentialStart;
+          if (unitGroupId) {
+            unitGroupStartById.set(unitGroupId, startIso);
+          }
+        }
+      }
+
+      const block = scheduleUnitBlock(
+        unit,
+        startIso,
+        calendarStartIso,
+        blocksBySectionId,
+      );
+
+      if (!started) {
+        projectStartIso = block.startIso;
+        started = true;
+      }
+      projectEndIso = laterIso(projectEndIso, block.endIso);
+      categoryEndIso = laterIso(categoryEndIso, block.endIso);
+      latestEndIso = latestEndIso
+        ? laterIso(latestEndIso, block.endIso)
+        : block.endIso;
+      sequentialStart = advanceStartCursor(sequentialStart, block.endIso);
+    }
+
+    // Nākamā (nesapārotā) kategorija sākas pēc šīs kategorijas beigām.
+    nextCategoryStart = advanceStartCursor(nextCategoryStart, categoryEndIso);
+  }
+
+  if (!started) {
+    const empty = scheduleBlockAt(0, nextCategoryStart, calendarStartIso, 1);
+    return {
+      nextCursor: nextWorkdayAfter(empty.endIso),
+      projectStartIso: empty.startIso,
+      projectEndIso: empty.endIso,
+      blocksBySectionId,
+    };
+  }
+
+  return {
+    nextCursor: latestEndIso
+      ? nextWorkdayAfter(latestEndIso)
+      : nextCategoryStart,
+    projectStartIso,
+    projectEndIso,
+    blocksBySectionId,
+  };
+}
+
+function spanFromBlocks(
+  blocks: ScheduleBlock[],
+  fallbackHours: number,
+  fallbackPeopleCount: number,
+  cursor: string,
+  calendarStartIso: string,
+): ScheduleBlock & { nextCursor: string } {
+  if (blocks.length === 0) {
+    const block = scheduleBlockAt(
+      fallbackHours,
+      cursor,
+      calendarStartIso,
+      fallbackPeopleCount,
+    );
+    return { ...block, nextCursor: nextWorkdayAfter(block.endIso) };
+  }
+
+  let startIso = blocks[0]!.startIso;
+  let endIso = blocks[0]!.endIso;
+  for (const block of blocks) {
+    startIso = earlierIso(startIso, block.startIso);
+    endIso = laterIso(endIso, block.endIso);
+  }
 
   return {
     startIso,
     endIso,
     durationDays: calendarInclusiveSpan(startIso, endIso),
-    dayOffset: children[0]!.dayOffset,
+    dayOffset: calendarDayOffset(calendarStartIso, startIso),
     nextCursor: nextWorkdayAfter(endIso),
   };
 }
@@ -201,84 +426,113 @@ export function scheduleTimelineGraphProjects(
   let cursor = ensureWorkdayIso(calendarStartIso);
 
   return projects.map((project) => {
+    const wave = scheduleProjectWaves(project, cursor, calendarStartIso);
+    cursor = wave.nextCursor;
+
+    if (project.categories.length === 0) {
+      const block =
+        wave.blocksBySectionId.get(project.id) ??
+        scheduleBlockAt(
+          project.laborWorkloadHours,
+          wave.projectStartIso,
+          calendarStartIso,
+          project.peopleCount,
+        );
+
+      return {
+        ...project,
+        startIso: block.startIso,
+        endIso: block.endIso,
+        durationDays: block.durationDays,
+        dayOffset: block.dayOffset,
+        categories: [],
+      };
+    }
+
     const scheduledCategories: ScheduledTimelineGraphCategory[] = [];
-    let projectStartIso = cursor;
-    let projectEndIso = cursor;
 
-    if (project.categories.length > 0) {
-      for (const category of project.categories) {
-        const scheduledChildren: ScheduledTimelineGraphChild[] = [];
+    for (const category of project.categories) {
+      const hasSubcategories = categoryHasSubcategories(category);
 
-        if (category.children.length > 0) {
-          for (const child of category.children) {
-            const block = scheduleBlock(
-              child.laborWorkloadHours,
-              cursor,
-              calendarStartIso,
-            );
-            scheduledChildren.push({
+      if (hasSubcategories) {
+        const scheduledChildren: ScheduledTimelineGraphChild[] =
+          category.children.map((child) => {
+            const block =
+              wave.blocksBySectionId.get(child.id) ??
+              scheduleBlockAt(
+                child.laborWorkloadHours,
+                wave.projectStartIso,
+                calendarStartIso,
+                child.peopleCount,
+              );
+            return {
               ...child,
               startIso: block.startIso,
               endIso: block.endIso,
               durationDays: block.durationDays,
               dayOffset: block.dayOffset,
-            });
-            cursor = block.nextCursor;
-          }
-
-          const span = spanFromChildren(
-            scheduledChildren,
-            category.laborWorkloadHours,
-            cursor,
-            calendarStartIso,
-          );
-
-          scheduledCategories.push({
-            ...category,
-            startIso: span.startIso,
-            endIso: span.endIso,
-            durationDays: span.durationDays,
-            dayOffset: span.dayOffset,
-            children: scheduledChildren,
+            };
           });
-          projectEndIso = span.endIso;
-        } else {
-          const block = scheduleBlock(
-            category.laborWorkloadHours,
-            cursor,
-            calendarStartIso,
-          );
-          cursor = block.nextCursor;
-          scheduledCategories.push({
-            ...category,
-            startIso: block.startIso,
-            endIso: block.endIso,
-            durationDays: block.durationDays,
-            dayOffset: block.dayOffset,
-            children: [],
-          });
-          projectEndIso = block.endIso;
-        }
+
+        const span = spanFromBlocks(
+          scheduledChildren.map((child) => ({
+            startIso: child.startIso,
+            endIso: child.endIso,
+            durationDays: child.durationDays,
+            dayOffset: child.dayOffset,
+          })),
+          category.laborWorkloadHours,
+          category.peopleCount,
+          wave.projectStartIso,
+          calendarStartIso,
+        );
+
+        scheduledCategories.push({
+          ...category,
+          startIso: span.startIso,
+          endIso: span.endIso,
+          durationDays: span.durationDays,
+          dayOffset: span.dayOffset,
+          children: scheduledChildren,
+        });
+        continue;
       }
 
-      projectStartIso = scheduledCategories[0]?.startIso ?? cursor;
-    } else {
-      const block = scheduleBlock(
-        project.laborWorkloadHours,
-        cursor,
-        calendarStartIso,
-      );
-      cursor = block.nextCursor;
-      projectStartIso = block.startIso;
-      projectEndIso = block.endIso;
+      const block =
+        wave.blocksBySectionId.get(category.id) ??
+        scheduleBlockAt(
+          category.laborWorkloadHours,
+          wave.projectStartIso,
+          calendarStartIso,
+          category.peopleCount,
+        );
+
+      scheduledCategories.push({
+        ...category,
+        startIso: block.startIso,
+        endIso: block.endIso,
+        durationDays: block.durationDays,
+        dayOffset: block.dayOffset,
+        // Bez apakškategorijām bērnu rindas UI nerāda — darbs ir kategorija.
+        children: category.children.map((child) => ({
+          ...child,
+          startIso: block.startIso,
+          endIso: block.endIso,
+          durationDays: block.durationDays,
+          dayOffset: block.dayOffset,
+        })),
+      });
     }
 
     return {
       ...project,
-      startIso: projectStartIso,
-      endIso: projectEndIso,
-      durationDays: calendarInclusiveSpan(projectStartIso, projectEndIso),
-      dayOffset: calendarDayOffset(calendarStartIso, projectStartIso),
+      startIso: wave.projectStartIso,
+      endIso: wave.projectEndIso,
+      durationDays: calendarInclusiveSpan(
+        wave.projectStartIso,
+        wave.projectEndIso,
+      ),
+      dayOffset: calendarDayOffset(calendarStartIso, wave.projectStartIso),
       categories: scheduledCategories,
     };
   });

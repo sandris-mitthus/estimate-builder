@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.116
+
+**Laika grafiks — cilvēku skaits un paralēlie darbi**
+
+- Cilvēku skaits pie darba saīsina kalendāra joslu (`company_timeline_graph_people`, migrācija `158`); bez apakškategorijām ievade ir uz kategorijas rindas
+- Drag-and-drop sapārošana vienā projektā — kategorijas un apakšdarbi var sākties paralēli; starp projektiem bloķēts (`159`–`162`); „Paralēli” atver locekļu modāli ar atvienošanu
+- Optimistic live atjauninājumi bez lapas pārlādes; tooltipi vietā pārlūka `title`
+
 ## v1.3.115
 
 **Eksports — aptuvens budžets rindas Kopā**

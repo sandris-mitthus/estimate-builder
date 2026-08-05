@@ -87,6 +87,12 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.project_description_save_failed",
   "Neizdevās saglabāt secību.": "errors.sort_order_save_failed",
   "Nav projektu secībai.": "errors.timeline_graph_projects_required",
+  "Nederīgs cilvēku skaits.": "errors.timeline_graph_people_count_invalid",
+  "Neizdevās saglabāt cilvēku skaitu.": "errors.timeline_graph_people_count_save_failed",
+  "Nevar sapārot šos darbus.": "errors.timeline_graph_parallel_invalid",
+  "Nevar sapārot ar citu projektu — paralēli tikai tajā pašā projektā.":
+    "errors.timeline_graph_parallel_cross_project",
+  "Neizdevās saglabāt paralēlo sapārojumu.": "errors.timeline_graph_parallel_save_failed",
   "Neizdevās saglabāt tāmes pozīciju.":
     "errors.estimate_position_save_failed",
   "Neizdevās augšupielādēt failu.": "errors.file_upload_failed",
