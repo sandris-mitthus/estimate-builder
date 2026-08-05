@@ -676,6 +676,7 @@ function NavUserSection({
 type AppNavProps = {
   currentUser?: UserDisplay | null;
   systemName?: string | null;
+  logoUrl?: string | null;
   companyName?: string | null;
   allowedNavKeys?: NavPermissionKey[] | null;
   isSystemAdmin?: boolean;
@@ -693,6 +694,7 @@ type PendingNavigation = {
 export function AppNav({
   currentUser = null,
   systemName = null,
+  logoUrl = null,
   companyName = null,
   allowedNavKeys = null,
   isSystemAdmin = false,
@@ -877,8 +879,15 @@ export function AppNav({
       >
         {menuExpanded ? (
           <div className="flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-zinc-50 to-white p-1 shadow-sm ring-1 ring-zinc-200/70">
-            <span className="min-w-0 truncate px-3 text-sm font-semibold text-zinc-700">
-              {displaySystemName}
+            <span className="flex min-w-0 items-center gap-2 px-2 text-sm font-semibold text-zinc-700">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="size-7 shrink-0 rounded-lg object-contain"
+                />
+              ) : null}
+              <span className="min-w-0 truncate">{displaySystemName}</span>
             </span>
             <Tooltip label={toggleMenuLabel} align="end">
               <button

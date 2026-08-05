@@ -10,6 +10,11 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.120
+
+- System logo and favicon upload with drag-and-drop in **Sistēmas uzstādījumi**; logo appears in the sidebar before the system name and on the login screen, favicon in the browser tab
+- Migration `165` adds `site_settings.logo_url` / `favicon_url`, a private `site-assets` bucket, and public `/api/site/logo` + `/api/site/favicon` proxies so branding works for anonymous visitors too
+
 ## v1.3.119
 
 - Data controller name, registration number, registered address and contact email are now edited in **Sistēmas uzstādījumi** instead of translation keys, and flow straight into the privacy policy

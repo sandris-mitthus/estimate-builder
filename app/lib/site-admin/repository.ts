@@ -8,6 +8,11 @@ import {
   SITE_TRANSLATIONS_CACHE_TAG,
 } from "@/app/lib/i18n/cache-tags";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import {
+  resolveSiteBrandingDisplayUrl,
+  sanitizeSiteBrandingUrl,
+  type SiteBrandingAssetKind,
+} from "@/app/lib/site-admin/branding-validation";
 import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import {
   DEFAULT_GROUP_DEFINITIONS,
@@ -82,6 +87,8 @@ type GlobalSiteSettingsRow = {
   controller_registration_number: string;
   controller_address: string;
   controller_email: string;
+  logo_url: string;
+  favicon_url: string;
   updated_at: string;
 };
 
@@ -168,6 +175,8 @@ export type SiteSettingsSummary = {
   controllerRegistrationNumber: string;
   controllerAddress: string;
   controllerEmail: string;
+  logoUrl: string;
+  faviconUrl: string;
   updatedAt: string;
 };
 
@@ -264,6 +273,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsSummary = {
   controllerRegistrationNumber: "",
   controllerAddress: "",
   controllerEmail: "",
+  logoUrl: "",
+  faviconUrl: "",
   updatedAt: "",
 };
 
@@ -1433,7 +1444,7 @@ export async function updateUserActiveLanguageCode({
 }
 
 const SITE_SETTINGS_COLUMNS =
-  "id, system_name, slogan, controller_name, controller_registration_number, controller_address, controller_email, updated_at";
+  "id, system_name, slogan, controller_name, controller_registration_number, controller_address, controller_email, logo_url, favicon_url, updated_at";
 
 function mapGlobalSiteSettingsRow(row: GlobalSiteSettingsRow): SiteSettingsSummary {
   return {
@@ -1443,6 +1454,8 @@ function mapGlobalSiteSettingsRow(row: GlobalSiteSettingsRow): SiteSettingsSumma
     controllerRegistrationNumber: row.controller_registration_number ?? "",
     controllerAddress: row.controller_address ?? "",
     controllerEmail: row.controller_email ?? "",
+    logoUrl: resolveSiteBrandingDisplayUrl("logo", row.logo_url ?? ""),
+    faviconUrl: resolveSiteBrandingDisplayUrl("favicon", row.favicon_url ?? ""),
     updatedAt: row.updated_at,
   };
 }
@@ -1522,6 +1535,59 @@ export async function saveSiteSettings(
 
   if (error || !data) {
     return { ok: false, error: "Neizdevās saglabāt sistēmas uzstādījumus." };
+  }
+
+  return {
+    ok: true,
+    settings: mapGlobalSiteSettingsRow(data as GlobalSiteSettingsRow),
+  };
+}
+
+export async function updateSiteBrandingUrl(
+  kind: SiteBrandingAssetKind,
+  url: string,
+): Promise<{ ok: true; settings: SiteSettingsSummary } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const sanitized = sanitizeSiteBrandingUrl(kind, url);
+  const supabase = createAdminClient();
+  const current = await getSiteSettingsUncached();
+
+  const { data, error } = await supabase
+    .from("site_settings")
+    .upsert(
+      {
+        id: 1,
+        system_name: current.systemName,
+        slogan: current.slogan,
+        controller_name: current.controllerName,
+        controller_registration_number: current.controllerRegistrationNumber,
+        controller_address: current.controllerAddress,
+        controller_email: current.controllerEmail,
+        logo_url:
+          kind === "logo"
+            ? sanitized
+            : sanitizeSiteBrandingUrl("logo", current.logoUrl),
+        favicon_url:
+          kind === "favicon"
+            ? sanitized
+            : sanitizeSiteBrandingUrl("favicon", current.faviconUrl),
+      },
+      { onConflict: "id" },
+    )
+    .select(SITE_SETTINGS_COLUMNS)
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error:
+        kind === "logo"
+          ? "Neizdevās saglabāt logotipu."
+          : "Neizdevās saglabāt favicon.",
+    };
   }
 
   return {

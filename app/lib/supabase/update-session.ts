@@ -33,6 +33,7 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/cookies",
+  "/api/site/",
 ];
 
 function isPublicPath(pathname: string): boolean {

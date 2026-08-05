@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveSiteSettingsAction } from "@/app/(protected)/site_settings/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
+import { SiteBrandingDropzone } from "@/app/components/site-branding-dropzone";
 import { useTranslations } from "@/app/components/translations-provider";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
@@ -36,6 +37,8 @@ export function SiteSettingsForm({
     toInput(initialSettings),
   );
   const [savedSettings, setSavedSettings] = useState(initialSettings);
+  const [logoUrl, setLogoUrl] = useState(initialSettings.logoUrl);
+  const [faviconUrl, setFaviconUrl] = useState(initialSettings.faviconUrl);
   const [isPending, startTransition] = useTransition();
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const { t } = useTranslations();
@@ -94,6 +97,8 @@ export function SiteSettingsForm({
       if (result.ok) {
         setSettings(toInput(result.settings));
         setSavedSettings(result.settings);
+        setLogoUrl(result.settings.logoUrl);
+        setFaviconUrl(result.settings.faviconUrl);
         showFeedback({
           type: "success",
           text: t("site_settings.feedback.saved", "Sistēmas uzstādījumi saglabāti."),
@@ -137,6 +142,33 @@ export function SiteSettingsForm({
                 "Tāmes piedāvājumu veidošana",
               )}
             />
+          </div>
+
+          <div className="space-y-5 border-t border-zinc-100 pt-5">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900">
+                {t("site_settings.form.branding_section", "Zīmols")}
+              </h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                {t(
+                  "site_settings.form.branding_section_hint",
+                  "Logotips redzams sānu joslā un pieteikšanās logā. Favicon — pārlūka cilnē.",
+                )}
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <SiteBrandingDropzone
+                kind="logo"
+                url={logoUrl}
+                onUrlChange={setLogoUrl}
+              />
+              <SiteBrandingDropzone
+                kind="favicon"
+                url={faviconUrl}
+                onUrlChange={setFaviconUrl}
+              />
+            </div>
           </div>
 
           <div className="space-y-5 border-t border-zinc-100 pt-5">
@@ -258,10 +290,21 @@ export function SiteSettingsForm({
         <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
           {t("site_settings.preview.title", "Priekšskatījums")}
         </p>
-        <h2 className="mt-2 text-lg font-semibold text-zinc-900">
-          {settings.systemName || "—"}
-        </h2>
-        <p className="mt-2 text-sm text-zinc-500">{settings.slogan || "—"}</p>
+        <div className="mt-3 flex items-center gap-3">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt=""
+              className="size-10 shrink-0 rounded-lg border border-zinc-200 object-contain p-1"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold text-zinc-900">
+              {settings.systemName || "—"}
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">{settings.slogan || "—"}</p>
+          </div>
+        </div>
         <div className="mt-5 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-500">
           {t(
             "site_settings.preview.description",

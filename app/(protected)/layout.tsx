@@ -80,6 +80,7 @@ export default async function ProtectedLayout({
           <LoginGate
             systemName={siteSettings.systemName}
             slogan={siteSettings.slogan}
+            logoUrl={siteSettings.logoUrl}
             languages={languages}
             activeLanguageCode={activeLanguageCode}
           />
@@ -135,6 +136,7 @@ export default async function ProtectedLayout({
         <LoginGate
           systemName={siteSettings.systemName}
           slogan={siteSettings.slogan}
+          logoUrl={siteSettings.logoUrl}
           languages={languages}
           activeLanguageCode={activeLanguageCode}
         />
@@ -153,6 +155,7 @@ export default async function ProtectedLayout({
             <AppNav
               currentUser={currentUser}
               systemName={siteSettings.systemName}
+              logoUrl={siteSettings.logoUrl}
               companyName={companyName}
               allowedNavKeys={allowedNavKeys}
               isSystemAdmin={isSystemAdmin}

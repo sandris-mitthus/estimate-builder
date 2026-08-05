@@ -107,6 +107,9 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.site_group_permissions_save_failed",
   "Neizdevās saglabāt sistēmas uzstādījumus.":
     "errors.site_settings_save_failed",
+  "Neizdevās saglabāt logotipu.": "errors.site_logo_save_failed",
+  "Neizdevās saglabāt favicon.": "errors.site_favicon_save_failed",
+  "Neizdevās augšupielādēt favicon.": "errors.site_favicon_upload_failed",
   "Neizdevās saglabāt tulkojumu.": "errors.translation_save_failed",
   "Neizdevās saglabāt valodas statusu.": "errors.language_status_save_failed",
   "Neizdevās saglabāt valodu.": "errors.language_save_failed",

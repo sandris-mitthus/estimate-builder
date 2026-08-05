@@ -15,10 +15,18 @@ const geistSans = Geist({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
+  const icons = settings.faviconUrl
+    ? {
+        icon: [{ url: settings.faviconUrl }],
+        shortcut: [settings.faviconUrl],
+        apple: [{ url: settings.faviconUrl }],
+      }
+    : undefined;
 
   return {
     title: settings.systemName,
     description: settings.slogan,
+    icons,
     openGraph: {
       title: settings.systemName,
       description: settings.slogan,

@@ -28,12 +28,14 @@ export function LoginGate({
   returnPath = "/",
   systemName,
   slogan,
+  logoUrl = "",
   languages = [],
   activeLanguageCode = "lv",
 }: {
   returnPath?: string;
   systemName: string;
   slogan: string;
+  logoUrl?: string;
   languages?: SiteLanguageSummary[];
   activeLanguageCode?: string;
 }) {
@@ -74,6 +76,13 @@ export function LoginGate({
           languages={languages}
           activeLanguageCode={activeLanguageCode}
         />
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt=""
+            className="mx-auto mb-5 h-14 w-auto max-w-[180px] object-contain"
+          />
+        ) : null}
         <p
           id="login-title"
           className="text-[2rem] font-semibold leading-none tracking-[-0.04em] text-[#18181b]"

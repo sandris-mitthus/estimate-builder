@@ -19,6 +19,7 @@ export default async function LoginPage() {
     <LoginGate
       systemName={siteSettings.systemName}
       slogan={siteSettings.slogan}
+      logoUrl={siteSettings.logoUrl}
     />
   );
 }
