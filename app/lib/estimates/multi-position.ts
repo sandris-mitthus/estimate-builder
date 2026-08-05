@@ -403,6 +403,50 @@ export function collectRowLineItems(
   return items;
 }
 
+export type EstimateExportDisplayRow = {
+  lineItem: EstimateLineItem;
+  /** Aptuvenais budžets — ja > 0, aizstāj aprēķināto cenu eksportā (kā kopsummās). */
+  attentionBudget: number;
+};
+
+/**
+ * Eksporta rindas (PDF/Excel): izvēlētā multi opcija + rindas aptuvenais budžets,
+ * lai „Kopā” sakristu ar `calculateEstimateTotals`.
+ */
+export function collectExportDisplayRows(
+  rows: EstimateRowItem[],
+): EstimateExportDisplayRow[] {
+  const result: EstimateExportDisplayRow[] = [];
+
+  for (const row of rows) {
+    if (isEstimateRowHidden(row)) {
+      continue;
+    }
+
+    if (isEstimateLineItem(row)) {
+      result.push({
+        lineItem: row,
+        attentionBudget: resolveAttentionBudgetAmount(row),
+      });
+      continue;
+    }
+
+    const selected = resolveSelectedMultiLineItem(row);
+    if (!selected) {
+      continue;
+    }
+
+    const multiBudget = resolveAttentionBudgetAmount(row);
+    const selectedBudget = resolveAttentionBudgetAmount(selected);
+    result.push({
+      lineItem: selected,
+      attentionBudget: multiBudget > 0 ? multiBudget : selectedBudget,
+    });
+  }
+
+  return result;
+}
+
 export type RowsTotalsSplit = {
   /** Pozīcijas, kurām kopsummu rēķina no cenām. */
   items: EstimateLineItem[];

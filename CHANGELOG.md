@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.115
+
+**Eksports — aptuvens budžets rindas Kopā**
+
+- Excel tāme un PDF piedāvājums rindās ar **Aptuvens budžets** rāda šo summu kolonnā **Kopā** (nevis aprēķināto cenu); sakrīt ar `calculateEstimateTotals` / `collectExportDisplayRows`
+
 ## v1.3.114
 
 **Papildu darbu tāmes — ielādes overlay**

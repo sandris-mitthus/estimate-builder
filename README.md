@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.114`
+**Current version:** `1.3.115`
 
 ---
 
@@ -15,7 +15,7 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Reusable template (Sagatave)** — build the structure once; new positions added in a project flow back to the template, and template changes can be pulled into existing projects
 - **Building modules** — reusable building types with drawings, PDFs, optional short notes and measurements (including sanitary rooms); copy a module with its files and description; project cards and the project create/edit module select show the note after the module name; estimate quantities can be linked to those sizes, combined with +/- or ×2, and update automatically
 - **Offer control** — hide positions or prices from the client offer, show only a total for selected rows, and keep a list of works explicitly not included in the offer
-- **PDF and Excel export** — branded PDF offer with your company details, logo and visualizations; Excel spreadsheet with the full price breakdown and VAT
+- **PDF and Excel export** — branded PDF offer with your company details, logo and visualizations; Excel spreadsheet with the full price breakdown and VAT; approximate-budget rows use that amount as the line total (same as on-screen totals)
 - **Approved projects** — material list with budget prices and an ordered/not-ordered status, plus assignment of materials to specific people with a reminder banner until everything is ordered
 - **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a labor workload schedule (Laika grafiks) ordered by project priority
 - **Teams and permissions** — several companies in one system, user groups that control what each person sees and may do, invitations, and access blocking

@@ -9,7 +9,7 @@ import {
 } from "@/app/lib/estimates/calculate-totals";
 import { shouldHideLineItemEstimateExportBreakdown } from "@/app/lib/estimates/line-item-export-visibility";
 import {
-  collectRowLineItems,
+  collectExportDisplayRows,
   resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
 import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
@@ -280,22 +280,25 @@ export async function buildEstimateExcel(
     // Category children in configured order
     for (const child of resolveCategoryChildren(cat)) {
       if (child.kind === "item") {
-        for (const item of collectRowLineItems([child.row], { forTotals: true })) {
+        for (const exportRow of collectExportDisplayRows([child.row])) {
           nr += 1;
-          const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
-            item,
+          addExportDataRow(
+            ws,
+            nr,
+            exportRow.lineItem,
+            exportRow.attentionBudget,
             catalogPositions,
             defaultHourlyRate,
             plannedProfitPercent,
+            "",
           );
-          addDataRow(ws, nr, item, unitPrice, lineTotal, "");
         }
         continue;
       }
 
       const sub = child.subcategory;
-      const subItems = collectRowLineItems(sub.items, { forTotals: true });
-      if (subItems.length === 0) continue;
+      const subExportRows = collectExportDisplayRows(sub.items);
+      if (subExportRows.length === 0) continue;
 
       const subRow = ws.addRow([
         "",
@@ -304,15 +307,18 @@ export async function buildEstimateExcel(
       subRow.height = 16;
       styleRowCells(subRow, 11, { italic: true, fontSize: 10, bgColor: BG_SUBCATEGORY, border: true });
 
-      for (const item of subItems) {
+      for (const exportRow of subExportRows) {
         nr += 1;
-        const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
-          item,
+        addExportDataRow(
+          ws,
+          nr,
+          exportRow.lineItem,
+          exportRow.attentionBudget,
           catalogPositions,
           defaultHourlyRate,
           plannedProfitPercent,
+          "    ",
         );
-        addDataRow(ws, nr, item, unitPrice, lineTotal, "    ");
       }
     }
   }
@@ -386,27 +392,59 @@ export async function buildEstimateExcel(
   return Buffer.from(arrayBuffer);
 }
 
+function addExportDataRow(
+  ws: ExcelJS.Worksheet,
+  nr: number,
+  item: EstimateLineItem,
+  attentionBudget: number,
+  catalogPositions: PositionPriceSummary[],
+  defaultHourlyRate: number | null,
+  plannedProfitPercent: number,
+  nameIndent: string,
+) {
+  if (attentionBudget > 0) {
+    addDataRow(ws, nr, item, null, null, nameIndent, attentionBudget);
+    return;
+  }
+
+  const { unitPrice, lineTotal } = resolveEstimateLineItemPrices(
+    item,
+    catalogPositions,
+    defaultHourlyRate,
+    plannedProfitPercent,
+  );
+  addDataRow(ws, nr, item, unitPrice, lineTotal, nameIndent, 0);
+}
+
 function addDataRow(
   ws: ExcelJS.Worksheet,
   nr: number,
   item: EstimateLineItem,
-  unitPrice: PriceBreakdown,
-  lineTotal: PriceBreakdown,
+  unitPrice: PriceBreakdown | null,
+  lineTotal: PriceBreakdown | null,
   nameIndent: string,
+  attentionBudget = 0,
 ) {
-  const hideBreakdown = shouldHideLineItemEstimateExportBreakdown(item);
+  const hideBreakdown =
+    attentionBudget > 0 || shouldHideLineItemEstimateExportBreakdown(item);
+  const total =
+    attentionBudget > 0
+      ? attentionBudget
+      : lineTotal
+        ? sumBreakdown(lineTotal)
+        : 0;
   const row = ws.addRow([
     nr,
     `${nameIndent}${resolveLineItemDisplayName(item)}`,
     item.unit || "",
     fmtQty(item.quantity),
-    hideBreakdown ? "" : fmtNum(unitPrice.labor),
-    hideBreakdown ? "" : fmtNum(unitPrice.materials),
-    hideBreakdown ? "" : fmtNum(unitPrice.mechanisms),
-    hideBreakdown ? "" : fmtNum(lineTotal.labor),
-    hideBreakdown ? "" : fmtNum(lineTotal.materials),
-    hideBreakdown ? "" : fmtNum(lineTotal.mechanisms),
-    fmtNum(sumBreakdown(lineTotal)),
+    hideBreakdown || !unitPrice ? "" : fmtNum(unitPrice.labor),
+    hideBreakdown || !unitPrice ? "" : fmtNum(unitPrice.materials),
+    hideBreakdown || !unitPrice ? "" : fmtNum(unitPrice.mechanisms),
+    hideBreakdown || !lineTotal ? "" : fmtNum(lineTotal.labor),
+    hideBreakdown || !lineTotal ? "" : fmtNum(lineTotal.materials),
+    hideBreakdown || !lineTotal ? "" : fmtNum(lineTotal.mechanisms),
+    fmtNum(total),
   ]);
   row.height = 16;
 

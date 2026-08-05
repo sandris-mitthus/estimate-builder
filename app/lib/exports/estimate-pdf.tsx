@@ -14,14 +14,13 @@ import {
   resolveEstimateLineItemPrices,
 } from "@/app/lib/estimates/calculate-totals";
 import {
-  collectRowLineItems,
-  isEstimateLineItem,
+  collectExportDisplayRows,
+  type EstimateExportDisplayRow,
   resolveLineItemDisplayName,
-  resolveSelectedMultiLineItem,
 } from "@/app/lib/estimates/multi-position";
 import { resolveCategoryChildren } from "@/app/lib/estimates/category-child-order";
 import { shouldHideLineItemOfferExportPrice } from "@/app/lib/estimates/line-item-export-visibility";
-import type { EstimateCategory, EstimateLineItem, EstimateSubcategory } from "@/app/lib/estimates/types";
+import type { EstimateCategory, EstimateSubcategory } from "@/app/lib/estimates/types";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
@@ -131,14 +130,18 @@ function fmtMoney(value: number, currency: string | null | undefined): string {
   return `${getCurrencySymbol(currency)} ${formatDecimalDisplay(value)}`;
 }
 
-function resolveItemGrand(
-  item: Parameters<typeof resolveEstimateLineItemPrices>[0],
+function resolveExportRowGrand(
+  row: EstimateExportDisplayRow,
   catalogPositions: PositionPriceSummary[],
   hourlyRate: number | null,
   plannedProfitPercent: number,
 ): number {
+  if (row.attentionBudget > 0) {
+    return roundToTwoDecimals(row.attentionBudget);
+  }
+
   const { lineTotal } = resolveEstimateLineItemPrices(
-    item,
+    row.lineItem,
     catalogPositions,
     hourlyRate,
     plannedProfitPercent,
@@ -146,25 +149,18 @@ function resolveItemGrand(
   return roundToTwoDecimals(sumBreakdown(lineTotal));
 }
 
-/** PDF rindām — tās pašas pozīcijas, ko izmanto kopsummu aprēķinam. */
-function collectSubcategoryOfferLineItems(
-  sub: EstimateSubcategory,
-): EstimateLineItem[] {
-  return collectRowLineItems(sub.items, { forTotals: true });
-}
-
-function sumLineItemsGrand(
-  items: EstimateLineItem[],
+function sumExportRowsGrand(
+  rows: EstimateExportDisplayRow[],
   catalogPositions: PositionPriceSummary[],
   defaultHourlyRate: number | null,
   plannedProfitPercent: number,
 ): number {
   return roundToTwoDecimals(
-    items.reduce(
-      (sum, item) =>
+    rows.reduce(
+      (sum, row) =>
         sum +
-        resolveItemGrand(
-          item,
+        resolveExportRowGrand(
+          row,
           catalogPositions,
           defaultHourlyRate,
           plannedProfitPercent,
@@ -188,13 +184,13 @@ function buildSubcategoryOfferRows(
   currency: string | null | undefined,
   t: Translate,
 ): SubcategoryPdfRowsResult {
-  const displayItems = collectSubcategoryOfferLineItems(sub);
-  if (displayItems.length === 0) {
+  const displayRows = collectExportDisplayRows(sub.items);
+  if (displayRows.length === 0) {
     return { rows: [], nextRowNr: startRowNr };
   }
 
-  const subGrand = sumLineItemsGrand(
-    displayItems,
+  const subGrand = sumExportRowsGrand(
+    displayRows,
     catalogPositions,
     defaultHourlyRate,
     plannedProfitPercent,
@@ -218,13 +214,13 @@ function buildSubcategoryOfferRows(
       </View>,
     );
 
-    for (const item of displayItems) {
+    for (const exportRow of displayRows) {
       rowNr += 1;
       rows.push(
-        <View key={item.id} style={s.itemRow}>
+        <View key={exportRow.lineItem.id} style={s.itemRow}>
           <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
           <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
-            {resolveLineItemDisplayName(item)}
+            {resolveLineItemDisplayName(exportRow.lineItem)}
           </Text>
           <Text style={[s.cell, s.colTotal]} />
         </View>,
@@ -262,20 +258,22 @@ function buildSubcategoryOfferRows(
     </View>,
   );
 
-  for (const item of displayItems) {
+  for (const exportRow of displayRows) {
     rowNr += 1;
-    const grand = resolveItemGrand(
-      item,
+    const grand = resolveExportRowGrand(
+      exportRow,
       catalogPositions,
       defaultHourlyRate,
       plannedProfitPercent,
     );
-    const hidePrice = shouldHideLineItemOfferExportPrice(item);
+    const hidePrice =
+      exportRow.attentionBudget <= 0 &&
+      shouldHideLineItemOfferExportPrice(exportRow.lineItem);
     rows.push(
-      <View key={item.id} style={s.itemRow}>
+      <View key={exportRow.lineItem.id} style={s.itemRow}>
         <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
         <Text style={[s.cell, s.colName, { paddingLeft: 16 }]}>
-          {resolveLineItemDisplayName(item)}
+          {resolveLineItemDisplayName(exportRow.lineItem)}
         </Text>
         <Text style={[s.cell, s.colTotal]}>
           {hidePrice ? "" : fmtMoney(grand, currency)}
@@ -484,26 +482,26 @@ export function EstimatePdfDocument({
 
               {resolveCategoryChildren(cat).map((child) => {
                 if (child.kind === "item") {
-                  const row = child.row;
-                  const lineItem = isEstimateLineItem(row)
-                    ? row
-                    : resolveSelectedMultiLineItem(row);
-                  if (!lineItem) return null;
+                  const exportRows = collectExportDisplayRows([child.row]);
+                  const exportRow = exportRows[0];
+                  if (!exportRow) return null;
 
                   rowNr += 1;
-                  const grand = resolveItemGrand(
-                    lineItem,
+                  const grand = resolveExportRowGrand(
+                    exportRow,
                     catalogPositions,
                     defaultHourlyRate,
                     plannedProfitPercent,
                   );
-                  const hidePrice = shouldHideLineItemOfferExportPrice(lineItem);
+                  const hidePrice =
+                    exportRow.attentionBudget <= 0 &&
+                    shouldHideLineItemOfferExportPrice(exportRow.lineItem);
 
                   return (
-                    <View key={row.id} style={s.itemRow}>
+                    <View key={child.row.id} style={s.itemRow}>
                       <Text style={[s.cell, s.colNr]}>{rowNr}</Text>
                       <Text style={[s.cell, s.colName]}>
-                        {resolveLineItemDisplayName(lineItem)}
+                        {resolveLineItemDisplayName(exportRow.lineItem)}
                       </Text>
                       <Text style={[s.cell, s.colTotal]}>
                         {hidePrice ? "" : fmtMoney(grand, company.currency)}
