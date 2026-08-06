@@ -228,6 +228,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "Tulkojumi",
   },
   {
+    key: "system_admin:site_email_templates",
+    href: "/site_email_templates",
+    icon: "fas fa-envelope",
+    labelKey: "nav.system_admin.site_email_templates",
+    fallbackLabel: "E-pasta šabloni",
+  },
+  {
     key: "system_admin:site_settings",
     href: "/site_settings",
     icon: "fas fa-sliders",

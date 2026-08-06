@@ -29,6 +29,19 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Grupas nosaukums ir pārāk garš.": "errors.group_name_too_long",
   "Grupas nosaukums nav norādīts.": "errors.group_name_required",
   "Ievadi sistēmas nosaukumu.": "site_settings.validation.system_name_required",
+  "Ievadi uzņēmuma nosaukumu.": "register_company.validation.name_required",
+  "Ievadi tāmes derīguma termiņu dienās.":
+    "settings.validation.estimate_validity_required",
+  "Uzņēmuma nosaukums ir pārāk garš.": "errors.company_name_too_long",
+  "Tu jau esi piesaistīts uzņēmumam.": "errors.company_already_member",
+  "Tev jau ir gaidošs uzņēmuma uzaicinājums.":
+    "errors.pending_company_invite",
+  "Neizdevās izveidot uzņēmumu.": "errors.company_create_failed",
+  "Neizdevās saglabāt uzņēmuma iestatījumus.": "errors.company_settings_create_failed",
+  "Neizdevās piesaistīt lietotāju uzņēmumam.": "errors.company_user_attach_failed",
+  "Neizdevās saglabāt lietotāja profilu.": "errors.company_user_profile_save_failed",
+  "Sistēmas administrators uzņēmumu šeit neveido.":
+    "errors.system_admin_cannot_register_company",
   "Ievadi sistēmas sloganu.": "site_settings.validation.slogan_required",
   "Ievadi derīgu pārziņa e-pasta adresi.":
     "site_settings.validation.controller_email_invalid",
@@ -126,6 +139,24 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās izveidot papildu darbu tāmi.": "errors.additional_work_create_failed",
   "Neizdevās saglabāt papildu darbu tāmi.": "errors.additional_work_save_failed",
   "Neizdevās nosūtīt uzaicinājumu.": "errors.invitation_send_failed",
+  "Uzaicinājuma e-pastu var sūtīt pārāk bieži. Uzgaidi minūti un mēģini vēlreiz.":
+    "errors.invitation_rate_limited",
+  "E-pasta reģistrācija pieejama tikai ar ieslēgtu Resend.":
+    "auth.email.resend_required",
+  "E-pasta apstiprinājums pieejams tikai ar ieslēgtu Resend.":
+    "auth.email.resend_required",
+  "Šis e-pasts jau ir reģistrēts. Pieraksties ar paroli.":
+    "auth.email.already_registered",
+  "Neizdevās nosūtīt apstiprinājuma e-pastu.":
+    "auth.email.confirmation_send_failed",
+  "Konts ar šo e-pastu nav atrasts.": "auth.email.account_not_found",
+  "E-pasts jau ir apstiprināts. Vari pierakstīties.":
+    "auth.email.already_confirmed",
+  "Parolei jābūt vismaz 8 rakstzīmēm.": "auth.email.password_min",
+  "Ievadi paroli.": "auth.email.password_required",
+  "Neizdevās pievienot lietotāju uzņēmumam.":
+    "errors.user_company_add_failed",
+  "Lietotājs jau ir šajā uzņēmumā.": "errors.user_already_in_company",
   "Neizdevās piešķirt grupu.": "errors.group_assign_failed",
   "Neizdevās atjaunināt pozīciju.": "errors.position_update_failed",
   "Neizdevās atjaunināt projekta statusu.":

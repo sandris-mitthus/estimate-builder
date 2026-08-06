@@ -3,16 +3,27 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  registerWithEmailAction,
+  resendSignupConfirmationAction,
+} from "@/app/login/actions";
+import { AuthHashRedirect } from "@/app/components/auth-session-from-url";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { SiteFooter } from "@/app/components/site-footer";
+import { signInWithEmailPassword } from "@/app/lib/auth/sign-in-with-email";
 import { signInWithGoogle } from "@/app/lib/auth/sign-in-with-google";
 import { useTranslations } from "@/app/components/translations-provider";
 import { writeCookie } from "@/app/lib/client/cookies";
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
+import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 
 /** Publiskā dokumentācija vēl nav sakārtota — saite paslēpta, līdz saturs ir gatavs. */
 const SHOW_DOCS_LINK = false;
+
+const fieldClassName =
+  "mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
 
 const backgroundCards = [
   "left-[3%] top-[6%] rotate-[-14deg]",
@@ -24,6 +35,8 @@ const backgroundCards = [
   "right-[9%] bottom-[1%] rotate-[-12deg]",
 ];
 
+type EmailMode = "login" | "register";
+
 export function LoginGate({
   returnPath = "/",
   systemName,
@@ -31,6 +44,7 @@ export function LoginGate({
   logoUrl = "",
   languages = [],
   activeLanguageCode = "lv",
+  emailAuthEnabled = false,
 }: {
   returnPath?: string;
   systemName: string;
@@ -38,14 +52,25 @@ export function LoginGate({
   logoUrl?: string;
   languages?: SiteLanguageSummary[];
   activeLanguageCode?: string;
+  /** Custom email/password auth — only when Resend is enabled. */
+  emailAuthEnabled?: boolean;
 }) {
   const { t } = useTranslations();
+  const router = useRouter();
   const { clearFeedback, showFeedback } = useFeedbackToast();
-  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailMode, setEmailMode] = useState<EmailMode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showResendConfirm, setShowResendConfirm] = useState(false);
+  const busy = googleLoading || emailLoading;
 
-  async function handleSignIn() {
-    setLoading(true);
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
     clearFeedback();
+    setShowResendConfirm(false);
 
     const { error: signInError } = await signInWithGoogle(returnPath);
 
@@ -54,12 +79,144 @@ export function LoginGate({
         type: "error",
         text: formatAuthError(signInError.message, t),
       });
-      setLoading(false);
+      setGoogleLoading(false);
     }
+  }
+
+  async function handleEmailSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+
+    clearFeedback();
+    setShowResendConfirm(false);
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      showFeedback({
+        type: "error",
+        text: t("validation.email_required", "Ievadi e-pasta adresi."),
+      });
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      showFeedback({
+        type: "error",
+        text: t("validation.email_invalid", "Ievadi derīgu e-pasta adresi."),
+      });
+      return;
+    }
+    if (!password) {
+      showFeedback({
+        type: "error",
+        text: t("auth.email.password_required", "Ievadi paroli."),
+      });
+      return;
+    }
+    if (password.length < 8) {
+      showFeedback({
+        type: "error",
+        text: t(
+          "auth.email.password_min",
+          "Parolei jābūt vismaz 8 rakstzīmēm.",
+        ),
+      });
+      return;
+    }
+
+    if (emailMode === "register") {
+      if (password !== confirmPassword) {
+        showFeedback({
+          type: "error",
+          text: t(
+            "auth.email.password_mismatch",
+            "Paroles nesakrīt.",
+          ),
+        });
+        return;
+      }
+
+      setEmailLoading(true);
+      const result = await registerWithEmailAction({
+        email: trimmedEmail,
+        password,
+      });
+      setEmailLoading(false);
+
+      if (!result.ok) {
+        showFeedback({ type: "error", text: translateActionError(t, result) });
+        return;
+      }
+
+      showFeedback({
+        type: "success",
+        text: t(
+          "auth.email.register_sent",
+          "Apstiprinājuma e-pasts nosūtīts. Atver saiti, lai aktivizētu kontu.",
+        ),
+      });
+      setEmailMode("login");
+      setConfirmPassword("");
+      return;
+    }
+
+    setEmailLoading(true);
+    const { error } = await signInWithEmailPassword(trimmedEmail, password);
+    setEmailLoading(false);
+
+    if (error) {
+      const message = error.message.toLowerCase();
+      if (
+        message.includes("email not confirmed") ||
+        message.includes("not confirmed")
+      ) {
+        setShowResendConfirm(true);
+        showFeedback({
+          type: "error",
+          text: t(
+            "auth.email.not_confirmed",
+            "E-pasts vēl nav apstiprināts. Pārbaudi iesūtni vai nosūti apstiprinājumu vēlreiz.",
+          ),
+        });
+        return;
+      }
+      showFeedback({
+        type: "error",
+        text: formatEmailLoginError(error.message, t),
+      });
+      return;
+    }
+
+    router.replace(returnPath || "/");
+    router.refresh();
+  }
+
+  async function handleResendConfirmation() {
+    if (busy) return;
+    clearFeedback();
+    setEmailLoading(true);
+    const result = await resendSignupConfirmationAction({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    setEmailLoading(false);
+
+    if (!result.ok) {
+      showFeedback({ type: "error", text: translateActionError(t, result) });
+      return;
+    }
+
+    showFeedback({
+      type: "success",
+      text: t(
+        "auth.email.resend_sent",
+        "Apstiprinājuma e-pasts nosūtīts vēlreiz.",
+      ),
+    });
   }
 
   return (
     <main className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#f4f4f5] px-4 py-10">
+      <AuthHashRedirect />
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top,#ffffff_0%,#f4f4f5_45%,#e4e4e7_100%)]" />
       <div className="absolute inset-0 -z-10 blur-[5px]" aria-hidden="true">
         {backgroundCards.map((className, index) => (
@@ -92,14 +249,137 @@ export function LoginGate({
         <p className="mt-3 text-[15px] font-medium text-[#c4c4c7]">
           {slogan}
         </p>
+
+        {emailAuthEnabled ? (
+          <form onSubmit={handleEmailSubmit} className="mt-8 text-left">
+            <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setEmailMode("login");
+                  setShowResendConfirm(false);
+                  clearFeedback();
+                }}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  emailMode === "login"
+                    ? "bg-white text-zinc-900 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                {t("auth.email.tab_login", "Pierakstīties")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setEmailMode("register");
+                  setShowResendConfirm(false);
+                  clearFeedback();
+                }}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  emailMode === "register"
+                    ? "bg-white text-zinc-900 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                {t("auth.email.tab_register", "Reģistrēties")}
+              </button>
+            </div>
+
+            <label className="block text-sm font-medium text-zinc-800">
+              {t("auth.email.email_label", "E-pasts")}
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={busy}
+                className={fieldClassName}
+                placeholder="vards@uznemums.lv"
+              />
+            </label>
+
+            <label className="mt-3 block text-sm font-medium text-zinc-800">
+              {t("auth.email.password_label", "Parole")}
+              <input
+                type="password"
+                autoComplete={
+                  emailMode === "register" ? "new-password" : "current-password"
+                }
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={busy}
+                className={fieldClassName}
+                placeholder="••••••••"
+              />
+            </label>
+
+            {emailMode === "register" ? (
+              <label className="mt-3 block text-sm font-medium text-zinc-800">
+                {t("auth.email.confirm_password_label", "Atkārto paroli")}
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  disabled={busy}
+                  className={fieldClassName}
+                  placeholder="••••••••"
+                />
+              </label>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="mt-5 inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-6 text-[15px] font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {emailLoading ? (
+                <i
+                  className="fas fa-circle-notch fa-spin text-xs"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {emailMode === "register"
+                ? t("auth.email.register_submit", "Izveidot kontu")
+                : t("auth.email.login_submit", "Pierakstīties")}
+            </button>
+
+            {showResendConfirm ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleResendConfirmation()}
+                className="mt-3 w-full text-center text-sm font-medium text-zinc-600 underline-offset-2 transition hover:text-zinc-900 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t(
+                  "auth.email.resend_confirmation",
+                  "Nosūtīt apstiprinājuma e-pastu vēlreiz",
+                )}
+              </button>
+            ) : null}
+
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-zinc-200" />
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                {t("auth.email.or", "vai")}
+              </span>
+              <div className="h-px flex-1 bg-zinc-200" />
+            </div>
+          </form>
+        ) : null}
+
         <button
           type="button"
-          onClick={handleSignIn}
-          disabled={loading}
-          className="mt-9 inline-flex h-[58px] w-full items-center justify-center gap-4 rounded-xl border border-[#d8d8dd] bg-white px-6 text-[17px] font-medium tracking-[-0.02em] text-[#3f3f46] shadow-[0_1px_0_rgba(24,24,27,0.04)] transition hover:border-[#c7c7cf] hover:bg-[#fafafa] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => void handleGoogleSignIn()}
+          disabled={busy}
+          className={`${
+            emailAuthEnabled ? "mt-0" : "mt-9"
+          } inline-flex h-[58px] w-full items-center justify-center gap-4 rounded-xl border border-[#d8d8dd] bg-white px-6 text-[17px] font-medium tracking-[-0.02em] text-[#3f3f46] shadow-[0_1px_0_rgba(24,24,27,0.04)] transition hover:border-[#c7c7cf] hover:bg-[#fafafa] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60`}
         >
           <GoogleIcon />
-          {loading
+          {googleLoading
             ? t("auth.signing_in", "Signing in...")
             : t("auth.google_sign_in", "Continue with Google")}
         </button>
@@ -245,6 +525,23 @@ function formatAuthError(
     );
   }
   return message;
+}
+
+function formatEmailLoginError(
+  message: string,
+  t: ReturnType<typeof useTranslations>["t"],
+) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("invalid login credentials") ||
+    lower.includes("invalid credentials")
+  ) {
+    return t(
+      "auth.email.invalid_credentials",
+      "Nepareizs e-pasts vai parole.",
+    );
+  }
+  return formatAuthError(message, t);
 }
 
 function DecorativePlanCard({

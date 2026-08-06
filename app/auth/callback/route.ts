@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSafeRedirectPath } from "@/app/lib/security/safe-redirect-path";
 import { createClient } from "@/app/lib/supabase/server";
+import { activateInvitedCompanyMemberships } from "@/app/lib/users/activate-invited-membership";
 
 const ALLOWED_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
@@ -50,11 +51,27 @@ export async function GET(request: Request) {
         }
       }
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.id) {
+        await activateInvitedCompanyMemberships(user.id);
+      }
+
       const forwardedHost = request.headers.get("x-forwarded-host");
       const redirectOrigin = resolveRedirectOrigin(origin, forwardedHost);
       return NextResponse.redirect(`${redirectOrigin}${next}`);
     }
+
+    return NextResponse.redirect(`${origin}/auth/auth-code-error`);
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  // Invite / recovery links often deliver tokens in the URL hash (not ?code=).
+  // The hash is invisible to this route handler but survives the redirect, so
+  // /auth/confirm can call setSession on the client.
+  const confirmUrl = new URL("/auth/confirm", origin);
+  if (next && next !== "/") {
+    confirmUrl.searchParams.set("next", next);
+  }
+  return NextResponse.redirect(confirmUrl);
 }

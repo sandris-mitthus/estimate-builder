@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { InviteUserButton } from "@/app/components/invite-user-button";
-import { ListEntryGrid } from "@/app/components/list-entry-card";
 import { SectionPage } from "@/app/components/section-page";
-import { UserCompanyActions } from "@/app/components/user-company-actions";
-import { UserGroupSelect } from "@/app/components/user-group-select";
-import { UserListCard } from "@/app/components/user-list-card";
+import { UsersList } from "@/app/components/users-list";
 import { assertNavAccess } from "@/app/lib/auth/assert-nav-access";
 import { getServerTranslations } from "@/app/lib/i18n/server";
-import type { ServerTranslations } from "@/app/lib/i18n/server";
 import {
   canPerformAction,
   listUserGroupMemberships,
@@ -15,21 +11,6 @@ import {
   getDefaultNewUserGroupId,
 } from "@/app/lib/users/groups-repository";
 import { listUsers } from "@/app/lib/users/repository";
-
-function statusLabel(
-  status: (Awaited<ReturnType<typeof listUsers>>)[number]["companyStatus"],
-  t: ServerTranslations["t"],
-) {
-  if (status === "disabled") {
-    return t("user_status.disabled", "Pieeja liegta");
-  }
-
-  if (status === "invited") {
-    return t("user_status.invited", "Uzaicināts");
-  }
-
-  return null;
-}
 
 export default async function UsersPage() {
   const session = await assertNavAccess("users");
@@ -47,10 +28,9 @@ export default async function UsersPage() {
   const canInvite = canPerformAction(session.access, "users.invite");
   const canAssignGroup = canPerformAction(session.access, "users.assign_group");
   const canManageGroups = canPerformAction(session.access, "groups.manage");
-  const canManageCompanyAccess = canPerformAction(
-    session.access,
-    "users.manage_company_access",
-  ) || canManageGroups;
+  const canManageCompanyAccess =
+    canPerformAction(session.access, "users.manage_company_access") ||
+    canManageGroups;
 
   const defaultGroupId = getDefaultNewUserGroupId(groups);
 
@@ -75,39 +55,16 @@ export default async function UsersPage() {
         </div>
       }
     >
-      <ListEntryGrid>
-        {users.map((user) => (
-          <UserListCard
-            key={user.id}
-            name={user.name}
-            email={user.email}
-            avatarUrl={user.avatarUrl}
-            statusLabel={statusLabel(user.companyStatus, t)}
-            actions={
-              <UserCompanyActions
-                userId={user.id}
-                userName={user.name}
-                status={user.companyStatus}
-                canManageCompanyAccess={canManageCompanyAccess}
-                isCurrentUser={
-                  session.user?.id === user.id ||
-                  session.user?.email?.toLowerCase() === user.email.toLowerCase()
-                }
-              />
-            }
-            footer={
-              canAssignGroup ? (
-                <UserGroupSelect
-                  userId={user.id}
-                  groupId={memberships[user.id] ?? defaultGroupId}
-                  groups={groups}
-                  disabled={user.companyStatus === "disabled"}
-                />
-              ) : null
-            }
-          />
-        ))}
-      </ListEntryGrid>
+      <UsersList
+        initialUsers={users}
+        groups={groups}
+        memberships={memberships}
+        defaultGroupId={defaultGroupId}
+        currentUserId={session.user?.id ?? null}
+        currentUserEmail={session.user?.email ?? null}
+        canAssignGroup={canAssignGroup}
+        canManageCompanyAccess={canManageCompanyAccess}
+      />
     </SectionPage>
   );
 }

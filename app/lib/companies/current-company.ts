@@ -10,16 +10,16 @@ type CompanyMembershipRow = {
   status?: string;
 };
 
-export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): Promise<
-  string | null
+const listCurrentUserMemberships = cache(async function listCurrentUserMemberships(): Promise<
+  CompanyMembershipRow[]
 > {
   if (!isSupabaseAdminConfigured()) {
-    return null;
+    return [];
   }
 
   const user = await getCurrentUser();
   if (!user) {
-    return null;
+    return [];
   }
 
   const supabase = createAdminClient();
@@ -30,14 +30,32 @@ export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): P
     .order("created_at", { ascending: true })
     .returns<CompanyMembershipRow[]>();
 
-  if (!error && data.length > 0) {
-    const activeMembership = data.find(
-      (membership) => membership.status !== "disabled",
-    );
-    return activeMembership?.company_id ?? null;
+  if (error || !data) {
+    return [];
   }
 
-  return null;
+  return data;
+});
+
+export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): Promise<
+  string | null
+> {
+  const memberships = await listCurrentUserMemberships();
+  // Only active membership grants access. invited = pending email acceptance;
+  // disabled = blocked. After removeCompanyUser there is no row at all.
+  const activeMembership = memberships.find(
+    (membership) => membership.status === "active",
+  );
+  return activeMembership?.company_id ?? null;
+});
+
+/** True when the user has been invited but has not opened the invite email yet. */
+export const hasPendingCompanyInvite = cache(async function hasPendingCompanyInvite(): Promise<boolean> {
+  const memberships = await listCurrentUserMemberships();
+  if (memberships.some((membership) => membership.status === "active")) {
+    return false;
+  }
+  return memberships.some((membership) => membership.status === "invited");
 });
 
 export async function requireCurrentCompanyId(): Promise<string | null> {

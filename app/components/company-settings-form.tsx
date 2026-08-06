@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { registerCompanyAction } from "@/app/(protected)/register-company/actions";
 import { saveCompanySettingsAction } from "@/app/(protected)/settings/actions";
 import { CompanyLogoDropzone } from "@/app/components/company-logo-dropzone";
 import { InputWithSuffix } from "@/app/components/input-with-suffix";
@@ -196,9 +198,13 @@ function CompanyPreview({
 
 export function CompanySettingsForm({
   initialSettings,
+  mode = "edit",
 }: {
   initialSettings: CompanySettings;
+  mode?: "edit" | "register";
 }) {
+  const isRegister = mode === "register";
+  const router = useRouter();
   const [settings, setSettings] = useState<CompanySettings>(() => ({
     ...initialSettings,
     offerValidityDays: initialSettings.estimateValidityDays,
@@ -221,13 +227,14 @@ export function CompanySettingsForm({
   );
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const { t } = useTranslations();
-  const canSave = useActionPermission("settings.save");
+  const canSavePermission = useActionPermission("settings.save");
+  const canSave = isRegister || canSavePermission;
   const [isPending, startTransition] = useTransition();
   const isDirty =
     serializeSettingsDraft(settings, hourlyRateInput) !== savedSnapshot;
   const { confirmOpen, stayOnPage, confirmLeave } = useUnsavedChangesGuard({
     isDirty,
-    enabled: canSave,
+    enabled: canSave && !isRegister,
   });
   const daysSuffix = t("common.days_count", "{count} dienas", {
     count: "",
@@ -258,7 +265,18 @@ export function CompanySettingsForm({
     event.preventDefault();
     clearFeedback();
 
-    if (!isDirty) {
+    if (!isRegister && !isDirty) {
+      return;
+    }
+
+    if (!settings.companyName.trim()) {
+      showFeedback({
+        type: "error",
+        text: t(
+          "register_company.validation.name_required",
+          "Ievadi uzņēmuma nosaukumu.",
+        ),
+      });
       return;
     }
 
@@ -286,12 +304,28 @@ export function CompanySettingsForm({
       ...settings,
       offerValidityDays: settings.estimateValidityDays,
       defaultHourlyRate: parsedHourlyRate,
+      logoUrl: isRegister ? "" : settings.logoUrl,
     };
 
     startTransition(async () => {
-      const result = await saveCompanySettingsAction(settingsToSave);
+      const result = isRegister
+        ? await registerCompanyAction(settingsToSave)
+        : await saveCompanySettingsAction(settingsToSave);
 
       if (result.ok) {
+        if (isRegister) {
+          showFeedback({
+            type: "success",
+            text: t(
+              "register_company.feedback.created",
+              "Uzņēmums izveidots. Vari sākt darbu.",
+            ),
+          });
+          router.replace("/");
+          router.refresh();
+          return;
+        }
+
         setSettings(settingsToSave);
         setSavedSnapshot(serializeSettingsDraft(settingsToSave, hourlyRateInput));
         showFeedback({
@@ -311,15 +345,17 @@ export function CompanySettingsForm({
         <fieldset disabled={!canSave || isPending} className="space-y-8 disabled:opacity-80">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
           <SettingsSection title={t("settings.section.company", "Uzņēmums")}>
-            <CompanyLogoDropzone
-              logoUrl={settings.logoUrl}
-              onLogoChange={(logoUrl) => updateField("logoUrl", logoUrl)}
-              onError={(text) =>
-                text
-                  ? showFeedback({ type: "error", text })
-                  : clearFeedback()
-              }
-            />
+            {!isRegister ? (
+              <CompanyLogoDropzone
+                logoUrl={settings.logoUrl}
+                onLogoChange={(logoUrl) => updateField("logoUrl", logoUrl)}
+                onError={(text) =>
+                  text
+                    ? showFeedback({ type: "error", text })
+                    : clearFeedback()
+                }
+              />
+            ) : null}
             <div className="sm:col-span-2">
               <FormField
                 label={t("settings.company_name", "Uzņēmuma nosaukums")}
@@ -515,10 +551,14 @@ export function CompanySettingsForm({
           {canSave ? (
           <button
             type="submit"
-            disabled={isPending || !isDirty}
+            disabled={isPending || (!isRegister && !isDirty)}
             className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending ? t("actions.saving", "Saglabā…") : t("actions.save", "Saglabāt")}
+            {isPending
+              ? t("actions.saving", "Saglabā…")
+              : isRegister
+                ? t("register_company.actions.create", "Izveidot uzņēmumu")
+                : t("actions.save", "Saglabāt")}
           </button>
           ) : null}
         </div>
@@ -529,11 +569,13 @@ export function CompanySettingsForm({
         <CompanyPreview settings={settings} t={t} />
       </div>
 
-      <UnsavedChangesConfirmModal
-        open={confirmOpen}
-        onStay={stayOnPage}
-        onLeave={confirmLeave}
-      />
+      {!isRegister ? (
+        <UnsavedChangesConfirmModal
+          open={confirmOpen}
+          onStay={stayOnPage}
+          onLeave={confirmLeave}
+        />
+      ) : null}
     </div>
   );
 }

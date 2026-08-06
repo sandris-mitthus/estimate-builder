@@ -10,6 +10,24 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.121
+
+**Uzņēmuma reģistrācija pirms darba sākšanas**
+
+- Signed-in users without a `company_users` membership must register a company before using the app; system admins (`public.users.is_admin`) are exempt and keep the usual system admin UI
+- Registration reuses `CompanySettingsForm` (`mode="register"`) — the same fields and preview as `/settings` (logo upload only after the company exists); creates `companies`, `company_settings`, owner membership and default groups
+- Protected layout gate with empty nav; `/register-company` route; translations migration `166`
+- Fixed invite sign-in: Supabase invite links deliver `#access_token` (not PKCE `?code=`), so `/auth/confirm` (and recovery on `/auth/auth-code-error`) call `setSession` on the client; invited membership becomes `active`; translations `167`–`168`
+- Invite confirm no longer races with `detectSessionInUrl` or a server-action cookie check — full-page redirect after `setSession`; login page forwards `/#access_token=…` to `/auth/confirm`
+- Inviting an already-registered email attaches them as `invited` and sends a magic-link invite email again (also after remove); only `active` membership grants company access; remove also clears group membership; pending invite shows a wait screen instead of company registration; translations `169`–`170`
+- Users list removes a member card immediately on confirm (optimistic), so the same user cannot be deleted twice while the request is in flight
+- Re-invite of an existing / pending user resends the confirmation email (magic link via anon client); `invited` status allows resend instead of “already in company”; clearer rate-limit error; translations `171`
+- Informational Resend emails when company access is disabled, restored, or the user is removed (`RESEND_API_KEY` + `EMAIL_FROM`); DB change still succeeds if mail fails; translations `172`
+- System admin **E-pasta šabloni** (`/site_email_templates`): enable Resend, set From + API key, edit invite and access-notice templates (lv/en); when enabled, invites use `generateLink` + Resend; translations `173`
+- Invite Resend email uses HTML layout with a confirm CTA button (`email.invite.button`); admin preview shows the HTML design; translations `174`
+- Email/password register + login on the login screen when Resend is enabled; signup confirmation HTML email via Resend must be accepted before sign-in; translations `175`
+- Email templates editor loads all system languages with a language switcher synced to the live preview; translations `176`
+
 ## v1.3.120
 
 - System logo and favicon upload with drag-and-drop in **Sistēmas uzstādījumi**; logo appears in the sidebar before the system name and on the login screen, favicon in the browser tab

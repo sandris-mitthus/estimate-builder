@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.120`
+**Current version:** `1.3.121`
 
 ---
 
@@ -18,7 +18,7 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **PDF and Excel export** — branded PDF offer with your company details, logo and visualizations; Excel spreadsheet with the full price breakdown and VAT; approximate-budget rows use that amount as the line total (same as on-screen totals)
 - **Approved projects** — material list with budget prices and an ordered/not-ordered status, plus assignment of materials to specific people with a reminder banner until everything is ordered
 - **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a labor workload schedule (Laika grafiks) with project priority, people count per job, and parallel pairing within a project
-- **Teams and permissions** — several companies in one system, user groups that control what each person sees and may do, invitations, and access blocking
+- **Teams and permissions** — several companies in one system; a signed-in user without a company must register one (same form as **Uzstādījumi**) before using the app, except system admins; user groups control what each person sees and may do, with invitations and access blocking
 - **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app
 - **GDPR legal pages and cookie consent** — public privacy policy, terms of service and cookie policy (`/privacy`, `/terms`, `/cookies`) reachable from a site footer whether signed in or not; consent banner with per-category switches where optional cookies stay off until accepted and stored ones are deleted when consent is withdrawn; the data controller details shown in the privacy policy are filled in under **Sistēmas uzstādījumi**; system logo and favicon are uploaded there too (sidebar, login screen, browser tab)
@@ -71,6 +71,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
 | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional for multi-instance production | Enables distributed PDF/Excel export rate limiting; without these, local/single-instance deploys use in-process limits |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Optional fallback for transactional email | Prefer configuring Resend under system admin **E-pasta šabloni** (`/site_email_templates`); env vars work as fallback when the toggle is on. Domain must be verified in [Resend](https://resend.com) |
 
 ### Supabase setup
 
@@ -88,8 +89,10 @@ npm run db:test
 5. **Authentication → URL Configuration** (separate from the Google provider screen):  
    - **Site URL:** production app URL (e.g. `https://your-app.vercel.app`)  
    - **Redirect URLs:** add every app callback you use, e.g.  
-     - `http://localhost:3100/auth/callback` (local dev)  
-     - `https://your-app.vercel.app/auth/callback` (production)
+     - `http://localhost:3100/auth/callback` (local OAuth)  
+     - `http://localhost:3100/auth/confirm` (local invites / email links)  
+     - `https://your-app.vercel.app/auth/callback`  
+     - `https://your-app.vercel.app/auth/confirm`
 6. *(Optional)* Disable public sign-ups in Authentication → Settings → User Signups (use invites only)
 7. Start the app — sign in, then `/` loads projects from `public.projects`
 
