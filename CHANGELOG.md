@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.122
+
+**Uzņēmuma frontend moduļi**
+
+- System admin **Uzņēmumi**: click a company row to open a modal and enable/disable frontend modules for that company only (`company_frontend_modules`, migration `177`)
+- Modules are not auto-enabled for companies; company users need both the global `site_frontend_modules` flag and the company assignment
+- Globally disabled modules stay unavailable in the company modal
+
 ## v1.3.121
 
 **Uzņēmuma reģistrācija pirms darba sākšanas**

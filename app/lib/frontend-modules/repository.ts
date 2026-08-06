@@ -1,6 +1,8 @@
 import { cache } from "react";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { getEnabledFrontendModuleKeysForCompany } from "@/app/lib/frontend-modules/company-repository";
 import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
 
 type FrontendModuleRow = {
@@ -79,12 +81,12 @@ export const getEnabledFrontendModuleKeys = cache(
       return new Set(Object.values(FRONTEND_MODULE_KEYS));
     }
 
-    const modules = await listFrontendModules();
-    return new Set(
-      modules
-        .filter((module) => module.isEnabled)
-        .map((module) => module.moduleKey),
-    );
+    const companyId = await getCurrentCompanyId();
+    if (!companyId) {
+      return new Set();
+    }
+
+    return getEnabledFrontendModuleKeysForCompany(companyId);
   },
 );
 

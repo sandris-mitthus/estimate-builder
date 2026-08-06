@@ -154,6 +154,11 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "auth.email.already_confirmed",
   "Parolei jābūt vismaz 8 rakstzīmēm.": "auth.email.password_min",
   "Ievadi paroli.": "auth.email.password_required",
+  "Neizdevās saglabāt uzņēmuma moduļa statusu.":
+    "errors.company_module_status_save_failed",
+  "Modulis nav globāli ieslēgts un to nevar piešķirt uzņēmumam.":
+    "errors.company_module_global_off",
+  "Uzņēmums nav norādīts.": "errors.company_required",
   "Neizdevās pievienot lietotāju uzņēmumam.":
     "errors.user_company_add_failed",
   "Lietotājs jau ir šajā uzņēmumā.": "errors.user_already_in_company",
