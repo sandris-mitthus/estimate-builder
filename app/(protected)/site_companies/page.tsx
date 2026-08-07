@@ -4,8 +4,11 @@ import { addThousandSeparators } from "@/app/lib/estimates/calculate-line";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
 import { listSiteCompanies } from "@/app/lib/site-admin/repository";
-import { listCompanyFrontendModuleAssignments } from "@/app/lib/frontend-modules/company-repository";
-import type { CompanyFrontendModuleAssignment } from "@/app/lib/frontend-modules/company-repository";
+import { listCompanyFrontendModuleAssignmentsForCompanies } from "@/app/lib/frontend-modules/company-repository";
+import {
+  isPaymentPlansEnabled,
+  listPaymentPlans,
+} from "@/app/lib/payment-plans/repository";
 
 function formatCount(value: number): string {
   return addThousandSeparators(String(value));
@@ -13,23 +16,23 @@ function formatCount(value: number): string {
 
 export default async function SiteCompaniesPage() {
   await assertSystemAdminAccess();
-  const [companies, { t }] = await Promise.all([
-    listSiteCompanies(),
-    getServerTranslations(),
-  ]);
+  const [companies, paymentPlansEnabled, paymentPlans, { t }] =
+    await Promise.all([
+      listSiteCompanies(),
+      isPaymentPlansEnabled(),
+      listPaymentPlans(),
+      getServerTranslations(),
+    ]);
 
-  const assignmentsEntries = await Promise.all(
-    companies.map(async (company) => {
-      const assignments = await listCompanyFrontendModuleAssignments(
-        company.id,
-      );
-      return [company.id, assignments] as const;
-    }),
-  );
-  const initialAssignmentsByCompanyId: Record<
-    string,
-    CompanyFrontendModuleAssignment[]
-  > = Object.fromEntries(assignmentsEntries);
+  // Always load company module assignments: used when plans are OFF, and for VIP
+  // companies when plans are ON (VIP still uses individual module switches).
+  // Batched: one modules catalog + one IN query (not N+1 per company).
+  const initialAssignmentsByCompanyId =
+    companies.length > 0
+      ? await listCompanyFrontendModuleAssignmentsForCompanies(
+          companies.map((company) => company.id),
+        )
+      : {};
 
   return (
     <SectionPage
@@ -42,6 +45,8 @@ export default async function SiteCompaniesPage() {
         <SiteCompaniesModulesManager
           companies={companies}
           initialAssignmentsByCompanyId={initialAssignmentsByCompanyId}
+          paymentPlansEnabled={paymentPlansEnabled}
+          paymentPlans={paymentPlans}
         />
       ) : (
         <div className="rounded-2xl border border-dashed border-zinc-200 bg-white p-6 text-sm text-zinc-500">

@@ -1,0 +1,460 @@
+import { getCompanyPaymentAccessRow } from "@/app/lib/companies/payment-access";
+import {
+  normalizeLocalizedValues,
+  parseLocalizedValues,
+} from "@/app/lib/i18n/localized-values";
+import { listSiteLanguages } from "@/app/lib/site-admin/repository";
+import { listFrontendModules } from "@/app/lib/frontend-modules/repository";
+import { createAdminClient } from "@/app/lib/supabase/admin";
+import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { cache } from "react";
+import {
+  getCompanyAccessLockReason,
+  type CompanyAccessLockReason,
+  type LocalizedValues,
+  type PaymentPlanInput,
+  type PaymentPlanSummary,
+} from "@/app/lib/payment-plans/helpers";
+
+export type {
+  LocalizedValues,
+  PaymentPlanInput,
+  PaymentPlanSummary,
+} from "@/app/lib/payment-plans/helpers";
+export {
+  getCompanyAccessLockReason,
+  isCompanyPaymentPlanActive,
+  isCompanyPaymentPlanExpired,
+  resolveLocalizedValue,
+  toDateInputValue,
+} from "@/app/lib/payment-plans/helpers";
+export type { CompanyAccessLockReason } from "@/app/lib/payment-plans/helpers";
+
+type PaymentPlanRow = {
+  id: string;
+  plan_key: string;
+  name_values: unknown;
+  description_values: unknown;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type PlanModuleRow = {
+  plan_id: string;
+  module_key: string;
+};
+
+const PLAN_KEY_PATTERN = /^[a-z0-9._:-]+$/;
+
+function normalizePlanKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function validatePlanKey(planKey: string): string | null {
+  if (!planKey) {
+    return "Ievadi plāna atslēgu.";
+  }
+  if (planKey.length > 64 || !PLAN_KEY_PATTERN.test(planKey)) {
+    return "Atslēgai jābūt formātā ar mazajiem burtiem, cipariem, punktiem, svītrām, apakšsvītrām un kolu.";
+  }
+  return null;
+}
+
+export async function isPaymentPlansEnabled(): Promise<boolean> {
+  if (!isSupabaseAdminConfigured()) {
+    return false;
+  }
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("payment_plans_enabled")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error || !data) {
+    return false;
+  }
+  return data.payment_plans_enabled === true;
+}
+
+export const getPaymentPlansEnabledCached = cache(isPaymentPlansEnabled);
+
+export async function setPaymentPlansEnabled(
+  enabled: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("site_settings").upsert(
+    { id: 1, payment_plans_enabled: enabled === true },
+    { onConflict: "id" },
+  );
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt maksas plānu iestatījumu." };
+  }
+  return { ok: true };
+}
+
+async function listPlanModuleRows(): Promise<PlanModuleRow[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_payment_plan_modules")
+    .select("plan_id, module_key");
+  if (error || !data) {
+    return [];
+  }
+  return data as PlanModuleRow[];
+}
+
+export async function listPaymentPlans(): Promise<PaymentPlanSummary[]> {
+  if (!isSupabaseAdminConfigured()) {
+    return [];
+  }
+
+  const supabase = createAdminClient();
+  const [{ data, error }, moduleRows] = await Promise.all([
+    supabase
+      .from("site_payment_plans")
+      .select(
+        "id, plan_key, name_values, description_values, sort_order, created_at, updated_at",
+      )
+      .order("sort_order", { ascending: true })
+      .order("plan_key", { ascending: true }),
+    listPlanModuleRows(),
+  ]);
+
+  if (error || !data) {
+    return [];
+  }
+
+  const modulesByPlan = new Map<string, string[]>();
+  for (const row of moduleRows) {
+    const list = modulesByPlan.get(row.plan_id) ?? [];
+    list.push(row.module_key);
+    modulesByPlan.set(row.plan_id, list);
+  }
+
+  return (data as PaymentPlanRow[]).map((row) => ({
+    id: row.id,
+    planKey: row.plan_key,
+    nameValues: parseLocalizedValues(row.name_values),
+    descriptionValues: parseLocalizedValues(row.description_values),
+    moduleKeys: (modulesByPlan.get(row.id) ?? []).sort(),
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+export const getPaymentPlanModuleKeys = cache(
+  async (planId: string): Promise<Set<string>> => {
+    if (!planId.trim() || !isSupabaseAdminConfigured()) {
+      return new Set();
+    }
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("site_payment_plan_modules")
+      .select("module_key")
+      .eq("plan_id", planId.trim());
+    if (error || !data) {
+      return new Set();
+    }
+    return new Set(
+      data
+        .map((row) =>
+          typeof row.module_key === "string" ? row.module_key : "",
+        )
+        .filter(Boolean),
+    );
+  },
+);
+
+async function replacePlanModules(
+  planId: string,
+  moduleKeys: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = createAdminClient();
+  const { error: deleteError } = await supabase
+    .from("site_payment_plan_modules")
+    .delete()
+    .eq("plan_id", planId);
+  if (deleteError) {
+    return { ok: false, error: "Neizdevās saglabāt plāna moduļus." };
+  }
+
+  const uniqueKeys = [...new Set(moduleKeys.map((key) => key.trim()).filter(Boolean))];
+  if (uniqueKeys.length === 0) {
+    return { ok: true };
+  }
+
+  const { error: insertError } = await supabase
+    .from("site_payment_plan_modules")
+    .insert(
+      uniqueKeys.map((module_key) => ({
+        plan_id: planId,
+        module_key,
+      })),
+    );
+  if (insertError) {
+    return { ok: false, error: "Neizdevās saglabāt plāna moduļus." };
+  }
+  return { ok: true };
+}
+
+export async function createPaymentPlan(
+  input: PaymentPlanInput,
+): Promise<{ ok: true; plan: PaymentPlanSummary } | { ok: false; error: string }> {
+  const planKey = normalizePlanKey(input.planKey);
+  const keyError = validatePlanKey(planKey);
+  if (keyError) {
+    return { ok: false, error: keyError };
+  }
+
+  const nameValues = normalizeLocalizedValues(input.nameValues);
+  if (!Object.values(nameValues).some((value) => value.trim())) {
+    return { ok: false, error: "Ievadi plāna nosaukumu vismaz vienā valodā." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const existing = await listPaymentPlans();
+  const nextSortOrder =
+    Math.max(0, ...existing.map((plan) => plan.sortOrder)) + 10;
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_payment_plans")
+    .insert({
+      plan_key: planKey,
+      name_values: nameValues,
+      description_values: normalizeLocalizedValues(input.descriptionValues),
+      sort_order: nextSortOrder,
+    })
+    .select(
+      "id, plan_key, name_values, description_values, sort_order, created_at, updated_at",
+    )
+    .single();
+
+  if (error || !data) {
+    const message = error?.message?.toLowerCase() ?? "";
+    return {
+      ok: false,
+      error:
+        message.includes("duplicate") || message.includes("unique")
+          ? "Plāns ar šo atslēgu jau eksistē."
+          : "Neizdevās izveidot maksas plānu.",
+    };
+  }
+
+  const modulesResult = await replacePlanModules(data.id, input.moduleKeys);
+  if (!modulesResult.ok) {
+    await supabase.from("site_payment_plans").delete().eq("id", data.id);
+    return modulesResult;
+  }
+
+  const plan = (await listPaymentPlans()).find((item) => item.id === data.id);
+  if (!plan) {
+    return { ok: false, error: "Neizdevās izveidot maksas plānu." };
+  }
+  return { ok: true, plan };
+}
+
+export async function updatePaymentPlan(
+  planId: string,
+  input: PaymentPlanInput,
+): Promise<{ ok: true; plan: PaymentPlanSummary } | { ok: false; error: string }> {
+  const trimmedId = planId.trim();
+  if (!trimmedId) {
+    return { ok: false, error: "Plāns nav norādīts." };
+  }
+
+  const planKey = normalizePlanKey(input.planKey);
+  const keyError = validatePlanKey(planKey);
+  if (keyError) {
+    return { ok: false, error: keyError };
+  }
+
+  const nameValues = normalizeLocalizedValues(input.nameValues);
+  if (!Object.values(nameValues).some((value) => value.trim())) {
+    return { ok: false, error: "Ievadi plāna nosaukumu vismaz vienā valodā." };
+  }
+
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("site_payment_plans")
+    .update({
+      plan_key: planKey,
+      name_values: nameValues,
+      description_values: normalizeLocalizedValues(input.descriptionValues),
+    })
+    .eq("id", trimmedId);
+
+  if (error) {
+    const message = error.message.toLowerCase();
+    return {
+      ok: false,
+      error:
+        message.includes("duplicate") || message.includes("unique")
+          ? "Plāns ar šo atslēgu jau eksistē."
+          : "Neizdevās saglabāt maksas plānu.",
+    };
+  }
+
+  const modulesResult = await replacePlanModules(trimmedId, input.moduleKeys);
+  if (!modulesResult.ok) {
+    return modulesResult;
+  }
+
+  const plan = (await listPaymentPlans()).find((item) => item.id === trimmedId);
+  if (!plan) {
+    return { ok: false, error: "Neizdevās saglabāt maksas plānu." };
+  }
+  return { ok: true, plan };
+}
+
+export async function deletePaymentPlan(
+  planId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedId = planId.trim();
+  if (!trimmedId) {
+    return { ok: false, error: "Plāns nav norādīts." };
+  }
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_payment_plans")
+    .delete()
+    .eq("id", trimmedId)
+    .select("id");
+
+  if (error) {
+    return { ok: false, error: "Neizdevās dzēst maksas plānu." };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, error: "Maksas plāns nav atrasts." };
+  }
+  return { ok: true };
+}
+
+export type CompanyPaymentPlanAssignment = {
+  paymentPlanId: string | null;
+  paymentPlanUntil: string | null;
+  paymentPlanPaid: boolean;
+  accessBlocked: boolean;
+};
+
+export async function updateCompanyPaymentPlan(
+  companyId: string,
+  input: CompanyPaymentPlanAssignment,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedCompanyId = companyId.trim();
+  if (!trimmedCompanyId) {
+    return { ok: false, error: "Uzņēmums nav norādīts." };
+  }
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const planId = input.paymentPlanId?.trim() || null;
+  const until = input.paymentPlanUntil?.trim() || null;
+  if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+    return { ok: false, error: "Ievadi derīgu datumu (YYYY-MM-DD)." };
+  }
+
+  if (planId) {
+    const plans = await listPaymentPlans();
+    if (!plans.some((plan) => plan.id === planId)) {
+      return { ok: false, error: "Maksas plāns nav atrasts." };
+    }
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("companies")
+    .update({
+      payment_plan_id: planId,
+      payment_plan_until: until,
+      payment_plan_paid: input.paymentPlanPaid === true,
+      access_blocked: input.accessBlocked === true,
+    })
+    .eq("id", trimmedCompanyId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt uzņēmuma maksas plānu." };
+  }
+  return { ok: true };
+}
+
+export async function updateCompanyVip(
+  companyId: string,
+  isVip: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmedCompanyId = companyId.trim();
+  if (!trimmedCompanyId) {
+    return { ok: false, error: "Uzņēmums nav norādīts." };
+  }
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("companies")
+    .update({ is_vip: isVip === true })
+    .eq("id", trimmedCompanyId);
+
+  if (error) {
+    return { ok: false, error: "Neizdevās saglabāt VIP statusu." };
+  }
+  return { ok: true };
+}
+
+export async function getCompanyAccessLockReasonForCompany(
+  companyId: string,
+): Promise<CompanyAccessLockReason | null> {
+  const trimmed = companyId.trim();
+  if (!trimmed || !isSupabaseAdminConfigured()) {
+    return null;
+  }
+
+  const [enabled, data] = await Promise.all([
+    getPaymentPlansEnabledCached(),
+    getCompanyPaymentAccessRow(trimmed),
+  ]);
+
+  if (!data) {
+    return null;
+  }
+
+  return getCompanyAccessLockReason({
+    paymentPlansEnabled: enabled,
+    paymentPlanUntil:
+      typeof data.payment_plan_until === "string"
+        ? data.payment_plan_until.slice(0, 10)
+        : null,
+    accessBlocked: data.access_blocked === true,
+    isVip: data.is_vip === true,
+  });
+}
+
+export async function emptyLocalizedValues(): Promise<LocalizedValues> {
+  const languages = await listSiteLanguages();
+  return Object.fromEntries(languages.map((language) => [language.code, ""]));
+}
+
+export async function listGloballyEnabledModuleKeys(): Promise<string[]> {
+  const modules = await listFrontendModules();
+  return modules
+    .filter((module) => module.isEnabled)
+    .map((module) => module.moduleKey);
+}

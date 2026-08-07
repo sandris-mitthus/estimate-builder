@@ -10,6 +10,40 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.126
+
+**Renderēšanas ceļa apļi un dev ātrums**
+
+- **Autorizētais layout** — invited → active pārslēgšana notiek jau ielasītajās `company_users` rindās (`listCurrentUserMemberships`), tāpēc atsevišķs `activateInvitedCompanyMemberships` aplis pirms visa pārējā ir noņemts; frontend moduļu atslēgas ielādējas tajā pašā paralēlajā grupā ar sesiju, tāpēc nav filtrēšana nemaksā vēl vienu apli
+- **`/api/assigned-materials`** — `project_material_assignments` tiek lasīta **vienu reizi** (`listCompanyMaterialAssignments` kalpo gan par lēto pārbaudi, gan par datu avotu); `estimates` un ēku moduļi, tāpat kā lietotāju saraksts, katalogs un uzņēmuma iestatījumi, ielādējas paralēli — 9 secīgi apļi kļuva par 6
+- **Dev serveris** — `turbopack.root` norāda uz pašu projektu, nevis vecāko darbvietas mapi, tāpēc dev serveris vairs neapstaigā blakus projektus (lockfile brīdinājums joprojām apklusināts, jo ceļš ir norādīts skaidri)
+
+## v1.3.125
+
+**Ātrdarbība un koda konsolidācija**
+
+- **Projekta tāme** — `/[id]` lasa `estimates` **vienu reizi**: sagataves paslēptās struktūras sinhronizācija notiek atmiņā uz jau ielasītās rindas (`getProjectEstimateWithSagataveSync`), tulkojumi un moduļa pārbaude ielādējas paralēli ar pārējiem datiem
+- **Projektu saraksts** — brīdinājumu badge’i velk tāmes JSON tikai tiem projektiem, kuriem badge vispār iespējams (aktīvie + `approved`); arhīva skats vairs neparsē `completed` / `rejected` tāmes
+- **Tāmes redaktors** — `PositionModal`, `MultiPositionModal` un `SyncSagataveChangesModal` ielādējas pēc vajadzības (`next/dynamic`), un klientam sūtītais katalogs vairs nesatur piegādātāju laukus (`toEstimateCatalogPositions`)
+- **Deleģēto materiālu banneris** — lēta pārbaude pirms smagajiem vaicājumiem un ielāde `requestIdleCallback` brīdī; system admin darbības (`/site_companies`, `/site_payment_plans`) vairs neinvalidē visu app shell
+- **Mazāk dublikātu** — kopīgs attēlu validators (`createImageFileValidator`), viens `slugifyName`, `ToggleSwitch` komponente un `localized-values` helperi; `listFrontendModules` / uzņēmuma moduļu piesaistes lasās pa vienam vaicājumam uz renderi
+
+## v1.3.124
+
+**VIP un pieejas bloķēšana**
+
+- **Uzņēmumi** — zvaigznīte aiz nosaukuma (`companies.is_vip`, migrācija `181`): dzeltena = VIP ieslēgts, pelēka = izslēgts
+- VIP uzņēmumam nestrādā maksas plāna un „Bloķēt pieeju” ierobežojumi; efektīvie moduļi joprojām no individuālajiem `company_frontend_modules` (un globālajiem slēdžiem)
+- Non-admin pieeja tiek bloķēta ar blur + modāli, ja `access_blocked`, nav derīguma datuma vai plāns beidzies (migrācijas `179`–`180`); sistēmas admini netiek bloķēti
+
+## v1.3.123
+
+**Maksas plāni**
+
+- System admin sidebar link **Maksas plāni** (`/site_payment_plans`): enable payment plans and assign frontend modules to each plan (names/descriptions in all system languages; migration `178`)
+- When payment plans are on, company modules come from the assigned plan only if it is paid and not past the valid-until date; otherwise per-company module toggles stay in use
+- **Uzņēmumi** then shows active plan, valid-until date and a paid/unpaid control (row opens plan assignment modal)
+
 ## v1.3.122
 
 **Uzņēmuma frontend moduļi**

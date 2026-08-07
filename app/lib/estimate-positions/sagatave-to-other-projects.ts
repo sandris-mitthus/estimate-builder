@@ -15,7 +15,6 @@ import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { parseEstimatePositionDocumentPayload } from "@/app/lib/estimate-positions/serialize-document";
 import type { EstimateMeta } from "@/app/lib/projects/types";
 import { shouldShowStaleCatalogPriceWarnings } from "@/app/lib/projects/project-status";
-import type { ProjectStatus } from "@/app/lib/projects/project-status";
 
 export type { SagataveStructureIntroEntry } from "@/app/lib/estimate-positions/sagatave-structure-intro-entries";
 export { listSagataveStructureIntroEntries } from "@/app/lib/estimate-positions/sagatave-structure-intro-entries";
@@ -94,80 +93,6 @@ export function mergeMissingSagataveAsHiddenForProject(
     changed: true,
     addedNodeIds: merged.addedNodeIds,
   };
-}
-
-export async function ensureHiddenSagataveStructureForProject(
-  projectId: string,
-): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
-  if (!isSupabaseAdminConfigured()) {
-    return { ok: true, changed: false };
-  }
-
-  const companyId = await getCurrentCompanyId();
-  if (!companyId) {
-    return { ok: false, error: "Uzņēmums nav atrasts." };
-  }
-
-  const supabase = createAdminClient();
-  const { data: projectRow, error: projectError } = await supabase
-    .from("projects")
-    .select("status")
-    .eq("id", projectId)
-    .eq("company_id", companyId)
-    .maybeSingle();
-
-  if (
-    projectError ||
-    !projectRow ||
-    !shouldShowStaleCatalogPriceWarnings(projectRow.status as ProjectStatus)
-  ) {
-    return { ok: true, changed: false };
-  }
-
-  const sagatave = await ensureDefaultEstimatePosition();
-  const { data, error } = await supabase
-    .from("estimates")
-    .select("title, meta, categories")
-    .eq("project_id", projectId)
-    .eq("company_id", companyId)
-    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
-    .maybeSingle();
-
-  if (error || !data) {
-    return { ok: false, error: "Tāme nav atrasta." };
-  }
-
-  const parsed = parseEstimatePositionDocumentPayload(data.categories);
-  const merged = mergeMissingSagataveAsHiddenForProject(
-    parsed.sections,
-    parsed.multiOptionLinks,
-    (data.meta ?? {}) as EstimateMeta,
-    sagatave.sections,
-    sagatave.multiOptionLinks,
-  );
-
-  if (!merged.changed) {
-    return { ok: true, changed: false };
-  }
-
-  const { error: updateError } = await supabase
-    .from("estimates")
-    .update({
-      meta: merged.meta,
-      categories: buildEstimatePositionSectionsStorage(
-        merged.categories,
-        merged.multiOptionLinks,
-      ),
-    })
-    .eq("project_id", projectId)
-    .eq("company_id", companyId)
-    .eq("estimate_kind", ESTIMATE_KIND_MAIN);
-
-  if (updateError) {
-    return { ok: false, error: "Neizdevās sinhronizēt sagataves struktūru." };
-  }
-
-  return { ok: true, changed: true };
 }
 
 export async function propagateSagataveStructureToOtherProjects(

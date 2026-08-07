@@ -1,5 +1,7 @@
 "use client";
 
+import { ToggleSwitch } from "@/app/components/ui/toggle-switch";
+
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -31,38 +33,6 @@ const LANGUAGE_OPTIONS = [
   { code: "pl", name: "Polski" },
   { code: "ru", name: "Русский" },
 ];
-
-function Switch({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        checked ? "bg-zinc-900" : "bg-zinc-200"
-      }`}
-    >
-      <span
-        className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
 
 export function SiteLanguagesForm({
   initialLanguages,
@@ -266,7 +236,7 @@ export function SiteLanguagesForm({
           </select>
           <label className="inline-flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-700">
             {t("common.default", "Default")}
-            <Switch
+            <ToggleSwitch
               checked={makeDefault}
               disabled={isBusy}
               label={t(
@@ -321,7 +291,7 @@ export function SiteLanguagesForm({
                     {language.code}
                   </td>
                   <td className="px-5 py-4">
-                    <Switch
+                    <ToggleSwitch
                       checked={language.isActive}
                       disabled={isBusy}
                       label={t("site_languages.aria.active", "{name} aktīva", {
@@ -333,7 +303,7 @@ export function SiteLanguagesForm({
                     />
                   </td>
                   <td className="px-5 py-4">
-                    <Switch
+                    <ToggleSwitch
                       checked={language.isDefault}
                       disabled={isBusy}
                       label={t(

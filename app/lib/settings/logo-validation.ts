@@ -1,42 +1,23 @@
-export const COMPANY_LOGO_MAX_BYTES = 2 * 1024 * 1024;
-export const COMPANY_LOGO_EXTENSIONS = ["png", "jpg", "webp", "svg"] as const;
+import {
+  createImageFileValidator,
+  RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+} from "@/app/lib/validation/image-file";
 
-const ALLOWED_LOGO_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
+export const COMPANY_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+const companyLogoValidator = createImageFileValidator({
+  extensionByMimeType: RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+  maxBytes: COMPANY_LOGO_MAX_BYTES,
+  formatError: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
+  sizeError: "Logotips nedrīkst būt lielāks par 2 MB.",
+});
+
+export const COMPANY_LOGO_EXTENSIONS = companyLogoValidator.extensions;
 
 export function getLogoExtension(mimeType: string) {
-  switch (mimeType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/svg+xml":
-      return "svg";
-    default:
-      return null;
-  }
+  return companyLogoValidator.getExtension(mimeType);
 }
 
 export function validateCompanyLogoFile(file: File) {
-  if (!ALLOWED_LOGO_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
-    };
-  }
-
-  if (file.size > COMPANY_LOGO_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "Logotips nedrīkst būt lielāks par 2 MB.",
-    };
-  }
-
-  return { ok: true as const };
+  return companyLogoValidator.validate(file);
 }

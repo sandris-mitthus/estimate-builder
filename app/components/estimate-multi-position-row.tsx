@@ -7,7 +7,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react";
-import { MultiPositionModal } from "@/app/components/multi-position-modal";
+import dynamic from "next/dynamic";
 import { MultiPositionLinkHandle } from "@/app/components/multi-position-link-handle";
 import { AttachedModuleSizeLabel } from "@/app/components/attached-module-size-label";
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
@@ -84,6 +84,13 @@ import type {
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import { getEstimateNumericStyles, estimateLineItemActionsInnerClassName } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import type { SectionGroupHoverHandlers } from "@/app/lib/hooks/use-section-group-hover";
+
+/** Editing modal opens on demand — kept out of the estimate table's first bundle. */
+const MultiPositionModal = dynamic(() =>
+  import("@/app/components/multi-position-modal").then(
+    (mod) => mod.MultiPositionModal,
+  ),
+);
 
 const readOnlyNum =
   "block px-2 py-1.5 text-center text-sm tabular-nums text-zinc-700";

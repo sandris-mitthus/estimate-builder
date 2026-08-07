@@ -10,6 +10,11 @@ type CompanyMembershipRow = {
   status?: string;
 };
 
+/**
+ * Memberships for the signed-in user with invited → active promotion applied.
+ * Activation runs here, on rows we already read, so an invite link grants access
+ * within the same request without a second `company_users` round trip.
+ */
 const listCurrentUserMemberships = cache(async function listCurrentUserMemberships(): Promise<
   CompanyMembershipRow[]
 > {
@@ -34,7 +39,25 @@ const listCurrentUserMemberships = cache(async function listCurrentUserMembershi
     return [];
   }
 
-  return data;
+  if (!data.some((membership) => membership.status === "invited")) {
+    return data;
+  }
+
+  const { error: activateError } = await supabase
+    .from("company_users")
+    .update({ status: "active" })
+    .eq("user_id", user.id)
+    .eq("status", "invited");
+
+  if (activateError) {
+    return data;
+  }
+
+  return data.map((membership) =>
+    membership.status === "invited"
+      ? { ...membership, status: "active" }
+      : membership,
+  );
 });
 
 export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): Promise<

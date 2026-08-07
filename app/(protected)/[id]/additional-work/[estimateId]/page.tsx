@@ -9,6 +9,7 @@ import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repo
 import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
 import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { getProject } from "@/app/lib/projects/repository";
+import { toEstimateCatalogPositions } from "@/app/lib/positions/estimate-catalog";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { getServerTranslations } from "@/app/lib/i18n/server";
@@ -75,7 +76,7 @@ export default async function AdditionalWorkEstimatePage({
         estimateUpdatedAt={estimate.updatedAt}
         project={project}
         estimateValidityDays={companySettings.estimateValidityDays}
-        catalogPositions={catalogPositions}
+        catalogPositions={toEstimateCatalogPositions(catalogPositions)}
         defaultHourlyRate={companySettings.defaultHourlyRate}
         currency={companySettings.currency}
         sagataveSections={sagatave.sections}

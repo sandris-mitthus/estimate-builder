@@ -39,7 +39,7 @@ type EstimateAssignmentRow = {
   categories: unknown;
 };
 
-type MaterialAssignmentRow = {
+export type MaterialAssignmentRow = {
   project_id: string;
   position_price_id: string;
   assignee_user_id: string;
@@ -49,7 +49,38 @@ type ListUserAssignedMaterialGroupsOptions = {
   relatedUserIds?: string[];
   allUsers?: UserSummary[];
   catalogPositions?: PositionPriceSummary[];
+  assignments?: MaterialAssignmentRow[];
 };
+
+/**
+ * Every material assignment in the company. Three small columns, so this doubles
+ * as the cheap gate for the assigned-materials banner: an empty result skips the
+ * user list, catalog and estimate reads without a separate probe query.
+ */
+export async function listCompanyMaterialAssignments(): Promise<
+  MaterialAssignmentRow[]
+> {
+  if (!isSupabaseAdminConfigured()) {
+    return [];
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return [];
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("project_material_assignments")
+    .select("project_id, position_price_id, assignee_user_id")
+    .eq("company_id", companyId);
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data as MaterialAssignmentRow[];
+}
 
 function resolveMatchingUserIds(
   userId: string,
@@ -197,17 +228,16 @@ export async function listUserAssignedMaterialGroups(
   }
 
   const supabase = createAdminClient();
-  const { data: assignmentData, error: assignmentError } = await supabase
-    .from("project_material_assignments")
-    .select("project_id, position_price_id, assignee_user_id")
-    .eq("company_id", companyId)
-    .in("assignee_user_id", Array.from(matchingUserIds));
+  const companyAssignments =
+    options.assignments ?? (await listCompanyMaterialAssignments());
+  const assignments = companyAssignments.filter((assignment) =>
+    matchingUserIds.has(normalizeUserId(assignment.assignee_user_id)),
+  );
 
-  if (assignmentError || !assignmentData || assignmentData.length === 0) {
+  if (assignments.length === 0) {
     return [];
   }
 
-  const assignments = assignmentData as MaterialAssignmentRow[];
   const assignmentsByProjectId = new Map<string, MaterialAssignmentRow[]>();
   for (const assignment of assignments) {
     const existing = assignmentsByProjectId.get(assignment.project_id) ?? [];
@@ -236,34 +266,35 @@ export async function listUserAssignedMaterialGroups(
   const projectById = new Map(
     lockedProjects.map((project) => [project.id, project]),
   );
+  const moduleIds = Array.from(
+    new Set(
+      lockedProjects
+        .map((project) => project.buildingModuleId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
 
-  const { data, error } = await supabase
-    .from("estimates")
-    .select("project_id, meta, categories")
-    .eq("company_id", companyId)
-    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
-    .in("project_id", lockedProjects.map((project) => project.id));
+  // Both only depend on the locked project list, so they load together.
+  const [estimatesResult, moduleCache] = await Promise.all([
+    supabase
+      .from("estimates")
+      .select("project_id, meta, categories")
+      .eq("company_id", companyId)
+      .eq("estimate_kind", ESTIMATE_KIND_MAIN)
+      .in("project_id", lockedProjects.map((project) => project.id)),
+    getBuildingModulesByIds(moduleIds),
+  ]);
 
+  const { data, error } = estimatesResult;
   if (error || !data) {
     return [];
   }
 
-  const rows = (data as EstimateAssignmentRow[]).filter((row) => {
-    const project = projectById.get(row.project_id);
-    if (!project) {
-      return false;
-    }
-
-    return assignmentsByProjectId.has(row.project_id);
-  });
-  const moduleIds = Array.from(
-    new Set(
-      rows
-        .map((row) => projectById.get(row.project_id)?.buildingModuleId)
-        .filter((id): id is string => Boolean(id)),
-    ),
+  const rows = (data as EstimateAssignmentRow[]).filter(
+    (row) =>
+      projectById.has(row.project_id) &&
+      assignmentsByProjectId.has(row.project_id),
   );
-  const moduleCache = await getBuildingModulesByIds(moduleIds);
   const groups: UserAssignedMaterialsProjectGroup[] = [];
 
   for (const row of rows) {

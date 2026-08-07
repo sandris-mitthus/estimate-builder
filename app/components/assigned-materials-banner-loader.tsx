@@ -18,6 +18,7 @@ export function AssignedMaterialsBannerLoader() {
 
   useEffect(() => {
     const controller = new AbortController();
+    let cancelIdle: (() => void) | null = null;
 
     async function loadAssignedMaterials() {
       try {
@@ -27,6 +28,11 @@ export function AssignedMaterialsBannerLoader() {
         });
 
         if (!response.ok) {
+          return;
+        }
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/json")) {
           return;
         }
 
@@ -41,9 +47,21 @@ export function AssignedMaterialsBannerLoader() {
       }
     }
 
-    void loadAssignedMaterials();
+    // The banner is secondary content — wait for idle so it does not compete
+    // with the page's own data on first paint.
+    const idle = window.requestIdleCallback;
+    if (typeof idle === "function") {
+      const handle = idle(() => void loadAssignedMaterials(), { timeout: 2000 });
+      cancelIdle = () => window.cancelIdleCallback?.(handle);
+    } else {
+      const timer = window.setTimeout(() => void loadAssignedMaterials(), 300);
+      cancelIdle = () => window.clearTimeout(timer);
+    }
 
-    return () => controller.abort();
+    return () => {
+      cancelIdle?.();
+      controller.abort();
+    };
   }, []);
 
   if (!payload) {

@@ -1,9 +1,18 @@
 import { cache } from "react";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { getEnabledFrontendModuleKeysForCompany } from "@/app/lib/frontend-modules/company-repository";
 import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
+import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
+
+export type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
+
+export type FrontendModuleInput = {
+  moduleKey: string;
+};
 
 type FrontendModuleRow = {
   id: string;
@@ -12,19 +21,6 @@ type FrontendModuleRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
-};
-
-export type FrontendModuleSummary = {
-  id: string;
-  moduleKey: string;
-  isEnabled: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type FrontendModuleInput = {
-  moduleKey: string;
 };
 
 const MODULE_KEY_PATTERN = /^[a-z0-9._:-]+$/;
@@ -56,29 +52,41 @@ function validateModuleKey(moduleKey: string): string | null {
   return null;
 }
 
-export async function listFrontendModules(): Promise<FrontendModuleSummary[]> {
-  if (!isSupabaseAdminConfigured()) {
-    return [];
-  }
+export const listFrontendModules = cache(
+  async (): Promise<FrontendModuleSummary[]> => {
+    if (!isSupabaseAdminConfigured()) {
+      return [];
+    }
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("site_frontend_modules")
-    .select("id, module_key, is_enabled, sort_order, created_at, updated_at")
-    .order("sort_order", { ascending: true })
-    .order("module_key", { ascending: true });
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("site_frontend_modules")
+      .select("id, module_key, is_enabled, sort_order, created_at, updated_at")
+      .order("sort_order", { ascending: true })
+      .order("module_key", { ascending: true });
 
-  if (error || !data) {
-    return [];
-  }
+    if (error || !data) {
+      return [];
+    }
 
-  return (data as FrontendModuleRow[]).map(mapFrontendModuleRow);
-}
+    return (data as FrontendModuleRow[]).map(mapFrontendModuleRow);
+  },
+);
 
 export const getEnabledFrontendModuleKeys = cache(
   async (): Promise<Set<string>> => {
     if (!isSupabaseAdminConfigured()) {
       return new Set(Object.values(FRONTEND_MODULE_KEYS));
+    }
+
+    // System admins see all globally enabled modules; company assignment/plan
+    // gating applies only to non-admin users.
+    const user = await getCurrentUser();
+    if (user && (await isSystemAdminUser(user))) {
+      const modules = await listFrontendModules();
+      return new Set(
+        modules.filter((module) => module.isEnabled).map((module) => module.moduleKey),
+      );
     }
 
     const companyId = await getCurrentCompanyId();

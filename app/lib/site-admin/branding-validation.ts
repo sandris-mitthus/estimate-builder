@@ -1,46 +1,27 @@
+import {
+  createImageFileValidator,
+  RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+} from "@/app/lib/validation/image-file";
+
 export const SITE_BRANDING_MAX_BYTES = 2 * 1024 * 1024;
-export const SITE_BRANDING_EXTENSIONS = ["png", "jpg", "webp", "svg"] as const;
 
 export type SiteBrandingAssetKind = "logo" | "favicon";
 
-const ALLOWED_BRANDING_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
+const siteBrandingValidator = createImageFileValidator({
+  extensionByMimeType: RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+  maxBytes: SITE_BRANDING_MAX_BYTES,
+  formatError: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
+  sizeError: "Logotips nedrīkst būt lielāks par 2 MB.",
+});
+
+export const SITE_BRANDING_EXTENSIONS = siteBrandingValidator.extensions;
 
 export function getSiteBrandingExtension(mimeType: string) {
-  switch (mimeType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/svg+xml":
-      return "svg";
-    default:
-      return null;
-  }
+  return siteBrandingValidator.getExtension(mimeType);
 }
 
 export function validateSiteBrandingFile(file: File) {
-  if (!ALLOWED_BRANDING_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
-    };
-  }
-
-  if (file.size > SITE_BRANDING_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "Logotips nedrīkst būt lielāks par 2 MB.",
-    };
-  }
-
-  return { ok: true as const };
+  return siteBrandingValidator.validate(file);
 }
 
 export function siteBrandingApiPath(kind: SiteBrandingAssetKind): string {

@@ -12,15 +12,15 @@ import {
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
-import { ensureHiddenSagataveStructureForProject } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
 import { syncVariableQuantityFromSagatave } from "@/app/lib/estimate-positions/sync-variable-quantity";
 import { listExcludedPositions } from "@/app/lib/excluded-positions/repository";
 import { getBuildingModule, listBuildingModules } from "@/app/lib/modules/repository";
 import {
   getProject,
-  getProjectEstimateForProject,
+  getProjectEstimateWithSagataveSync,
 } from "@/app/lib/projects/repository";
 import { isProjectEstimateLocked } from "@/app/lib/projects/project-status";
+import { toEstimateCatalogPositions } from "@/app/lib/positions/estimate-catalog";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
 import { listUsers } from "@/app/lib/users/repository";
@@ -37,11 +37,9 @@ export default async function ProjectDetailPage({
   }
 
   const { id } = await params;
-  const { t } = await getServerTranslations();
-  const additionalWorkModuleEnabled = await isFrontendModuleEnabled(
-    FRONTEND_MODULE_KEYS.additionalWork,
-  );
   const [
+    { t },
+    additionalWorkModuleEnabled,
     project,
     modules,
     companySettings,
@@ -49,6 +47,8 @@ export default async function ProjectDetailPage({
     sagatave,
     globalExcludedPositions,
   ] = await Promise.all([
+    getServerTranslations(),
+    isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.additionalWork),
     getProject(id),
     listBuildingModules(),
     getCompanySettings(),
@@ -61,11 +61,10 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  await ensureHiddenSagataveStructureForProject(id);
-
-  const estimate = await getProjectEstimateForProject(
+  const estimate = await getProjectEstimateWithSagataveSync(
     project,
     companySettings.estimateValidityDays,
+    sagatave,
   );
 
   if (!estimate) {
@@ -126,7 +125,7 @@ export default async function ProjectDetailPage({
         project={project}
         modules={modules}
         estimateValidityDays={companySettings.estimateValidityDays}
-        catalogPositions={catalogPositions}
+        catalogPositions={toEstimateCatalogPositions(catalogPositions)}
         defaultHourlyRate={companySettings.defaultHourlyRate}
         currency={companySettings.currency}
         sagataveSections={sagatave.sections}

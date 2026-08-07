@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = dirname(projectRoot);
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "";
 const isDev = process.env.NODE_ENV === "development";
 
@@ -34,8 +33,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "5mb",
     },
   },
+  // Keep the dev file-watching / module graph inside this project. Pointing the
+  // root at the parent folder pulled the sibling workspaces into the dev server.
   turbopack: {
-    root: workspaceRoot,
+    root: projectRoot,
   },
   async redirects() {
     return [

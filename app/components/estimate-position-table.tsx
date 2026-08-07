@@ -10,6 +10,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import dynamic from "next/dynamic";
 import {
   SortableContext,
   useSortable,
@@ -112,8 +113,6 @@ import { SubcategoryPriceVisibilityToggle } from "@/app/components/subcategory-p
 import { DeleteButton } from "@/app/components/delete-button";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { EstimateMultiPositionRow } from "@/app/components/estimate-multi-position-row";
-import { MultiPositionModal } from "@/app/components/multi-position-modal";
-import { PositionModal } from "@/app/components/position-modal";
 import {
   PositionModalProvider,
   usePositionModal,
@@ -150,6 +149,16 @@ import {
   itemDragId,
   subcategoryDragId,
 } from "@/app/lib/estimates/drag-ids";
+
+// Modals only mount after a user action, so they stay out of the first bundle.
+const PositionModal = dynamic(() =>
+  import("@/app/components/position-modal").then((mod) => mod.PositionModal),
+);
+const MultiPositionModal = dynamic(() =>
+  import("@/app/components/multi-position-modal").then(
+    (mod) => mod.MultiPositionModal,
+  ),
+);
 
 const FULL_COL_COUNT = 9;
 const ESTIMATE_POSITION_DND_CONTEXT_ID = "estimate-position-table-dnd";

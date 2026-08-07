@@ -1,10 +1,19 @@
 import { cache } from "react";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import { getCompanyPaymentAccessRow } from "@/app/lib/companies/payment-access";
+import { listFrontendModules } from "@/app/lib/frontend-modules/repository";
+import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
+import type { CompanyFrontendModuleAssignment } from "@/app/lib/frontend-modules/types";
 import {
-  listFrontendModules,
-  type FrontendModuleSummary,
-} from "@/app/lib/frontend-modules/repository";
+  isCompanyPaymentPlanActive,
+} from "@/app/lib/payment-plans/helpers";
+import {
+  getPaymentPlanModuleKeys,
+  getPaymentPlansEnabledCached,
+} from "@/app/lib/payment-plans/repository";
+
+export type { CompanyFrontendModuleAssignment } from "@/app/lib/frontend-modules/types";
 
 type CompanyFrontendModuleRow = {
   company_id: string;
@@ -12,17 +21,31 @@ type CompanyFrontendModuleRow = {
   is_enabled: boolean;
 };
 
-export type CompanyFrontendModuleAssignment = {
-  moduleKey: string;
-  /** Globally available in site_frontend_modules. */
-  globalEnabled: boolean;
-  /** Enabled for this company (default false). */
-  companyEnabled: boolean;
-  sortOrder: number;
-};
-
 function normalizeModuleKey(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function buildAssignmentsForCompany(
+  modules: FrontendModuleSummary[],
+  companyRows: CompanyFrontendModuleRow[],
+): CompanyFrontendModuleAssignment[] {
+  const companyMap = new Map(
+    companyRows.map((row) => [row.module_key, row.is_enabled] as const),
+  );
+
+  return modules
+    .map((module: FrontendModuleSummary) => ({
+      moduleKey: module.moduleKey,
+      globalEnabled: module.isEnabled,
+      companyEnabled: companyMap.get(module.moduleKey) === true,
+      sortOrder: module.sortOrder,
+    }))
+    .sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+      return left.moduleKey.localeCompare(right.moduleKey);
+    });
 }
 
 async function listCompanyModuleRows(
@@ -45,9 +68,32 @@ async function listCompanyModuleRows(
   return data as CompanyFrontendModuleRow[];
 }
 
+async function getCompanyModuleIntersectionKeys(
+  companyId: string,
+  modules: FrontendModuleSummary[],
+): Promise<Set<string>> {
+  const companyRows = await listCompanyModuleRows(companyId);
+  const companyEnabled = new Set(
+    companyRows
+      .filter((row) => row.is_enabled)
+      .map((row) => row.module_key),
+  );
+
+  return new Set(
+    modules
+      .filter(
+        (module) =>
+          module.isEnabled && companyEnabled.has(module.moduleKey),
+      )
+      .map((module) => module.moduleKey),
+  );
+}
+
 /**
- * Effective module keys for a company = global on AND company on.
- * Missing company row means off (not auto-enabled).
+ * Effective module keys for a company.
+ * - VIP: global on ∧ company_frontend_modules on (payment plan ignored).
+ * - Payment plans ON: global on ∧ modules from active paid plan.
+ * - Payment plans OFF: global on ∧ company_frontend_modules on.
  */
 export const getEnabledFrontendModuleKeysForCompany = cache(
   async (companyId: string): Promise<Set<string>> => {
@@ -59,58 +105,90 @@ export const getEnabledFrontendModuleKeysForCompany = cache(
       return new Set();
     }
 
-    const [modules, companyRows] = await Promise.all([
-      listFrontendModules(),
-      listCompanyModuleRows(companyId),
-    ]);
-
-    const companyEnabled = new Set(
-      companyRows
-        .filter((row) => row.is_enabled)
-        .map((row) => row.module_key),
+    const modules = await listFrontendModules();
+    const globallyEnabled = new Set(
+      modules.filter((module) => module.isEnabled).map((module) => module.moduleKey),
     );
 
-    return new Set(
-      modules
-        .filter(
-          (module) =>
-            module.isEnabled && companyEnabled.has(module.moduleKey),
-        )
-        .map((module) => module.moduleKey),
-    );
+    const payment = await getCompanyPaymentAccessRow(companyId);
+    if (payment?.is_vip === true) {
+      return getCompanyModuleIntersectionKeys(companyId, modules);
+    }
+
+    const paymentPlansEnabled = await getPaymentPlansEnabledCached();
+    if (paymentPlansEnabled) {
+      const until = payment?.payment_plan_until
+        ? String(payment.payment_plan_until).slice(0, 10)
+        : null;
+      if (
+        !payment ||
+        !isCompanyPaymentPlanActive({
+          paymentPlanId: payment.payment_plan_id,
+          paymentPlanUntil: until,
+          paymentPlanPaid: payment.payment_plan_paid === true,
+        })
+      ) {
+        return new Set();
+      }
+
+      const planModules = await getPaymentPlanModuleKeys(
+        payment.payment_plan_id ?? "",
+      );
+      return new Set(
+        [...planModules].filter((key) => globallyEnabled.has(key)),
+      );
+    }
+
+    return getCompanyModuleIntersectionKeys(companyId, modules);
   },
 );
 
 export async function listCompanyFrontendModuleAssignments(
   companyId: string,
 ): Promise<CompanyFrontendModuleAssignment[]> {
-  const trimmed = companyId.trim();
-  if (!trimmed || !isSupabaseAdminConfigured()) {
-    return [];
+  const map = await listCompanyFrontendModuleAssignmentsForCompanies([
+    companyId,
+  ]);
+  return map[companyId.trim()] ?? [];
+}
+
+/** One modules catalog + one IN query for all companies (avoids N+1). */
+export async function listCompanyFrontendModuleAssignmentsForCompanies(
+  companyIds: string[],
+): Promise<Record<string, CompanyFrontendModuleAssignment[]>> {
+  const ids = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length || !isSupabaseAdminConfigured()) {
+    return {};
   }
 
-  const [modules, companyRows] = await Promise.all([
-    listFrontendModules(),
-    listCompanyModuleRows(trimmed),
-  ]);
+  const modules = await listFrontendModules();
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("company_frontend_modules")
+    .select("company_id, module_key, is_enabled")
+    .in("company_id", ids);
 
-  const companyMap = new Map(
-    companyRows.map((row) => [row.module_key, row.is_enabled] as const),
-  );
-
-  return modules
-    .map((module: FrontendModuleSummary) => ({
-      moduleKey: module.moduleKey,
-      globalEnabled: module.isEnabled,
-      companyEnabled: companyMap.get(module.moduleKey) === true,
-      sortOrder: module.sortOrder,
-    }))
-    .sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder;
+  const rowsByCompany = new Map<string, CompanyFrontendModuleRow[]>();
+  for (const id of ids) {
+    rowsByCompany.set(id, []);
+  }
+  if (!error && data) {
+    for (const row of data as CompanyFrontendModuleRow[]) {
+      const list = rowsByCompany.get(row.company_id);
+      if (list) {
+        list.push(row);
+      } else {
+        rowsByCompany.set(row.company_id, [row]);
       }
-      return left.moduleKey.localeCompare(right.moduleKey);
-    });
+    }
+  }
+
+  return Object.fromEntries(
+    ids.map((id) => [
+      id,
+      buildAssignmentsForCompany(modules, rowsByCompany.get(id) ?? []),
+    ]),
+  );
 }
 
 export async function setCompanyFrontendModuleEnabled(

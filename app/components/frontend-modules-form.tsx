@@ -1,5 +1,7 @@
 "use client";
 
+import { ToggleSwitch } from "@/app/components/ui/toggle-switch";
+
 import { useEffect, useState, useTransition } from "react";
 import {
   createFrontendModuleAction,
@@ -11,7 +13,7 @@ import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { IconActionButton } from "@/app/components/icon-action-button";
 import { useTranslations } from "@/app/components/translations-provider";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
-import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/repository";
+import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
 
 function sortModules(modules: FrontendModuleSummary[]) {
   return [...modules].sort((left, right) => {
@@ -21,38 +23,6 @@ function sortModules(modules: FrontendModuleSummary[]) {
 
     return left.moduleKey.localeCompare(right.moduleKey);
   });
-}
-
-function Switch({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        checked ? "bg-zinc-900" : "bg-zinc-200"
-      }`}
-    >
-      <span
-        className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
 }
 
 export function FrontendModulesForm({
@@ -265,7 +235,7 @@ export function FrontendModulesForm({
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="inline-flex items-center justify-end gap-3">
-                        <Switch
+                        <ToggleSwitch
                           checked={module.isEnabled}
                           disabled={isRowBusy}
                           label={t(

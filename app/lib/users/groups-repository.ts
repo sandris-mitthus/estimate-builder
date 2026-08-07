@@ -9,6 +9,7 @@ import {
 } from "@/app/lib/auth/permissions";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { listSiteUserGroups } from "@/app/lib/site-admin/repository";
+import { slugifyName } from "@/app/lib/slugify";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
@@ -32,24 +33,12 @@ function mapGroupRow(row: UserGroupRow): UserGroupSummary {
 
 const DEFAULT_NEW_USER_GROUP_SLUG = "viewer";
 
-function slugifyGroupName(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return slug || "grupa";
-}
-
 async function buildUniqueGroupSlug(
   supabase: ReturnType<typeof createAdminClient>,
   companyId: string,
   name: string,
 ): Promise<string> {
-  const baseSlug = slugifyGroupName(name);
+  const baseSlug = slugifyName(name);
   let slug = baseSlug;
   let counter = 2;
 
@@ -160,27 +149,39 @@ async function ensureDefaultGroups(
   companyId: string,
 ): Promise<void> {
   const defaultGroups = await listSiteUserGroups();
+  if (defaultGroups.length === 0) {
+    return;
+  }
 
-  for (const group of defaultGroups) {
-    const { data: existing } = await supabase
-      .from("company_user_groups")
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("slug", group.slug)
-      .maybeSingle();
+  const slugs = defaultGroups.map((group) => group.slug);
+  const { data: existingRows } = await supabase
+    .from("company_user_groups")
+    .select("slug")
+    .eq("company_id", companyId)
+    .in("slug", slugs);
 
-    if (existing) {
-      continue;
-    }
+  const existingSlugs = new Set(
+    (existingRows ?? [])
+      .map((row) => (typeof row.slug === "string" ? row.slug : ""))
+      .filter(Boolean),
+  );
 
-    await supabase.from("company_user_groups").insert({
+  const missing = defaultGroups.filter(
+    (group) => !existingSlugs.has(group.slug),
+  );
+  if (missing.length === 0) {
+    return;
+  }
+
+  await supabase.from("company_user_groups").insert(
+    missing.map((group) => ({
       company_id: companyId,
       slug: group.slug,
       name: group.name,
       permissions: group.permissions,
       is_system: true,
-    });
-  }
+    })),
+  );
 }
 
 export async function listUserGroups(): Promise<UserGroupSummary[]> {

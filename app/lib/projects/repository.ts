@@ -10,12 +10,14 @@ import {
 } from "@/app/lib/estimate-positions/serialize-document";
 import { cloneSagataveDocumentForProject } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import { getProjectEstimateBaseFromSagatave } from "@/app/lib/estimate-positions/project-estimate-base";
-import { sagataveHasNewPositionsForProject } from "@/app/lib/estimate-positions/sagatave-has-new-positions";
 import { sagataveHasPositionChangesForProject } from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { propagateLaborTimeNormsFromProject } from "@/app/lib/estimate-positions/labor-time-norm-sync";
 import { propagateProjectStructureToSagatave } from "@/app/lib/estimate-positions/project-structure-to-sagatave";
-import { propagateSagataveStructureToOtherProjects } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
+import {
+  mergeMissingSagataveAsHiddenForProject,
+  propagateSagataveStructureToOtherProjects,
+} from "@/app/lib/estimate-positions/sagatave-to-other-projects";
 import {
   createExcludedPosition,
   deleteExcludedPosition,
@@ -291,27 +293,41 @@ export async function getProjectListBadges(
     return empty;
   }
 
+  // Only projects that can actually show a badge need their estimate JSON.
+  // Archived / rejected / completed rows are skipped before the query.
+  const badgeProjects = projects.filter(
+    (project) =>
+      shouldShowStaleCatalogPriceWarnings(project.status) ||
+      project.status === "approved",
+  );
+
+  if (badgeProjects.length === 0) {
+    return empty;
+  }
+
   const [catalogPositions, companySettings, sagatave] = await Promise.all([
     listPositionPrices(),
     getCompanySettings(),
     ensureDefaultEstimatePosition(),
   ]);
   const defaultHourlyRate = companySettings.defaultHourlyRate;
-  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const projectById = new Map(
+    badgeProjects.map((project) => [project.id, project]),
+  );
   const approvedProjectById = new Map(
-    projects
+    badgeProjects
       .filter((project) => project.status === "approved")
       .map((project) => [project.id, project]),
   );
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("estimates")
-    .select("id, project_id, meta, categories, updated_at")
+    .select("project_id, meta, categories, updated_at")
     .eq("company_id", companyId)
     .eq("estimate_kind", ESTIMATE_KIND_MAIN)
     .in(
       "project_id",
-      projects.map((project) => project.id),
+      badgeProjects.map((project) => project.id),
     );
 
   if (error || !data) {
@@ -554,6 +570,77 @@ export async function getProjectEstimateForProject(
   }
 
   return parseEstimateRow(data as EstimateRow | null, project, validityDays);
+}
+
+/**
+ * Project estimate + hidden sagatave structure sync in a single estimate read.
+ * The merge runs in memory on the row we already loaded, so opening a project
+ * does not query `estimates` twice.
+ */
+export async function getProjectEstimateWithSagataveSync(
+  project: ProjectSummary,
+  validityDays: number,
+  sagatave: {
+    sections: EstimateCategory[];
+    multiOptionLinks: MultiOptionLinkGroup[];
+  },
+): Promise<ProjectEstimate | null> {
+  if (!isSupabaseAdminConfigured()) {
+    return defaultEstimateForProject(project, validityDays);
+  }
+
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return defaultEstimateForProject(project, validityDays);
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("id, title, meta, categories, updated_at")
+    .eq("project_id", project.id)
+    .eq("company_id", companyId)
+    .eq("estimate_kind", ESTIMATE_KIND_MAIN)
+    .maybeSingle();
+
+  if (error) {
+    return defaultEstimateForProject(project, validityDays);
+  }
+
+  let row = data as EstimateRow | null;
+
+  if (row && shouldShowStaleCatalogPriceWarnings(project.status)) {
+    const parsed = parseEstimatePositionDocumentPayload(row.categories);
+    const merged = mergeMissingSagataveAsHiddenForProject(
+      parsed.sections,
+      parsed.multiOptionLinks,
+      (row.meta ?? {}) as EstimateMeta,
+      sagatave.sections,
+      sagatave.multiOptionLinks,
+    );
+
+    if (merged.changed) {
+      const categories = buildEstimatePositionSectionsStorage(
+        merged.categories,
+        merged.multiOptionLinks,
+      ) as unknown as EstimateCategory[];
+
+      row = { ...row, meta: merged.meta, categories };
+
+      const { error: updateError } = await supabase
+        .from("estimates")
+        .update({ meta: merged.meta, categories })
+        .eq("project_id", project.id)
+        .eq("company_id", companyId)
+        .eq("estimate_kind", ESTIMATE_KIND_MAIN);
+
+      if (updateError) {
+        console.error("syncHiddenSagataveStructure:", updateError.message);
+      }
+    }
+  }
+
+  return parseEstimateRow(row, project, validityDays);
 }
 
 export async function createProject(

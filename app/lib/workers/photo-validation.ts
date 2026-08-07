@@ -1,41 +1,25 @@
-export const WORKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-export const WORKER_PHOTO_EXTENSIONS = ["png", "jpg", "webp"] as const;
+import {
+  createImageFileValidator,
+  RASTER_IMAGE_EXTENSIONS_BY_MIME,
+} from "@/app/lib/validation/image-file";
 
-const ALLOWED_PHOTO_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-]);
+export const WORKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+
+const workerPhotoValidator = createImageFileValidator({
+  extensionByMimeType: RASTER_IMAGE_EXTENSIONS_BY_MIME,
+  maxBytes: WORKER_PHOTO_MAX_BYTES,
+  formatError: "Atbalstīti formāti: PNG, JPG, WEBP.",
+  formatErrorKey: "errors.logo_format_supported",
+  sizeError: "Foto nedrīkst būt lielāks par 5 MB.",
+  sizeErrorKey: "errors.worker_photo_too_large",
+});
+
+export const WORKER_PHOTO_EXTENSIONS = workerPhotoValidator.extensions;
 
 export function getWorkerPhotoExtension(mimeType: string) {
-  switch (mimeType) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    default:
-      return null;
-  }
+  return workerPhotoValidator.getExtension(mimeType);
 }
 
 export function validateWorkerPhotoFile(file: File) {
-  if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Atbalstīti formāti: PNG, JPG, WEBP.",
-      errorKey: "errors.logo_format_supported",
-    };
-  }
-
-  if (file.size > WORKER_PHOTO_MAX_BYTES) {
-    return {
-      ok: false as const,
-      error: "Foto nedrīkst būt lielāks par 5 MB.",
-      errorKey: "errors.worker_photo_too_large",
-    };
-  }
-
-  return { ok: true as const };
+  return workerPhotoValidator.validate(file);
 }

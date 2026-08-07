@@ -214,6 +214,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "Frontend moduļi",
   },
   {
+    key: "system_admin:site_payment_plans",
+    href: "/site_payment_plans",
+    icon: "fas fa-credit-card",
+    labelKey: "nav.system_admin.site_payment_plans",
+    fallbackLabel: "Maksas plāni",
+  },
+  {
     key: "system_admin:site_languages",
     href: "/site_languages",
     icon: "fas fa-language",

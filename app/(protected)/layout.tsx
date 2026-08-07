@@ -28,10 +28,13 @@ import {
 import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
 import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-counts";
 import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
+import { CompanyAccessLockOverlay } from "@/app/components/company-access-lock-overlay";
 import { filterNavKeysByFrontendModules } from "@/app/lib/frontend-modules/access";
+import { getEnabledFrontendModuleKeys } from "@/app/lib/frontend-modules/repository";
+import { getCompanyAccessLockReasonForCompany } from "@/app/lib/payment-plans/repository";
+import type { CompanyAccessLockReason } from "@/app/lib/payment-plans/helpers";
 import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
-import { activateInvitedCompanyMemberships } from "@/app/lib/users/activate-invited-membership";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 
@@ -65,6 +68,7 @@ export default async function ProtectedLayout({
   let isSystemAdmin = false;
   let needsCompanyRegistration = false;
   let pendingCompanyInvite = false;
+  let accessLockReason: CompanyAccessLockReason | null = null;
   let languages = DEFAULT_SITE_LANGUAGES.filter((language) => language.isActive);
   let activeLanguageCode = "lv";
   let translations = {};
@@ -107,10 +111,8 @@ export default async function ProtectedLayout({
     currentUser = currentUserDisplay;
     currentUserId = user.id;
 
-    // Promote invited → active before resolving company, so the invite link
-    // acceptance grants access in this same request.
-    await activateInvitedCompanyMemberships(user.id);
-
+    // Invited → active promotion happens inside the company membership read,
+    // so it costs no extra round trip here.
     const [
       adminFlag,
       languagesResult,
@@ -141,13 +143,21 @@ export default async function ProtectedLayout({
       actionPermissions = createFullPermissions(false).actions;
       navCounts = {};
     } else {
-      const [session, companyNameResult, navCountsResult] = await Promise.all([
-        getCurrentUserAccess(),
-        isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
-        getNavigationCounts({ isSystemAdmin, activeLanguageCode }),
-      ]);
+      // The module keys are only needed after `session` resolves, but they are
+      // fetched here so the nav filter below reads them from the request cache.
+      const [session, companyNameResult, navCountsResult, lockReason] =
+        await Promise.all([
+          getCurrentUserAccess(),
+          isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
+          getNavigationCounts({ isSystemAdmin, activeLanguageCode }),
+          !isSystemAdmin && companyId
+            ? getCompanyAccessLockReasonForCompany(companyId)
+            : Promise.resolve(null),
+          isSystemAdmin ? Promise.resolve(null) : getEnabledFrontendModuleKeys(),
+        ]);
       companyName = companyNameResult;
       navCounts = navCountsResult;
+      accessLockReason = lockReason;
 
       if (session) {
         actionPermissions = session.access.permissions.actions;
@@ -187,40 +197,53 @@ export default async function ProtectedLayout({
           languageCode={activeLanguageCode}
           translations={translations}
         >
-          <div className="min-h-screen bg-zinc-100">
-            <AppNav
-              currentUser={currentUser}
-              systemName={siteSettings.systemName}
-              logoUrl={siteSettings.logoUrl}
-              companyName={companyName}
-              allowedNavKeys={allowedNavKeys}
-              isSystemAdmin={isSystemAdmin}
-              languages={languages}
-              activeLanguageCode={activeLanguageCode}
-              initialSidebarCollapsed={initialSidebarCollapsed}
-              navCounts={navCounts}
-            />
+          <div className="relative min-h-screen bg-zinc-100">
             <div
-              data-app-main
-              className="flex min-h-screen min-w-0 w-full flex-col pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
+              className={
+                accessLockReason
+                  ? "pointer-events-none select-none blur-sm"
+                  : undefined
+              }
+              aria-hidden={accessLockReason ? true : undefined}
             >
-              {currentUser &&
-              currentUserId &&
-              !needsCompanyRegistration &&
-              !pendingCompanyInvite ? (
-                <AssignedMaterialsBannerLoader />
-              ) : null}
-              <div className="min-w-0 flex-1">
-                {needsCompanyRegistration ? (
-                  <RegisterCompanyView userEmail={user?.email ?? ""} />
-                ) : pendingCompanyInvite ? (
-                  <PendingCompanyInviteView />
-                ) : (
-                  children
-                )}
+              <AppNav
+                currentUser={currentUser}
+                systemName={siteSettings.systemName}
+                logoUrl={siteSettings.logoUrl}
+                companyName={companyName}
+                allowedNavKeys={allowedNavKeys}
+                isSystemAdmin={isSystemAdmin}
+                languages={languages}
+                activeLanguageCode={activeLanguageCode}
+                initialSidebarCollapsed={initialSidebarCollapsed}
+                navCounts={navCounts}
+              />
+              <div
+                data-app-main
+                className="flex min-h-screen min-w-0 w-full flex-col pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
+              >
+                {currentUser &&
+                currentUserId &&
+                !needsCompanyRegistration &&
+                !pendingCompanyInvite &&
+                !accessLockReason ? (
+                  <AssignedMaterialsBannerLoader />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  {needsCompanyRegistration ? (
+                    <RegisterCompanyView userEmail={user?.email ?? ""} />
+                  ) : pendingCompanyInvite ? (
+                    <PendingCompanyInviteView />
+                  ) : accessLockReason ? null : (
+                    children
+                  )}
+                </div>
+                <SiteFooter systemName={siteSettings.systemName} />
               </div>
-              <SiteFooter systemName={siteSettings.systemName} />
             </div>
+            {accessLockReason ? (
+              <CompanyAccessLockOverlay reason={accessLockReason} />
+            ) : null}
           </div>
         </TranslationsProvider>
       </SystemAdminProvider>

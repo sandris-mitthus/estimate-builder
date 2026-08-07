@@ -15,6 +15,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import dynamic from "next/dynamic";
 import {
   createContext,
   useCallback,
@@ -133,7 +134,6 @@ import { EstimateLineItemNameField } from "@/app/components/estimate-line-item-n
 import { EstimateLineItemNote } from "@/app/components/estimate-line-item-note";
 import { EstimateQuantityInput } from "@/app/components/estimate-quantity-input";
 import { IconActionButton } from "@/app/components/icon-action-button";
-import { PositionModal } from "@/app/components/position-modal";
 import { PositionModalProvider, usePositionModal } from "@/app/components/position-modal-context";
 import {
   SectionTitleFocusProvider,
@@ -142,7 +142,6 @@ import {
 } from "@/app/components/section-title-focus-context";
 import { PositionVariableQuantityIcon } from "@/app/components/position-variable-quantity-icon";
 import { Tooltip } from "@/app/components/tooltip";
-import { MultiPositionModal } from "@/app/components/multi-position-modal";
 import { useSyncCatalogPositionFromLineItem } from "@/app/lib/hooks/use-sync-catalog-position-from-line-item";
 import { useCatalogPositionsWithRefresh } from "@/app/lib/hooks/use-catalog-positions-with-refresh";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
@@ -256,12 +255,26 @@ import {
   listSagatavePositionChanges,
 } from "@/app/lib/estimate-positions/sagatave-position-changes";
 import { listSagataveStructureIntroEntries } from "@/app/lib/estimate-positions/sagatave-structure-intro-entries";
-import { SyncSagataveChangesModal } from "@/app/components/sync-sagatave-changes-modal";
 import type { EstimateMeta, ProjectSummary } from "@/app/lib/projects/types";
 import type { UserSummary } from "@/app/lib/users/types";
 import { isIndividualProjectModuleDataComplete } from "@/app/lib/projects/project-module-utils";
 import { countPendingProjectMaterials } from "@/app/lib/projects/pending-project-materials";
 import { DEFAULT_ESTIMATE_VALIDITY_DAYS } from "@/app/lib/settings/estimate-validity-days";
+
+// Modals only mount after a user action, so they stay out of the first bundle.
+const PositionModal = dynamic(() =>
+  import("@/app/components/position-modal").then((mod) => mod.PositionModal),
+);
+const MultiPositionModal = dynamic(() =>
+  import("@/app/components/multi-position-modal").then(
+    (mod) => mod.MultiPositionModal,
+  ),
+);
+const SyncSagataveChangesModal = dynamic(() =>
+  import("@/app/components/sync-sagatave-changes-modal").then(
+    (mod) => mod.SyncSagataveChangesModal,
+  ),
+);
 
 /** Papildu darbu tāmē apjoms vienmēr ievadāms manuāli (bez moduļa piesaistes). */
 const ForceManualQuantityContext = createContext(false);

@@ -1,5 +1,7 @@
 "use client";
 
+import { ToggleSwitch } from "@/app/components/ui/toggle-switch";
+
 import { useMemo, useState, useTransition } from "react";
 import {
   saveEmailTemplatesAction,
@@ -55,38 +57,6 @@ const PREVIEW_PARAMS = {
   system: "Estimate Builder",
   link: "https://example.com/auth/confirm#…",
 };
-
-function Switch({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        checked ? "bg-zinc-900" : "bg-zinc-200"
-      }`}
-    >
-      <span
-        className={`inline-block size-5 rounded-full bg-white shadow-sm transition ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
 
 function cloneTemplates(templates: EmailTemplateDraft[]): EmailTemplateDraft[] {
   return templates.map((template) => ({
@@ -361,7 +331,7 @@ export function SiteEmailTemplatesForm({
               <span className="text-sm text-zinc-700">
                 {t("site_email_templates.resend.enabled", "Ieslēgt Resend")}
               </span>
-              <Switch
+              <ToggleSwitch
                 checked={enabled}
                 disabled={isPending}
                 label={t(

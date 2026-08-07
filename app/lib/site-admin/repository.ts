@@ -13,6 +13,7 @@ import {
   sanitizeSiteBrandingUrl,
   type SiteBrandingAssetKind,
 } from "@/app/lib/site-admin/branding-validation";
+import { slugifyName } from "@/app/lib/slugify";
 import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import {
   DEFAULT_GROUP_DEFINITIONS,
@@ -20,12 +21,23 @@ import {
   type PermissionSet,
   type UserGroupSummary,
 } from "@/app/lib/auth/permissions";
+import type {
+  SiteCompanySummary,
+  SiteLanguageSummary,
+} from "@/app/lib/site-admin/types";
+
+export type { SiteCompanySummary, SiteLanguageSummary } from "@/app/lib/site-admin/types";
 
 type CompanyRow = {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
+  payment_plan_id: string | null;
+  payment_plan_until: string | null;
+  payment_plan_paid: boolean;
+  access_blocked: boolean;
+  is_vip: boolean;
 };
 
 type CompanyUserRow = {
@@ -134,21 +146,6 @@ type SiteDocRow = {
   updated_at: string;
 };
 
-export type SiteCompanySummary = {
-  id: string;
-  name: string;
-  logoUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-  settingsCompanyName: string;
-  registrationNumber: string;
-  address: string;
-  email: string;
-  phone: string;
-  userCount: number;
-  activeUserCount: number;
-};
-
 export type SiteCompanyUserSummary = {
   companyId: string | null;
   companyName: string | null;
@@ -197,14 +194,6 @@ export type SiteUserGroupSummary = UserGroupSummary & {
 
 export type SiteUserGroupInput = {
   name: string;
-};
-
-export type SiteLanguageSummary = {
-  code: string;
-  name: string;
-  isActive: boolean;
-  isDefault: boolean;
-  sortOrder: number;
 };
 
 export type SiteLanguageInput = {
@@ -345,23 +334,11 @@ function mapSiteUserGroupRow(row: SiteUserGroupRow): SiteUserGroupSummary {
   };
 }
 
-function slugifySiteGroupName(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return slug || "grupa";
-}
-
 async function buildUniqueSiteGroupSlug(
   supabase: ReturnType<typeof createAdminClient>,
   name: string,
 ): Promise<string> {
-  const baseSlug = slugifySiteGroupName(name);
+  const baseSlug = slugifyName(name);
   let slug = baseSlug;
   let counter = 2;
 
@@ -475,7 +452,9 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
   const [companiesResult, usersResult, settingsResult] = await Promise.all([
     supabase
       .from("companies")
-      .select("id, name, created_at, updated_at")
+      .select(
+        "id, name, created_at, updated_at, payment_plan_id, payment_plan_until, payment_plan_paid, access_blocked, is_vip",
+      )
       .order("name", { ascending: true }),
     supabase.from("company_users").select("company_id, status"),
     supabase
@@ -544,6 +523,13 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
       phone: settings?.phone ?? "",
       userCount: stats.userCount,
       activeUserCount: stats.activeUserCount,
+      paymentPlanId: company.payment_plan_id ?? null,
+      paymentPlanUntil: company.payment_plan_until
+        ? String(company.payment_plan_until).slice(0, 10)
+        : null,
+      paymentPlanPaid: company.payment_plan_paid === true,
+      accessBlocked: company.access_blocked === true,
+      isVip: company.is_vip === true,
     };
   });
 }
