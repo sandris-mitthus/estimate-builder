@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.128
+
+**Atkarību drošība**
+
+- **`pdfjs-dist`** → `6.2.108` (GHSA-hq66-cqwq-w95j)
+- **`js-yaml`** override → `4.3.1` (CVE-2026-59870 / GHSA-5p4m-2wfm-xmqj)
+
 ## v1.3.127
 
 **Pieejas atrisināšana bez liekiem apļiem**
