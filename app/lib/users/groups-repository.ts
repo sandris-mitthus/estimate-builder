@@ -7,7 +7,11 @@ import {
   type PermissionSet,
   type UserGroupSummary,
 } from "@/app/lib/auth/permissions";
-import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import {
+  getCurrentCompanyId,
+  getCurrentCompanyMembership,
+} from "@/app/lib/companies/current-company";
 import { listSiteUserGroups } from "@/app/lib/site-admin/repository";
 import { slugifyName } from "@/app/lib/slugify";
 import { createAdminClient } from "@/app/lib/supabase/admin";
@@ -280,8 +284,6 @@ export async function getUserGroupMembership(
     return null;
   }
 
-  await ensureDefaultGroups(supabase, companyId);
-
   const { data: membership } = await supabase
     .from("company_group_members")
     .select("group_id")
@@ -292,6 +294,9 @@ export async function getUserGroupMembership(
   let groupId = membership?.group_id ?? null;
 
   if (!groupId) {
+    // Only the fallback needs the default profiles to exist, so the guard stays
+    // off the path taken by users who already belong to a profile.
+    await ensureDefaultGroups(supabase, companyId);
     groupId = await ensureUserDefaultMembership(supabase, userId, companyId);
   }
 
@@ -640,6 +645,12 @@ export type UserAccess = {
   permissions: PermissionSet;
 };
 
+function normalizeCompanyRole(
+  role: string | null | undefined,
+): UserAccess["companyRole"] {
+  return role === "owner" || role === "admin" ? role : "member";
+}
+
 async function getCompanyUserRole(
   userId: string,
   companyId: string | null,
@@ -656,13 +667,23 @@ async function getCompanyUserRole(
     .eq("user_id", userId)
     .maybeSingle();
 
-  return data?.role === "owner" || data?.role === "admin" ? data.role : "member";
+  return normalizeCompanyRole(data?.role as string | undefined);
 }
 
 export async function getUserAccess(userId: string): Promise<UserAccess | null> {
-  const companyId = await getCurrentCompanyId();
-  const companyRole = await getCompanyUserRole(userId, companyId);
-  const group = await getUserGroupMembership(userId);
+  const membership = await getCurrentCompanyMembership();
+  const companyId = membership?.company_id ?? null;
+  const currentUser = await getCurrentUser();
+
+  // The signed-in user's role already came back with the membership read; only a
+  // lookup for somebody else needs its own query.
+  const [companyRole, group] = await Promise.all([
+    companyId && currentUser?.id === userId
+      ? Promise.resolve(normalizeCompanyRole(membership?.role))
+      : getCompanyUserRole(userId, companyId),
+    getUserGroupMembership(userId),
+  ]);
+
   if (!group) {
     const viewer = getDefaultGroupDefinition();
     if (!viewer) {

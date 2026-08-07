@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import type { TranslationDictionary } from "@/app/lib/i18n/translations";
 import {
@@ -668,7 +669,10 @@ export async function listSiteCompanyUsers(): Promise<SiteCompanyUserSummary[]> 
   return [...systemAdminRows, ...membershipRows];
 }
 
-export async function listSiteUserGroups(): Promise<SiteUserGroupSummary[]> {
+/** Global default profiles; cached per request since several callers re-read them. */
+export const listSiteUserGroups = cache(async function listSiteUserGroups(): Promise<
+  SiteUserGroupSummary[]
+> {
   if (!isSupabaseAdminConfigured()) {
     return fallbackSiteUserGroups();
   }
@@ -685,7 +689,7 @@ export async function listSiteUserGroups(): Promise<SiteUserGroupSummary[]> {
   }
 
   return (data as SiteUserGroupRow[]).map(mapSiteUserGroupRow);
-}
+});
 
 export async function createSiteUserGroup(
   input: SiteUserGroupInput,

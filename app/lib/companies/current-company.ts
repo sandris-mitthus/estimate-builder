@@ -5,9 +5,10 @@ import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 
 export const BOOTSTRAP_COMPANY_ID = "00000000-0000-0000-0000-000000000001";
 
-type CompanyMembershipRow = {
+export type CompanyMembershipRow = {
   company_id: string;
   status?: string;
+  role?: string;
 };
 
 /**
@@ -30,7 +31,7 @@ const listCurrentUserMemberships = cache(async function listCurrentUserMembershi
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("company_users")
-    .select("company_id, status")
+    .select("company_id, status, role")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .returns<CompanyMembershipRow[]>();
@@ -60,16 +61,25 @@ const listCurrentUserMemberships = cache(async function listCurrentUserMembershi
   );
 });
 
+/**
+ * Active membership row for the signed-in user, carrying `role` so callers do not
+ * need a second `company_users` lookup. Only active membership grants access:
+ * invited = pending email acceptance, disabled = blocked, and after
+ * removeCompanyUser there is no row at all.
+ */
+export const getCurrentCompanyMembership = cache(
+  async function getCurrentCompanyMembership(): Promise<CompanyMembershipRow | null> {
+    const memberships = await listCurrentUserMemberships();
+    return (
+      memberships.find((membership) => membership.status === "active") ?? null
+    );
+  },
+);
+
 export const getCurrentCompanyId = cache(async function getCurrentCompanyId(): Promise<
   string | null
 > {
-  const memberships = await listCurrentUserMemberships();
-  // Only active membership grants access. invited = pending email acceptance;
-  // disabled = blocked. After removeCompanyUser there is no row at all.
-  const activeMembership = memberships.find(
-    (membership) => membership.status === "active",
-  );
-  return activeMembership?.company_id ?? null;
+  return (await getCurrentCompanyMembership())?.company_id ?? null;
 });
 
 /** True when the user has been invited but has not opened the invite email yet. */

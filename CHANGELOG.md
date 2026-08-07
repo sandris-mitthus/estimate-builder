@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.127
+
+**Pieejas atrisināšana bez liekiem apļiem**
+
+- **`getUserAccess`** — loma nāk no jau ielasītās `company_users` dalības (`getCurrentCompanyMembership` + `role`), nevis no otrā vaicājuma; loma un grupas dalība atrisinās paralēli
+- **`getUserGroupMembership`** — `ensureDefaultGroups` paliek tikai fallback ceļā, kad lietotājam vēl nav profila; tipiskajā pieprasījumā vairs netiek lasīti `site_user_groups` un pārbaudīti default profili
+- **`listSiteUserGroups`** — React `cache` uz pieprasījumu, lai vairāki izsaucēji vienā SSR renderī neatkārto to pašu vaicājumu
+
 ## v1.3.126
 
 **Renderēšanas ceļa apļi un dev ātrums**
