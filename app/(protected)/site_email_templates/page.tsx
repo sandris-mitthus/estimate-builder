@@ -21,11 +21,11 @@ export default async function SiteEmailTemplatesPage() {
       title={t("nav.system_admin.site_email_templates", "E-pasta šabloni")}
       subtitle={t(
         "site_email_templates.page.subtitle",
-        "Resend integrācija un e-pastu teksti, kas tiek sūtīti lietotājiem",
+        "E-pastu teksti, kas tiek sūtīti lietotājiem",
       )}
     >
       <SiteEmailTemplatesForm
-        initialResend={resendSettings}
+        resendEnabled={resendSettings.enabled}
         initialTemplates={templates}
         languages={languages}
       />

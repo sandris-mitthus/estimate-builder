@@ -242,6 +242,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "E-pasta šabloni",
   },
   {
+    key: "system_admin:site_integrations",
+    href: "/site_integrations",
+    icon: "fas fa-plug",
+    labelKey: "nav.system_admin.site_integrations",
+    fallbackLabel: "Integrācijas",
+  },
+  {
     key: "system_admin:site_settings",
     href: "/site_settings",
     icon: "fas fa-sliders",

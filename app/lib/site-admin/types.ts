@@ -14,6 +14,8 @@ export type SiteCompanySummary = {
   paymentPlanId: string | null;
   paymentPlanUntil: string | null;
   paymentPlanPaid: boolean;
+  /** Plan came from the signup trial, not from a real payment. */
+  paymentPlanIsTrial: boolean;
   accessBlocked: boolean;
   isVip: boolean;
 };

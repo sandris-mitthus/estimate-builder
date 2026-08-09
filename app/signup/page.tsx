@@ -9,7 +9,7 @@ import { getSiteSettings, listSiteLanguages } from "@/app/lib/site-admin/reposit
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({
+export default async function SignupPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
@@ -38,7 +38,7 @@ export default async function LoginPage({
 
   return (
     <AuthScreen
-      mode="login"
+      mode="signup"
       returnPath={getSafeRedirectPath(params.next ?? null)}
       systemName={siteSettings.systemName}
       logoUrl={siteSettings.logoUrl}

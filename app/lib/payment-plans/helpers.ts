@@ -90,6 +90,24 @@ export function getCompanyAccessLockReason(input: {
   return null;
 }
 
+export type TrialSettings = {
+  /** null disables the trial: new companies get no plan at all. */
+  trialPlanId: string | null;
+  trialDays: number;
+};
+
+export const MIN_TRIAL_DAYS = 1;
+export const MAX_TRIAL_DAYS = 365;
+export const DEFAULT_TRIAL_DAYS = 14;
+
+/** YYYY-MM-DD that is `days` after today, used for trial valid-until dates. */
+export function addDaysToTodayIso(days: number, todayIso?: string): string {
+  const base = todayIso ?? new Date().toISOString().slice(0, 10);
+  const date = new Date(`${base}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + Math.trunc(days));
+  return date.toISOString().slice(0, 10);
+}
+
 /** Normalize DB date / ISO timestamp to YYYY-MM-DD for <input type="date">. */
 export function toDateInputValue(value: string | null | undefined): string {
   const trimmed = value?.trim() ?? "";

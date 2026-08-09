@@ -189,6 +189,9 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Tāme ir apstiprināta un to vairs nevar labot.":
     "errors.estimate_approved_locked",
   "Tāme nav atrasta.": "errors.estimate_not_found",
+  "Ievadi izmēģinājuma dienu skaitu no 1 līdz 365.":
+    "errors.trial_days_invalid",
+  "Maksas plāns nav atrasts.": "errors.payment_plan_not_found",
   "Modulis nav atrasts.": "errors.module_not_found",
   "Projekts nav atrasts.": "errors.project_not_found",
   "Uzņēmums nav atrasts.": "errors.company_not_found",

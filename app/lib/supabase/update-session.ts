@@ -28,6 +28,8 @@ function purgeForeignSupabaseCookies(
 const PUBLIC_PATHS = [
   "/auth/",
   "/auth/auth-code-error",
+  "/login",
+  "/signup",
   "/docs",
   "/wiki",
   "/privacy",

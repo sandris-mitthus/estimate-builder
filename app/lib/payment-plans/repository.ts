@@ -9,19 +9,28 @@ import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { cache } from "react";
 import {
+  DEFAULT_TRIAL_DAYS,
+  MAX_TRIAL_DAYS,
+  MIN_TRIAL_DAYS,
   getCompanyAccessLockReason,
   type CompanyAccessLockReason,
   type LocalizedValues,
   type PaymentPlanInput,
   type PaymentPlanSummary,
+  type TrialSettings,
 } from "@/app/lib/payment-plans/helpers";
 
 export type {
   LocalizedValues,
   PaymentPlanInput,
   PaymentPlanSummary,
+  TrialSettings,
 } from "@/app/lib/payment-plans/helpers";
 export {
+  DEFAULT_TRIAL_DAYS,
+  MAX_TRIAL_DAYS,
+  MIN_TRIAL_DAYS,
+  addDaysToTodayIso,
   getCompanyAccessLockReason,
   isCompanyPaymentPlanActive,
   isCompanyPaymentPlanExpired,
@@ -93,6 +102,93 @@ export async function setPaymentPlansEnabled(
   if (error) {
     return { ok: false, error: "Neizdevās saglabāt maksas plānu iestatījumu." };
   }
+  return { ok: true };
+}
+
+function normalizeTrialDays(value: unknown): number {
+  const parsed =
+    typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_TRIAL_DAYS;
+  }
+  return Math.min(MAX_TRIAL_DAYS, Math.max(MIN_TRIAL_DAYS, Math.trunc(parsed)));
+}
+
+export const getTrialSettings = cache(async (): Promise<TrialSettings> => {
+  if (!isSupabaseAdminConfigured()) {
+    return { trialPlanId: null, trialDays: DEFAULT_TRIAL_DAYS };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("trial_plan_id, trial_days")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { trialPlanId: null, trialDays: DEFAULT_TRIAL_DAYS };
+  }
+
+  return {
+    trialPlanId:
+      typeof data.trial_plan_id === "string" && data.trial_plan_id.trim()
+        ? data.trial_plan_id
+        : null,
+    trialDays: normalizeTrialDays(data.trial_days),
+  };
+});
+
+export async function saveTrialSettings(
+  input: TrialSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const planId = input.trialPlanId?.trim() || null;
+  const rawDays =
+    typeof input.trialDays === "number"
+      ? input.trialDays
+      : Number.parseInt(String(input.trialDays ?? ""), 10);
+
+  // The length only matters while a trial plan is selected; without one it is
+  // just a stored preference, so keep it usable instead of failing the save.
+  const daysInvalid =
+    !Number.isFinite(rawDays) ||
+    !Number.isInteger(rawDays) ||
+    rawDays < MIN_TRIAL_DAYS ||
+    rawDays > MAX_TRIAL_DAYS;
+
+  if (planId && daysInvalid) {
+    return {
+      ok: false,
+      error: "Ievadi izmēģinājuma dienu skaitu no 1 līdz 365.",
+    };
+  }
+
+  const days = daysInvalid ? normalizeTrialDays(rawDays) : rawDays;
+
+  if (planId) {
+    const plans = await listPaymentPlans();
+    if (!plans.some((plan) => plan.id === planId)) {
+      return { ok: false, error: "Maksas plāns nav atrasts." };
+    }
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("site_settings").upsert(
+    { id: 1, trial_plan_id: planId, trial_days: days },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: "Neizdevās saglabāt izmēģinājuma iestatījumus.",
+    };
+  }
+
   return { ok: true };
 }
 
@@ -386,6 +482,8 @@ export async function updateCompanyPaymentPlan(
       payment_plan_until: until,
       payment_plan_paid: input.paymentPlanPaid === true,
       access_blocked: input.accessBlocked === true,
+      // An explicit admin decision replaces the signup trial.
+      payment_plan_is_trial: false,
     })
     .eq("id", trimmedCompanyId);
 

@@ -49,6 +49,7 @@ type CompanyPlanState = {
   paymentPlanId: string | null;
   paymentPlanUntil: string | null;
   paymentPlanPaid: boolean;
+  paymentPlanIsTrial: boolean;
   accessBlocked: boolean;
 };
 
@@ -57,9 +58,18 @@ function planStateFromCompany(company: SiteCompanySummary): CompanyPlanState {
     paymentPlanId: company.paymentPlanId,
     paymentPlanUntil: company.paymentPlanUntil,
     paymentPlanPaid: company.paymentPlanPaid,
+    paymentPlanIsTrial: company.paymentPlanIsTrial,
     accessBlocked: company.accessBlocked,
   };
 }
+
+const emptyPlanState: CompanyPlanState = {
+  paymentPlanId: null,
+  paymentPlanUntil: null,
+  paymentPlanPaid: false,
+  paymentPlanIsTrial: false,
+  accessBlocked: false,
+};
 
 export function SiteCompaniesModulesManager({
   companies,
@@ -151,12 +161,7 @@ export function SiteCompaniesModulesManager({
     clearFeedback();
     setSelectedCompanyId(companyId);
     if (paymentPlansEnabled) {
-      const current = planByCompany[companyId] ?? {
-        paymentPlanId: null,
-        paymentPlanUntil: null,
-        paymentPlanPaid: false,
-        accessBlocked: false,
-      };
+      const current = planByCompany[companyId] ?? emptyPlanState;
       setPlanDraft({ ...current });
       setPlanSaved({ ...current });
     }
@@ -255,14 +260,14 @@ export function SiteCompaniesModulesManager({
     if (pendingKey) return;
     clearFeedback();
 
-    const current = planByCompany[companyId] ?? {
-      paymentPlanId: null,
-      paymentPlanUntil: null,
-      paymentPlanPaid: false,
-      accessBlocked: false,
-    };
+    const current = planByCompany[companyId] ?? emptyPlanState;
     const previous = { ...current };
-    const next = { ...current, paymentPlanPaid: nextPaid };
+    // Any explicit admin decision ends the signup trial, mirroring the server.
+    const next = {
+      ...current,
+      paymentPlanPaid: nextPaid,
+      paymentPlanIsTrial: false,
+    };
 
     setPlanByCompany((state) => ({ ...state, [companyId]: next }));
     if (selectedCompanyId === companyId && planDraft) {
@@ -304,14 +309,13 @@ export function SiteCompaniesModulesManager({
     if (pendingKey) return;
     clearFeedback();
 
-    const current = planByCompany[companyId] ?? {
-      paymentPlanId: null,
-      paymentPlanUntil: null,
-      paymentPlanPaid: false,
-      accessBlocked: false,
-    };
+    const current = planByCompany[companyId] ?? emptyPlanState;
     const previous = { ...current };
-    const next = { ...current, accessBlocked: nextBlocked };
+    const next = {
+      ...current,
+      accessBlocked: nextBlocked,
+      paymentPlanIsTrial: false,
+    };
 
     setPlanByCompany((state) => ({ ...state, [companyId]: next }));
     if (selectedCompanyId === companyId && planDraft) {
@@ -355,6 +359,7 @@ export function SiteCompaniesModulesManager({
       paymentPlanId: planDraft.paymentPlanId?.trim() || null,
       paymentPlanUntil: planDraft.paymentPlanUntil?.trim() || null,
       paymentPlanPaid: planDraft.paymentPlanPaid,
+      paymentPlanIsTrial: false,
       accessBlocked: planDraft.accessBlocked,
     };
 
@@ -400,22 +405,28 @@ export function SiteCompaniesModulesManager({
     return (
       <td className="px-5 py-4">
         <p className="font-semibold text-zinc-900">{planName}</p>
-        <button
-          type="button"
-          onClick={(event) =>
-            handlePaidToggle(company.id, !state.paymentPlanPaid, event)
-          }
-          disabled={pendingKey === `paid:${company.id}` || isPending}
-          className={`mt-2 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-            state.paymentPlanPaid
-              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-          }`}
-        >
-          {state.paymentPlanPaid
-            ? t("site_companies.plan.paid", "Samaksāts")
-            : t("site_companies.plan.unpaid", "Nav samaksāts")}
-        </button>
+        {state.paymentPlanIsTrial ? (
+          <span className="mt-2 inline-flex items-center rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+            {t("site_companies.plan.trial", "Izmēģinājums")}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={(event) =>
+              handlePaidToggle(company.id, !state.paymentPlanPaid, event)
+            }
+            disabled={pendingKey === `paid:${company.id}` || isPending}
+            className={`mt-2 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              state.paymentPlanPaid
+                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+            }`}
+          >
+            {state.paymentPlanPaid
+              ? t("site_companies.plan.paid", "Samaksāts")
+              : t("site_companies.plan.unpaid", "Nav samaksāts")}
+          </button>
+        )}
         <p className="mt-2 text-xs text-zinc-500">
           {t("site_companies.plan.until", "Līdz")}{" "}
           {state.paymentPlanUntil

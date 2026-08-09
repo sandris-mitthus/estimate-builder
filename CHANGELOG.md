@@ -10,6 +10,15 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.131
+
+**Publiskā landing lapa, auth un integrācijas**
+
+- Anonīms `/` rāda marketinga landing page; `/login` un `/signup` ir atsevišķi ekrāni (`AuthScreen`); `LoginGate` noņemts
+- `/site_integrations` — sistēmas admina sadaļa: ieslēgt/izslēgt landing page un konfigurēt Resend (pārcelts no e-pasta šabloniem); bez landing `/` novirza uz `/login`
+- Izmēģinājuma periods jauniem uzņēmumiem (`trial_plan_id` + `trial_days` `/site_payment_plans`); reģistrācija piešķir plānu ar `payment_plan_is_trial`, un `/site_companies` rāda **Izmēģinājums** badge
+- Kad maksas plāni ir ieslēgti, landing page rāda plānu kartes ar iekļautajiem moduļiem un izmēģinājuma piezīmi
+
 ## v1.3.130
 
 **Atkarību drošība**

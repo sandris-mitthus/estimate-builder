@@ -1,12 +1,8 @@
 "use client";
 
-import { ToggleSwitch } from "@/app/components/ui/toggle-switch";
-
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import {
-  saveEmailTemplatesAction,
-  saveResendSettingsAction,
-} from "@/app/(protected)/site_email_templates/actions";
+import { saveEmailTemplatesAction } from "@/app/(protected)/site_email_templates/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { UnsavedChangesConfirmModal } from "@/app/components/unsaved-changes-confirm-modal";
 import { useTranslations } from "@/app/components/translations-provider";
@@ -14,7 +10,6 @@ import { useUnsavedChangesGuard } from "@/app/lib/hooks/use-unsaved-changes-guar
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import { interpolateTranslation } from "@/app/lib/i18n/translations";
 import { buildInviteEmailHtml } from "@/app/lib/email/build-invite-email-html";
-import type { ResendSettingsPublic } from "@/app/lib/email/resend-config";
 import type {
   EmailTemplateDraft,
   EmailTemplateKind,
@@ -111,22 +106,18 @@ function templatesEqual(
 }
 
 export function SiteEmailTemplatesForm({
-  initialResend,
+  resendEnabled,
   initialTemplates,
   languages,
 }: {
-  initialResend: ResendSettingsPublic;
+  /** Read-only here: Resend is configured under /site_integrations. */
+  resendEnabled: boolean;
   initialTemplates: EmailTemplateDraft[];
   languages: SiteLanguageSummary[];
 }) {
   const { t } = useTranslations();
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [isPending, startTransition] = useTransition();
-
-  const [enabled, setEnabled] = useState(initialResend.enabled);
-  const [emailFrom, setEmailFrom] = useState(initialResend.emailFrom);
-  const [apiKey, setApiKey] = useState("");
-  const [savedResend, setSavedResend] = useState(initialResend);
 
   const [templates, setTemplates] = useState(() =>
     cloneTemplates(initialTemplates),
@@ -141,12 +132,7 @@ export function SiteEmailTemplatesForm({
       "lv",
   );
 
-  const resendDirty =
-    enabled !== savedResend.enabled ||
-    emailFrom.trim() !== savedResend.emailFrom.trim() ||
-    apiKey.trim().length > 0;
-  const templatesDirty = !templatesEqual(templates, savedTemplates);
-  const isDirty = resendDirty || templatesDirty;
+  const isDirty = !templatesEqual(templates, savedTemplates);
 
   const { confirmOpen, stayOnPage, confirmLeave } = useUnsavedChangesGuard({
     isDirty,
@@ -225,66 +211,10 @@ export function SiteEmailTemplatesForm({
     );
   }
 
-  function handleSaveResend(event: React.FormEvent) {
-    event.preventDefault();
-    clearFeedback();
-    if (!resendDirty) return;
-
-    if (enabled && !emailFrom.trim()) {
-      showFeedback({
-        type: "error",
-        text: t(
-          "site_email_templates.resend.validation.from_required",
-          "Ievadi sūtītāja adresi, lai ieslēgtu Resend.",
-        ),
-      });
-      return;
-    }
-
-    if (
-      enabled &&
-      !apiKey.trim() &&
-      !savedResend.hasStoredApiKey &&
-      !savedResend.hasEnvApiKey
-    ) {
-      showFeedback({
-        type: "error",
-        text: t(
-          "site_email_templates.resend.validation.key_required",
-          "Ievadi Resend API atslēgu vai iestati RESEND_API_KEY vidē.",
-        ),
-      });
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await saveResendSettingsAction({
-        enabled,
-        emailFrom,
-        apiKey,
-      });
-      if (result.ok) {
-        setSavedResend(result.settings);
-        setEnabled(result.settings.enabled);
-        setEmailFrom(result.settings.emailFrom);
-        setApiKey("");
-        showFeedback({
-          type: "success",
-          text: t(
-            "site_email_templates.resend.saved",
-            "Resend iestatījumi saglabāti.",
-          ),
-        });
-        return;
-      }
-      showFeedback({ type: "error", text: translateActionError(t, result) });
-    });
-  }
-
   function handleSaveTemplates(event: React.FormEvent) {
     event.preventDefault();
     clearFeedback();
-    if (!templatesDirty) return;
+    if (!isDirty) return;
 
     startTransition(async () => {
       const result = await saveEmailTemplatesAction(templates);
@@ -307,133 +237,20 @@ export function SiteEmailTemplatesForm({
 
   return (
     <div className="space-y-8">
-      <form
-        onSubmit={handleSaveResend}
-        className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6"
-      >
-        <fieldset disabled={isPending} className="space-y-5 disabled:opacity-80">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-zinc-900">
-                {t(
-                  "site_email_templates.resend.section",
-                  "Resend integrācija",
-                )}
-              </h2>
-              <p className="mt-1 text-xs text-zinc-500">
-                {t(
-                  "site_email_templates.resend.section_hint",
-                  "Kad ieslēgts, uzaicinājumi un pieejas paziņojumi tiek sūtīti caur Resend ar zemāk esošajiem šabloniem. Bez API atslēgas un sūtītāja adreses e-pasti netiek sūtīti.",
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-zinc-700">
-                {t("site_email_templates.resend.enabled", "Ieslēgt Resend")}
-              </span>
-              <ToggleSwitch
-                checked={enabled}
-                disabled={isPending}
-                label={t(
-                  "site_email_templates.resend.enabled",
-                  "Ieslēgt Resend",
-                )}
-                onChange={(next) => {
-                  clearFeedback();
-                  setEnabled(next);
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="emailFrom" className={labelClassName}>
-              {t(
-                "site_email_templates.resend.email_from",
-                "Sūtītāja adrese (From)",
-              )}
-            </label>
-            <input
-              id="emailFrom"
-              value={emailFrom}
-              onChange={(event) => {
-                clearFeedback();
-                setEmailFrom(event.target.value);
-              }}
-              className={fieldClassName}
-              placeholder="Estimate Builder <noreply@yourdomain.com>"
-              autoComplete="off"
-            />
-            <p className="mt-1 text-xs text-zinc-500">
-              {t(
-                "site_email_templates.resend.email_from_hint",
-                "Piemērs: Estimate Builder <noreply@yourdomain.com>. Domēnam jābūt verificētam Resend.",
-              )}
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="resendApiKey" className={labelClassName}>
-              {t(
-                "site_email_templates.resend.api_key",
-                "Resend API atslēga",
-              )}
-            </label>
-            <input
-              id="resendApiKey"
-              type="password"
-              value={apiKey}
-              onChange={(event) => {
-                clearFeedback();
-                setApiKey(event.target.value);
-              }}
-              className={fieldClassName}
-              placeholder={
-                savedResend.hasStoredApiKey ? "••••••••••••••••" : "re_…"
-              }
-              autoComplete="new-password"
-            />
-            <p className="mt-1 text-xs text-zinc-500">
-              {savedResend.hasStoredApiKey
-                ? t(
-                    "site_email_templates.resend.api_key_hint_set",
-                    "Atslēga ir saglabāta. Atstāj tukšu, lai saglabātu esošo, vai ievadi jaunu, lai aizstātu.",
-                  )
-                : t(
-                    "site_email_templates.resend.api_key_hint_empty",
-                    "Var arī iestatīt RESEND_API_KEY vides mainīgajā serverī.",
-                  )}
-            </p>
-            {savedResend.hasEnvApiKey ? (
-              <p className="mt-1 text-xs text-emerald-700">
-                {t(
-                  "site_email_templates.resend.env_key_configured",
-                  "Serverī ir iestatīts RESEND_API_KEY (vides mainīgais).",
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex justify-end border-t border-zinc-100 pt-5">
-            <button
-              type="submit"
-              disabled={isPending || !resendDirty}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isPending && resendDirty ? (
-                <i
-                  className="fas fa-circle-notch fa-spin text-xs"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {t(
-                "site_email_templates.resend.save",
-                "Saglabāt Resend iestatījumus",
-              )}
-            </button>
-          </div>
-        </fieldset>
-      </form>
+      {resendEnabled ? null : (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          {t(
+            "site_email_templates.resend_disabled_notice",
+            "Resend ir izslēgts, tāpēc e-pasti netiek sūtīti. Ieslēdz to sadaļā Integrācijas.",
+          )}{" "}
+          <Link
+            href="/site_integrations"
+            className="font-semibold underline underline-offset-2"
+          >
+            {t("nav.system_admin.site_integrations", "Integrācijas")}
+          </Link>
+        </p>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <form
@@ -628,10 +445,10 @@ export function SiteEmailTemplatesForm({
             <div className="flex justify-end border-t border-zinc-100 pt-5">
               <button
                 type="submit"
-                disabled={isPending || !templatesDirty}
+                disabled={isPending || !isDirty}
                 className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isPending && templatesDirty ? (
+                {isPending && isDirty ? (
                   <i
                     className="fas fa-circle-notch fa-spin text-xs"
                     aria-hidden="true"

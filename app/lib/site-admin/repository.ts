@@ -37,6 +37,7 @@ type CompanyRow = {
   payment_plan_id: string | null;
   payment_plan_until: string | null;
   payment_plan_paid: boolean;
+  payment_plan_is_trial: boolean;
   access_blocked: boolean;
   is_vip: boolean;
 };
@@ -454,7 +455,7 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
     supabase
       .from("companies")
       .select(
-        "id, name, created_at, updated_at, payment_plan_id, payment_plan_until, payment_plan_paid, access_blocked, is_vip",
+        "id, name, created_at, updated_at, payment_plan_id, payment_plan_until, payment_plan_paid, payment_plan_is_trial, access_blocked, is_vip",
       )
       .order("name", { ascending: true }),
     supabase.from("company_users").select("company_id, status"),
@@ -529,6 +530,7 @@ export async function listSiteCompanies(): Promise<SiteCompanySummary[]> {
         ? String(company.payment_plan_until).slice(0, 10)
         : null,
       paymentPlanPaid: company.payment_plan_paid === true,
+      paymentPlanIsTrial: company.payment_plan_is_trial === true,
       accessBlocked: company.access_blocked === true,
       isVip: company.is_vip === true,
     };

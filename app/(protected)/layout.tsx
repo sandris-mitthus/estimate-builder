@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { ActionPermissionsProvider } from "@/app/components/action-permissions-context";
 import { AppNav } from "@/app/components/app-nav";
 import { AssignedMaterialsBannerLoader } from "@/app/components/assigned-materials-banner-loader";
 import { RegisterCompanyView } from "@/app/components/register-company-view";
 import { PendingCompanyInviteView } from "@/app/components/pending-company-invite-view";
-import { LoginGate } from "@/app/components/login-gate";
+import { LandingPage } from "@/app/components/landing-page";
 import { SiteFooter } from "@/app/components/site-footer";
 import { SystemAdminProvider } from "@/app/components/system-admin-context";
 import { TranslationsProvider } from "@/app/components/translations-provider";
@@ -16,7 +17,6 @@ import {
   getCurrentCompanyId,
   hasPendingCompanyInvite,
 } from "@/app/lib/companies/current-company";
-import { getResendSettingsPublic } from "@/app/lib/email/resend-config";
 import {
   getDefaultSiteLanguageCode,
   DEFAULT_SITE_LANGUAGES,
@@ -30,10 +30,19 @@ import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-
 import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
 import { CompanyAccessLockOverlay } from "@/app/components/company-access-lock-overlay";
 import { filterNavKeysByFrontendModules } from "@/app/lib/frontend-modules/access";
+import { isLandingPageEnabled } from "@/app/lib/integrations/landing-page";
 import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
 import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
-import { getCompanyAccessLockReasonForCompany } from "@/app/lib/payment-plans/repository";
-import type { CompanyAccessLockReason } from "@/app/lib/payment-plans/helpers";
+import {
+  getCompanyAccessLockReasonForCompany,
+  getTrialSettings,
+  isPaymentPlansEnabled,
+  listPaymentPlans,
+} from "@/app/lib/payment-plans/repository";
+import type {
+  CompanyAccessLockReason,
+  PaymentPlanSummary,
+} from "@/app/lib/payment-plans/helpers";
 import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
@@ -54,6 +63,28 @@ async function getAnonymousActiveLanguageCode(
 
   const defaultCode = await getDefaultSiteLanguageCode();
   return activeCodes.has(defaultCode) ? defaultCode : (languages[0]?.code ?? "lv");
+}
+
+/** Plans are only shown on the public landing page when payment plans are on. */
+async function getLandingPricingProps(): Promise<{
+  paymentPlans: PaymentPlanSummary[];
+  trialDays: number | null;
+  trialPlanId: string | null;
+}> {
+  if (!(await isPaymentPlansEnabled())) {
+    return { paymentPlans: [], trialDays: null, trialPlanId: null };
+  }
+
+  const [paymentPlans, trial] = await Promise.all([
+    listPaymentPlans(),
+    getTrialSettings(),
+  ]);
+
+  return {
+    paymentPlans,
+    trialDays: trial.trialPlanId ? trial.trialDays : null,
+    trialPlanId: trial.trialPlanId,
+  };
 }
 
 export default async function ProtectedLayout({
@@ -84,11 +115,15 @@ export default async function ProtectedLayout({
 
   if (isSupabaseConfigured()) {
     if (!user) {
+      if (!(await isLandingPageEnabled())) {
+        redirect("/login");
+      }
+
       languages = await listSiteLanguages({ activeOnly: true });
       activeLanguageCode = await getAnonymousActiveLanguageCode(languages);
-      const [translationsResult, resendSettings] = await Promise.all([
+      const [translationsResult, pricing] = await Promise.all([
         getSiteTranslationDictionary(activeLanguageCode),
-        getResendSettingsPublic(),
+        getLandingPricingProps(),
       ]);
       translations = translationsResult;
 
@@ -97,13 +132,15 @@ export default async function ProtectedLayout({
           languageCode={activeLanguageCode}
           translations={translations}
         >
-          <LoginGate
+          <LandingPage
             systemName={siteSettings.systemName}
             slogan={siteSettings.slogan}
             logoUrl={siteSettings.logoUrl}
             languages={languages}
             activeLanguageCode={activeLanguageCode}
-            emailAuthEnabled={resendSettings.enabled}
+            paymentPlans={pricing.paymentPlans}
+            trialDays={pricing.trialDays}
+            trialPlanId={pricing.trialPlanId}
           />
         </TranslationsProvider>
       );
@@ -186,7 +223,7 @@ export default async function ProtectedLayout({
         languageCode={activeLanguageCode}
         translations={translations}
       >
-        <LoginGate
+        <LandingPage
           systemName={siteSettings.systemName}
           slogan={siteSettings.slogan}
           logoUrl={siteSettings.logoUrl}

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createPaymentPlanAction,
   deletePaymentPlanAction,
+  saveTrialSettingsAction,
   setPaymentPlansEnabledAction,
   updatePaymentPlanAction,
 } from "@/app/(protected)/site_payment_plans/actions";
@@ -18,14 +19,20 @@ import { useTranslations } from "@/app/components/translations-provider";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
 import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
 import {
+  MAX_TRIAL_DAYS,
+  MIN_TRIAL_DAYS,
   resolveLocalizedValue,
   type LocalizedValues,
   type PaymentPlanSummary,
+  type TrialSettings,
 } from "@/app/lib/payment-plans/helpers";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/types";
 
-const fieldClassName =
-  "mt-1.5 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+const fieldBaseClassName =
+  "w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+const fieldClassName = `mt-1.5 ${fieldBaseClassName}`;
+// Native select arrow replaced by the app-wide chevron (see /site_companies).
+const selectClassName = `${fieldBaseClassName} appearance-none pr-10`;
 
 function emptyValues(languages: SiteLanguageSummary[]): LocalizedValues {
   return Object.fromEntries(languages.map((language) => [language.code, ""]));
@@ -104,11 +111,13 @@ function moduleLabel(
 export function SitePaymentPlansForm({
   initialEnabled,
   initialPlans,
+  initialTrial,
   modules,
   languages,
 }: {
   initialEnabled: boolean;
   initialPlans: PaymentPlanSummary[];
+  initialTrial: TrialSettings;
   modules: FrontendModuleSummary[];
   languages: SiteLanguageSummary[];
 }) {
@@ -116,6 +125,16 @@ export function SitePaymentPlansForm({
   const { showFeedback, clearFeedback } = useFeedbackToast();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [plans, setPlans] = useState(initialPlans);
+  const { trialPlanId: initialTrialPlanId, trialDays: initialTrialDays } =
+    initialTrial;
+  const [trialPlanId, setTrialPlanId] = useState<string | null>(
+    initialTrialPlanId,
+  );
+  const [trialDaysText, setTrialDaysText] = useState(String(initialTrialDays));
+  const [savedTrial, setSavedTrial] = useState<TrialSettings>({
+    trialPlanId: initialTrialPlanId,
+    trialDays: initialTrialDays,
+  });
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PaymentPlanSummary | null>(
     null,
@@ -144,12 +163,24 @@ export function SitePaymentPlansForm({
     setPlans(initialPlans);
   }, [initialPlans]);
 
+  useEffect(() => {
+    setTrialPlanId(initialTrialPlanId);
+    setTrialDaysText(String(initialTrialDays));
+    setSavedTrial({
+      trialPlanId: initialTrialPlanId,
+      trialDays: initialTrialDays,
+    });
+  }, [initialTrialPlanId, initialTrialDays]);
+
   const globallyEnabledModules = useMemo(
     () => modules.filter((module) => module.isEnabled),
     [modules],
   );
 
   const dirty = !draftsEqual(draft, savedDraft);
+  const trialDirty =
+    trialPlanId !== savedTrial.trialPlanId ||
+    trialDaysText.trim() !== String(savedTrial.trialDays);
 
   function openCreate() {
     clearFeedback();
@@ -206,6 +237,37 @@ export function SitePaymentPlansForm({
         text: t(
           "site_payment_plans.enable.saved",
           "Maksas plānu iestatījums saglabāts.",
+        ),
+      });
+    });
+  }
+
+  function handleSaveTrial(event: React.FormEvent) {
+    event.preventDefault();
+    if (!trialDirty || isBusy) return;
+    clearFeedback();
+
+    startTransition(async () => {
+      setPendingKey("trial");
+      const parsedDays = Number.parseInt(trialDaysText.trim(), 10);
+      const result = await saveTrialSettingsAction({
+        trialPlanId,
+        trialDays: parsedDays,
+      });
+      setPendingKey(null);
+
+      if (!result.ok) {
+        showFeedback({ type: "error", text: translateActionError(t, result) });
+        return;
+      }
+
+      setSavedTrial({ trialPlanId, trialDays: parsedDays });
+      setTrialDaysText(String(parsedDays));
+      showFeedback({
+        type: "success",
+        text: t(
+          "site_payment_plans.trial.saved",
+          "Izmēģinājuma iestatījumi saglabāti.",
         ),
       });
     });
@@ -324,6 +386,90 @@ export function SitePaymentPlansForm({
           </div>
         </div>
       </div>
+
+      <form
+        onSubmit={handleSaveTrial}
+        className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6"
+      >
+        <h2 className="text-sm font-semibold text-zinc-900">
+          {t("site_payment_plans.trial.section", "Izmēģinājuma periods")}
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          {t(
+            "site_payment_plans.trial.hint",
+            "Jauns uzņēmums pēc reģistrācijas saņem šo plānu uz norādīto dienu skaitu. Bez izmēģinājuma plāna jaunam uzņēmumam nav pieejas, kamēr plānu nepiešķir manuāli.",
+          )}
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-zinc-800">
+              {t(
+                "site_payment_plans.trial.field_plan",
+                "Plāns jauniem uzņēmumiem",
+              )}
+            </span>
+            <div className="relative mt-1.5">
+              <select
+                value={trialPlanId ?? ""}
+                onChange={(event) => setTrialPlanId(event.target.value || null)}
+                disabled={isBusy}
+                className={`${selectClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <option value="">
+                  {t("site_payment_plans.trial.plan_none", "Bez izmēģinājuma")}
+                </option>
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {resolveLocalizedValue(plan.nameValues, languageCode) ||
+                      plan.planKey}
+                  </option>
+                ))}
+              </select>
+              <i
+                className="fas fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"
+                aria-hidden="true"
+              />
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-zinc-800">
+              {t("site_payment_plans.trial.field_days", "Izmēģinājuma dienas")}
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={MIN_TRIAL_DAYS}
+              max={MAX_TRIAL_DAYS}
+              step={1}
+              value={trialDaysText}
+              onChange={(event) => setTrialDaysText(event.target.value)}
+              disabled={isBusy || trialPlanId === null}
+              className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+            />
+            <span className="mt-1 block text-xs text-zinc-500">
+              {t("site_payment_plans.trial.days_hint", "No 1 līdz 365 dienām.")}
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="submit"
+            disabled={isBusy || !trialDirty}
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingKey === "trial" ? (
+              <i
+                className="fas fa-circle-notch fa-spin text-xs"
+                aria-hidden="true"
+              />
+            ) : null}
+            {t("actions.save", "Saglabāt")}
+          </button>
+        </div>
+      </form>
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">

@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.130`
+**Current version:** `1.3.131`
 
 ---
 
@@ -21,7 +21,8 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Teams and permissions** — several companies in one system; a signed-in user without a company must register one (same form as **Uzstādījumi**) before using the app, except system admins; user groups control what each person sees and may do, with invitations and access blocking
 - **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app
-- **GDPR legal pages and cookie consent** — public privacy policy, terms of service and cookie policy (`/privacy`, `/terms`, `/cookies`) reachable from a site footer whether signed in or not; consent banner with per-category switches where optional cookies stay off until accepted and stored ones are deleted when consent is withdrawn; the data controller details shown in the privacy policy are filled in under **Sistēmas uzstādījumi**; system logo and favicon are uploaded there too (sidebar, login screen, browser tab)
+- **Public landing and auth** — anonymous visitors see a marketing landing page at `/` (toggleable under **Integrācijas**); dedicated `/login` and `/signup` screens; when payment plans are on, the landing page shows each plan and which modules it includes
+- **GDPR legal pages and cookie consent** — public privacy policy, terms of service and cookie policy (`/privacy`, `/terms`, `/cookies`) reachable from a site footer whether signed in or not; consent banner with per-category switches where optional cookies stay off until accepted and stored ones are deleted when consent is withdrawn; the data controller details shown in the privacy policy are filled in under **Sistēmas uzstādījumi**; system logo and favicon are uploaded there too (sidebar, login, signup)
 
 ---
 
@@ -71,7 +72,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |
 | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional for multi-instance production | Enables distributed PDF/Excel export rate limiting; without these, local/single-instance deploys use in-process limits |
-| `RESEND_API_KEY` + `EMAIL_FROM` | Optional fallback for transactional email | Prefer configuring Resend under system admin **E-pasta šabloni** (`/site_email_templates`); env vars work as fallback when the toggle is on. Domain must be verified in [Resend](https://resend.com) |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Optional fallback for transactional email | Prefer configuring Resend under system admin **Integrācijas** (`/site_integrations`); env vars work as fallback when the toggle is on. Email copy stays under **E-pasta šabloni**. Domain must be verified in [Resend](https://resend.com) |
 
 ### Supabase setup
 

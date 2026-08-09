@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
+import { addDaysToTodayIso } from "@/app/lib/payment-plans/helpers";
+import { getTrialSettings } from "@/app/lib/payment-plans/repository";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "@/app/lib/settings/currencies";
 import { normalizeDefaultHourlyRate } from "@/app/lib/settings/default-hourly-rate";
 import { normalizeEstimateValidityDays } from "@/app/lib/settings/estimate-validity-days";
@@ -124,9 +126,24 @@ export async function registerCompanyForCurrentUser(
     return { ok: false, error: "Neizdevās saglabāt lietotāja profilu." };
   }
 
+  // Without a trial the company would have no plan and, with payment plans
+  // enabled, hit the access lock immediately after registration.
+  // `payment_plan_paid` has to be true because module resolution treats an
+  // unpaid plan as inactive; `payment_plan_is_trial` keeps it distinguishable
+  // from a real payment.
+  const trial = await getTrialSettings();
+  const trialFields = trial.trialPlanId
+    ? {
+        payment_plan_id: trial.trialPlanId,
+        payment_plan_until: addDaysToTodayIso(trial.trialDays),
+        payment_plan_paid: true,
+        payment_plan_is_trial: true,
+      }
+    : {};
+
   const { data: company, error: companyError } = await supabase
     .from("companies")
-    .insert({ name: companyName })
+    .insert({ name: companyName, ...trialFields })
     .select("id")
     .single();
 

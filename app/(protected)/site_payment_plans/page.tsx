@@ -2,6 +2,7 @@ import { SectionPage } from "@/app/components/section-page";
 import { SitePaymentPlansForm } from "@/app/components/site-payment-plans-form";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import {
+  getTrialSettings,
   isPaymentPlansEnabled,
   listPaymentPlans,
 } from "@/app/lib/payment-plans/repository";
@@ -11,11 +12,12 @@ import { listSiteLanguages } from "@/app/lib/site-admin/repository";
 
 export default async function SitePaymentPlansPage() {
   await assertSystemAdminAccess();
-  const [enabled, plans, modules, languages, { t }] = await Promise.all([
+  const [enabled, plans, modules, languages, trial, { t }] = await Promise.all([
     isPaymentPlansEnabled(),
     listPaymentPlans(),
     listFrontendModules(),
     listSiteLanguages(),
+    getTrialSettings(),
     getServerTranslations(),
   ]);
 
@@ -30,6 +32,7 @@ export default async function SitePaymentPlansPage() {
       <SitePaymentPlansForm
         initialEnabled={enabled}
         initialPlans={plans}
+        initialTrial={trial}
         modules={modules}
         languages={languages}
       />
