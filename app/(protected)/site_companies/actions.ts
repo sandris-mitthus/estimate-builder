@@ -36,6 +36,8 @@ export async function updateCompanyPaymentPlanAction(
   const result = await updateCompanyPaymentPlan(companyId, input);
   if (result.ok) {
     revalidatePath("/site_companies");
+    revalidatePath("/site_payment_plans");
+    revalidatePath("/", "layout");
   }
   return result;
 }

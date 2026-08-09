@@ -50,6 +50,7 @@ type CompanyPlanState = {
   paymentPlanUntil: string | null;
   paymentPlanPaid: boolean;
   paymentPlanIsTrial: boolean;
+  paymentPlanIsEarlyBird: boolean;
   accessBlocked: boolean;
 };
 
@@ -59,6 +60,7 @@ function planStateFromCompany(company: SiteCompanySummary): CompanyPlanState {
     paymentPlanUntil: company.paymentPlanUntil,
     paymentPlanPaid: company.paymentPlanPaid,
     paymentPlanIsTrial: company.paymentPlanIsTrial,
+    paymentPlanIsEarlyBird: company.paymentPlanIsEarlyBird,
     accessBlocked: company.accessBlocked,
   };
 }
@@ -68,6 +70,7 @@ const emptyPlanState: CompanyPlanState = {
   paymentPlanUntil: null,
   paymentPlanPaid: false,
   paymentPlanIsTrial: false,
+  paymentPlanIsEarlyBird: false,
   accessBlocked: false,
 };
 
@@ -150,6 +153,7 @@ export function SiteCompaniesModulesManager({
     (planDraft.paymentPlanId !== planSaved.paymentPlanId ||
       (planDraft.paymentPlanUntil ?? "") !== (planSaved.paymentPlanUntil ?? "") ||
       planDraft.paymentPlanPaid !== planSaved.paymentPlanPaid ||
+      planDraft.paymentPlanIsEarlyBird !== planSaved.paymentPlanIsEarlyBird ||
       planDraft.accessBlocked !== planSaved.accessBlocked);
 
   const plansById = useMemo(
@@ -360,6 +364,7 @@ export function SiteCompaniesModulesManager({
       paymentPlanUntil: planDraft.paymentPlanUntil?.trim() || null,
       paymentPlanPaid: planDraft.paymentPlanPaid,
       paymentPlanIsTrial: false,
+      paymentPlanIsEarlyBird: planDraft.paymentPlanIsEarlyBird,
       accessBlocked: planDraft.accessBlocked,
     };
 
@@ -427,6 +432,11 @@ export function SiteCompaniesModulesManager({
               : t("site_companies.plan.unpaid", "Nav samaksāts")}
           </button>
         )}
+        {state.paymentPlanIsEarlyBird ? (
+          <span className="mt-2 ml-2 inline-flex items-center rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+            {t("site_companies.plan.early_bird", "Early Bird")}
+          </span>
+        ) : null}
         <p className="mt-2 text-xs text-zinc-500">
           {t("site_companies.plan.until", "Līdz")}{" "}
           {state.paymentPlanUntil
@@ -731,6 +741,35 @@ export function SiteCompaniesModulesManager({
                     )
                   }
                 />
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 px-4 py-3">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-zinc-800">
+                    {t("site_companies.plan.field_early_bird", "Early Bird")}
+                  </span>
+                  <ToggleSwitch
+                    checked={planDraft.paymentPlanIsEarlyBird}
+                    disabled={isPending || pendingKey !== null}
+                    label={t(
+                      "site_companies.plan.field_early_bird",
+                      "Early Bird",
+                    )}
+                    onChange={(checked) =>
+                      setPlanDraft((current) =>
+                        current
+                          ? { ...current, paymentPlanIsEarlyBird: checked }
+                          : current,
+                      )
+                    }
+                  />
+                </div>
+                <p className="mt-2 text-xs text-zinc-500">
+                  {t(
+                    "site_companies.plan.early_bird_hint",
+                    "Piešķir paliekošas Early Bird cenas. Slotu limīts ir kopīgs visiem plāniem.",
+                  )}
+                </p>
               </div>
 
               <div className="rounded-xl border border-zinc-200 px-4 py-3">

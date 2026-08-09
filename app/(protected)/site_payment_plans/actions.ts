@@ -5,9 +5,11 @@ import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
 import {
   createPaymentPlan,
   deletePaymentPlan,
+  saveEarlyBirdSettings,
   saveTrialSettings,
   setPaymentPlansEnabled,
   updatePaymentPlan,
+  type EarlyBirdSettings,
   type PaymentPlanInput,
   type TrialSettings,
 } from "@/app/lib/payment-plans/repository";
@@ -31,6 +33,15 @@ export async function setPaymentPlansEnabledAction(enabled: boolean) {
 export async function saveTrialSettingsAction(input: TrialSettings) {
   await assertSystemAdminAccess();
   const result = await saveTrialSettings(input);
+  if (result.ok) {
+    revalidatePaymentPlanPaths();
+  }
+  return result;
+}
+
+export async function saveEarlyBirdSettingsAction(input: EarlyBirdSettings) {
+  await assertSystemAdminAccess();
+  const result = await saveEarlyBirdSettings(input);
   if (result.ok) {
     revalidatePaymentPlanPaths();
   }

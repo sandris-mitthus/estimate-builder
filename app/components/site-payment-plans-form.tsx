@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createPaymentPlanAction,
   deletePaymentPlanAction,
+  saveEarlyBirdSettingsAction,
   saveTrialSettingsAction,
   setPaymentPlansEnabledAction,
   updatePaymentPlanAction,
@@ -17,11 +18,13 @@ import { IconActionButton } from "@/app/components/icon-action-button";
 import { ModalFormActions } from "@/app/components/modal-form-actions";
 import { useTranslations } from "@/app/components/translations-provider";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
+import { formatMoney } from "@/app/lib/estimates/format-money";
 import type { FrontendModuleSummary } from "@/app/lib/frontend-modules/types";
 import {
   MAX_TRIAL_DAYS,
   MIN_TRIAL_DAYS,
   resolveLocalizedValue,
+  type EarlyBirdAvailability,
   type LocalizedValues,
   type PaymentPlanSummary,
   type TrialSettings,
@@ -33,6 +36,11 @@ const fieldBaseClassName =
 const fieldClassName = `mt-1.5 ${fieldBaseClassName}`;
 // Native select arrow replaced by the app-wide chevron (see /site_companies).
 const selectClassName = `${fieldBaseClassName} appearance-none pr-10`;
+
+function priceToInput(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  return (Math.round(value * 100) / 100).toFixed(2);
+}
 
 function emptyValues(languages: SiteLanguageSummary[]): LocalizedValues {
   return Object.fromEntries(languages.map((language) => [language.code, ""]));
@@ -70,6 +78,12 @@ type PlanDraft = {
   nameValues: LocalizedValues;
   descriptionValues: LocalizedValues;
   moduleKeys: string[];
+  priceMonth: string;
+  priceQuarter: string;
+  priceYear: string;
+  earlyBirdPriceMonth: string;
+  earlyBirdPriceQuarter: string;
+  earlyBirdPriceYear: string;
 };
 
 function draftFromPlan(
@@ -82,6 +96,12 @@ function draftFromPlan(
       nameValues: emptyValues(languages),
       descriptionValues: emptyValues(languages),
       moduleKeys: [],
+      priceMonth: "",
+      priceQuarter: "",
+      priceYear: "",
+      earlyBirdPriceMonth: "",
+      earlyBirdPriceQuarter: "",
+      earlyBirdPriceYear: "",
     };
   }
   return {
@@ -89,6 +109,12 @@ function draftFromPlan(
     nameValues: mergeValues(languages, plan.nameValues),
     descriptionValues: mergeValues(languages, plan.descriptionValues),
     moduleKeys: [...plan.moduleKeys],
+    priceMonth: priceToInput(plan.priceMonth),
+    priceQuarter: priceToInput(plan.priceQuarter),
+    priceYear: priceToInput(plan.priceYear),
+    earlyBirdPriceMonth: priceToInput(plan.earlyBirdPriceMonth),
+    earlyBirdPriceQuarter: priceToInput(plan.earlyBirdPriceQuarter),
+    earlyBirdPriceYear: priceToInput(plan.earlyBirdPriceYear),
   };
 }
 
@@ -97,7 +123,13 @@ function draftsEqual(left: PlanDraft, right: PlanDraft): boolean {
     left.planKey.trim() === right.planKey.trim() &&
     valuesEqual(left.nameValues, right.nameValues) &&
     valuesEqual(left.descriptionValues, right.descriptionValues) &&
-    moduleKeysEqual(left.moduleKeys, right.moduleKeys)
+    moduleKeysEqual(left.moduleKeys, right.moduleKeys) &&
+    left.priceMonth.trim() === right.priceMonth.trim() &&
+    left.priceQuarter.trim() === right.priceQuarter.trim() &&
+    left.priceYear.trim() === right.priceYear.trim() &&
+    left.earlyBirdPriceMonth.trim() === right.earlyBirdPriceMonth.trim() &&
+    left.earlyBirdPriceQuarter.trim() === right.earlyBirdPriceQuarter.trim() &&
+    left.earlyBirdPriceYear.trim() === right.earlyBirdPriceYear.trim()
   );
 }
 
@@ -112,12 +144,14 @@ export function SitePaymentPlansForm({
   initialEnabled,
   initialPlans,
   initialTrial,
+  initialEarlyBird,
   modules,
   languages,
 }: {
   initialEnabled: boolean;
   initialPlans: PaymentPlanSummary[];
   initialTrial: TrialSettings;
+  initialEarlyBird: EarlyBirdAvailability;
   modules: FrontendModuleSummary[];
   languages: SiteLanguageSummary[];
 }) {
@@ -135,6 +169,15 @@ export function SitePaymentPlansForm({
     trialPlanId: initialTrialPlanId,
     trialDays: initialTrialDays,
   });
+  const [earlyBirdLimitText, setEarlyBirdLimitText] = useState(
+    String(initialEarlyBird.limit),
+  );
+  const [savedEarlyBirdLimit, setSavedEarlyBirdLimit] = useState(
+    initialEarlyBird.limit,
+  );
+  const [earlyBirdClaimed, setEarlyBirdClaimed] = useState(
+    initialEarlyBird.claimed,
+  );
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PaymentPlanSummary | null>(
     null,
@@ -172,6 +215,12 @@ export function SitePaymentPlansForm({
     });
   }, [initialTrialPlanId, initialTrialDays]);
 
+  useEffect(() => {
+    setEarlyBirdLimitText(String(initialEarlyBird.limit));
+    setSavedEarlyBirdLimit(initialEarlyBird.limit);
+    setEarlyBirdClaimed(initialEarlyBird.claimed);
+  }, [initialEarlyBird.limit, initialEarlyBird.claimed]);
+
   const globallyEnabledModules = useMemo(
     () => modules.filter((module) => module.isEnabled),
     [modules],
@@ -181,6 +230,8 @@ export function SitePaymentPlansForm({
   const trialDirty =
     trialPlanId !== savedTrial.trialPlanId ||
     trialDaysText.trim() !== String(savedTrial.trialDays);
+  const earlyBirdDirty =
+    earlyBirdLimitText.trim() !== String(savedEarlyBirdLimit);
 
   function openCreate() {
     clearFeedback();
@@ -273,10 +324,56 @@ export function SitePaymentPlansForm({
     });
   }
 
+  function handleSaveEarlyBird(event: React.FormEvent) {
+    event.preventDefault();
+    if (!earlyBirdDirty || isBusy) return;
+    clearFeedback();
+
+    startTransition(async () => {
+      setPendingKey("early-bird");
+      const parsedLimit = Number.parseInt(earlyBirdLimitText.trim(), 10);
+      const result = await saveEarlyBirdSettingsAction({ limit: parsedLimit });
+      setPendingKey(null);
+
+      if (!result.ok) {
+        showFeedback({ type: "error", text: translateActionError(t, result) });
+        return;
+      }
+
+      setSavedEarlyBirdLimit(parsedLimit);
+      setEarlyBirdLimitText(String(parsedLimit));
+      showFeedback({
+        type: "success",
+        text: t(
+          "site_payment_plans.early_bird.saved",
+          "Early Bird limīts saglabāts.",
+        ),
+      });
+    });
+  }
+
   function handleSavePlan(event: React.FormEvent) {
     event.preventDefault();
     if (!dirty || isBusy) return;
     clearFeedback();
+
+    if (
+      !draft.priceMonth.trim() ||
+      !draft.priceQuarter.trim() ||
+      !draft.priceYear.trim() ||
+      !draft.earlyBirdPriceMonth.trim() ||
+      !draft.earlyBirdPriceQuarter.trim() ||
+      !draft.earlyBirdPriceYear.trim()
+    ) {
+      showFeedback({
+        type: "error",
+        text: t(
+          "errors.payment_plan_price_invalid",
+          "Ievadi derīgu cenu (0 vai vairāk) katram periodam.",
+        ),
+      });
+      return;
+    }
 
     startTransition(async () => {
       setPendingKey(editingPlan ? `save:${editingPlan.id}` : "create");
@@ -285,6 +382,12 @@ export function SitePaymentPlansForm({
         nameValues: draft.nameValues,
         descriptionValues: draft.descriptionValues,
         moduleKeys: draft.moduleKeys,
+        priceMonth: draft.priceMonth,
+        priceQuarter: draft.priceQuarter,
+        priceYear: draft.priceYear,
+        earlyBirdPriceMonth: draft.earlyBirdPriceMonth,
+        earlyBirdPriceQuarter: draft.earlyBirdPriceQuarter,
+        earlyBirdPriceYear: draft.earlyBirdPriceYear,
       };
       const result = editingPlan
         ? await updatePaymentPlanAction(editingPlan.id, input)
@@ -471,6 +574,76 @@ export function SitePaymentPlansForm({
         </div>
       </form>
 
+      <form
+        onSubmit={handleSaveEarlyBird}
+        className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6"
+      >
+        <h2 className="text-sm font-semibold text-zinc-900">
+          {t("site_payment_plans.early_bird.section", "Early Bird")}
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          {t(
+            "site_payment_plans.early_bird.hint",
+            "Kopīgs limīts, cik uzņēmumiem var piešķirt Early Bird cenas. Piešķiršana notiek manuāli uzņēmumu sarakstā. 0 — Early Bird izslēgts.",
+          )}
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-zinc-800">
+              {t(
+                "site_payment_plans.early_bird.field_limit",
+                "Slotu skaits",
+              )}
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={earlyBirdLimitText}
+              onChange={(event) => setEarlyBirdLimitText(event.target.value)}
+              disabled={isBusy}
+              className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+            />
+          </label>
+          <div className="flex items-end">
+            <p className="pb-2.5 text-sm text-zinc-600">
+              {savedEarlyBirdLimit > 0
+                ? t(
+                    "site_payment_plans.early_bird.claimed",
+                    "Piešķirts: {claimed} / {limit}",
+                    {
+                      claimed: earlyBirdClaimed,
+                      limit: savedEarlyBirdLimit,
+                    },
+                  )
+                : t(
+                    "site_payment_plans.early_bird.claimed_off",
+                    "Piešķirts: {claimed} (izslēgts)",
+                    { claimed: earlyBirdClaimed },
+                  )}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="submit"
+            disabled={isBusy || !earlyBirdDirty}
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingKey === "early-bird" ? (
+              <i
+                className="fas fa-circle-notch fa-spin text-xs"
+                aria-hidden="true"
+              />
+            ) : null}
+            {t("actions.save", "Saglabāt")}
+          </button>
+        </div>
+      </form>
+
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
           <h2 className="text-sm font-semibold text-zinc-900">
@@ -495,6 +668,9 @@ export function SitePaymentPlansForm({
                   {t("site_payment_plans.form.name", "Nosaukums")}
                 </th>
                 <th className="px-5 py-3">
+                  {t("site_payment_plans.list.prices", "Cenas")}
+                </th>
+                <th className="px-5 py-3">
                   {t("site_payment_plans.form.modules", "Moduļi šajā plānā")}
                 </th>
                 <th className="px-5 py-3 text-right">
@@ -506,7 +682,7 @@ export function SitePaymentPlansForm({
               {plans.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     className="px-5 py-8 text-center text-sm text-zinc-500"
                   >
                     {t(
@@ -526,6 +702,44 @@ export function SitePaymentPlansForm({
                         <p className="font-semibold text-zinc-900">{name}</p>
                         <p className="mt-0.5 font-mono text-xs text-zinc-400">
                           {plan.planKey}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4 text-xs tabular-nums text-zinc-600">
+                        <p>
+                          {formatMoney(plan.priceMonth, "EUR")}{" "}
+                          {t("site_payment_plans.period.month_short", "/ mēn.")}
+                        </p>
+                        <p className="mt-0.5">
+                          {formatMoney(plan.priceQuarter, "EUR")}{" "}
+                          {t(
+                            "site_payment_plans.period.quarter_short",
+                            "/ cet.",
+                          )}
+                        </p>
+                        <p className="mt-0.5">
+                          {formatMoney(plan.priceYear, "EUR")}{" "}
+                          {t("site_payment_plans.period.year_short", "/ gadā")}
+                        </p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                          {t(
+                            "site_payment_plans.list.early_bird_prices",
+                            "Early Bird",
+                          )}
+                        </p>
+                        <p className="mt-0.5">
+                          {formatMoney(plan.earlyBirdPriceMonth, "EUR")}{" "}
+                          {t("site_payment_plans.period.month_short", "/ mēn.")}
+                        </p>
+                        <p className="mt-0.5">
+                          {formatMoney(plan.earlyBirdPriceQuarter, "EUR")}{" "}
+                          {t(
+                            "site_payment_plans.period.quarter_short",
+                            "/ cet.",
+                          )}
+                        </p>
+                        <p className="mt-0.5">
+                          {formatMoney(plan.earlyBirdPriceYear, "EUR")}{" "}
+                          {t("site_payment_plans.period.year_short", "/ gadā")}
                         </p>
                       </td>
                       <td className="px-5 py-4 text-xs text-zinc-600">
@@ -571,7 +785,7 @@ export function SitePaymentPlansForm({
         }
         dirty={dirty}
         blocking={isBusy}
-        panelMaxWidthClassName="max-w-lg"
+        panelMaxWidthClassName="max-w-xl"
       >
         <form onSubmit={handleSavePlan} className="space-y-4">
           <label className="block">
@@ -686,6 +900,151 @@ export function SitePaymentPlansForm({
               disabled={isBusy}
             />
           </label>
+
+          <div>
+            <p className="text-sm font-medium text-zinc-800">
+              {t("site_payment_plans.form.prices", "Cenas (EUR)")}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {t(
+                "site_payment_plans.form.prices_hint",
+                "Norādi cenu eiro. Decimālatdalītājs ir punkts, piemēram 29.00.",
+              )}
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_month", "Mēnesis")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.priceMonth}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      priceMonth: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_quarter", "Ceturksnis")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.priceQuarter}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      priceQuarter: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_year", "Gads")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.priceYear}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      priceYear: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-zinc-800">
+              {t(
+                "site_payment_plans.form.early_bird_prices",
+                "Early Bird cenas (EUR)",
+              )}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {t(
+                "site_payment_plans.form.early_bird_prices_hint",
+                "Šīs cenas attiecas uz uzņēmumiem ar Early Bird statusu un paliek uz mūžu.",
+              )}
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_month", "Mēnesis")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.earlyBirdPriceMonth}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      earlyBirdPriceMonth: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_quarter", "Ceturksnis")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.earlyBirdPriceQuarter}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      earlyBirdPriceQuarter: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-zinc-600">
+                  {t("site_payment_plans.form.price_year", "Gads")}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={draft.earlyBirdPriceYear}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      earlyBirdPriceYear: event.target.value,
+                    }))
+                  }
+                  className={`${fieldClassName} tabular-nums`}
+                  placeholder="0.00"
+                  disabled={isBusy}
+                />
+              </label>
+            </div>
+          </div>
 
           <div>
             <p className="text-sm font-medium text-zinc-800">

@@ -5,12 +5,29 @@ import {
 export type { LocalizedValues } from "@/app/lib/i18n/localized-values";
 export { resolveLocalizedValue } from "@/app/lib/i18n/localized-values";
 
+export type PaymentPlanPrices = {
+  priceMonth: number;
+  priceQuarter: number;
+  priceYear: number;
+  earlyBirdPriceMonth: number;
+  earlyBirdPriceQuarter: number;
+  earlyBirdPriceYear: number;
+};
+
+export type PaymentPlanBillingPeriod = "month" | "quarter" | "year";
+
 export type PaymentPlanSummary = {
   id: string;
   planKey: string;
   nameValues: LocalizedValues;
   descriptionValues: LocalizedValues;
   moduleKeys: string[];
+  priceMonth: number;
+  priceQuarter: number;
+  priceYear: number;
+  earlyBirdPriceMonth: number;
+  earlyBirdPriceQuarter: number;
+  earlyBirdPriceYear: number;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -21,7 +38,70 @@ export type PaymentPlanInput = {
   nameValues: LocalizedValues;
   descriptionValues: LocalizedValues;
   moduleKeys: string[];
+  priceMonth: number | string;
+  priceQuarter: number | string;
+  priceYear: number | string;
+  earlyBirdPriceMonth: number | string;
+  earlyBirdPriceQuarter: number | string;
+  earlyBirdPriceYear: number | string;
 };
+
+export type EarlyBirdSettings = {
+  /** 0 disables Early Bird offers and new assignments. */
+  limit: number;
+};
+
+export type EarlyBirdAvailability = EarlyBirdSettings & {
+  claimed: number;
+};
+
+/** Parses a money input into a non-negative finite number, or null if invalid. */
+export function parsePaymentPlanPrice(value: unknown): number | null {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0) return null;
+    return Math.round(value * 100) / 100;
+  }
+
+  const trimmed = String(value ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
+  if (!trimmed) return null;
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
+export function getPaymentPlanPriceForPeriod(
+  plan: Pick<
+    PaymentPlanSummary,
+    | "priceMonth"
+    | "priceQuarter"
+    | "priceYear"
+    | "earlyBirdPriceMonth"
+    | "earlyBirdPriceQuarter"
+    | "earlyBirdPriceYear"
+  >,
+  period: PaymentPlanBillingPeriod,
+  options?: { earlyBird?: boolean },
+): number {
+  if (options?.earlyBird) {
+    if (period === "quarter") return plan.earlyBirdPriceQuarter;
+    if (period === "year") return plan.earlyBirdPriceYear;
+    return plan.earlyBirdPriceMonth;
+  }
+  if (period === "quarter") return plan.priceQuarter;
+  if (period === "year") return plan.priceYear;
+  return plan.priceMonth;
+}
+
+/** True when the public Early Bird offer should still be shown (slots remain). */
+export function isEarlyBirdOfferAvailable(
+  availability: Pick<EarlyBirdAvailability, "limit" | "claimed">,
+): boolean {
+  return availability.limit > 0 && availability.claimed < availability.limit;
+}
 
 /** True when plan is paid, has until-date, and until-date is not past. */
 export function isCompanyPaymentPlanActive(input: {

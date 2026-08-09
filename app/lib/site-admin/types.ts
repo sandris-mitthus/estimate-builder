@@ -16,6 +16,8 @@ export type SiteCompanySummary = {
   paymentPlanPaid: boolean;
   /** Plan came from the signup trial, not from a real payment. */
   paymentPlanIsTrial: boolean;
+  /** Lifelong Early Bird pricing entitlement (manual admin assignment). */
+  paymentPlanIsEarlyBird: boolean;
   accessBlocked: boolean;
   isVip: boolean;
 };

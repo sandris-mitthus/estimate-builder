@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { AuthHashRedirect } from "@/app/components/auth-session-from-url";
+import { LandingPricingCards } from "@/app/components/landing-pricing-cards";
 import { PublicLanguageSelector } from "@/app/components/public-language-selector";
 import { SiteFooter } from "@/app/components/site-footer";
 import { getServerTranslations } from "@/app/lib/i18n/server";
-import {
-  resolveLocalizedValue,
-  type PaymentPlanSummary,
-} from "@/app/lib/payment-plans/helpers";
+import type { PaymentPlanSummary } from "@/app/lib/payment-plans/helpers";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 
 const primaryButtonClassName =
@@ -14,16 +12,6 @@ const primaryButtonClassName =
 
 const secondaryButtonClassName =
   "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50";
-
-const MODULE_LABEL_FALLBACKS: Record<string, string> = {
-  module_todo_list: "Darāmo darbu saraksts",
-  module_workers: "Darbinieki",
-  module_tools: "Instrumenti",
-  module_timeline_graph: "Laika grafiks",
-  module_additional_work: "Papildu darbu tāmes",
-  module_profit: "Plānotā peļņa",
-  module_delegated_orders: "Materiālu pasūtīšana un deleģēšana",
-};
 
 export async function LandingPage({
   systemName,
@@ -34,6 +22,8 @@ export async function LandingPage({
   paymentPlans = [],
   trialDays = null,
   trialPlanId = null,
+  earlyBirdAvailable = false,
+  earlyBirdRemaining = null,
 }: {
   systemName: string;
   slogan: string;
@@ -44,6 +34,8 @@ export async function LandingPage({
   paymentPlans?: PaymentPlanSummary[];
   trialDays?: number | null;
   trialPlanId?: string | null;
+  earlyBirdAvailable?: boolean;
+  earlyBirdRemaining?: number | null;
 }) {
   const { t, languageCode } = await getServerTranslations();
   const showPricing = paymentPlans.length > 0;
@@ -357,123 +349,27 @@ export async function LandingPage({
                   "Katrs plāns ietver pamata tāmes iespējas. Zemāk — kas papildus ietilpst katrā līmenī.",
                 )}
               </p>
-              {trialDays && trialPlanId ? (
-                <p className="mt-3 text-sm font-medium text-zinc-500">
-                  {t(
-                    "landing.pricing.trial_note",
-                    "Jauns uzņēmums sāk ar {days} dienu izmēģinājumu.",
-                    { days: trialDays },
-                  )}
-                </p>
-              ) : null}
             </div>
 
-            <div
-              className={`mt-12 grid gap-5 ${
-                paymentPlans.length === 1
-                  ? "mx-auto max-w-md"
-                  : paymentPlans.length === 2
-                    ? "mx-auto max-w-3xl md:grid-cols-2"
-                    : "lg:grid-cols-3"
-              }`}
-            >
-              {paymentPlans.map((plan) => {
-                const name =
-                  resolveLocalizedValue(plan.nameValues, languageCode) ||
-                  plan.planKey;
-                const description = resolveLocalizedValue(
-                  plan.descriptionValues,
-                  languageCode,
-                ).trim();
-                const recommended = plan.id === recommendedPlanId;
-                const moduleLabels = plan.moduleKeys.map((moduleKey) =>
-                  t(
-                    `frontend_modules.label.${moduleKey}`,
-                    MODULE_LABEL_FALLBACKS[moduleKey] ?? moduleKey,
-                  ),
-                );
-
-                return (
-                  <article
-                    key={plan.id}
-                    className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
-                      recommended
-                        ? "border-zinc-900 ring-1 ring-zinc-900"
-                        : "border-zinc-200"
-                    }`}
-                  >
-                    {recommended ? (
-                      <span className="absolute -top-3 left-6 inline-flex rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
-                        {t("landing.pricing.recommended", "Ieteicams")}
-                      </span>
-                    ) : null}
-
-                    <h3 className="text-xl font-semibold tracking-[-0.03em] text-zinc-950">
-                      {name}
-                    </h3>
-                    {description ? (
-                      <p className="mt-2 text-sm leading-6 text-zinc-500">
-                        {description}
-                      </p>
-                    ) : null}
-
-                    <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-                      {t("landing.pricing.modules_heading", "Ietilpst")}
-                    </p>
-                    <ul className="mt-3 flex-1 space-y-2.5">
-                      <li className="flex items-start gap-2.5 text-sm text-zinc-700">
-                        <i
-                          className="fas fa-check mt-1 text-[10px] text-emerald-600"
-                          aria-hidden="true"
-                        />
-                        <span>{coreIncludedLabel}</span>
-                      </li>
-                      {moduleLabels.length > 0 ? (
-                        moduleLabels.map((label) => (
-                          <li
-                            key={label}
-                            className="flex items-start gap-2.5 text-sm text-zinc-700"
-                          >
-                            <i
-                              className="fas fa-check mt-1 text-[10px] text-emerald-600"
-                              aria-hidden="true"
-                            />
-                            <span>{label}</span>
-                          </li>
-                        ))
-                      ) : (
-                        <li className="flex items-start gap-2.5 text-sm text-zinc-500">
-                          <i
-                            className="fas fa-minus mt-1 text-[10px] text-zinc-300"
-                            aria-hidden="true"
-                          />
-                          <span>
-                            {t(
-                              "landing.pricing.modules_empty",
-                              "Tikai pamata iespējas",
-                            )}
-                          </span>
-                        </li>
-                      )}
-                    </ul>
-
-                    <Link
-                      href="/signup"
-                      className={`mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-medium transition ${
-                        recommended
-                          ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                          : "border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
-                      }`}
-                    >
-                      {planCtaLabel}
-                      <i
-                        className="fas fa-arrow-right text-xs"
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  </article>
-                );
-              })}
+            <div className="mt-10">
+              <LandingPricingCards
+                plans={paymentPlans}
+                languageCode={languageCode}
+                recommendedPlanId={recommendedPlanId}
+                trialNote={
+                  trialDays && trialPlanId
+                    ? t(
+                        "landing.pricing.trial_note",
+                        "Jauns uzņēmums sāk ar {days} dienu izmēģinājumu.",
+                        { days: trialDays },
+                      )
+                    : null
+                }
+                earlyBirdAvailable={earlyBirdAvailable}
+                earlyBirdRemaining={earlyBirdRemaining}
+                coreIncludedLabel={coreIncludedLabel}
+                planCtaLabel={planCtaLabel}
+              />
             </div>
           </div>
         </section>

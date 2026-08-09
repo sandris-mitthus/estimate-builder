@@ -35,7 +35,9 @@ import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
 import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import {
   getCompanyAccessLockReasonForCompany,
+  getEarlyBirdSettings,
   getTrialSettings,
+  isEarlyBirdOfferAvailable,
   isPaymentPlansEnabled,
   listPaymentPlans,
 } from "@/app/lib/payment-plans/repository";
@@ -70,20 +72,35 @@ async function getLandingPricingProps(): Promise<{
   paymentPlans: PaymentPlanSummary[];
   trialDays: number | null;
   trialPlanId: string | null;
+  earlyBirdAvailable: boolean;
+  earlyBirdRemaining: number | null;
 }> {
   if (!(await isPaymentPlansEnabled())) {
-    return { paymentPlans: [], trialDays: null, trialPlanId: null };
+    return {
+      paymentPlans: [],
+      trialDays: null,
+      trialPlanId: null,
+      earlyBirdAvailable: false,
+      earlyBirdRemaining: null,
+    };
   }
 
-  const [paymentPlans, trial] = await Promise.all([
+  const [paymentPlans, trial, earlyBird] = await Promise.all([
     listPaymentPlans(),
     getTrialSettings(),
+    getEarlyBirdSettings(),
   ]);
+
+  const earlyBirdAvailable = isEarlyBirdOfferAvailable(earlyBird);
 
   return {
     paymentPlans,
     trialDays: trial.trialPlanId ? trial.trialDays : null,
     trialPlanId: trial.trialPlanId,
+    earlyBirdAvailable,
+    earlyBirdRemaining: earlyBirdAvailable
+      ? Math.max(0, earlyBird.limit - earlyBird.claimed)
+      : null,
   };
 }
 
@@ -141,6 +158,8 @@ export default async function ProtectedLayout({
             paymentPlans={pricing.paymentPlans}
             trialDays={pricing.trialDays}
             trialPlanId={pricing.trialPlanId}
+            earlyBirdAvailable={pricing.earlyBirdAvailable}
+            earlyBirdRemaining={pricing.earlyBirdRemaining}
           />
         </TranslationsProvider>
       );

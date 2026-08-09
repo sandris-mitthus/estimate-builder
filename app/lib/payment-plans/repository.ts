@@ -13,7 +13,10 @@ import {
   MAX_TRIAL_DAYS,
   MIN_TRIAL_DAYS,
   getCompanyAccessLockReason,
+  parsePaymentPlanPrice,
   type CompanyAccessLockReason,
+  type EarlyBirdAvailability,
+  type EarlyBirdSettings,
   type LocalizedValues,
   type PaymentPlanInput,
   type PaymentPlanSummary,
@@ -21,8 +24,12 @@ import {
 } from "@/app/lib/payment-plans/helpers";
 
 export type {
+  EarlyBirdAvailability,
+  EarlyBirdSettings,
   LocalizedValues,
+  PaymentPlanBillingPeriod,
   PaymentPlanInput,
+  PaymentPlanPrices,
   PaymentPlanSummary,
   TrialSettings,
 } from "@/app/lib/payment-plans/helpers";
@@ -32,8 +39,11 @@ export {
   MIN_TRIAL_DAYS,
   addDaysToTodayIso,
   getCompanyAccessLockReason,
+  getPaymentPlanPriceForPeriod,
   isCompanyPaymentPlanActive,
   isCompanyPaymentPlanExpired,
+  isEarlyBirdOfferAvailable,
+  parsePaymentPlanPrice,
   resolveLocalizedValue,
   toDateInputValue,
 } from "@/app/lib/payment-plans/helpers";
@@ -44,6 +54,12 @@ type PaymentPlanRow = {
   plan_key: string;
   name_values: unknown;
   description_values: unknown;
+  price_month: number | string | null;
+  price_quarter: number | string | null;
+  price_year: number | string | null;
+  early_bird_price_month: number | string | null;
+  early_bird_price_quarter: number | string | null;
+  early_bird_price_year: number | string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -192,6 +208,159 @@ export async function saveTrialSettings(
   return { ok: true };
 }
 
+export async function countEarlyBirdCompanies(): Promise<number> {
+  if (!isSupabaseAdminConfigured()) {
+    return 0;
+  }
+  const supabase = createAdminClient();
+  const { count, error } = await supabase
+    .from("companies")
+    .select("id", { count: "exact", head: true })
+    .eq("payment_plan_is_early_bird", true);
+  if (error || count == null) {
+    return 0;
+  }
+  return count;
+}
+
+export const getEarlyBirdSettings = cache(
+  async (): Promise<EarlyBirdAvailability> => {
+    if (!isSupabaseAdminConfigured()) {
+      return { limit: 0, claimed: 0 };
+    }
+
+    const supabase = createAdminClient();
+    const [{ data, error }, claimed] = await Promise.all([
+      supabase
+        .from("site_settings")
+        .select("early_bird_limit")
+        .eq("id", 1)
+        .maybeSingle(),
+      countEarlyBirdCompanies(),
+    ]);
+
+    if (error || !data) {
+      return { limit: 0, claimed };
+    }
+
+    const raw = data.early_bird_limit;
+    const parsed =
+      typeof raw === "number" ? raw : Number.parseInt(String(raw ?? ""), 10);
+    const limit =
+      Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : 0;
+
+    return { limit, claimed };
+  },
+);
+
+export async function saveEarlyBirdSettings(
+  input: EarlyBirdSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseAdminConfigured()) {
+    return { ok: false, error: "Datubāze nav konfigurēta." };
+  }
+
+  const raw =
+    typeof input.limit === "number"
+      ? input.limit
+      : Number.parseInt(String(input.limit ?? ""), 10);
+
+  if (!Number.isFinite(raw) || !Number.isInteger(raw) || raw < 0) {
+    return {
+      ok: false,
+      error: "Ievadi derīgu Early Bird slotu skaitu (0 vai vairāk).",
+    };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("site_settings").upsert(
+    { id: 1, early_bird_limit: raw },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: "Neizdevās saglabāt Early Bird limītu.",
+    };
+  }
+
+  return { ok: true };
+}
+
+function mapPaymentPlanRow(
+  row: PaymentPlanRow,
+  moduleKeys: string[],
+): PaymentPlanSummary {
+  return {
+    id: row.id,
+    planKey: row.plan_key,
+    nameValues: parseLocalizedValues(row.name_values),
+    descriptionValues: parseLocalizedValues(row.description_values),
+    moduleKeys,
+    priceMonth: parsePaymentPlanPrice(row.price_month) ?? 0,
+    priceQuarter: parsePaymentPlanPrice(row.price_quarter) ?? 0,
+    priceYear: parsePaymentPlanPrice(row.price_year) ?? 0,
+    earlyBirdPriceMonth: parsePaymentPlanPrice(row.early_bird_price_month) ?? 0,
+    earlyBirdPriceQuarter:
+      parsePaymentPlanPrice(row.early_bird_price_quarter) ?? 0,
+    earlyBirdPriceYear: parsePaymentPlanPrice(row.early_bird_price_year) ?? 0,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizePlanPrices(input: PaymentPlanInput): {
+  ok: true;
+  prices: {
+    price_month: number;
+    price_quarter: number;
+    price_year: number;
+    early_bird_price_month: number;
+    early_bird_price_quarter: number;
+    early_bird_price_year: number;
+  };
+} | { ok: false; error: string } {
+  const priceMonth = parsePaymentPlanPrice(input.priceMonth);
+  const priceQuarter = parsePaymentPlanPrice(input.priceQuarter);
+  const priceYear = parsePaymentPlanPrice(input.priceYear);
+  const earlyBirdPriceMonth = parsePaymentPlanPrice(input.earlyBirdPriceMonth);
+  const earlyBirdPriceQuarter = parsePaymentPlanPrice(
+    input.earlyBirdPriceQuarter,
+  );
+  const earlyBirdPriceYear = parsePaymentPlanPrice(input.earlyBirdPriceYear);
+
+  if (
+    priceMonth === null ||
+    priceQuarter === null ||
+    priceYear === null ||
+    earlyBirdPriceMonth === null ||
+    earlyBirdPriceQuarter === null ||
+    earlyBirdPriceYear === null
+  ) {
+    return {
+      ok: false,
+      error: "Ievadi derīgu cenu (0 vai vairāk) katram periodam.",
+    };
+  }
+
+  return {
+    ok: true,
+    prices: {
+      price_month: priceMonth,
+      price_quarter: priceQuarter,
+      price_year: priceYear,
+      early_bird_price_month: earlyBirdPriceMonth,
+      early_bird_price_quarter: earlyBirdPriceQuarter,
+      early_bird_price_year: earlyBirdPriceYear,
+    },
+  };
+}
+
+const PLAN_SELECT =
+  "id, plan_key, name_values, description_values, price_month, price_quarter, price_year, early_bird_price_month, early_bird_price_quarter, early_bird_price_year, sort_order, created_at, updated_at";
+
 async function listPlanModuleRows(): Promise<PlanModuleRow[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -212,9 +381,7 @@ export async function listPaymentPlans(): Promise<PaymentPlanSummary[]> {
   const [{ data, error }, moduleRows] = await Promise.all([
     supabase
       .from("site_payment_plans")
-      .select(
-        "id, plan_key, name_values, description_values, sort_order, created_at, updated_at",
-      )
+      .select(PLAN_SELECT)
       .order("sort_order", { ascending: true })
       .order("plan_key", { ascending: true }),
     listPlanModuleRows(),
@@ -231,16 +398,9 @@ export async function listPaymentPlans(): Promise<PaymentPlanSummary[]> {
     modulesByPlan.set(row.plan_id, list);
   }
 
-  return (data as PaymentPlanRow[]).map((row) => ({
-    id: row.id,
-    planKey: row.plan_key,
-    nameValues: parseLocalizedValues(row.name_values),
-    descriptionValues: parseLocalizedValues(row.description_values),
-    moduleKeys: (modulesByPlan.get(row.id) ?? []).sort(),
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  return (data as PaymentPlanRow[]).map((row) =>
+    mapPaymentPlanRow(row, (modulesByPlan.get(row.id) ?? []).sort()),
+  );
 }
 
 export const getPaymentPlanModuleKeys = cache(
@@ -312,6 +472,11 @@ export async function createPaymentPlan(
     return { ok: false, error: "Ievadi plāna nosaukumu vismaz vienā valodā." };
   }
 
+  const pricesResult = normalizePlanPrices(input);
+  if (!pricesResult.ok) {
+    return pricesResult;
+  }
+
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
@@ -328,10 +493,9 @@ export async function createPaymentPlan(
       name_values: nameValues,
       description_values: normalizeLocalizedValues(input.descriptionValues),
       sort_order: nextSortOrder,
+      ...pricesResult.prices,
     })
-    .select(
-      "id, plan_key, name_values, description_values, sort_order, created_at, updated_at",
-    )
+    .select(PLAN_SELECT)
     .single();
 
   if (error || !data) {
@@ -378,6 +542,11 @@ export async function updatePaymentPlan(
     return { ok: false, error: "Ievadi plāna nosaukumu vismaz vienā valodā." };
   }
 
+  const pricesResult = normalizePlanPrices(input);
+  if (!pricesResult.ok) {
+    return pricesResult;
+  }
+
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
@@ -389,6 +558,7 @@ export async function updatePaymentPlan(
       plan_key: planKey,
       name_values: nameValues,
       description_values: normalizeLocalizedValues(input.descriptionValues),
+      ...pricesResult.prices,
     })
     .eq("id", trimmedId);
 
@@ -446,6 +616,7 @@ export type CompanyPaymentPlanAssignment = {
   paymentPlanId: string | null;
   paymentPlanUntil: string | null;
   paymentPlanPaid: boolean;
+  paymentPlanIsEarlyBird: boolean;
   accessBlocked: boolean;
 };
 
@@ -475,6 +646,35 @@ export async function updateCompanyPaymentPlan(
   }
 
   const supabase = createAdminClient();
+  const wantEarlyBird = input.paymentPlanIsEarlyBird === true;
+
+  if (wantEarlyBird) {
+    const { data: currentRow, error: currentError } = await supabase
+      .from("companies")
+      .select("payment_plan_is_early_bird")
+      .eq("id", trimmedCompanyId)
+      .maybeSingle();
+
+    if (currentError || !currentRow) {
+      return { ok: false, error: "Uzņēmums nav atrasts." };
+    }
+
+    const alreadyEarlyBird = currentRow.payment_plan_is_early_bird === true;
+    if (!alreadyEarlyBird) {
+      const availability = await getEarlyBirdSettings();
+      if (
+        availability.limit <= 0 ||
+        availability.claimed >= availability.limit
+      ) {
+        return {
+          ok: false,
+          error:
+            "Early Bird sloti ir izsmelti vai Early Bird nav ieslēgts.",
+        };
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("companies")
     .update({
@@ -482,6 +682,7 @@ export async function updateCompanyPaymentPlan(
       payment_plan_until: until,
       payment_plan_paid: input.paymentPlanPaid === true,
       access_blocked: input.accessBlocked === true,
+      payment_plan_is_early_bird: wantEarlyBird,
       // An explicit admin decision replaces the signup trial.
       payment_plan_is_trial: false,
     })

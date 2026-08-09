@@ -189,8 +189,14 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Tāme ir apstiprināta un to vairs nevar labot.":
     "errors.estimate_approved_locked",
   "Tāme nav atrasta.": "errors.estimate_not_found",
+  "Ievadi derīgu cenu (0 vai vairāk) katram periodam.":
+    "errors.payment_plan_price_invalid",
   "Ievadi izmēģinājuma dienu skaitu no 1 līdz 365.":
     "errors.trial_days_invalid",
+  "Ievadi derīgu Early Bird slotu skaitu (0 vai vairāk).":
+    "errors.early_bird_limit_invalid",
+  "Early Bird sloti ir izsmelti vai Early Bird nav ieslēgts.":
+    "errors.early_bird_slots_full",
   "Maksas plāns nav atrasts.": "errors.payment_plan_not_found",
   "Modulis nav atrasts.": "errors.module_not_found",
   "Projekts nav atrasts.": "errors.project_not_found",

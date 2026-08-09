@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.132
+
+**Maksas plānu cenas un Early Bird**
+
+- Katram plānam mēneša / ceturkšņa / gada cena (EUR) `/site_payment_plans`; landing rāda cenu ar perioda pārslēgu
+- Early Bird: atsevišķas cenas katram plānam, viens kopīgs slotu limīts (`early_bird_limit`), manuāla piešķiršana `/site_companies` (`payment_plan_is_early_bird`)
+- Landing, kamēr ir brīvi Early Bird sloti, rāda Early Bird cenu, pārsvītroto parasto cenu un atlikušo vietu skaitu
+
 ## v1.3.131
 
 **Publiskā landing lapa, auth un integrācijas**
