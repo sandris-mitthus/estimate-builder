@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.130
+
+**Atkarību drošība**
+
+- **`nanoid`** override → `3.3.17+` (GHSA-2v37-7h3g-55p8); `postcss` tranzitīvā atkarība bloķēja Security audit CI
+
 ## v1.3.129
 
 **Divi jauni frontend moduļi**

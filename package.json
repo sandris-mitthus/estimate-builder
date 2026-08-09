@@ -1,6 +1,6 @@
 {
   "name": "estimate-builder",
-  "version": "1.3.129",
+  "version": "1.3.130",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -47,6 +47,7 @@
     "uuid": "^11.1.1",
     "sharp": "^0.35.0",
     "js-yaml": "^4.3.1",
+    "nanoid": "^3.3.17",
     "brace-expansion@1": "1.1.18",
     "brace-expansion@2": "2.1.4",
     "brace-expansion@5": "5.0.9"
