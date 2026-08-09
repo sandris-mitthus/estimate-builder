@@ -34,14 +34,21 @@ export default async function AdditionalWorkEstimatePage({
   }
 
   const { t } = await getServerTranslations();
-  const [project, companySettings, catalogPositions, estimate, sagatave] =
-    await Promise.all([
-      getProject(projectId),
-      getCompanySettings(),
-      listPositionPrices(),
-      getAdditionalWorkEstimate(projectId, estimateId),
-      ensureDefaultEstimatePosition(),
-    ]);
+  const [
+    project,
+    companySettings,
+    catalogPositions,
+    estimate,
+    sagatave,
+    profitModuleEnabled,
+  ] = await Promise.all([
+    getProject(projectId),
+    getCompanySettings(),
+    listPositionPrices(),
+    getAdditionalWorkEstimate(projectId, estimateId),
+    ensureDefaultEstimatePosition(),
+    isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
+  ]);
 
   if (!project || !estimate) {
     notFound();
@@ -80,6 +87,7 @@ export default async function AdditionalWorkEstimatePage({
         defaultHourlyRate={companySettings.defaultHourlyRate}
         currency={companySettings.currency}
         sagataveSections={sagatave.sections}
+        profitModuleEnabled={profitModuleEnabled}
       />
     </main>
   );

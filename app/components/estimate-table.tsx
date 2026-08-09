@@ -67,8 +67,8 @@ import { formatAmountDisplay } from "@/app/lib/estimates/calculate-line";
 import { getEstimateNumericStyles } from "@/app/lib/estimates/estimate-table-numeric-styles";
 import {
   isPlannedProfitUnset,
-  normalizePlannedProfitPercent,
   parsePlannedProfitInput,
+  resolvePlannedProfitPercent,
   applyPlannedProfitPercent,
 } from "@/app/lib/estimates/planned-profit";
 import { calculateEstimateTotals, collectEstimateLineItems } from "@/app/lib/estimates/calculate-totals";
@@ -2452,6 +2452,10 @@ type EstimateTableProps = {
   sagataveMultiOptionLinks?: MultiOptionLinkGroup[];
   globalExcludedPositions?: ExcludedPosition[];
   users?: UserSummary[];
+  /** `module_profit`: without it the planned profit input and 0% notices are hidden. */
+  profitModuleEnabled?: boolean;
+  /** `module_delegated_orders`: gates the materials-to-order list and delegation. */
+  delegatedOrdersModuleEnabled?: boolean;
 };
 
 export function EstimateTable({
@@ -2476,6 +2480,8 @@ export function EstimateTable({
   sagataveMultiOptionLinks = [],
   globalExcludedPositions = EMPTY_EXCLUDED_POSITIONS,
   users = [],
+  profitModuleEnabled = true,
+  delegatedOrdersModuleEnabled = true,
 }: EstimateTableProps = {}) {
   const { t } = useTranslations();
   const isAdditionalWork = estimateMode === "additional_work";
@@ -2518,7 +2524,10 @@ export function EstimateTable({
     ),
   );
   const [savedPlannedProfitPercent, setSavedPlannedProfitPercent] = useState(() =>
-    normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
+    resolvePlannedProfitPercent(
+      initialMeta.plannedProfitPercent ?? 0,
+      profitModuleEnabled,
+    ),
   );
   const [savedAt, setSavedAt] = useState<string | undefined>(
     initialMeta.savedAt,
@@ -2540,11 +2549,15 @@ export function EstimateTable({
     : false;
   const editorLocked = estimateStatusLocked || !canSaveEstimate;
   const datesReadOnly = estimateStatusLocked || !canEditEstimateDates;
-  const plannedProfitPercent = normalizePlannedProfitPercent(
+  const plannedProfitPercent = resolvePlannedProfitPercent(
     meta.plannedProfitPercent ?? 0,
+    profitModuleEnabled,
   );
+  const showPlannedProfitField = profitModuleEnabled && project != null;
+  const showProjectMaterials =
+    delegatedOrdersModuleEnabled && estimateStatusLocked;
   const showPlannedProfitMissingNotice =
-    project != null && isPlannedProfitUnset(meta.plannedProfitPercent);
+    showPlannedProfitField && isPlannedProfitUnset(meta.plannedProfitPercent);
   const openPositionModal = useCallback(
     (item: EstimateLineItem, onSave: (next: EstimateLineItem) => void) => {
       refreshCatalogPositions();
@@ -2599,9 +2612,12 @@ export function EstimateTable({
     setMeta(initialMeta);
     setSavedAt(initialMeta.savedAt);
     setSavedPlannedProfitPercent(
-      normalizePlannedProfitPercent(initialMeta.plannedProfitPercent ?? 0),
+      resolvePlannedProfitPercent(
+        initialMeta.plannedProfitPercent ?? 0,
+        profitModuleEnabled,
+      ),
     );
-  }, [initialMeta]);
+  }, [initialMeta, profitModuleEnabled]);
 
   useEffect(() => {
     if (estimateMode === "additional_work") {
@@ -2796,7 +2812,10 @@ export function EstimateTable({
         serializeEstimatePositionDocument(title, categoriesToSave, multiOptionLinks),
       );
       setSavedPlannedProfitPercent(
-        normalizePlannedProfitPercent(nextMeta.plannedProfitPercent ?? 0),
+        resolvePlannedProfitPercent(
+          nextMeta.plannedProfitPercent ?? 0,
+          profitModuleEnabled,
+        ),
       );
       setSavedAt(savedAtIso);
       showFeedback({
@@ -3139,27 +3158,29 @@ export function EstimateTable({
                   setMeta({ ...meta, project: projectAddress })
                 }
               />
-              <MetaField
-                label={t("estimate.planned_profit", "Plānotā peļņa")}
-                value={
-                  meta.plannedProfitPercent != null
-                    ? String(meta.plannedProfitPercent)
-                    : estimateStatusLocked
-                      ? "0"
-                      : ""
-                }
-                type="number"
-                suffix="%"
-                disabled={estimateStatusLocked}
-                readOnly={!estimateStatusLocked && editorLocked}
-                onChange={(raw) => {
-                  const parsed = parsePlannedProfitInput(raw);
-                  setMeta({
-                    ...meta,
-                    plannedProfitPercent: parsed > 0 ? parsed : undefined,
-                  });
-                }}
-              />
+              {showPlannedProfitField ? (
+                <MetaField
+                  label={t("estimate.planned_profit", "Plānotā peļņa")}
+                  value={
+                    meta.plannedProfitPercent != null
+                      ? String(meta.plannedProfitPercent)
+                      : estimateStatusLocked
+                        ? "0"
+                        : ""
+                  }
+                  type="number"
+                  suffix="%"
+                  disabled={estimateStatusLocked}
+                  readOnly={!estimateStatusLocked && editorLocked}
+                  onChange={(raw) => {
+                    const parsed = parsePlannedProfitInput(raw);
+                    setMeta({
+                      ...meta,
+                      plannedProfitPercent: parsed > 0 ? parsed : undefined,
+                    });
+                  }}
+                />
+              ) : null}
               <MetaField
                 label={t("common.date", "Datums")}
                 type="date"
@@ -3405,15 +3426,15 @@ export function EstimateTable({
           <div
             className={
               estimateStatusLocked
-                ? project
+                ? showPlannedProfitField
                   ? "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)]"
                   : "grid grid-cols-1 gap-y-4"
-                : project
+                : showPlannedProfitField
                   ? "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)_minmax(0,1fr)]"
                   : "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2"
             }
           >
-            {project ? (
+            {showPlannedProfitField ? (
               <div className="w-full max-w-[8.5rem] shrink-0">
                 <MetaField
                   label={t("estimate.planned_profit", "Plānotā peļņa")}
@@ -3473,11 +3494,11 @@ export function EstimateTable({
 
       {project && estimateStatusLocked ? <ApprovedEstimateStatusLabel /> : null}
 
-      {project && estimateStatusLocked ? (
+      {project && showProjectMaterials ? (
         <PendingProjectMaterialsBanner summary={pendingMaterialsSummary} />
       ) : null}
 
-      {project && estimateStatusLocked ? (
+      {project && showProjectMaterials ? (
         <ProjectMaterialsDelegationPanel
           projectId={project.id}
           users={users}

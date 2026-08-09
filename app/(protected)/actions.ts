@@ -26,6 +26,8 @@ import {
   updateProjectStatus,
 } from "@/app/lib/projects/repository";
 import { acknowledgeSagataveStructureIntro } from "@/app/lib/estimate-positions/sagatave-to-other-projects";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import type { ReorderExcludedPositionsInput } from "@/app/lib/excluded-positions/types";
 import type { ProjectStatus } from "@/app/lib/projects/project-status";
 import type { CreateProjectInput, UpdateProjectInput } from "@/app/lib/projects/types";
@@ -33,6 +35,16 @@ import type { EstimateMeta } from "@/app/lib/projects/types";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 import type { MultiOptionLinkGroup } from "@/app/lib/estimates/types";
 import { validateProjectContactFields } from "@/app/lib/validation/contact-fields";
+
+const PROFIT_MODULE_DISABLED = {
+  ok: false as const,
+  error: "Plānotās peļņas modulis nav pieejams.",
+};
+
+const DELEGATED_ORDERS_MODULE_DISABLED = {
+  ok: false as const,
+  error: "Materiālu pasūtīšanas modulis nav pieejams.",
+};
 
 function statusActionPermission(status: ProjectStatus) {
   switch (status) {
@@ -130,6 +142,10 @@ export async function updateProjectEstimatePlannedProfitAction(
 ) {
   const { denied } = await requireAction("estimate.save");
   if (denied) return denied;
+
+  if (!(await isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit))) {
+    return PROFIT_MODULE_DISABLED;
+  }
 
   const result = await updateProjectEstimatePlannedProfit(
     projectId,
@@ -313,6 +329,10 @@ export async function markProjectMaterialOrderedAction(
   const { denied } = await requireAction("materials.order");
   if (denied) return denied;
 
+  if (!(await isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders))) {
+    return DELEGATED_ORDERS_MODULE_DISABLED;
+  }
+
   const result = await markProjectMaterialOrdered(projectId, positionPriceId);
 
   if (result.ok) {
@@ -333,6 +353,10 @@ export async function assignProjectMaterialUserAction(
 ) {
   const { denied } = await requireAction("materials.assign");
   if (denied) return denied;
+
+  if (!(await isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders))) {
+    return DELEGATED_ORDERS_MODULE_DISABLED;
+  }
 
   const result = await assignProjectMaterialUser(
     projectId,

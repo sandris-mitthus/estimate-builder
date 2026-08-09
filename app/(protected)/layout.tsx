@@ -30,7 +30,8 @@ import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-
 import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
 import { CompanyAccessLockOverlay } from "@/app/components/company-access-lock-overlay";
 import { filterNavKeysByFrontendModules } from "@/app/lib/frontend-modules/access";
-import { getEnabledFrontendModuleKeys } from "@/app/lib/frontend-modules/repository";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { getCompanyAccessLockReasonForCompany } from "@/app/lib/payment-plans/repository";
 import type { CompanyAccessLockReason } from "@/app/lib/payment-plans/helpers";
 import { getCompanyDisplayName } from "@/app/lib/settings/repository";
@@ -74,6 +75,7 @@ export default async function ProtectedLayout({
   let translations = {};
   let initialSidebarCollapsed = false;
   let navCounts: NavCountMap = {};
+  let delegatedOrdersModuleEnabled = false;
 
   const [siteSettings, user] = await Promise.all([
     getSiteSettings(),
@@ -143,21 +145,26 @@ export default async function ProtectedLayout({
       actionPermissions = createFullPermissions(false).actions;
       navCounts = {};
     } else {
-      // The module keys are only needed after `session` resolves, but they are
-      // fetched here so the nav filter below reads them from the request cache.
-      const [session, companyNameResult, navCountsResult, lockReason] =
-        await Promise.all([
-          getCurrentUserAccess(),
-          isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
-          getNavigationCounts({ isSystemAdmin, activeLanguageCode }),
-          !isSystemAdmin && companyId
-            ? getCompanyAccessLockReasonForCompany(companyId)
-            : Promise.resolve(null),
-          isSystemAdmin ? Promise.resolve(null) : getEnabledFrontendModuleKeys(),
-        ]);
+      // The module check also warms the request cache the nav filter below reads.
+      const [
+        session,
+        companyNameResult,
+        navCountsResult,
+        lockReason,
+        delegatedOrdersEnabled,
+      ] = await Promise.all([
+        getCurrentUserAccess(),
+        isSystemAdmin ? Promise.resolve(null) : getCompanyDisplayName(),
+        getNavigationCounts({ isSystemAdmin, activeLanguageCode }),
+        !isSystemAdmin && companyId
+          ? getCompanyAccessLockReasonForCompany(companyId)
+          : Promise.resolve(null),
+        isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders),
+      ]);
       companyName = companyNameResult;
       navCounts = navCountsResult;
       accessLockReason = lockReason;
+      delegatedOrdersModuleEnabled = delegatedOrdersEnabled;
 
       if (session) {
         actionPermissions = session.access.permissions.actions;
@@ -224,6 +231,7 @@ export default async function ProtectedLayout({
               >
                 {currentUser &&
                 currentUserId &&
+                delegatedOrdersModuleEnabled &&
                 !needsCompanyRegistration &&
                 !pendingCompanyInvite &&
                 !accessLockReason ? (

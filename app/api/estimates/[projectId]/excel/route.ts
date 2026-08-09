@@ -5,6 +5,9 @@ import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { buildEstimateExcel } from "@/app/lib/exports/estimate-excel";
+import { applyProfitModuleToMeta } from "@/app/lib/estimates/planned-profit";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import { getProjectEstimate } from "@/app/lib/projects/repository";
 import { getCompanySettings } from "@/app/lib/settings/repository";
@@ -41,11 +44,13 @@ export async function GET(
   const { projectId } = await params;
   const estimateId = new URL(request.url).searchParams.get("estimateId");
 
-  const [{ t }, catalogPositions, companySettings] = await Promise.all([
-    getServerTranslations(),
-    listPositionPrices(),
-    getCompanySettings(),
-  ]);
+  const [{ t }, catalogPositions, companySettings, profitModuleEnabled] =
+    await Promise.all([
+      getServerTranslations(),
+      listPositionPrices(),
+      getCompanySettings(),
+      isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
+    ]);
 
   const estimate = estimateId
     ? await getAdditionalWorkEstimate(projectId, estimateId)
@@ -57,7 +62,7 @@ export async function GET(
 
   const buffer = await buildEstimateExcel(
     estimate.title,
-    estimate.meta,
+    applyProfitModuleToMeta(estimate.meta, profitModuleEnabled),
     estimate.categories,
     catalogPositions,
     companySettings.defaultHourlyRate,

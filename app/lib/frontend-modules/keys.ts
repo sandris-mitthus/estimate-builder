@@ -6,6 +6,8 @@ export const FRONTEND_MODULE_KEYS = {
   tools: "module_tools",
   timelineGraph: "module_timeline_graph",
   additionalWork: "module_additional_work",
+  profit: "module_profit",
+  delegatedOrders: "module_delegated_orders",
 } as const;
 
 export type FrontendModuleKey =

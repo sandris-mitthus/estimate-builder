@@ -13,6 +13,30 @@ export function isPlannedProfitUnset(value: unknown): boolean {
   return normalizePlannedProfitPercent(value) <= 0;
 }
 
+/**
+ * Planned profit only applies when the company has `module_profit`. Stored
+ * values stay untouched in the database, but every calculation and export
+ * reads 0% so amounts never include profit the company cannot see or edit.
+ */
+export function resolvePlannedProfitPercent(
+  value: unknown,
+  profitModuleEnabled: boolean,
+): number {
+  return profitModuleEnabled ? normalizePlannedProfitPercent(value) : 0;
+}
+
+/** Estimate meta with profit stripped when the company has no profit module. */
+export function applyProfitModuleToMeta<T extends { plannedProfitPercent?: number }>(
+  meta: T,
+  profitModuleEnabled: boolean,
+): T {
+  if (profitModuleEnabled) {
+    return meta;
+  }
+
+  return { ...meta, plannedProfitPercent: 0 };
+}
+
 export function parsePlannedProfitInput(raw: string): number {
   const trimmed = raw.trim().replace(",", ".");
   if (!trimmed) {

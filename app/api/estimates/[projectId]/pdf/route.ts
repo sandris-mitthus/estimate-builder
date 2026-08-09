@@ -6,6 +6,9 @@ import { getAdditionalWorkEstimate } from "@/app/lib/additional-work-estimates/r
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
+import { applyProfitModuleToMeta } from "@/app/lib/estimates/planned-profit";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { EstimatePdfDocument } from "@/app/lib/exports/estimate-pdf";
 import {
   fetchLogoAsset,
@@ -59,12 +62,14 @@ export async function GET(
   const { projectId } = await params;
   const estimateId = new URL(request.url).searchParams.get("estimateId");
 
-  const [{ t }, project, catalogPositions, companySettings] = await Promise.all([
-    getServerTranslations(),
-    getProject(projectId),
-    listPositionPrices(),
-    getCompanySettings(),
-  ]);
+  const [{ t }, project, catalogPositions, companySettings, profitModuleEnabled] =
+    await Promise.all([
+      getServerTranslations(),
+      getProject(projectId),
+      listPositionPrices(),
+      getCompanySettings(),
+      isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
+    ]);
 
   if (!project) {
     return new Response("Not found", { status: 404 });
@@ -121,7 +126,7 @@ export async function GET(
   const buffer = await renderToBuffer(
     createElement(EstimatePdfDocument, {
       title: estimate.title,
-      meta: estimate.meta,
+      meta: applyProfitModuleToMeta(estimate.meta, profitModuleEnabled),
       categories: categoriesForOffer,
       catalogPositions,
       defaultHourlyRate: companySettings.defaultHourlyRate,

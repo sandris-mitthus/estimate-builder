@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.129
+
+**Divi jauni frontend moduļi**
+
+- **`module_profit`** — bez tā pazūd **Plānotā peļņa** lauks un 0% paziņojumi (rindā paliek **Datums** + **Tāmes termiņš**), un peļņa tiek rēķināta kā 0% arī kopsummās, PDF un Excel; saglabātā vērtība DB netiek dzēsta
+- **`module_delegated_orders`** — bez tā pazūd pasūtāmo materiālu saraksts, delegācijas panelis, globālais baneris un projektu kartīšu hints; `materials.order` / `materials.assign` tiek bloķētas arī serverī
+- Migrācija `182` seedo abus moduļus globāli ieslēgtus un ieslēdz tos esošajiem uzņēmumiem un maksas plāniem, lai neviens nepazaudē jau lietoto funkcionalitāti
+
 ## v1.3.128
 
 **Atkarību drošība**

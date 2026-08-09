@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { mapUserDisplay } from "@/app/lib/auth/map-user-display";
 import { resolveRelatedUserIds } from "@/app/lib/auth/resolve-related-user-ids";
+import { FRONTEND_MODULE_KEYS } from "@/app/lib/frontend-modules/keys";
+import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { toEstimateCatalogPositions } from "@/app/lib/positions/estimate-catalog";
 import { listPositionPrices } from "@/app/lib/positions/repository";
 import {
@@ -26,6 +28,13 @@ export async function GET() {
     avatarUrl: currentUserDisplay.avatarUrl,
     companyStatus: "active" as const,
   };
+
+  if (!(await isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders))) {
+    return Response.json(
+      { groups: [], catalogPositions: [], currency: null, currentUser },
+      { headers: EMPTY_HEADERS },
+    );
+  }
 
   // Gates the banner and supplies the rows the grouping needs, so the
   // assignments table is read once per request instead of twice.

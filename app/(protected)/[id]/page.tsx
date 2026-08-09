@@ -40,6 +40,8 @@ export default async function ProjectDetailPage({
   const [
     { t },
     additionalWorkModuleEnabled,
+    profitModuleEnabled,
+    delegatedOrdersModuleEnabled,
     project,
     modules,
     companySettings,
@@ -49,6 +51,8 @@ export default async function ProjectDetailPage({
   ] = await Promise.all([
     getServerTranslations(),
     isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.additionalWork),
+    isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
+    isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders),
     getProject(id),
     listBuildingModules(),
     getCompanySettings(),
@@ -73,7 +77,9 @@ export default async function ProjectDetailPage({
 
   const [buildingModule, users, additionalWorkEstimates] = await Promise.all([
     project.buildingModuleId ? getBuildingModule(project.buildingModuleId) : null,
-    isProjectEstimateLocked(project.status) ? listUsers() : [],
+    delegatedOrdersModuleEnabled && isProjectEstimateLocked(project.status)
+      ? listUsers()
+      : [],
     additionalWorkModuleEnabled
       ? listAdditionalWorkEstimates(project.id)
       : Promise.resolve([]),
@@ -132,6 +138,8 @@ export default async function ProjectDetailPage({
         sagataveMultiOptionLinks={sagatave.multiOptionLinks}
         globalExcludedPositions={globalExcludedPositions}
         users={users}
+        profitModuleEnabled={profitModuleEnabled}
+        delegatedOrdersModuleEnabled={delegatedOrdersModuleEnabled}
       />
       {additionalWorkModuleEnabled ? (
         <div className="mt-8">
