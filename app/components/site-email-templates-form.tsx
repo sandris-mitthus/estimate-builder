@@ -61,7 +61,7 @@ const PREVIEW_PARAMS = {
   name: "Jānis Bērziņš",
   company: "Demo SIA",
   system: "Estimate Builder",
-  link: "https://example.com/auth/confirm#…",
+  link: "https://example.com/auth/confirm?token_hash=…&type=signup",
 };
 
 function cloneTemplates(templates: EmailTemplateDraft[]): EmailTemplateDraft[] {

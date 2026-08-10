@@ -6,13 +6,10 @@ import {
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { resolveResendConfig } from "@/app/lib/email/resend-config";
 import { sendPasswordResetEmail } from "@/app/lib/email/send-password-reset";
-
-function authRecoveryRedirectUrl(): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "http://localhost:3100";
-  return `${base}/auth/confirm?next=/reset-password`;
-}
+import {
+  authConfirmRedirectUrl,
+  resolveAuthEmailLink,
+} from "@/app/lib/auth/auth-confirm-link";
 
 async function findAuthUserByEmailExact(email: string): Promise<{
   id: string;
@@ -79,14 +76,18 @@ export async function requestPasswordReset(
   }
 
   const admin = createAdminClient();
+  const redirectTo = authConfirmRedirectUrl("/reset-password");
   const generated = await admin.auth.admin.generateLink({
     type: "recovery",
     email: trimmedEmail,
-    options: { redirectTo: authRecoveryRedirectUrl() },
+    options: { redirectTo },
   });
 
-  const actionLink = generated.data?.properties?.action_link?.trim() ?? "";
-  if (generated.error || !actionLink) {
+  const resetLink = resolveAuthEmailLink(generated.data?.properties, {
+    type: "recovery",
+    next: "/reset-password",
+  });
+  if (generated.error || !resetLink) {
     console.warn(
       "[auth] Failed to generate recovery link:",
       generated.error?.message,
@@ -99,7 +100,7 @@ export async function requestPasswordReset(
 
   const sent = await sendPasswordResetEmail({
     email: trimmedEmail,
-    resetLink: actionLink,
+    resetLink,
   });
 
   if (!sent.ok) {

@@ -1,4 +1,8 @@
 import { mapUserDisplay, resolveAvatarUrl } from "@/app/lib/auth/map-user-display";
+import {
+  authConfirmRedirectUrl,
+  resolveAuthEmailLink,
+} from "@/app/lib/auth/auth-confirm-link";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
@@ -98,13 +102,9 @@ export const listUsers = cache(async function listUsers(): Promise<UserSummary[]
 });
 
 function inviteRedirectUrl(): string {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "http://localhost:3100";
-
-  // Invite links use hash tokens (PKCE is not supported for inviteUserByEmail).
-  // /auth/confirm completes the session on the client via setSession.
-  return `${siteUrl}/auth/confirm`;
+  // Resend path uses token_hash on /auth/confirm; Supabase-built-in mail still
+  // lands with hash tokens (PKCE is not supported for inviteUserByEmail).
+  return authConfirmRedirectUrl();
 }
 
 type InviteUserResult =
@@ -248,9 +248,11 @@ async function sendCompanyInviteEmail(
       options: { redirectTo },
     });
 
-    let actionLink = inviteLink.data?.properties?.action_link?.trim() ?? "";
+    let siteLink = resolveAuthEmailLink(inviteLink.data?.properties, {
+      type: "invite",
+    });
 
-    if (inviteLink.error || !actionLink) {
+    if (inviteLink.error || !siteLink) {
       if (
         inviteLink.error &&
         !isEmailAlreadyRegisteredError(inviteLink.error)
@@ -271,8 +273,10 @@ async function sendCompanyInviteEmail(
         options: { redirectTo },
       });
 
-      actionLink = magic.data?.properties?.action_link?.trim() ?? "";
-      if (magic.error || !actionLink) {
+      siteLink = resolveAuthEmailLink(magic.data?.properties, {
+        type: "magiclink",
+      });
+      if (magic.error || !siteLink) {
         if (magic.error && isEmailRateLimitError(magic.error)) {
           return {
             ok: false,
@@ -286,7 +290,7 @@ async function sendCompanyInviteEmail(
 
     return sendCompanyInviteNotice({
       email,
-      inviteLink: actionLink,
+      inviteLink: siteLink,
     });
   }
 

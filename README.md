@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.3.133`
+**Current version:** `1.4.0`
 
 ---
 
@@ -67,7 +67,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `NEXT_PUBLIC_SUPABASE_URL` | DB + Auth | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | DB + Auth | Public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | DB + users list + settings + logo upload | Server only |
-| `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; on Vercel set to `https://your-app.vercel.app` (server invites, CSP/HSTS); browser OAuth uses `window.location.origin` |
+| `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; on Vercel set to the public domain (e.g. `https://uupis.com`) — used for Resend auth email links (`/auth/confirm?token_hash=…`), CSP/HSTS; browser OAuth uses `window.location.origin` |
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | If set, only this domain may sign in via Google OAuth (e.g. `mycompany.com`) |

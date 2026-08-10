@@ -6,15 +6,12 @@ import {
 import { validateRequiredEmail } from "@/app/lib/validation/contact-fields";
 import { resolveResendConfig } from "@/app/lib/email/resend-config";
 import { sendSignupConfirmation } from "@/app/lib/email/send-signup-confirmation";
+import {
+  authConfirmRedirectUrl,
+  resolveAuthEmailLink,
+} from "@/app/lib/auth/auth-confirm-link";
 
 const MIN_PASSWORD_LENGTH = 8;
-
-function authConfirmRedirectUrl(): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "http://localhost:3100";
-  return `${base}/auth/confirm`;
-}
 
 function isAlreadyRegisteredError(error: {
   message?: string;
@@ -86,9 +83,11 @@ async function sendSignupLink(
     options: { redirectTo },
   });
 
-  let actionLink = generated.data?.properties?.action_link?.trim() ?? "";
+  let confirmLink = resolveAuthEmailLink(generated.data?.properties, {
+    type: "signup",
+  });
 
-  if (generated.error || !actionLink) {
+  if (generated.error || !confirmLink) {
     if (generated.error && isAlreadyRegisteredError(generated.error)) {
       const existing = await findAuthUserByEmailExact(email);
       if (existing?.emailConfirmed) {
@@ -105,8 +104,10 @@ async function sendSignupLink(
           email,
           options: { redirectTo },
         });
-        actionLink = invite.data?.properties?.action_link?.trim() ?? "";
-        if (invite.error || !actionLink) {
+        confirmLink = resolveAuthEmailLink(invite.data?.properties, {
+          type: "invite",
+        });
+        if (invite.error || !confirmLink) {
           return {
             ok: false,
             error: "Neizdevās nosūtīt apstiprinājuma e-pastu.",
@@ -128,7 +129,7 @@ async function sendSignupLink(
 
   return sendSignupConfirmation({
     email,
-    confirmLink: actionLink,
+    confirmLink,
   });
 }
 

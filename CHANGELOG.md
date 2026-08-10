@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.0
+
+**Auth e-pastu saites uz produkta domēnu**
+
+- Resend signup / uzaicinājuma / paroles atjaunošanas CTA izmanto `NEXT_PUBLIC_SITE_URL/auth/confirm?token_hash=…&type=…` (`resolveAuthEmailLink`), nevis `*.supabase.co/auth/v1/verify`
+- Lai saites rādītu `uupis.com`, Vercel env `NEXT_PUBLIC_SITE_URL` un Supabase Redirect URLs jānorāda uz to pašu domēnu
+
 ## v1.3.133
 
 **Paroles atjaunošana**
