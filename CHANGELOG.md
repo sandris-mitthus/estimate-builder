@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.3.133
+
+**Paroles atjaunošana**
+
+- Login saite **Aizmirsi paroli?** → `/forgot-password`; Resend e-pasts ar recovery saiti un `/reset-password` jaunās paroles forma
+- Admin `/site_email_templates` — jauns HTML šablons **Paroles atjaunošana** (`email.password_reset.*`, migrācija `190`)
+
 ## v1.3.132
 
 **Maksas plānu cenas un Early Bird**

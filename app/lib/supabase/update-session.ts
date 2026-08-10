@@ -30,6 +30,7 @@ const PUBLIC_PATHS = [
   "/auth/auth-code-error",
   "/login",
   "/signup",
+  "/forgot-password",
   "/docs",
   "/wiki",
   "/privacy",

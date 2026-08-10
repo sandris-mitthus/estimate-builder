@@ -309,6 +309,17 @@ export function AuthScreen({
                       />
                     </label>
 
+                    {!isSignup ? (
+                      <div className="mt-2 text-right">
+                        <Link
+                          href="/forgot-password"
+                          className="text-sm font-medium text-zinc-600 underline-offset-2 transition hover:text-zinc-900 hover:underline"
+                        >
+                          {t("auth.email.forgot_password", "Aizmirsi paroli?")}
+                        </Link>
+                      </div>
+                    ) : null}
+
                     {isSignup ? (
                       <label className="mt-4 block text-sm font-medium text-zinc-800">
                         {t("auth.email.confirm_password_label", "Atkārto paroli")}

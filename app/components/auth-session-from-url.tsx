@@ -243,14 +243,17 @@ export function AuthSessionFromUrl({
   );
 }
 
-/** When invite tokens land on Site URL (`/#access_token=…`), send them to confirm. */
+/** When invite/recovery tokens land on Site URL (`/#access_token=…`), send them to confirm. */
 export function AuthHashRedirect() {
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash.includes("access_token=")) {
       return;
     }
-    window.location.replace(`/auth/confirm${hash}`);
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const next =
+      params.get("type") === "recovery" ? "?next=/reset-password" : "";
+    window.location.replace(`/auth/confirm${next}${hash}`);
   }, []);
 
   return null;

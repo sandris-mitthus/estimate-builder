@@ -145,10 +145,14 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "auth.email.resend_required",
   "E-pasta apstiprinājums pieejams tikai ar ieslēgtu Resend.":
     "auth.email.resend_required",
+  "Paroles atjaunošana pieejama tikai ar ieslēgtu Resend.":
+    "auth.email.password_reset_resend_required",
   "Šis e-pasts jau ir reģistrēts. Pieraksties ar paroli.":
     "auth.email.already_registered",
   "Neizdevās nosūtīt apstiprinājuma e-pastu.":
     "auth.email.confirmation_send_failed",
+  "Neizdevās nosūtīt paroles atjaunošanas e-pastu.":
+    "auth.email.password_reset_send_failed",
   "Konts ar šo e-pastu nav atrasts.": "auth.email.account_not_found",
   "E-pasts jau ir apstiprināts. Vari pierakstīties.":
     "auth.email.already_confirmed",

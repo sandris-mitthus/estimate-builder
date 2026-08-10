@@ -14,6 +14,7 @@ import type {
   EmailTemplateDraft,
   EmailTemplateKind,
 } from "@/app/lib/email/templates";
+import { emailTemplateHasButton } from "@/app/lib/email/templates";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 
 const fieldClassName =
@@ -32,6 +33,10 @@ const TEMPLATE_LABEL_KEYS: Record<
     key: "site_email_templates.template.signup",
     fallback: "Reģistrācijas apstiprinājums",
   },
+  password_reset: {
+    key: "site_email_templates.template.password_reset",
+    fallback: "Paroles atjaunošana",
+  },
   disabled: {
     key: "site_email_templates.template.disabled",
     fallback: "Pieeja liegta",
@@ -44,6 +49,12 @@ const TEMPLATE_LABEL_KEYS: Record<
     key: "site_email_templates.template.removed",
     fallback: "Pieeja noņemta",
   },
+};
+
+const BUTTON_PREVIEW_FALLBACK: Record<string, string> = {
+  invite: "Apstiprināt uzaicinājumu",
+  signup: "Apstiprināt e-pastu",
+  password_reset: "Atjaunot paroli",
 };
 
 const PREVIEW_PARAMS = {
@@ -162,18 +173,17 @@ export function SiteEmailTemplatesForm({
       )
     : "";
   const previewButton =
-    activeTemplate?.kind === "invite" || activeTemplate?.kind === "signup"
+    activeTemplate && emailTemplateHasButton(activeTemplate.kind)
       ? interpolateTranslation(
           activeTemplate.buttons?.[editLang] ??
             activeTemplate.buttons?.lv ??
-            (activeTemplate.kind === "signup"
-              ? "Apstiprināt e-pastu"
-              : "Apstiprināt uzaicinājumu"),
+            BUTTON_PREVIEW_FALLBACK[activeTemplate.kind] ??
+            "",
           PREVIEW_PARAMS,
         )
       : "";
   const invitePreviewHtml =
-    activeTemplate?.kind === "invite" || activeTemplate?.kind === "signup"
+    activeTemplate && emailTemplateHasButton(activeTemplate.kind)
       ? buildInviteEmailHtml({
           systemName: PREVIEW_PARAMS.system,
           companyName: PREVIEW_PARAMS.company,
@@ -402,16 +412,12 @@ export function SiteEmailTemplatesForm({
                       )
                     }
                     rows={
-                      activeTemplate.kind === "invite" ||
-                      activeTemplate.kind === "signup"
-                        ? 6
-                        : 8
+                      emailTemplateHasButton(activeTemplate.kind) ? 6 : 8
                     }
                     className={`${fieldClassName} resize-y font-mono text-[13px] leading-relaxed`}
                   />
                 </div>
-                {activeTemplate.kind === "invite" ||
-                activeTemplate.kind === "signup" ? (
+                {emailTemplateHasButton(activeTemplate.kind) ? (
                   <div>
                     <label
                       htmlFor={`${activeTemplate.kind}-button-${activeLanguage.code}`}
@@ -477,7 +483,7 @@ export function SiteEmailTemplatesForm({
           <p className="mt-3 text-sm font-semibold text-zinc-900">
             {previewSubject || "—"}
           </p>
-          {activeKind === "invite" || activeKind === "signup" ? (
+          {emailTemplateHasButton(activeKind) ? (
             invitePreviewHtml ? (
             <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
               <iframe

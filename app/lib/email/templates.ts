@@ -9,6 +9,7 @@ import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 export type EmailTemplateKind =
   | "invite"
   | "signup"
+  | "password_reset"
   | "disabled"
   | "restored"
   | "removed";
@@ -22,13 +23,14 @@ export type EmailTemplateDraft = {
   subjects: Record<string, string>;
   /** language code → body text */
   bodies: Record<string, string>;
-  /** language code → CTA button label (invite / signup) */
+  /** language code → CTA button label (invite / signup / password_reset) */
   buttons?: Record<string, string>;
 };
 
 export const EMAIL_TEMPLATE_KINDS: EmailTemplateKind[] = [
   "invite",
   "signup",
+  "password_reset",
   "disabled",
   "restored",
   "removed",
@@ -36,6 +38,7 @@ export const EMAIL_TEMPLATE_KINDS: EmailTemplateKind[] = [
 
 const INVITE_BUTTON_KEY = "email.invite.button";
 const SIGNUP_BUTTON_KEY = "email.signup.button";
+const PASSWORD_RESET_BUTTON_KEY = "email.password_reset.button";
 
 const TEMPLATE_KEYS: Record<
   EmailTemplateKind,
@@ -51,6 +54,11 @@ const TEMPLATE_KEYS: Record<
     bodyKey: "email.signup.body",
     buttonKey: SIGNUP_BUTTON_KEY,
   },
+  password_reset: {
+    subjectKey: "email.password_reset.subject",
+    bodyKey: "email.password_reset.body",
+    buttonKey: PASSWORD_RESET_BUTTON_KEY,
+  },
   disabled: {
     subjectKey: "email.access.disabled.subject",
     bodyKey: "email.access.disabled.body",
@@ -65,17 +73,23 @@ const TEMPLATE_KEYS: Record<
   },
 };
 
-const BUTTON_FALLBACK: Record<"invite" | "signup", { lv: string; en: string }> =
-  {
-    invite: {
-      lv: "Apstiprināt uzaicinājumu",
-      en: "Confirm invitation",
-    },
-    signup: {
-      lv: "Apstiprināt e-pastu",
-      en: "Confirm email",
-    },
-  };
+const BUTTON_FALLBACK: Record<
+  "invite" | "signup" | "password_reset",
+  { lv: string; en: string }
+> = {
+  invite: {
+    lv: "Apstiprināt uzaicinājumu",
+    en: "Confirm invitation",
+  },
+  signup: {
+    lv: "Apstiprināt e-pastu",
+    en: "Confirm email",
+  },
+  password_reset: {
+    lv: "Atjaunot paroli",
+    en: "Reset password",
+  },
+};
 
 const FALLBACK_TEMPLATES: Record<
   EmailTemplateKind,
@@ -99,6 +113,16 @@ const FALLBACK_TEMPLATES: Record<
     body: {
       lv: "Sveiki, {name}!\n\nPaldies, ka reģistrējies sistēmā {system}.\n\nNospied pogu zemāk, lai apstiprinātu e-pastu un aktivizētu kontu.",
       en: "Hello, {name}!\n\nThanks for signing up to {system}.\n\nPress the button below to confirm your email and activate your account.",
+    },
+  },
+  password_reset: {
+    subject: {
+      lv: "Atjauno paroli — {system}",
+      en: "Reset your password — {system}",
+    },
+    body: {
+      lv: "Sveiki, {name}!\n\nSaņēmām pieprasījumu atjaunot paroli sistēmā {system}.\n\nNospied pogu zemāk, lai izvēlētos jaunu paroli. Ja tu to nepieprasīji, vari ignorēt šo e-pastu.",
+      en: "Hello, {name}!\n\nWe received a request to reset your password for {system}.\n\nPress the button below to choose a new password. If you did not request this, you can ignore this email.",
     },
   },
   disabled: {
@@ -160,11 +184,16 @@ function fallbackButton(
   kind: EmailTemplateKind,
   languageCode: string,
 ): string {
-  if (kind !== "invite" && kind !== "signup") {
+  if (kind !== "invite" && kind !== "signup" && kind !== "password_reset") {
     return "";
   }
   const pack = BUTTON_FALLBACK[kind];
   return languageCode === "en" ? pack.en : pack.lv;
+}
+
+/** Templates that use HTML CTA button + iframe preview in admin. */
+export function emailTemplateHasButton(kind: EmailTemplateKind): boolean {
+  return kind === "invite" || kind === "signup" || kind === "password_reset";
 }
 
 export async function listEmailTemplateDrafts(
