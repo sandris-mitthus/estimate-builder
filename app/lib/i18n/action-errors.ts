@@ -153,6 +153,14 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "auth.email.confirmation_send_failed",
   "Neizdevās nosūtīt paroles atjaunošanas e-pastu.":
     "auth.email.password_reset_send_failed",
+  "Jaunajai parolei jābūt atšķirīgai no iepriekšējās.":
+    "auth.reset.password_same_as_old",
+  "Parole ir pārāk vāja. Izvēlies sarežģītāku paroli.":
+    "auth.reset.password_too_weak",
+  "Atjaunošanas saite nav derīga vai ir beigusies. Pieprasi jaunu saiti.":
+    "auth.reset.session_required",
+  "Neizdevās saglabāt jauno paroli.": "auth.reset.update_failed",
+  "Paroles nesakrīt.": "auth.email.password_mismatch",
   "Konts ar šo e-pastu nav atrasts.": "auth.email.account_not_found",
   "E-pasts jau ir apstiprināts. Vari pierakstīties.":
     "auth.email.already_confirmed",

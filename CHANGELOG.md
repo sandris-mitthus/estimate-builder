@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.2
+
+**Paroles atjaunošanas saglabāšana**
+
+- `/reset-password` saglabā paroli caur server action (ne klienta `updateUser`), pēc recovery `verifyOtp` papildus `setSession`
+- Skaidrākas kļūdas: tā pati parole, vāja parole, beigusies saite (migrācija `192`)
+
 ## v1.4.1
 
 **Reset paroles UX un Node engines**

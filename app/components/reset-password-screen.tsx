@@ -8,7 +8,8 @@ import { PublicLanguageSelector } from "@/app/components/public-language-selecto
 import { SiteFooter } from "@/app/components/site-footer";
 import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
-import { createClient } from "@/app/lib/supabase/client";
+import { translateActionError } from "@/app/lib/i18n/action-errors";
+import { updatePasswordAfterRecoveryAction } from "@/app/reset-password/actions";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -73,15 +74,14 @@ export function ResetPasswordScreen({
     }
 
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    const result = await updatePasswordAfterRecoveryAction({
+      password,
+      confirmPassword,
+    });
     setLoading(false);
 
-    if (error) {
-      showFeedback({
-        type: "error",
-        text: t("auth.reset.update_failed", "Neizdevās saglabāt jauno paroli."),
-      });
+    if (!result.ok) {
+      showFeedback({ type: "error", text: translateActionError(t, result) });
       return;
     }
 

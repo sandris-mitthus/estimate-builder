@@ -88,6 +88,18 @@ async function establishSession(
     if (error || !data.session) {
       return null;
     }
+
+    // Recovery fires PASSWORD_RECOVERY; explicitly persist session to cookies
+    // so /reset-password server actions can call updateUser.
+    const { data: persisted, error: persistError } =
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    if (!persistError && persisted.session) {
+      return persisted.session;
+    }
+
     return data.session;
   }
 
