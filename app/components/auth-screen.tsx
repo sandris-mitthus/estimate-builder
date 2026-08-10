@@ -11,6 +11,7 @@ import { AuthHashRedirect } from "@/app/components/auth-session-from-url";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { PublicLanguageSelector } from "@/app/components/public-language-selector";
 import { SiteFooter } from "@/app/components/site-footer";
+import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
 import { signInWithEmailPassword } from "@/app/lib/auth/sign-in-with-email";
 import { signInWithGoogle } from "@/app/lib/auth/sign-in-with-google";
@@ -20,6 +21,9 @@ import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 
 const fieldClassName =
   "mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+
+const passwordFieldClassName =
+  "w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-3 pr-11 text-left text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
 
 export type AuthScreenMode = "login" | "signup";
 
@@ -52,10 +56,15 @@ export function AuthScreen({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showResendConfirm, setShowResendConfirm] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const isSignup = mode === "signup";
   const busy = googleLoading || emailLoading;
+
+  const showPasswordLabel = t("auth.email.show_password", "Rādīt paroli");
+  const hidePasswordLabel = t("auth.email.hide_password", "Paslēpt paroli");
 
   const title = isSignup
     ? t("auth.email.register_submit", "Izveidot kontu")
@@ -296,17 +305,45 @@ export function AuthScreen({
 
                     <label className="mt-4 block text-sm font-medium text-zinc-800">
                       {t("auth.email.password_label", "Parole")}
-                      <input
-                        type="password"
-                        autoComplete={
-                          isSignup ? "new-password" : "current-password"
-                        }
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        disabled={busy}
-                        className={fieldClassName}
-                        placeholder="••••••••"
-                      />
+                      <span className="relative mt-2 block">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          autoComplete={
+                            isSignup ? "new-password" : "current-password"
+                          }
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          disabled={busy}
+                          className={passwordFieldClassName}
+                          placeholder="••••••••"
+                        />
+                        <Tooltip
+                          label={
+                            showPassword ? hidePasswordLabel : showPasswordLabel
+                          }
+                          align="end"
+                          className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                        >
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              setShowPassword((current) => !current)
+                            }
+                            aria-label={
+                              showPassword
+                                ? hidePasswordLabel
+                                : showPasswordLabel
+                            }
+                            className="flex size-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <i
+                              className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        </Tooltip>
+                      </span>
                     </label>
 
                     {!isSignup ? (
@@ -322,18 +359,51 @@ export function AuthScreen({
 
                     {isSignup ? (
                       <label className="mt-4 block text-sm font-medium text-zinc-800">
-                        {t("auth.email.confirm_password_label", "Atkārto paroli")}
-                        <input
-                          type="password"
-                          autoComplete="new-password"
-                          value={confirmPassword}
-                          onChange={(event) =>
-                            setConfirmPassword(event.target.value)
-                          }
-                          disabled={busy}
-                          className={fieldClassName}
-                          placeholder="••••••••"
-                        />
+                        {t(
+                          "auth.email.confirm_password_label",
+                          "Atkārto paroli",
+                        )}
+                        <span className="relative mt-2 block">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            value={confirmPassword}
+                            onChange={(event) =>
+                              setConfirmPassword(event.target.value)
+                            }
+                            disabled={busy}
+                            className={passwordFieldClassName}
+                            placeholder="••••••••"
+                          />
+                          <Tooltip
+                            label={
+                              showConfirmPassword
+                                ? hidePasswordLabel
+                                : showPasswordLabel
+                            }
+                            align="end"
+                            className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                          >
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                setShowConfirmPassword((current) => !current)
+                              }
+                              aria-label={
+                                showConfirmPassword
+                                  ? hidePasswordLabel
+                                  : showPasswordLabel
+                              }
+                              className="flex size-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <i
+                                className={`fas ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}
+                                aria-hidden="true"
+                              />
+                            </button>
+                          </Tooltip>
+                        </span>
                       </label>
                     ) : null}
 

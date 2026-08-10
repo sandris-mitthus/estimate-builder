@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.3
+
+**Login / signup paroles rādīšana**
+
+- `/login` un `/signup` paroles laukiem acu ikona (rādīt / paslēpt), signup arī „Atkārto paroli”
+
 ## v1.4.2
 
 **Paroles atjaunošanas saglabāšana**
