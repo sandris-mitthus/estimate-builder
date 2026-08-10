@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.1
+
+**Reset paroles UX un Node engines**
+
+- `/reset-password` — acu ikona, lai rādītu / paslēptu jauno un atkārtoto paroli (migrācija `191`)
+- `package.json` `engines.node` → `22.x` (novērš Vercel brīdinājumu par `>=` major upgrade)
+
 ## v1.4.0
 
 **Auth e-pastu saites uz produkta domēnu**

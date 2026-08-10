@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { PublicLanguageSelector } from "@/app/components/public-language-selector";
 import { SiteFooter } from "@/app/components/site-footer";
+import { Tooltip } from "@/app/components/tooltip";
 import { useTranslations } from "@/app/components/translations-provider";
 import { createClient } from "@/app/lib/supabase/client";
 import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
@@ -13,7 +14,7 @@ import type { SiteLanguageSummary } from "@/app/lib/site-admin/repository";
 const MIN_PASSWORD_LENGTH = 8;
 
 const fieldClassName =
-  "mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+  "w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-3 pr-11 text-left text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
 
 export function ResetPasswordScreen({
   systemName,
@@ -33,7 +34,12 @@ export function ResetPasswordScreen({
   const { clearFeedback, showFeedback } = useFeedbackToast();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const showPasswordLabel = t("auth.email.show_password", "Rādīt paroli");
+  const hidePasswordLabel = t("auth.email.hide_password", "Paslēpt paroli");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -144,28 +150,82 @@ export function ResetPasswordScreen({
             <form onSubmit={handleSubmit} className="text-left">
               <label className="block text-sm font-medium text-zinc-800">
                 {t("auth.email.password_label", "Parole")}
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  disabled={loading}
-                  className={fieldClassName}
-                  placeholder="••••••••"
-                />
+                <span className="relative mt-2 block">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    disabled={loading}
+                    className={fieldClassName}
+                    placeholder="••••••••"
+                  />
+                  <Tooltip
+                    label={showPassword ? hidePasswordLabel : showPasswordLabel}
+                    align="end"
+                    className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                  >
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-label={
+                        showPassword ? hidePasswordLabel : showPasswordLabel
+                      }
+                      className="flex size-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <i
+                        className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </Tooltip>
+                </span>
               </label>
 
               <label className="mt-4 block text-sm font-medium text-zinc-800">
                 {t("auth.email.confirm_password_label", "Atkārto paroli")}
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  disabled={loading}
-                  className={fieldClassName}
-                  placeholder="••••••••"
-                />
+                <span className="relative mt-2 block">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) =>
+                      setConfirmPassword(event.target.value)
+                    }
+                    disabled={loading}
+                    className={fieldClassName}
+                    placeholder="••••••••"
+                  />
+                  <Tooltip
+                    label={
+                      showConfirmPassword
+                        ? hidePasswordLabel
+                        : showPasswordLabel
+                    }
+                    align="end"
+                    className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                  >
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() =>
+                        setShowConfirmPassword((current) => !current)
+                      }
+                      aria-label={
+                        showConfirmPassword
+                          ? hidePasswordLabel
+                          : showPasswordLabel
+                      }
+                      className="flex size-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <i
+                        className={`fas ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"} text-sm`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </Tooltip>
+                </span>
               </label>
 
               <button
