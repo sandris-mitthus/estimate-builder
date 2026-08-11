@@ -8,6 +8,7 @@ const LEGAL_LINKS = [
   { href: "/privacy", labelKey: "legal.privacy.title", fallback: "Privātuma politika" },
   { href: "/terms", labelKey: "legal.terms.title", fallback: "Lietošanas noteikumi" },
   { href: "/cookies", labelKey: "legal.cookies.title", fallback: "Sīkdatņu politika" },
+  { href: "/sitemap", labelKey: "sitemap.title", fallback: "Lapas karte" },
 ];
 
 export function LegalNav() {

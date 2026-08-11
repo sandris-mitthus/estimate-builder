@@ -595,7 +595,7 @@ export function getCookiePolicyContent(
           {
             key: "legal.cookies.categories.p1",
             fallback:
-              "Obligātās sīkdatnes nodrošina pieslēgšanos, drošību, izvēlēto valodu un tavas piekrišanas saglabāšanu. Preferenču sīkdatnes atceras saskarnes izvēles. Statistikas un mārketinga sīkdatnes šobrīd sistēmā netiek izmantotas, bet kategorijas ir pieejamas, lai varētu tās ieslēgt tikai ar tavu piekrišanu.",
+              "Obligātās sīkdatnes nodrošina pieslēgšanos, drošību, izvēlēto valodu un tavas piekrišanas saglabāšanu. Preferenču sīkdatnes atceras saskarnes izvēles. Statistikas sīkdatnes (Umami) mēra anonīmu lietojumu tikai ar tavu piekrišanu. Mārketinga sīkdatnes šobrīd sistēmā netiek izmantotas.",
           },
           {
             key: "legal.cookies.categories.p2",

@@ -36,6 +36,9 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/cookies",
+  "/sitemap",
+  "/robots.txt",
+  "/llms.txt",
   "/api/site/",
 ];
 

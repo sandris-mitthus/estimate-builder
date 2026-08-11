@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.13
+
+**SEO un Umami**
+
+- `robots.txt`, `sitemap.xml`, `/llms.txt` un HTML `/sitemap` (kājene + juridiskā navigācija); `metadataBase` / canonical publiskajām lapām (`209`)
+- Umami Cloud analitika root layoutā — ielādējas tikai pēc statistikas sīkdatņu piekrišanas (`210`)
+
 ## v1.4.12
 
 **Materiālu pasūtīšana vs deleģēšana**

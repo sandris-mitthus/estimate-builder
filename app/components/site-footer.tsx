@@ -54,6 +54,10 @@ export function SiteFooter({
         {t("legal.cookies.title", "Sīkdatņu politika")}
       </Link>
       <LinkSeparator />
+      <Link href="/sitemap" className={linkClassName}>
+        {t("sitemap.title", "Lapas karte")}
+      </Link>
+      <LinkSeparator />
       <button
         type="button"
         onClick={openSettings}

@@ -6,6 +6,7 @@ import {
   getLegalControllerDetails,
   getPrivacyPolicyContent,
 } from "@/app/lib/legal/documents";
+import { publicPageSeo } from "@/app/lib/seo/public-page-metadata";
 import { getSiteSettings } from "@/app/lib/site-admin/repository";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
   ]);
   const title = t("legal.privacy.title", "Privātuma politika");
 
-  return {
+  return publicPageSeo("/privacy", {
     title: `${title} — ${settings.systemName}`,
-  };
+  });
 }
 
 export default async function PrivacyPolicyPage() {

@@ -109,6 +109,15 @@ const COOKIE_REGISTRY: CookieRegistryEntry[] = [
     retentionFallback: "12 mēneši",
   },
   {
+    name: "umami",
+    category: "analytics",
+    purposeKey: "legal.cookies.table.umami.purpose",
+    purposeFallback:
+      "Anonīma lapu apmeklējumu un lietojuma statistika (Umami Cloud), lai uzlabotu sistēmu.",
+    retentionKey: "legal.cookies.table.umami.retention",
+    retentionFallback: "Līdz 24 mēnešiem vai līdz piekrišanas atsaukšanai",
+  },
+  {
     name: "local storage: estimate-builder-system-admin-todo-list",
     category: "necessary",
     purposeKey: "legal.cookies.table.todo_storage.purpose",

@@ -5,6 +5,7 @@ import { LegalDocumentView } from "@/app/components/legal-document-view";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import { getCookieRegistryRows } from "@/app/lib/legal/cookie-registry";
 import { getCookiePolicyContent } from "@/app/lib/legal/documents";
+import { publicPageSeo } from "@/app/lib/seo/public-page-metadata";
 import { getSiteSettings } from "@/app/lib/site-admin/repository";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
   ]);
   const title = t("legal.cookies.title", "Sīkdatņu politika");
 
-  return {
+  return publicPageSeo("/cookies", {
     title: `${title} — ${settings.systemName}`,
-  };
+  });
 }
 
 export default async function CookiePolicyPage() {

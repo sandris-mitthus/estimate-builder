@@ -24,14 +24,15 @@ Product overview and setup instructions: [README.md](README.md). Release history
 
 ### Legal pages, footer and cookie consent
 
-- **Publiskās juridiskās lapas** — `/privacy`, `/terms`, `/cookies` dzīvo `app/(legal)/` route grupā ar savu layout (atpakaļsaite, sadaļu navigācija, kājene); ceļi ir `PUBLIC_PATHS` sarakstā `update-session.ts`, tāpēc tie atveras gan ielogotam, gan anonīmam lietotājam vienā un tajā pašā URL
+- **Publiskās juridiskās lapas** — `/privacy`, `/terms`, `/cookies` dzīvo `app/(legal)/` route grupā ar savu layout (atpakaļsaite, sadaļu navigācija, kājene); ceļi ir `PUBLIC_PATHS` sarakstā `update-session.ts`, tāpēc tie atveras gan ielogotam, gan anonīmam lietotājam vienā un tajā pašā URL; HTML **Lapas karte** ir `/sitemap` (arī `PUBLIC_PATHS`)
 - **Saturs pilnībā tulkojumu atslēgās** — `app/lib/legal/documents.ts` būvē sadaļas no `legal.privacy.*`, `legal.terms.*`, `legal.cookies.*`; privātuma politikā ir VDAR 13. panta obligātie punkti (pārzinis, datu kategorijas, mērķi ar pantiem, saņēmēji, nodošana ārpus EEZ, termiņi, tiesības, drošība, automatizētas lēmumu pieņemšanas neesamība), noteikumos — patērētāja 14 dienu atteikums un piekritība
 - **Pārziņa rekvizīti nāk no `/site_settings`** — `controller_name`, `controller_registration_number`, `controller_address`, `controller_email` ir `site_settings` kolonnas (migrācija `164`), nevis tulkojumi, jo tie nav valodu atkarīgi; tukšs lauks privātuma politikā rādās kā `legal.controller.not_configured`, bet tukšs nosaukums atkāpjas uz sistēmas nosaukumu. Uzraudzības iestāde paliek tulkojums (`legal.common.supervisory_authority`), jo iestādes nosaukums ir tulkojams
 - **Sistēmas zīmols** — `/site_settings` drag-and-drop lauki `logo_url` un `favicon_url` (migrācija `165`); faili privātajā `site-assets` bucketā (`logo.*` / `favicon.*`), apkalpoti caur publiskajiem `/api/site/logo` un `/api/site/favicon` (`PUBLIC_PATHS`), jo login un pārlūka cilne rādās arī bez sesijas; logo — sidebar pirms nosaukuma un login virs virsraksta; favicon — `generateMetadata().icons`
-- **Sīkdatņu reģistrs** — `app/lib/legal/cookie-registry.ts` uztur pilnu sarakstu (nosaukums, kategorija, mērķis, glabāšanas laiks), ko `/cookies` renderē tabulā; jaunu sīkdatni pievienojot, jāatjaunina arī šis reģistrs
+- **SEO (meklētāji un AI)** — `app/robots.ts` (`/robots.txt`), `app/sitemap.ts` (`/sitemap.xml`), `app/llms.txt/route.ts` (`/llms.txt` pēc llmstxt.org), politika `app/lib/seo/search-crawl.ts`; publiskajām lapām `metadataBase` + `publicPageSeo()` (`canonical` / OG); `/wiki` ir `Disallow` dublikāts pret `/docs`
+- **Sīkdatņu reģistrs** — `app/lib/legal/cookie-registry.ts` uztur pilnu sarakstu (nosaukums, kategorija, mērķis, glabāšanas laiks), ko `/cookies` renderē tabulā; jaunu sīkdatni pievienojot, jāatjaunina arī šis reģistrs (ietver **umami**)
 - **Piekrišanas modelis** — `app/lib/consent/cookie-consent.ts` definē kategorijas `necessary` / `preferences` / `analytics` / `marketing`, versionētu `eb_cookie_consent` sīkdatni (6 mēneši) un `isPreferenceCookieName`; `COOKIE_CONSENT_VERSION` palielināšana padara vecās piekrišanas nederīgas un liek prasīt vēlreiz
-- **Slēdži reāli darbojas** — ērtības sīkdatnes rakstāmas tikai caur `writePreferenceCookie` (`app/lib/consent/client.ts`), ko izmanto `app-nav.tsx`, `collapsed-sections-cookie.ts` un `assigned-materials-banner-cookie.ts`; bez piekrišanas izmaiņa dzīvo tikai līdz pārlādei, bet pēc atsaukšanas `purgePreferenceCookies` uzreiz izdzēš jau saglabātās. `eb_language` un Supabase auth sīkdatnes ir obligātās (ePrivacy izņēmums), analytics/marketing kategorijām pagaidām nav patērētāju — jaunus skriptus liek aiz `useCookieConsent().isAllowed(category)`
-- **UI** — `CookieConsentProvider` (root layout) tur stāvokli un renderē `CookieConsentDialog`: baneris bez aizvēršanas krustiņa, kamēr izvēle nav izdarīta, un iestatījumu modālis ar slēdžiem; `SiteFooter` (sistēmā, landing/auth ekrānos, docs un juridiskajās lapās) rāda politiku saites un **Sīkdatņu iestatījumi**, kas atver moduli atkārtoti (`layout="spread" | "centered"`)
+- **Slēdži reāli darbojas** — ērtības sīkdatnes rakstāmas tikai caur `writePreferenceCookie` (`app/lib/consent/client.ts`), ko izmanto `app-nav.tsx`, `collapsed-sections-cookie.ts` un `assigned-materials-banner-cookie.ts`; bez piekrišanas izmaiņa dzīvo tikai līdz pārlādei, bet pēc atsaukšanas `purgePreferenceCookies` uzreiz izdzēš jau saglabātās. `eb_language` un Supabase auth sīkdatnes ir obligātās (ePrivacy izņēmums); **Umami** (`UmamiAnalytics` root layoutā, `cloud.umami.is`) ielādējas tikai ja `isAllowed("analytics")`
+- **UI** — `CookieConsentProvider` (root layout) tur stāvokli un renderē `CookieConsentDialog`: baneris bez aizvēršanas krustiņa, kamēr izvēle nav izdarīta, un iestatījumu modālis ar slēdžiem; `SiteFooter` (sistēmā, landing/auth ekrānos, docs un juridiskajās lapās) rāda politiku saites, **Lapas karte** un **Sīkdatņu iestatījumi**, kas atver moduli atkārtoti (`layout="spread" | "centered"`)
 - **Root layout** ietver `TranslationsProvider`, tāpēc arī publiskās lapas un consent UI saņem `t()`, un `<html lang>` seko aktīvajai valodai
 
 ### Multi-company users, groups and permissions
@@ -201,6 +202,10 @@ app/
 │   ├── todo/          # System admin local todo board (two columns + DnD)
 │   └── settings/      # Company settings (CompanySettingsForm mode=edit)
 ├── (legal)/           # Public legal pages (privacy/, terms/, cookies/) + shared layout with footer
+├── sitemap/           # Human-readable HTML site map (/sitemap)
+├── robots.ts          # /robots.txt
+├── sitemap.ts         # /sitemap.xml
+├── llms.txt/          # /llms.txt (AI agents)
 ├── docs/              # Public documentation alias for wiki
 ├── wiki/              # Public documentation page
 ├── api/
@@ -221,13 +226,15 @@ app/
 │   ├── confirm/        # Invite/recovery hash session (setSession + full-page redirect)
 │   └── auth-code-error/ # Error UI + hash-token / existing-session recovery
 
-├── components/         # UI (company-settings-form, register-company-view, estimate-table, project-additional-work-section, line-item-total-only-toggle, estimate-table-sticky-shell, estimate-table-header-label, restore-button, project-excluded-positions-panel, sync-sagatave-changes-modal, restore-sagatave-positions-modal, material-consumption-basis-control, mechanism-basis-control, line-item-catalog-ref-sortable-list, mechanism-quantity-control, modal-stack-context, public-docs-view, site-docs-manager, navigation-loading-context, action-permissions-context, project-materials-table, landing-page, landing-pricing-cards, auth-screen, public-language-selector, site-integrations-form, site-footer, cookie-consent-provider/context/dialog, cookie-settings-link, cookie-registry-table, legal-document-view, legal-controller-details, legal-nav, ui/toggle-switch, …)
+├── components/         # UI (…, site-footer, umami-analytics, cookie-consent-provider/context/dialog, cookie-settings-link, cookie-registry-table, legal-document-view, legal-controller-details, legal-nav, ui/toggle-switch, …)
 ├── lib/
 │   ├── slugify.ts      # slugifyName — kopīgs slug uzņēmuma un sistēmas grupām
 │   ├── i18n/           # server translations, anonymous geo language (country-language aliases), cache tags, localized-values (null-safe resolve)
 │   ├── additional-work-estimates/  # list/create/save/delete additional work estimates (estimate_kind = additional_work)
 │   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
 │   ├── companies/      # current company resolution, bootstrap company id, registerCompanyForCurrentUser (incl. signup trial plan), payment-access (kešots maksas/VIP/bloķēšanas snapshots)
+│   ├── analytics/      # Umami Cloud website ID + script URL
+│   ├── seo/            # search-crawl (robots/sitemap paths), public-page-metadata (canonical/OG)
 │   ├── client/         # cookie read/write/delete helpers
 │   ├── consent/        # cookie-consent categories + versioned consent cookie, consent-aware preference cookie writer and purge
 │   ├── estimate-positions/  # repository, serialize, reorder, collapsed-sections-cookie, clone-sagatave-for-project, project-structure-to-sagatave, sagatave-to-other-projects, sagatave-structure-intro-entries, sagatave-has-new-positions, sagatave-row-matching, sagatave-position-changes, project-estimate-base, sync-subcategory-offer-visibility, labor-time-norm-sync, sections-use-module-size-options, default sagatave
@@ -260,7 +267,7 @@ app/
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs, copy-company-data.mjs (one-off company clone)
 public/                 # pdf.worker.min.mjs (postinstall); fonts/Roboto-*.ttf (PDF latviešu burti)
-supabase/migrations/    # 001–208 (…; 196–197 = optional payment-plan periods; 198 = slogan_values; 208 = material order core vs delegation module labels)
+supabase/migrations/    # 001–210 (…; 208 = material order core vs delegation; 209 = SEO sitemap/llms; 210 = Umami cookie copy)
 .github/workflows/      # secret-scan.yml, security-audit.yml, security-smoke.yml
 .gitleaks.toml          # default rules + i18n translation key allowlist
 .cursor/rules/          # README bump, commits, db:migrate, Supabase security
@@ -375,6 +382,7 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 - [x] Moduļa lielumi — **Dzīvojamā platība** (m²; arī `module_data_complete`), logu/durvju **kopējais perimetrs**, vairākas vienlaikus atvērtas sadaļas apjoma izvēlē un sagataves piemēra piezīme bez moduļa nosaukuma
 - [x] Sanmezgli projekta aprakstā; apjomu **+/-** un **×2**; logu/durvju/sanmezglu neitrāli kārtas numuri; logu **Vitrīna** slēdzis
 - [x] Juridiskās lapas un sīkdatņu piekrišana — `/privacy`, `/terms`, `/cookies` publiski pieejami, kājene visos skatos, kategoriju slēdži ar reālu preferenču sīkdatņu bloķēšanu un dzēšanu (`163`)
+- [x] SEO — `robots.txt` / `sitemap.xml` / `/llms.txt` / HTML `/sitemap`; Umami aiz analytics piekrišanas (`209`–`210`)
 - [x] Uzņēmuma reģistrācija — lietotājiem bez membership layout gate + `CompanySettingsForm` `mode="register"`; `registerCompanyForCurrentUser`; tulkojumi `166`
 
 ---

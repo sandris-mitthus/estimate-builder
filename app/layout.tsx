@@ -3,6 +3,8 @@ import { Geist } from "next/font/google";
 import { CookieConsentProvider } from "@/app/components/cookie-consent-provider";
 import { FeedbackToastProvider } from "@/app/components/feedback-toast-provider";
 import { TranslationsProvider } from "@/app/components/translations-provider";
+import { UmamiAnalytics } from "@/app/components/umami-analytics";
+import { getSiteOrigin } from "@/app/lib/auth/auth-confirm-link";
 import { resolveLocalizedValue } from "@/app/lib/i18n/localized-values";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import { getSiteSettings } from "@/app/lib/site-admin/repository";
@@ -31,12 +33,15 @@ export async function generateMetadata(): Promise<Metadata> {
     : undefined;
 
   return {
+    metadataBase: new URL(getSiteOrigin()),
     title: settings.systemName,
     description,
     icons,
     openGraph: {
       title: settings.systemName,
       description,
+      type: "website",
+      url: "/",
     },
   };
 }
@@ -58,7 +63,10 @@ export default async function RootLayout({
           translations={translations}
         >
           <FeedbackToastProvider>
-            <CookieConsentProvider>{children}</CookieConsentProvider>
+            <CookieConsentProvider>
+              <UmamiAnalytics />
+              {children}
+            </CookieConsentProvider>
           </FeedbackToastProvider>
         </TranslationsProvider>
       </body>

@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.4.12`
+**Current version:** `1.4.13`
 
 ---
 
@@ -22,8 +22,9 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator; anonymous visitors without a language cookie get a language matching their country when that language is active (for example RU→Russian, FI→Finnish), otherwise English when active, then the system default
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app
 - **Public landing and auth** — anonymous visitors see a marketing landing page at `/` (toggleable under **Integrācijas**); dedicated `/login` and `/signup` screens with optional Google sign-in (also under **Integrācijas**); **Forgot password?** sends a Resend reset link when email auth is on; when payment plans are on, the landing page shows each plan with only the billing periods that have a price (month / quarter / year — empty periods stay hidden) and Early Bird prices while slots remain, plus which modules each plan includes; system slogan is editable per language under **Sistēmas uzstādījumi**
+- **SEO** — `robots.txt` and `sitemap.xml` for search engines, `/llms.txt` for AI agents, and a human-readable site map at `/sitemap` (linked from every footer); public pages use `canonical` and Open Graph URLs via `NEXT_PUBLIC_SITE_URL`
 - **System admin integrations** — landing page, Resend email, and Google Auth checklist (current `*.supabase.co` on Free; later `api.uupis.com` after Supabase Pro Custom Domain)
-- **GDPR legal pages and cookie consent** — public privacy policy, terms of service and cookie policy (`/privacy`, `/terms`, `/cookies`) reachable from a site footer whether signed in or not; consent banner with per-category switches where optional cookies stay off until accepted and stored ones are deleted when consent is withdrawn; the data controller details shown in the privacy policy are filled in under **Sistēmas uzstādījumi**; system logo and favicon are uploaded there too (sidebar, login, signup)
+- **GDPR legal pages and cookie consent** — public privacy policy, terms of service and cookie policy (`/privacy`, `/terms`, `/cookies`) reachable from a site footer whether signed in or not; consent banner with per-category switches where optional cookies stay off until accepted and stored ones are deleted when consent is withdrawn; **Umami** page analytics loads only after statistics cookies are accepted; the data controller details shown in the privacy policy are filled in under **Sistēmas uzstādījumi**; system logo and favicon are uploaded there too (sidebar, login, signup)
 
 ---
 
@@ -68,7 +69,7 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `NEXT_PUBLIC_SUPABASE_URL` | DB + Auth | Free: `https://<project-ref>.supabase.co`. After Pro Custom Domain: `https://api.uupis.com` (same keys) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | DB + Auth | Public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | DB + users list + settings + logo upload | Server only |
-| `NEXT_PUBLIC_SITE_URL` | Auth | `http://localhost:3100` locally; on Vercel the public **app** domain (e.g. `https://uupis.com`) — Resend auth links, CSP/HSTS; browser OAuth uses `window.location.origin` |
+| `NEXT_PUBLIC_SITE_URL` | Auth / SEO | `http://localhost:3100` locally; on Vercel the public **app** domain (e.g. `https://uupis.com`) — Resend auth links, CSP/HSTS, `robots.txt` / `sitemap.xml` / `llms.txt` / `metadataBase`; browser OAuth uses `window.location.origin` |
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | Fallback Google email domain lock. Prefer **Integrācijas → Google** (`google_allowed_email_domain`); DB wins when set |

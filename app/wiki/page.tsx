@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PublicDocsView } from "@/app/components/public-docs-view";
 import { getServerTranslations } from "@/app/lib/i18n/server";
+import { publicPageSeo } from "@/app/lib/seo/public-page-metadata";
 import {
   getSiteSettings,
   listSiteDocs,
@@ -20,14 +21,10 @@ export async function generateMetadata(): Promise<Metadata> {
     "Detalizēta Estimate Builder dokumentācija par projektiem, tāmēm, materiālu patēriņu, eksportu un administrēšanu.",
   );
 
-  return {
+  return publicPageSeo("/docs", {
     title: `${title} | ${settings.systemName}`,
     description,
-    openGraph: {
-      title: `${title} | ${settings.systemName}`,
-      description,
-    },
-  };
+  });
 }
 
 export default async function WikiPage() {
