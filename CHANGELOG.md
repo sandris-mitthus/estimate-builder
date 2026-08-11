@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.11
+
+**Lint**
+
+- `prefer-const` labojums `cross-project-sync.ts` (CI eslint)
+
 ## v1.4.10
 
 **Laika grafiks — mantošana un plānošana starp projektiem**

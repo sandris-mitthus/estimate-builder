@@ -274,7 +274,7 @@ export async function syncParallelPairAcrossProjects(
   }
 
   // After local merge, take the full parallel group around the source section.
-  let groupId = source.categories
+  const groupId = source.categories
     .flatMap((category) => [
       { id: category.id, groupId: category.parallelGroupId },
       ...category.children.map((child) => ({
