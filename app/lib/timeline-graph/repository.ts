@@ -18,6 +18,10 @@ import {
 } from "@/app/lib/timeline-graph/types";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
+import {
+  syncParallelPairAcrossProjects,
+  type TimelineGraphSectionRef,
+} from "@/app/lib/timeline-graph/cross-project-sync";
 
 type OrderRow = {
   project_id: string;
@@ -214,7 +218,10 @@ export async function updateTimelineGraphPeopleCount(
   projectId: string,
   sectionId: string,
   peopleCount: number,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; synced: TimelineGraphSectionRef[] }
+  | { ok: false; error: string }
+> {
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
@@ -265,27 +272,30 @@ export async function updateTimelineGraphPeopleCount(
     if (deleteError) {
       return { ok: false, error: "Neizdevās saglabāt cilvēku skaitu." };
     }
+  } else {
+    const { error: upsertError } = await supabase
+      .from("company_timeline_graph_people")
+      .upsert(
+        {
+          company_id: companyId,
+          project_id: trimmedProjectId,
+          section_id: trimmedSectionId,
+          people_count: normalizedPeople,
+        },
+        { onConflict: "company_id,project_id,section_id" },
+      );
 
-    return { ok: true };
+    if (upsertError) {
+      return { ok: false, error: "Neizdevās saglabāt cilvēku skaitu." };
+    }
   }
 
-  const { error: upsertError } = await supabase
-    .from("company_timeline_graph_people")
-    .upsert(
-      {
-        company_id: companyId,
-        project_id: trimmedProjectId,
-        section_id: trimmedSectionId,
-        people_count: normalizedPeople,
-      },
-      { onConflict: "company_id,project_id,section_id" },
-    );
-
-  if (upsertError) {
-    return { ok: false, error: "Neizdevās saglabāt cilvēku skaitu." };
-  }
-
-  return { ok: true };
+  // Cilvēku skaits tiek pārmantots no pēdējā projekta tikai izveides brīdī —
+  // dzīva sinhronizācija starp projektiem nav.
+  return {
+    ok: true,
+    synced: [{ projectId: trimmedProjectId, sectionId: trimmedSectionId }],
+  };
 }
 
 /** Dzēš cilvēku skaita ierakstus konkrētām sadaļām vienā projektā (legacy tīrīšana). */
@@ -334,7 +344,10 @@ export async function setTimelineGraphParallelPair(
   projectId: string,
   sectionId: string,
   targetSectionId: string | null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; syncedProjectIds: string[] }
+  | { ok: false; error: string }
+> {
   if (!isSupabaseAdminConfigured()) {
     return { ok: false, error: "Datubāze nav konfigurēta." };
   }
@@ -370,11 +383,19 @@ export async function setTimelineGraphParallelPair(
   }
 
   if (!trimmedTargetId) {
-    return clearParallelMembership(
+    const cleared = await clearParallelMembership(
       supabase,
       companyId,
       trimmedProjectId,
       trimmedSectionId,
+    );
+    if (!cleared.ok) {
+      return cleared;
+    }
+    return syncParallelPairAcrossProjects(
+      trimmedProjectId,
+      trimmedSectionId,
+      null,
     );
   }
 
@@ -429,10 +450,10 @@ export async function setTimelineGraphParallelPair(
   const { error: upsertError } = await supabase
     .from("company_timeline_graph_parallel")
     .upsert(
-      Array.from(sectionIdsToUpsert).map((sectionId) => ({
+      Array.from(sectionIdsToUpsert).map((sectionIdValue) => ({
         company_id: companyId,
         project_id: trimmedProjectId,
-        section_id: sectionId,
+        section_id: sectionIdValue,
         parallel_group_id: groupId,
       })),
       { onConflict: "company_id,project_id,section_id" },
@@ -442,7 +463,11 @@ export async function setTimelineGraphParallelPair(
     return { ok: false, error: "Neizdevās saglabāt paralēlo sapārojumu." };
   }
 
-  return { ok: true };
+  return syncParallelPairAcrossProjects(
+    trimmedProjectId,
+    trimmedSectionId,
+    trimmedTargetId,
+  );
 }
 
 async function clearParallelMembership(

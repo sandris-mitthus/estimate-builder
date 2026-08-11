@@ -794,6 +794,14 @@ export async function createProject(
     return { ok: false, error: "Neizdevās izveidot tāmi." };
   }
 
+  // Cilvēku skaits no pēdējā (vai kopēšanas avota) projekta + paralēlās saites.
+  const { inheritTimelineGraphSettingsForProject } = await import(
+    "@/app/lib/timeline-graph/cross-project-sync"
+  );
+  await inheritTimelineGraphSettingsForProject(project.id, {
+    preferSourceProjectId: input.copyEstimateFromProjectId,
+  });
+
   return { ok: true, id: project.id };
 }
 
@@ -966,6 +974,13 @@ export async function updateProjectStatus(
     }
 
     return { ok: false, error: "Neizdevās atjaunināt projekta statusu." };
+  }
+
+  if (status === "approved") {
+    const { inheritTimelineGraphSettingsForProject } = await import(
+      "@/app/lib/timeline-graph/cross-project-sync"
+    );
+    await inheritTimelineGraphSettingsForProject(projectId);
   }
 
   return { ok: true };

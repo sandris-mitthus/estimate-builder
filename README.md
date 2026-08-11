@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.4.9`
+**Current version:** `1.4.10`
 
 ---
 
@@ -17,7 +17,7 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Offer control** — hide positions or prices from the client offer, show only a total for selected rows, and keep a list of works explicitly not included in the offer
 - **PDF and Excel export** — branded PDF offer with your company details, logo and visualizations; Excel spreadsheet with the full price breakdown and VAT; approximate-budget rows use that amount as the line total (same as on-screen totals)
 - **Approved projects** — material list with budget prices and an ordered/not-ordered status, plus assignment of materials to specific people with a reminder banner until everything is ordered
-- **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a labor workload schedule (Laika grafiks) with project priority, people count per job, and parallel pairing within a project
+- **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a labor workload schedule (Laika grafiks) with project priority, people count copied from the last project on create, approved end date under the address, overlapping projects, and same-named categories that never overlap
 - **Teams and permissions** — several companies in one system; a signed-in user without a company must register one (same form as **Uzstādījumi**) before using the app, except system admins; user groups control what each person sees and may do, with invitations and access blocking
 - **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator; anonymous visitors without a language cookie get a language matching their country when that language is active (for example RU→Russian, FI→Finnish), otherwise English when active, then the system default
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app

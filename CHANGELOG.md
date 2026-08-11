@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.10
+
+**Laika grafiks — mantošana un plānošana starp projektiem**
+
+- Jaunam projektam cilvēku skaits tiek nokopēts no pēdējā projekta (vai kopēšanas avota) pēc kategorijas / apakškategorijas nosaukuma; dzīva sinhronizācija starp projektiem nav (`203`–`204`, `207`)
+- Projekti kā veselums drīkst pārklāties; vienādas kategorijas (pēc nosaukuma) starp projektiem nepārklājas — nākamais sāk pēc iepriekšējā beigas (`205`)
+- Apstiprinātam projektam zem adreses rāda beigu datumu (`206`)
+
 ## v1.4.9
 
 **Metadata slogan crash fix**

@@ -237,29 +237,71 @@ function scheduleUnitBlock(
   return block;
 }
 
+function resourceKeyForCategory(category: TimelineGraphCategory): string {
+  return category.title.trim().toLowerCase() || "—";
+}
+
 /**
  * Plāno vienu projektu.
- * - Kategorijas var sākties paralēli (category.parallelGroupId) — nesagaida
- *   iepriekšējo kategoriju; starp projektiem pārklāšanās nav.
- * - Apakšdarbi kategorijā iet secīgi; to pašu var sapārot savā starpā.
+ * - Projekta iekšienē kategorijas iet secīgi (ja nav parallelGroupId).
+ * - Vienādas kategorijas (pēc nosaukuma) starp projektiem nesākās, kamēr
+ *   iepriekšējā projekta tā pati kategorija nav beigusies
+ *   (`categoryResourceFreeAt`).
+ * - Projekti kā veselums drīkst pārklāties (dažādas kategorijas vienlaikus).
  */
 function scheduleProjectWaves(
   project: TimelineGraphProject,
-  projectCursor: string,
   calendarStartIso: string,
+  categoryResourceFreeAt: Map<string, string>,
 ): {
-  nextCursor: string;
   projectStartIso: string;
   projectEndIso: string;
   blocksBySectionId: Map<string, ScheduleBlock>;
 } {
   const blocksBySectionId = new Map<string, ScheduleBlock>();
   const categoryGroupStartById = new Map<string, string>();
-  let nextCategoryStart = ensureWorkdayIso(projectCursor);
+  const calendarStart = ensureWorkdayIso(calendarStartIso);
+  // Projekta iekšējā secība — NESAGAIDA iepriekšējā projekta beigas.
+  let nextCategoryStart = calendarStart;
   let latestEndIso: string | null = null;
-  let projectStartIso = nextCategoryStart;
-  let projectEndIso = nextCategoryStart;
+  let projectStartIso = calendarStart;
+  let projectEndIso = calendarStart;
   let started = false;
+
+  function resolveCategoryStart(
+    category: TimelineGraphCategory,
+    categoryGroupId: string | undefined,
+  ): string {
+    if (categoryGroupId && categoryGroupStartById.has(categoryGroupId)) {
+      return categoryGroupStartById.get(categoryGroupId)!;
+    }
+
+    let start = nextCategoryStart;
+    const ownResource = categoryResourceFreeAt.get(
+      resourceKeyForCategory(category),
+    );
+    if (ownResource && calendarDayOffset(start, ownResource) > 0) {
+      start = ownResource;
+    }
+
+    // Paralēlai grupai — sākums pēc visu grupas biedru resursu atbrīvošanās.
+    if (categoryGroupId) {
+      for (const other of project.categories) {
+        if (other.parallelGroupId?.trim() !== categoryGroupId) {
+          continue;
+        }
+        const otherFree = categoryResourceFreeAt.get(
+          resourceKeyForCategory(other),
+        );
+        if (otherFree && calendarDayOffset(start, otherFree) > 0) {
+          start = otherFree;
+        }
+      }
+      categoryGroupStartById.set(categoryGroupId, start);
+    }
+
+    return start;
+  }
 
   if (project.categories.length === 0) {
     const block = scheduleUnitBlock(
@@ -271,12 +313,11 @@ function scheduleProjectWaves(
         parallelGroupId: project.parallelGroupId,
         child: null,
       },
-      nextCategoryStart,
+      calendarStart,
       calendarStartIso,
       blocksBySectionId,
     );
     return {
-      nextCursor: nextWorkdayAfter(block.endIso),
       projectStartIso: block.startIso,
       projectEndIso: block.endIso,
       blocksBySectionId,
@@ -286,16 +327,7 @@ function scheduleProjectWaves(
   for (const category of project.categories) {
     const hasSubcategories = categoryHasSubcategories(category);
     const categoryGroupId = category.parallelGroupId?.trim() || undefined;
-
-    let categoryStart: string;
-    if (categoryGroupId && categoryGroupStartById.has(categoryGroupId)) {
-      categoryStart = categoryGroupStartById.get(categoryGroupId)!;
-    } else {
-      categoryStart = nextCategoryStart;
-      if (categoryGroupId) {
-        categoryGroupStartById.set(categoryGroupId, categoryStart);
-      }
-    }
+    const categoryStart = resolveCategoryStart(category, categoryGroupId);
 
     const units: FlattenedWorkUnit[] = hasSubcategories
       ? category.children.map((child) => ({
@@ -362,14 +394,22 @@ function scheduleProjectWaves(
       sequentialStart = advanceStartCursor(sequentialStart, block.endIso);
     }
 
-    // Nākamā (nesapārotā) kategorija sākas pēc šīs kategorijas beigām.
+    // Resurss „kategorijas nosaukums” brīvs nākamajam projektam pēc šīs beigas.
+    const freeAt = nextWorkdayAfter(categoryEndIso);
+    const key = resourceKeyForCategory(category);
+    const previousFree = categoryResourceFreeAt.get(key);
+    categoryResourceFreeAt.set(
+      key,
+      previousFree ? laterIso(previousFree, freeAt) : freeAt,
+    );
+
+    // Nākamā (nesapārotā) kategorija šajā projektā — pēc šīs kategorijas beigām.
     nextCategoryStart = advanceStartCursor(nextCategoryStart, categoryEndIso);
   }
 
   if (!started) {
     const empty = scheduleBlockAt(0, nextCategoryStart, calendarStartIso, 1);
     return {
-      nextCursor: nextWorkdayAfter(empty.endIso),
       projectStartIso: empty.startIso,
       projectEndIso: empty.endIso,
       blocksBySectionId,
@@ -377,11 +417,8 @@ function scheduleProjectWaves(
   }
 
   return {
-    nextCursor: latestEndIso
-      ? nextWorkdayAfter(latestEndIso)
-      : nextCategoryStart,
     projectStartIso,
-    projectEndIso,
+    projectEndIso: latestEndIso ?? projectEndIso,
     blocksBySectionId,
   };
 }
@@ -423,11 +460,15 @@ export function scheduleTimelineGraphProjects(
   projects: TimelineGraphProject[],
   calendarStartIso: string = todayIsoDate(),
 ): ScheduledTimelineGraphProject[] {
-  let cursor = ensureWorkdayIso(calendarStartIso);
+  /** Kad brīva katra kategorijas nosaukuma „josla” nākamajam projektam. */
+  const categoryResourceFreeAt = new Map<string, string>();
 
   return projects.map((project) => {
-    const wave = scheduleProjectWaves(project, cursor, calendarStartIso);
-    cursor = wave.nextCursor;
+    const wave = scheduleProjectWaves(
+      project,
+      calendarStartIso,
+      categoryResourceFreeAt,
+    );
 
     if (project.categories.length === 0) {
       const block =

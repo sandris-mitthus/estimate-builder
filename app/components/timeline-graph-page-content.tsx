@@ -52,6 +52,10 @@ import {
   timelineGraphPeopleCountKey,
 } from "@/app/lib/timeline-graph/people-count";
 import {
+  findSectionIdByIdentity,
+  findSectionIdentity,
+} from "@/app/lib/timeline-graph/section-identity";
+import {
   TIMELINE_GRAPH_HOURS_PER_DAY,
   buildTimelineGraphDayRange,
   formatTimelineGraphMonthLabel,
@@ -257,35 +261,50 @@ function patchParallelPair(
   });
 }
 
-function listParallelGroupMembers(
-  project: TimelineGraphProject,
+function patchParallelPairAcrossMatchingProjects(
+  projects: TimelineGraphProject[],
+  projectId: string,
+  sectionId: string,
+  targetSectionId: string,
   groupId: string,
-  directPositionsLabel: string,
-): TimelineGraphParallelGroupMember[] {
-  const members: TimelineGraphParallelGroupMember[] = [];
-
-  if (project.parallelGroupId === groupId) {
-    members.push({ sectionId: project.id, title: project.name });
+): TimelineGraphProject[] {
+  const source = projects.find((project) => project.id === projectId);
+  if (!source) {
+    return patchParallelPair(
+      projects,
+      projectId,
+      sectionId,
+      targetSectionId,
+      groupId,
+    );
   }
 
-  for (const category of project.categories) {
-    if (category.parallelGroupId === groupId) {
-      members.push({ sectionId: category.id, title: category.title });
-    }
-    for (const child of category.children) {
-      if (child.parallelGroupId === groupId) {
-        members.push({
-          sectionId: child.id,
-          title:
-            child.kind === "direct"
-              ? `${category.title} · ${directPositionsLabel}`
-              : child.title,
-        });
-      }
-    }
+  const leftIdentity = findSectionIdentity(source, sectionId);
+  const rightIdentity = findSectionIdentity(source, targetSectionId);
+  if (!leftIdentity || !rightIdentity) {
+    return patchParallelPair(
+      projects,
+      projectId,
+      sectionId,
+      targetSectionId,
+      groupId,
+    );
   }
 
-  return members;
+  let next = projects;
+  for (const project of projects) {
+    const leftId = findSectionIdByIdentity(project, leftIdentity);
+    const rightId = findSectionIdByIdentity(project, rightIdentity);
+    if (!leftId || !rightId || leftId === rightId) continue;
+    next = patchParallelPair(
+      next,
+      project.id,
+      leftId,
+      rightId,
+      project.id === projectId ? groupId : crypto.randomUUID(),
+    );
+  }
+  return next;
 }
 
 function patchParallelUnpair(
@@ -326,6 +345,61 @@ function patchParallelUnpair(
 
     return next;
   });
+}
+
+function patchParallelUnpairAcrossMatchingProjects(
+  projects: TimelineGraphProject[],
+  projectId: string,
+  sectionId: string,
+): TimelineGraphProject[] {
+  const source = projects.find((project) => project.id === projectId);
+  if (!source) {
+    return patchParallelUnpair(projects, projectId, sectionId);
+  }
+
+  const identity = findSectionIdentity(source, sectionId);
+  if (!identity) {
+    return patchParallelUnpair(projects, projectId, sectionId);
+  }
+
+  let next = projects;
+  for (const project of projects) {
+    const matchId = findSectionIdByIdentity(project, identity);
+    if (!matchId) continue;
+    next = patchParallelUnpair(next, project.id, matchId);
+  }
+  return next;
+}
+
+function listParallelGroupMembers(
+  project: TimelineGraphProject,
+  groupId: string,
+  directPositionsLabel: string,
+): TimelineGraphParallelGroupMember[] {
+  const members: TimelineGraphParallelGroupMember[] = [];
+
+  if (project.parallelGroupId === groupId) {
+    members.push({ sectionId: project.id, title: project.name });
+  }
+
+  for (const category of project.categories) {
+    if (category.parallelGroupId === groupId) {
+      members.push({ sectionId: category.id, title: category.title });
+    }
+    for (const child of category.children) {
+      if (child.parallelGroupId === groupId) {
+        members.push({
+          sectionId: child.id,
+          title:
+            child.kind === "direct"
+              ? `${category.title} · ${directPositionsLabel}`
+              : child.title,
+        });
+      }
+    }
+  }
+
+  return members;
 }
 
 function ParallelBadgeButton({
@@ -1158,7 +1232,15 @@ function SortableProjectBlock({
               }`}
             >
               {confirmed
-                ? project.address.trim() || "\u00a0"
+                ? (() => {
+                    const address = project.address.trim();
+                    const until = t(
+                      "timeline_graph.status.until",
+                      "līdz {date}",
+                      { date: formatDisplayDateDdMmYy(project.endIso) },
+                    );
+                    return address ? `${address} · ${until}` : until;
+                  })()
                 : t(
                     "timeline_graph.status.unconfirmed",
                     "Nav apstiprināts · aptuveni līdz {date}",
@@ -1501,7 +1583,7 @@ export function TimelineGraphPageContent({
       previousTargetGroup ?? previousSourceGroup ?? crypto.randomUUID();
 
     setProjects((current) =>
-      patchParallelPair(
+      patchParallelPairAcrossMatchingProjects(
         current,
         projectId,
         sectionId,
@@ -1556,7 +1638,7 @@ export function TimelineGraphPageContent({
           type: "success",
           text: t(
             "timeline_graph.parallel.feedback.paired",
-            "Sapāroti paralēli tajā pašā projektā.",
+            "Sapāroti paralēli. Tādi paši darbi citos projektos arī sasaitīti.",
           ),
         });
       } finally {
@@ -1597,7 +1679,11 @@ export function TimelineGraphPageContent({
       return;
     }
 
-    const nextProjects = patchParallelUnpair(projects, projectId, sectionId);
+    const nextProjects = patchParallelUnpairAcrossMatchingProjects(
+      projects,
+      projectId,
+      sectionId,
+    );
     setProjects(nextProjects);
 
     const nextProject = nextProjects.find((entry) => entry.id === projectId);
@@ -1738,11 +1824,11 @@ export function TimelineGraphPageContent({
         canManage
           ? t(
               "timeline_graph.page.subtitle",
-              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Norādi cilvēku skaitu pie darba — grafiks saīsinās. Velc darbu uz citu darbu tajā pašā projektā, lai ietu paralēli. Velc projektu, lai mainītu prioritāti.",
+              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Jaunam projektam cilvēku skaits tiek nokopēts no pēdējā projekta pēc kategorijas nosaukuma. Paralēlā sasaistīšana pēc nosaukuma sinhronizējas starp projektiem. Vienādas kategorijas starp projektiem nepārklājas; projekti kā veselums drīkst pārklāties. Velc darbu uz citu darbu tajā pašā projektā, lai ietu paralēli. Velc projektu, lai mainītu prioritāti.",
             )
           : t(
               "timeline_graph.page.subtitle_readonly",
-              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Cilvēku skaits saīsina darba ilgumu; sapāroti darbi iet paralēli.",
+              "Sakļauj projektu vienā rindā vai izvērs kategorijas un subkategorijas. Jaunam projektam cilvēku skaits tiek nokopēts no pēdējā projekta pēc kategorijas nosaukuma. Vienādas kategorijas starp projektiem nepārklājas; projekti kā veselums drīkst pārklāties.",
             )
       }
     >
