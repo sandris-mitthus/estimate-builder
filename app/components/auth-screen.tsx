@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  assertLoginRateLimitAction,
   registerWithEmailAction,
   resendSignupConfirmationAction,
 } from "@/app/login/actions";
@@ -153,6 +154,13 @@ export function AuthScreen({
     }
 
     setEmailLoading(true);
+    const rate = await assertLoginRateLimitAction({ email: trimmedEmail });
+    if (!rate.ok) {
+      setEmailLoading(false);
+      showFeedback({ type: "error", text: translateActionError(t, rate) });
+      return;
+    }
+
     const { error } = await signInWithEmailPassword(trimmedEmail, password);
     setEmailLoading(false);
 

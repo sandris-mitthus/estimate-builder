@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.7
+
+**Drošība, veiktspēja un ģeo valoda**
+
+- Padziļināts drošības audits (`security-check.md` **9.6 / 10**): company-scoped module `storagePath`, grupas piešķiršana bez silent membership, OAuth redirect, signup password takeover, SVG logo aizliegums, auth rate limit
+- Veiktspēja: geo/IP izlaišana, ja ir valodas cookie; `getUserActiveLanguageCode` request cache; protected layout paralelizē cookies ar pārējiem lasījumiem
+- Anonīma valoda caur `country-language` (valsts → aktīvā valoda + aliasi); tulkojumi `199`
+
 ## v1.4.6
 
 **Lokalizēts slogans un ģeo valoda**

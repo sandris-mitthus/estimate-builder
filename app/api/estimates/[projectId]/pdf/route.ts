@@ -4,6 +4,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { getAdditionalWorkEstimate } from "@/app/lib/additional-work-estimates/repository";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
 import { checkRateLimit, rateLimitResponse } from "@/app/lib/security/rate-limit";
 import { applyProfitModuleToMeta } from "@/app/lib/estimates/planned-profit";
@@ -61,6 +62,10 @@ export async function GET(
 
   const { projectId } = await params;
   const estimateId = new URL(request.url).searchParams.get("estimateId");
+  const companyId = await getCurrentCompanyId();
+  if (!companyId) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   const [{ t }, project, catalogPositions, companySettings, profitModuleEnabled] =
     await Promise.all([
@@ -117,7 +122,10 @@ export async function GET(
     const moduleVisualizations = buildingModule
       ? buildingModule.visualizationBlocks
       : project.visualizationBlocks;
-    visualizationImages = await fetchVisualizationImages(moduleVisualizations);
+    visualizationImages = await fetchVisualizationImages(
+      moduleVisualizations,
+      companyId,
+    );
   }
 
   const displayModuleName =

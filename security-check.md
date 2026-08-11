@@ -2,8 +2,51 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-08-04 (**v1.3.110**) — **9.5 / 10**  
-**Iepriekšējā pilnā pārbaude:** 2026-06-30 (v1.3.63) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-08-11 (**v1.4.7**) — **9.6 / 10**  
+**Iepriekšējā pilnā pārbaude:** 2026-08-04 (v1.3.110) — 9.5 / 10
+
+---
+
+## Ātrā pārbaude v1.4.7 (2026-08-11)
+
+Padziļināta pārbaude pret šo failu + fokusēti labojumi multi-tenant storage, auth un branding.
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| Module / project `storagePath` | ✅ `assertModuleBlocksForCompany` / `isModuleStoragePathForCompany` — rakstīšanā un PDF vizualizāciju lejupielādē tikai `companies/{companyId}/…` (bez `..`) |
+| Module asset proxy | ✅ Joprojām company path regex + companyId salīdzinājums |
+| `assignUserToGroup` | ✅ Prasa esošu `company_users` (`active`/`invited`); vairs neizveido membership caur grupas upsert |
+| OAuth `/auth/callback` | ✅ Production bez `NEXT_PUBLIC_SITE_URL` **neuzticas** `X-Forwarded-Host` vienam |
+| Signup password takeover | ✅ Unconfirmed kontiem parole netiek pārrakstīta pirms apstiprinājuma |
+| SVG XSS (logo / branding) | ✅ Uzņēmuma un sistēmas logo/favicon — tikai raster (PNG/JPG/WEBP) |
+| Auth rate limit | ✅ Signup, resend, password reset, login soft-gate (`auth-rate-limit.ts` + Upstash/in-process) |
+| Geo / IP lookup | ✅ 1.5s timeout; plašāki private IP; cookie short-circuit (nav ipapi, ja valoda jau zināma) |
+| XSS / `eval()` | ✅ Nav `dangerouslySetInnerHTML` / `eval()` / `new Function()` `app/` |
+| npm audit | ✅ `npm run audit:check` — no unaccepted HIGH/CRITICAL |
+| DB migrācijas | ✅ `199_seed_security_auth_error_translations.sql` |
+
+### Labojumi šajā ciklā (bija atrasti)
+
+| # | Severity | Apraksts | Statuss |
+|---|----------|----------|---------|
+| H1 | 🔴 HIGH | Poisoned `storagePath` cross-tenant module/PDF | ✅ LABOTS |
+| H2 | 🔴 HIGH | `assignUserToGroup` silent `company_users` upsert | ✅ LABOTS |
+| M1 | 🟠 MED | OAuth redirect via forged `X-Forwarded-Host` | ✅ LABOTS |
+| M2 | 🟠 MED | Signup overwrite password on unconfirmed user | ✅ LABOTS |
+| M3 | 🟠 MED | SVG upload XSS surface (branding) | ✅ LABOTS |
+| M4 | 🟠 MED | Auth email / login bez app rate limit | ✅ LABOTS |
+| L1 | 🟡 LOW | ipapi hang / private IP gaps | ✅ LABOTS |
+
+### Atlikušās piezīmes / ieteikumi (nebloķējoši)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | Production: `ALLOWED_EMAIL_DOMAIN` + Supabase Auth invite-only, ja publiskais signup nav vajadzīgs |
+| L27 | ℹ️ ARHITEKTŪRA | Service role repository apzināti apiet RLS; klienti deny — company scope serverī |
+| L29 | ℹ️ DEPLOY | Multi-instance: `UPSTASH_REDIS_REST_*` rate limitam |
+| L30 | ℹ️ AUTH | Login rate limit ir soft-gate pirms klienta `signInWithPassword`; noteiktais uzbrukums joprojām iet caur Supabase Auth limitiem |
+
+**Atzīme:** **9.6 / 10** — atrastie HIGH/MED laboti; atlikušais galvenokārt deploy konfigurācija un apzināta service-role arhitektūra.
 
 ---
 

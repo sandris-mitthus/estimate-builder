@@ -1,5 +1,6 @@
 import { downloadCompanyLogoFile } from "@/app/lib/settings/logo-storage";
 import { MODULE_ASSETS_BUCKET } from "@/app/lib/modules/file-storage";
+import { isModuleStoragePathForCompany } from "@/app/lib/modules/resolve-block-asset";
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import type { ModuleContentBlock } from "@/app/lib/modules/types";
@@ -30,16 +31,23 @@ export async function fetchLogoAsset(): Promise<PdfImageAsset | null> {
 
 export async function fetchVisualizationImages(
   blocks: ModuleContentBlock[],
+  companyId: string,
 ): Promise<PdfImageAsset[]> {
-  if (!isSupabaseAdminConfigured() || blocks.length === 0) return [];
+  if (!isSupabaseAdminConfigured() || blocks.length === 0 || !companyId) {
+    return [];
+  }
 
   const supabase = createAdminClient();
   const imageBlocks = blocks
-    .filter((b) => b.mimeType.startsWith("image/"))
+    .filter(
+      (b) =>
+        b.mimeType.startsWith("image/") &&
+        isModuleStoragePathForCompany(b.storagePath, companyId),
+    )
     .slice(0, MAX_PDF_VISUALIZATION_IMAGES);
-  const results: Array<PdfImageAsset | null> = new Array(imageBlocks.length).fill(
-    null,
-  );
+  const results: Array<PdfImageAsset | null> = new Array(
+    imageBlocks.length,
+  ).fill(null);
   let totalBytes = 0;
   let nextIndex = 0;
 

@@ -10,7 +10,7 @@ Product overview and setup instructions: [README.md](README.md). Release history
 
 ### Authentication
 
-- **Google OAuth** via Supabase — unauthenticated users see a dedicated `/login` screen with the configured `site_settings` system name and per-language slogan (`slogan_values`, resolved for the active UI language; optional system logo above the title), a Google sign-in button when `/site_integrations` has Google enabled (`google_auth_enabled`, default on), a centered legal footer, and a language dropdown when more than one UI language is active (explicit choice in `eb_language` cookie; otherwise geo: LV → `lv`, other countries → `en` if active, else system default via `getAnonymousActiveLanguageCode`); the `/docs` link is hidden behind `SHOW_DOCS_LINK` in `login-gate.tsx` until the public documentation content is ready
+- **Google OAuth** via Supabase — unauthenticated users see a dedicated `/login` screen with the configured `site_settings` system name and per-language slogan (`slogan_values`, resolved for the active UI language; optional system logo above the title), a Google sign-in button when `/site_integrations` has Google enabled (`google_auth_enabled`, default on), a centered legal footer, and a language dropdown when more than one UI language is active (explicit choice in `eb_language` cookie; otherwise geo via `matchActiveLanguageForCountry`: country code → same language code if active, e.g. RU→`ru`, FI→`fi`, plus aliases SE→`sv`, EE→`et`, …; then `en` if active; else system default); the `/docs` link is hidden behind `SHOW_DOCS_LINK` in `login-gate.tsx` until the public documentation content is ready
 - OAuth `redirectTo` uses the **browser origin** in the client (`sign-in-with-google.ts`), so production login works even when `NEXT_PUBLIC_SITE_URL` was baked for localhost at build time
 - Optional Google email domain lock: `site_settings.google_allowed_email_domain` (admin) with env `ALLOWED_EMAIL_DOMAIN` fallback — enforced in `/auth/callback` via `resolveAllowedEmailDomain()`
 - **Google consent screen host** — Google shows the Supabase Auth callback host (“Continue to …”). On Free plan that is `*.supabase.co`. Branded `api.uupis.com` requires Supabase **Pro + Custom Domain**; steps are documented in `/site_integrations` (Google card). After cutover set `NEXT_PUBLIC_SUPABASE_URL=https://api.uupis.com` and keep `NEXT_PUBLIC_SITE_URL=https://uupis.com`
@@ -224,7 +224,7 @@ app/
 ├── components/         # UI (company-settings-form, register-company-view, estimate-table, project-additional-work-section, line-item-total-only-toggle, estimate-table-sticky-shell, estimate-table-header-label, restore-button, project-excluded-positions-panel, sync-sagatave-changes-modal, restore-sagatave-positions-modal, material-consumption-basis-control, mechanism-basis-control, line-item-catalog-ref-sortable-list, mechanism-quantity-control, modal-stack-context, public-docs-view, site-docs-manager, navigation-loading-context, action-permissions-context, project-materials-table, landing-page, landing-pricing-cards, auth-screen, public-language-selector, site-integrations-form, site-footer, cookie-consent-provider/context/dialog, cookie-settings-link, cookie-registry-table, legal-document-view, legal-controller-details, legal-nav, ui/toggle-switch, …)
 ├── lib/
 │   ├── slugify.ts      # slugifyName — kopīgs slug uzņēmuma un sistēmas grupām
-│   ├── i18n/           # server translations, anonymous geo language, cache tags, localized-values
+│   ├── i18n/           # server translations, anonymous geo language (country-language aliases), cache tags, localized-values
 │   ├── additional-work-estimates/  # list/create/save/delete additional work estimates (estimate_kind = additional_work)
 │   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
 │   ├── companies/      # current company resolution, bootstrap company id, registerCompanyForCurrentUser (incl. signup trial plan), payment-access (kešots maksas/VIP/bloķēšanas snapshots)
@@ -241,13 +241,13 @@ app/
 │   ├── hooks/          # use-unsaved-changes-guard, use-sync-catalog-position-from-line-item, use-catalog-positions-with-refresh, use-collapsed-estimate-sections, use-assigned-materials-banner-expanded
 │   ├── form/           # input invalid styles
 │   ├── geo/            # country ISO + calling-code detection (Vercel / IP)
-│   ├── modules/        # repository (incl. copyBuildingModule), outline/blocks parse, building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (company-scoped module-assets + copyModuleContentBlocks), file-validation
+│   ├── modules/        # repository (incl. copyBuildingModule), outline/blocks parse, resolve-block-asset (company storagePath assert), building-module-data, project-description types/calc/parse, foundation-plane-options, format-module-size-summary, apply-module-size-adjustments, listBuildingModuleSizeOptions, file-storage (company-scoped module-assets + copyModuleContentBlocks), file-validation
 │   ├── legal/          # privacy/terms/cookie policy content builders + cookie registry table rows
 │   ├── navigation/     # sidebar cookie + layout-change event, nav count badges and navigation helpers
 │   ├── positions/      # repository (listPositionPricesForHydration, listPositionPricesForHints), estimate-catalog (klienta payload bez piegādātāju laukiem), catalog-positions-differ, apply-catalog-to-line-item, sync-from-estimate-line-items (catalog lookup), sync-estimate-line-items-to-catalog (batch update), has-defined-labor, variable-quantity, stale-catalog-price, filter-positions
 │   ├── projects/       # repository, project-module-data, project-module-utils, list-user-assigned-materials, assigned-materials-banner-cookie, pending-project-materials, project-status, filter-projects, …
-│   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation, IBAN bank resolve, currencies
-│   ├── site-admin/     # system admin access, site settings (incl. branding storage), docs, languages, translations, default groups
+│   ├── settings/       # company settings, vat-breakdown, offer-additional-info, company-scoped logo storage, logo-validation (raster only), IBAN bank resolve, currencies
+│   ├── site-admin/     # system admin access, site settings (incl. branding storage, raster-only logo/favicon), docs, languages, translations, default groups
 │   ├── todo/           # User-scoped todo repository, default category, delegated material task helpers
 │   ├── workers/        # Company workers repository, photo storage/validation
 │   ├── tools/          # Company tools inventory repository
@@ -255,7 +255,7 @@ app/
 │   ├── timeline-graph/ # Labor workload schedule: types, people-count, repository/order/parallel, build-sections, workday schedule
 │   ├── users/          # Auth user list, public.users sync, company membership status, invite, groups-repository (company membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone, image-file (kopīgs mime + izmēra validators logo/favicon/foto/moduļu attēliem)
-│   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit
+│   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit, auth-rate-limit (signup/login/reset)
 │   └── supabase/       # clients, update-session (session refresh + auth redirect), storage-key cookie cleanup
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs, copy-company-data.mjs (one-off company clone)
@@ -288,7 +288,7 @@ gitleaks detect --redact -v --exit-code=2 --log-opts=-1
 
 `npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`, `brace-expansion` same-major patches).
 
-Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.5 / 10**).
+Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.6 / 10**, pārbaude v1.4.7).
 
 ---
 
@@ -371,7 +371,7 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 - [x] Sidebar — **Tāme** grupa, Laika grafiks virs moduļiem, Tasks apakšā (`156`); nekompletu moduļu nav brīdinājums (`151`–`152`)
 - [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
 - [x] System admin sadaļas — uzņēmumi, lietotāji, default grupas, Docs pārvaldība, Todo dēlis, valodas, tulkojumi, e-pasta šabloni, integrācijas un sistēmas uzstādījumi
-- [x] Drošības audits — `security-check.md` **9.5 / 10** (L23, M23, L24, `npm run audit:check` bez neapstiprinātiem HIGH/CRITICAL)
+- [x] Drošības audits — `security-check.md` **9.6 / 10** (v1.4.7: storagePath scope, grupas membership, OAuth host, signup password, SVG logo, auth rate limit; `npm run audit:check` tīrs)
 - [x] Moduļa lielumi — **Dzīvojamā platība** (m²; arī `module_data_complete`), logu/durvju **kopējais perimetrs**, vairākas vienlaikus atvērtas sadaļas apjoma izvēlē un sagataves piemēra piezīme bez moduļa nosaukuma
 - [x] Sanmezgli projekta aprakstā; apjomu **+/-** un **×2**; logu/durvju/sanmezglu neitrāli kārtas numuri; logu **Vitrīna** slēdzis
 - [x] Juridiskās lapas un sīkdatņu piekrišana — `/privacy`, `/terms`, `/cookies` publiski pieejami, kājene visos skatos, kategoriju slēdži ar reālu preferenču sīkdatņu bloķēšanu un dzēšanu (`163`)

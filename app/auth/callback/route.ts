@@ -14,21 +14,19 @@ function resolveRedirectOrigin(
     return origin;
   }
 
-  if (forwardedHost) {
-    if (ALLOWED_ORIGIN) {
-      try {
-        const allowed = new URL(ALLOWED_ORIGIN);
-        if (forwardedHost === allowed.host) {
-          return `https://${forwardedHost}`;
-        }
-      } catch {
-        // fall through to origin
+  if (ALLOWED_ORIGIN) {
+    try {
+      const allowed = new URL(ALLOWED_ORIGIN);
+      if (forwardedHost && forwardedHost === allowed.host) {
+        return `https://${forwardedHost}`;
       }
+      return allowed.origin;
+    } catch {
       return origin;
     }
-    return `https://${forwardedHost}`;
   }
 
+  // Production without NEXT_PUBLIC_SITE_URL: never trust X-Forwarded-Host alone.
   return origin;
 }
 

@@ -107,3 +107,37 @@ export function normalizeModuleContentBlock(
 export function resolveModuleBlockAssetUrl(block: ModuleContentBlock): string {
   return moduleAssetProxyUrl(block.storagePath);
 }
+
+/** True when path is under companies/{companyId}/ with no traversal. */
+export function isModuleStoragePathForCompany(
+  storagePath: string,
+  companyId: string,
+): boolean {
+  const trimmed = storagePath.trim();
+  if (!trimmed || trimmed.includes("..") || trimmed.startsWith("/")) {
+    return false;
+  }
+  const prefix = `companies/${companyId}/`;
+  return trimmed.startsWith(prefix);
+}
+
+/**
+ * Keeps only blocks whose storagePath belongs to the company.
+ * Returns null if any block is out of scope (reject whole write).
+ */
+export function assertModuleBlocksForCompany(
+  blocks: ModuleContentBlock[],
+  companyId: string,
+): { ok: true; blocks: ModuleContentBlock[] } | { ok: false } {
+  const sanitized: ModuleContentBlock[] = [];
+  for (const block of blocks) {
+    if (!isModuleStoragePathForCompany(block.storagePath, companyId)) {
+      return { ok: false };
+    }
+    sanitized.push({
+      ...block,
+      fileUrl: moduleAssetProxyUrl(block.storagePath),
+    });
+  }
+  return { ok: true, blocks: sanitized };
+}

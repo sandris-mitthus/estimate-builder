@@ -14,6 +14,7 @@ import { createEmptyProjectDescriptionFormState } from "@/app/lib/modules/projec
 import { SAMPLE_MODULE_BLOCKS } from "@/app/lib/modules/sample-blocks";
 import { SAMPLE_MODULE_OUTLINES } from "@/app/lib/modules/sample-outlines";
 import { SAMPLE_BUILDING_MODULES } from "@/app/lib/modules/sample-modules";
+import { assertModuleBlocksForCompany } from "@/app/lib/modules/resolve-block-asset";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import type {
   BuildingModuleDetail,
@@ -503,12 +504,21 @@ export async function updateBuildingModuleBlocks(
     return { ok: false, error: "Uzņēmums nav atrasts." };
   }
 
+  const visualization = assertModuleBlocksForCompany(
+    input.visualizationBlocks,
+    companyId,
+  );
+  const project = assertModuleBlocksForCompany(input.projectBlocks, companyId);
+  if (!visualization.ok || !project.ok) {
+    return { ok: false, error: "Nederīgs faila ceļš." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("building_modules")
     .update({
-      visualization_blocks: input.visualizationBlocks,
-      project_blocks: input.projectBlocks,
+      visualization_blocks: visualization.blocks,
+      project_blocks: project.blocks,
     })
     .eq("id", input.id)
     .eq("company_id", companyId);

@@ -10,6 +10,7 @@ import {
   authConfirmRedirectUrl,
   resolveAuthEmailLink,
 } from "@/app/lib/auth/auth-confirm-link";
+import { checkAuthEmailRateLimit } from "@/app/lib/security/auth-rate-limit";
 
 async function findAuthUserByEmailExact(email: string): Promise<{
   id: string;
@@ -68,6 +69,14 @@ export async function requestPasswordReset(
   }
 
   const trimmedEmail = email.trim().toLowerCase();
+  const allowed = await checkAuthEmailRateLimit("password_reset", trimmedEmail);
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "Pārāk daudz mēģinājumu. Mēģini vēlāk.",
+    };
+  }
+
   const existing = await findAuthUserByEmailExact(trimmedEmail);
 
   // Silent success when the account is missing or not confirmed.

@@ -165,12 +165,14 @@ export default async function ProtectedLayout({
       activeLanguageCodeResult,
       companyId,
       pendingInvite,
+      cookieStore,
     ] = await Promise.all([
       isSystemAdminUser(user),
       listSiteLanguages({ activeOnly: true }),
       getUserActiveLanguageCode(user.id),
       getCurrentCompanyId(),
       hasPendingCompanyInvite(),
+      cookies(),
     ]);
     isSystemAdmin = adminFlag;
     languages = languagesResult;
@@ -181,7 +183,7 @@ export default async function ProtectedLayout({
       !isSystemAdmin && !companyId && !pendingInvite;
 
     initialSidebarCollapsed =
-      (await cookies()).get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
+      cookieStore.get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
 
     if (needsCompanyRegistration || pendingCompanyInvite) {
       // Čaula paliek; saturs = reģistrācija vai gaidošs uzaicinājums.

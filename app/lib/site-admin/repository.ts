@@ -1362,34 +1362,34 @@ export async function getDefaultSiteLanguageCode(): Promise<string> {
   );
 }
 
-export async function getUserActiveLanguageCode(
-  userId: string,
-): Promise<string> {
-  if (!isSupabaseAdminConfigured()) {
-    return "lv";
-  }
+export const getUserActiveLanguageCode = cache(
+  async function getUserActiveLanguageCode(userId: string): Promise<string> {
+    if (!isSupabaseAdminConfigured()) {
+      return "lv";
+    }
 
-  const languages = await listSiteLanguages({ activeOnly: true });
-  const defaultCode =
-    languages.find((language) => language.isDefault)?.code ??
-    languages[0]?.code ??
-    "lv";
-  const activeCodes = new Set(languages.map((language) => language.code));
+    const languages = await listSiteLanguages({ activeOnly: true });
+    const defaultCode =
+      languages.find((language) => language.isDefault)?.code ??
+      languages[0]?.code ??
+      "lv";
+    const activeCodes = new Set(languages.map((language) => language.code));
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("active_language_code")
-    .eq("id", userId)
-    .maybeSingle();
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("users")
+      .select("active_language_code")
+      .eq("id", userId)
+      .maybeSingle();
 
-  const code =
-    !error && typeof data?.active_language_code === "string"
-      ? data.active_language_code
-      : "";
+    const code =
+      !error && typeof data?.active_language_code === "string"
+        ? data.active_language_code
+        : "";
 
-  return activeCodes.has(code) ? code : defaultCode;
-}
+    return activeCodes.has(code) ? code : defaultCode;
+  },
+);
 
 export async function updateUserActiveLanguageCode({
   userId,

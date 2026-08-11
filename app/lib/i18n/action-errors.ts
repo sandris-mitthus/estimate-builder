@@ -18,6 +18,7 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.database_service_role_not_configured",
   "Avota projekta tāme nav atrasta.": "errors.source_estimate_not_found",
   "Atbalstīti formāti: PNG, JPG, WEBP, SVG.": "errors.logo_format_supported",
+  "Atbalstīti formāti: PNG, JPG, WEBP.": "errors.logo_format_supported",
   "Attēls nedrīkst būt lielāks par 10 MB.": "errors.image_too_large",
   "Avota projekts nav atrasts.": "errors.source_project_not_found",
   "Bloks nav atrasts.": "errors.block_not_found",
@@ -180,6 +181,11 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.user_company_add_failed",
   "Lietotājs jau ir šajā uzņēmumā.": "errors.user_already_in_company",
   "Neizdevās piešķirt grupu.": "errors.group_assign_failed",
+  "Neizdevās pārbaudīt lietotāja piederību.": "errors.membership_check_failed",
+  "Lietotājs nav šī uzņēmuma biedrs. Vispirms uzaicini lietotāju.":
+    "errors.user_not_company_member",
+  "Nederīgs faila ceļš.": "errors.invalid_storage_path",
+  "Pārāk daudz mēģinājumu. Mēģini vēlāk.": "errors.auth_rate_limit",
   "Neizdevās atjaunināt pozīciju.": "errors.position_update_failed",
   "Neizdevās atjaunināt projekta statusu.":
     "errors.project_status_update_failed",

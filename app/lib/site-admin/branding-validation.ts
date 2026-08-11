@@ -1,6 +1,6 @@
 import {
   createImageFileValidator,
-  RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+  RASTER_IMAGE_EXTENSIONS_BY_MIME,
 } from "@/app/lib/validation/image-file";
 
 export const SITE_BRANDING_MAX_BYTES = 2 * 1024 * 1024;
@@ -8,9 +8,9 @@ export const SITE_BRANDING_MAX_BYTES = 2 * 1024 * 1024;
 export type SiteBrandingAssetKind = "logo" | "favicon";
 
 const siteBrandingValidator = createImageFileValidator({
-  extensionByMimeType: RASTER_AND_SVG_EXTENSIONS_BY_MIME,
+  extensionByMimeType: RASTER_IMAGE_EXTENSIONS_BY_MIME,
   maxBytes: SITE_BRANDING_MAX_BYTES,
-  formatError: "Atbalstīti formāti: PNG, JPG, WEBP, SVG.",
+  formatError: "Atbalstīti formāti: PNG, JPG, WEBP.",
   sizeError: "Logotips nedrīkst būt lielāks par 2 MB.",
 });
 

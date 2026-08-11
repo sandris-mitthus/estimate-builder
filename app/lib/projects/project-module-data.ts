@@ -2,6 +2,7 @@ import {
   deleteModuleBlockFiles,
   uploadProjectBlockFile,
 } from "@/app/lib/modules/file-storage";
+import { assertModuleBlocksForCompany } from "@/app/lib/modules/resolve-block-asset";
 import type { ModuleBlockKind, ModuleContentBlock } from "@/app/lib/modules/types";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { parseProjectModuleBlocks } from "@/app/lib/projects/project-module-utils";
@@ -49,12 +50,21 @@ export async function updateProjectModuleBlocks(
     return { ok: false, error: "Uzņēmums nav atrasts." };
   }
 
+  const visualization = assertModuleBlocksForCompany(
+    input.visualizationBlocks,
+    companyId,
+  );
+  const project = assertModuleBlocksForCompany(input.projectBlocks, companyId);
+  if (!visualization.ok || !project.ok) {
+    return { ok: false, error: "Nederīgs faila ceļš." };
+  }
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("projects")
     .update({
-      visualization_blocks: input.visualizationBlocks,
-      project_blocks: input.projectBlocks,
+      visualization_blocks: visualization.blocks,
+      project_blocks: project.blocks,
     })
     .eq("id", input.id)
     .eq("company_id", companyId);

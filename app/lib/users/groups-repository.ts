@@ -563,15 +563,26 @@ export async function assignUserToGroup(
   }
 
   const supabase = createAdminClient();
-  await supabase.from("company_users").upsert(
-    {
-      company_id: companyId,
-      user_id: trimmedUserId,
-      role: "member",
-      status: "active",
-    },
-    { onConflict: "company_id,user_id" },
-  );
+  const { data: membership, error: membershipError } = await supabase
+    .from("company_users")
+    .select("user_id, status")
+    .eq("company_id", companyId)
+    .eq("user_id", trimmedUserId)
+    .maybeSingle();
+
+  if (membershipError) {
+    return { ok: false, error: "Neizdevās pārbaudīt lietotāja piederību." };
+  }
+
+  if (
+    !membership ||
+    (membership.status !== "active" && membership.status !== "invited")
+  ) {
+    return {
+      ok: false,
+      error: "Lietotājs nav šī uzņēmuma biedrs. Vispirms uzaicini lietotāju.",
+    };
+  }
 
   const { error } = await supabase.from("company_group_members").upsert(
     {

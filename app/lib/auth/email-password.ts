@@ -10,6 +10,7 @@ import {
   authConfirmRedirectUrl,
   resolveAuthEmailLink,
 } from "@/app/lib/auth/auth-confirm-link";
+import { checkAuthEmailRateLimit } from "@/app/lib/security/auth-rate-limit";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -98,7 +99,7 @@ async function sendSignupLink(
       }
 
       if (existing && !existing.emailConfirmed) {
-        await admin.auth.admin.updateUserById(existing.id, { password });
+        // Do not set/overwrite password on unconfirmed accounts (pre-confirm takeover).
         const invite = await admin.auth.admin.generateLink({
           type: "invite",
           email,
@@ -164,6 +165,14 @@ export async function registerWithEmailPassword(
   }
 
   const trimmedEmail = email.trim().toLowerCase();
+  const allowed = await checkAuthEmailRateLimit("signup", trimmedEmail);
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "Pārāk daudz mēģinājumu. Mēģini vēlāk.",
+    };
+  }
+
   const existing = await findAuthUserByEmailExact(trimmedEmail);
   if (existing?.emailConfirmed) {
     return {
@@ -210,6 +219,14 @@ export async function resendSignupConfirmationEmail(
   }
 
   const trimmedEmail = email.trim().toLowerCase();
+  const allowed = await checkAuthEmailRateLimit("resend_signup", trimmedEmail);
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "Pārāk daudz mēģinājumu. Mēģini vēlāk.",
+    };
+  }
+
   const existing = await findAuthUserByEmailExact(trimmedEmail);
   if (!existing) {
     return { ok: false, error: "Konts ar šo e-pastu nav atrasts." };

@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.4.6`
+**Current version:** `1.4.7`
 
 ---
 
@@ -19,7 +19,7 @@ Estimate Builder is a web app for construction companies that prepare tender est
 - **Approved projects** — material list with budget prices and an ordered/not-ordered status, plus assignment of materials to specific people with a reminder banner until everything is ordered
 - **Tasks, workers, tools and schedule** — personal task boards, an employee directory with photos, a tool inventory with assignment history, and a labor workload schedule (Laika grafiks) with project priority, people count per job, and parallel pairing within a project
 - **Teams and permissions** — several companies in one system; a signed-in user without a company must register one (same form as **Uzstādījumi**) before using the app, except system admins; user groups control what each person sees and may do, with invitations and access blocking
-- **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator; anonymous visitors without a language cookie get **lv** from Latvia and **en** from other countries when English is an active system language
+- **Multi-language interface** — Latvian and English out of the box, with all interface texts editable by an administrator; anonymous visitors without a language cookie get a language matching their country when that language is active (for example RU→Russian, FI→Finnish), otherwise English when active, then the system default
 - **Documentation portal** — public `/docs` section with categories and articles, managed inside the app
 - **Public landing and auth** — anonymous visitors see a marketing landing page at `/` (toggleable under **Integrācijas**); dedicated `/login` and `/signup` screens with optional Google sign-in (also under **Integrācijas**); **Forgot password?** sends a Resend reset link when email auth is on; when payment plans are on, the landing page shows each plan with only the billing periods that have a price (month / quarter / year — empty periods stay hidden) and Early Bird prices while slots remain, plus which modules each plan includes; system slogan is editable per language under **Sistēmas uzstādījumi**
 - **System admin integrations** — landing page, Resend email, and Google Auth checklist (current `*.supabase.co` on Free; later `api.uupis.com` after Supabase Pro Custom Domain)
