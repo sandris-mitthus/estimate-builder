@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.6
+
+**Lokalizēts slogans un ģeo valoda**
+
+- `/site_settings` — slogans katrai sistēmas valodai (`slogan_values`, migrācija `198`); landing un metadati lieto aktīvās valodas tekstu
+- Anonīma valoda: `eb_language` cookie → LV apmeklētājiem `lv` → citām valstīm `en` (ja aktīvs) → sistēmas noklusējums
+
 ## v1.4.5
 
 **Landing cenu periodi un UX**

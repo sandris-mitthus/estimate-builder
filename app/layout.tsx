@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { CookieConsentProvider } from "@/app/components/cookie-consent-provider";
 import { FeedbackToastProvider } from "@/app/components/feedback-toast-provider";
 import { TranslationsProvider } from "@/app/components/translations-provider";
+import { resolveLocalizedValue } from "@/app/lib/i18n/localized-values";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import { getSiteSettings } from "@/app/lib/site-admin/repository";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -14,7 +15,13 @@ const geistSans = Geist({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings();
+  const [settings, { languageCode }] = await Promise.all([
+    getSiteSettings(),
+    getServerTranslations(),
+  ]);
+  const description =
+    resolveLocalizedValue(settings.sloganValues, languageCode) ||
+    settings.slogan;
   const icons = settings.faviconUrl
     ? {
         icon: [{ url: settings.faviconUrl }],
@@ -25,11 +32,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: settings.systemName,
-    description: settings.slogan,
+    description,
     icons,
     openGraph: {
       title: settings.systemName,
-      description: settings.slogan,
+      description,
     },
   };
 }

@@ -18,14 +18,14 @@ import {
   hasPendingCompanyInvite,
 } from "@/app/lib/companies/current-company";
 import {
-  getDefaultSiteLanguageCode,
   DEFAULT_SITE_LANGUAGES,
   getSiteSettings,
   getSiteTranslationDictionary,
   getUserActiveLanguageCode,
   listSiteLanguages,
 } from "@/app/lib/site-admin/repository";
-import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
+import { getAnonymousActiveLanguageCode } from "@/app/lib/i18n/anonymous-language";
+import { resolveLocalizedValue } from "@/app/lib/i18n/localized-values";
 import { getNavigationCounts, type NavCountMap } from "@/app/lib/navigation/nav-counts";
 import { SIDEBAR_COLLAPSED_COOKIE } from "@/app/lib/navigation/sidebar-cookie";
 import { CompanyAccessLockOverlay } from "@/app/components/company-access-lock-overlay";
@@ -51,21 +51,6 @@ import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
-
-async function getAnonymousActiveLanguageCode(
-  languages: { code: string }[],
-): Promise<string> {
-  const activeCodes = new Set(languages.map((language) => language.code));
-  const cookieStore = await cookies();
-  const cookieCode = cookieStore.get(ANONYMOUS_LANGUAGE_COOKIE)?.value?.trim() ?? "";
-
-  if (activeCodes.has(cookieCode)) {
-    return cookieCode;
-  }
-
-  const defaultCode = await getDefaultSiteLanguageCode();
-  return activeCodes.has(defaultCode) ? defaultCode : (languages[0]?.code ?? "lv");
-}
 
 /** Plans are only shown on the public landing page when payment plans are on. */
 async function getLandingPricingProps(): Promise<{
@@ -151,7 +136,10 @@ export default async function ProtectedLayout({
         >
           <LandingPage
             systemName={siteSettings.systemName}
-            slogan={siteSettings.slogan}
+            slogan={resolveLocalizedValue(
+              siteSettings.sloganValues,
+              activeLanguageCode,
+            )}
             logoUrl={siteSettings.logoUrl}
             languages={languages}
             activeLanguageCode={activeLanguageCode}
@@ -244,7 +232,10 @@ export default async function ProtectedLayout({
       >
         <LandingPage
           systemName={siteSettings.systemName}
-          slogan={siteSettings.slogan}
+          slogan={resolveLocalizedValue(
+            siteSettings.sloganValues,
+            activeLanguageCode,
+          )}
           logoUrl={siteSettings.logoUrl}
           languages={languages}
           activeLanguageCode={activeLanguageCode}

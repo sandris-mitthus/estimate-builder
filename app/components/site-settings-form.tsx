@@ -1,26 +1,59 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { saveSiteSettingsAction } from "@/app/(protected)/site_settings/actions";
 import { useFeedbackToast } from "@/app/components/feedback-toast-provider";
 import { SiteBrandingDropzone } from "@/app/components/site-branding-dropzone";
 import { useTranslations } from "@/app/components/translations-provider";
 import { formatDisplayDateDdMmYy } from "@/app/lib/format-display-date";
 import { translateActionError } from "@/app/lib/i18n/action-errors";
+import {
+  resolveLocalizedValue,
+  type LocalizedValues,
+} from "@/app/lib/i18n/localized-values";
 import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import type {
   SiteSettingsInput,
   SiteSettingsSummary,
 } from "@/app/lib/site-admin/repository";
+import type { SiteLanguageSummary } from "@/app/lib/site-admin/types";
 
 const fieldClassName =
   "mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
 const labelClassName = "text-sm font-medium text-zinc-800";
 
-function toInput(settings: SiteSettingsSummary): SiteSettingsInput {
+function emptyValues(languages: SiteLanguageSummary[]): LocalizedValues {
+  return Object.fromEntries(languages.map((language) => [language.code, ""]));
+}
+
+function mergeSloganValues(
+  languages: SiteLanguageSummary[],
+  values: LocalizedValues,
+): LocalizedValues {
+  const next = emptyValues(languages);
+  for (const [code, value] of Object.entries(values)) {
+    next[code] = value;
+  }
+  return next;
+}
+
+function sloganValuesEqual(left: LocalizedValues, right: LocalizedValues): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if ((left[key] ?? "").trim() !== (right[key] ?? "").trim()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function toInput(
+  settings: SiteSettingsSummary,
+  languages: SiteLanguageSummary[],
+): SiteSettingsInput {
   return {
     systemName: settings.systemName,
-    slogan: settings.slogan,
+    sloganValues: mergeSloganValues(languages, settings.sloganValues),
     controllerName: settings.controllerName,
     controllerRegistrationNumber: settings.controllerRegistrationNumber,
     controllerAddress: settings.controllerAddress,
@@ -30,22 +63,40 @@ function toInput(settings: SiteSettingsSummary): SiteSettingsInput {
 
 export function SiteSettingsForm({
   initialSettings,
+  languages,
 }: {
   initialSettings: SiteSettingsSummary;
+  languages: SiteLanguageSummary[];
 }) {
-  const [settings, setSettings] = useState<SiteSettingsInput>(
-    toInput(initialSettings),
+  const [settings, setSettings] = useState<SiteSettingsInput>(() =>
+    toInput(initialSettings, languages),
   );
   const [savedSettings, setSavedSettings] = useState(initialSettings);
   const [logoUrl, setLogoUrl] = useState(initialSettings.logoUrl);
   const [faviconUrl, setFaviconUrl] = useState(initialSettings.faviconUrl);
+  const [editLang, setEditLang] = useState(
+    () => languages.find((language) => language.isDefault)?.code ?? languages[0]?.code ?? "lv",
+  );
   const [isPending, startTransition] = useTransition();
   const { showFeedback, clearFeedback } = useFeedbackToast();
-  const { t } = useTranslations();
-  const savedInput = toInput(savedSettings);
-  const hasChanges = (
-    Object.keys(savedInput) as (keyof SiteSettingsInput)[]
-  ).some((key) => settings[key] !== savedInput[key]);
+  const { t, languageCode } = useTranslations();
+  const savedInput = useMemo(
+    () => toInput(savedSettings, languages),
+    [savedSettings, languages],
+  );
+  const hasChanges =
+    settings.systemName !== savedInput.systemName ||
+    settings.controllerName !== savedInput.controllerName ||
+    settings.controllerRegistrationNumber !==
+      savedInput.controllerRegistrationNumber ||
+    settings.controllerAddress !== savedInput.controllerAddress ||
+    settings.controllerEmail !== savedInput.controllerEmail ||
+    !sloganValuesEqual(settings.sloganValues, savedInput.sloganValues);
+
+  const previewSlogan =
+    resolveLocalizedValue(settings.sloganValues, languageCode) ||
+    resolveLocalizedValue(settings.sloganValues, editLang) ||
+    "—";
 
   function updateField<K extends keyof SiteSettingsInput>(
     key: K,
@@ -66,15 +117,23 @@ export function SiteSettingsForm({
     if (!settings.systemName.trim()) {
       showFeedback({
         type: "error",
-        text: t("site_settings.validation.system_name_required", "Ievadi sistēmas nosaukumu."),
+        text: t(
+          "site_settings.validation.system_name_required",
+          "Ievadi sistēmas nosaukumu.",
+        ),
       });
       return;
     }
 
-    if (!settings.slogan.trim()) {
+    if (
+      !Object.values(settings.sloganValues).some((value) => value.trim())
+    ) {
       showFeedback({
         type: "error",
-        text: t("site_settings.validation.slogan_required", "Ievadi sistēmas sloganu."),
+        text: t(
+          "site_settings.validation.slogan_required",
+          "Ievadi sistēmas sloganu vismaz vienā valodā.",
+        ),
       });
       return;
     }
@@ -95,13 +154,16 @@ export function SiteSettingsForm({
       const result = await saveSiteSettingsAction(settings);
 
       if (result.ok) {
-        setSettings(toInput(result.settings));
+        setSettings(toInput(result.settings, languages));
         setSavedSettings(result.settings);
         setLogoUrl(result.settings.logoUrl);
         setFaviconUrl(result.settings.faviconUrl);
         showFeedback({
           type: "success",
-          text: t("site_settings.feedback.saved", "Sistēmas uzstādījumi saglabāti."),
+          text: t(
+            "site_settings.feedback.saved",
+            "Sistēmas uzstādījumi saglabāti.",
+          ),
         });
         return;
       }
@@ -112,7 +174,10 @@ export function SiteSettingsForm({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6">
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6"
+      >
         <fieldset disabled={isPending} className="space-y-5 disabled:opacity-80">
           <div>
             <label htmlFor="systemName" className={labelClassName}>
@@ -128,13 +193,65 @@ export function SiteSettingsForm({
           </div>
 
           <div>
-            <label htmlFor="slogan" className={labelClassName}>
-              {t("site_settings.form.slogan", "Slogans")}
-            </label>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <label htmlFor="slogan" className={labelClassName}>
+                {t("site_settings.form.slogan", "Slogans")}
+                {languages.length > 1 ? (
+                  <span className="ml-1 font-mono text-xs uppercase text-zinc-400">
+                    ({editLang})
+                  </span>
+                ) : null}
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">
+              {t(
+                "site_settings.form.slogan_hint",
+                "Norādi sloganu katrai sistēmas valodai. Landing un metadati izmanto aktīvās valodas tekstu.",
+              )}
+            </p>
+            {languages.length > 1 ? (
+              <div
+                role="tablist"
+                aria-label={t("site_languages.page.title", "Valodas")}
+                className="mt-2 flex flex-wrap gap-2"
+              >
+                {languages.map((language) => {
+                  const active = language.code === editLang;
+                  return (
+                    <button
+                      key={language.code}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setEditLang(language.code)}
+                      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                        active
+                          ? "bg-zinc-900 text-white"
+                          : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                      }`}
+                    >
+                      <span>{language.name}</span>
+                      <span
+                        className={`font-mono text-[11px] uppercase ${
+                          active ? "text-zinc-300" : "text-zinc-400"
+                        }`}
+                      >
+                        {language.code}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <textarea
               id="slogan"
-              value={settings.slogan}
-              onChange={(event) => updateField("slogan", event.target.value)}
+              value={settings.sloganValues[editLang] ?? ""}
+              onChange={(event) =>
+                updateField("sloganValues", {
+                  ...settings.sloganValues,
+                  [editLang]: event.target.value,
+                })
+              }
               rows={3}
               className={`${fieldClassName} resize-y`}
               placeholder={t(
@@ -198,14 +315,7 @@ export function SiteSettingsForm({
                   updateField("controllerName", event.target.value)
                 }
                 className={fieldClassName}
-                placeholder={settings.systemName}
               />
-              <p className="mt-1 text-xs text-zinc-500">
-                {t(
-                  "site_settings.form.controller_name_hint",
-                  "Ja tukšs, izmanto sistēmas nosaukumu.",
-                )}
-              </p>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -229,13 +339,11 @@ export function SiteSettingsForm({
                     )
                   }
                   className={fieldClassName}
-                  placeholder="40003000000"
                 />
               </div>
-
               <div>
                 <label htmlFor="controllerEmail" className={labelClassName}>
-                  {t("site_settings.form.controller_email", "Kontaktu e-pasts")}
+                  {t("site_settings.form.controller_email", "E-pasts")}
                 </label>
                 <input
                   id="controllerEmail"
@@ -245,7 +353,6 @@ export function SiteSettingsForm({
                     updateField("controllerEmail", event.target.value)
                   }
                   className={fieldClassName}
-                  placeholder="info@example.lv"
                 />
               </div>
             </div>
@@ -302,7 +409,7 @@ export function SiteSettingsForm({
             <h2 className="truncate text-lg font-semibold text-zinc-900">
               {settings.systemName || "—"}
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">{settings.slogan || "—"}</p>
+            <p className="mt-1 text-sm text-zinc-500">{previewSlogan}</p>
           </div>
         </div>
         <div className="mt-5 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-500">
@@ -313,7 +420,10 @@ export function SiteSettingsForm({
         </div>
         {savedSettings.updatedAt ? (
           <p className="mt-4 text-xs text-zinc-400">
-            {t("site_settings.preview.last_saved", "Pēdējās saglabātās izmaiņas:")}{" "}
+            {t(
+              "site_settings.preview.last_saved",
+              "Pēdējās saglabātās izmaiņas:",
+            )}{" "}
             {formatDisplayDateDdMmYy(savedSettings.updatedAt) || "—"}
           </p>
         ) : null}

@@ -2,12 +2,16 @@ import { SectionPage } from "@/app/components/section-page";
 import { SiteSettingsForm } from "@/app/components/site-settings-form";
 import { getServerTranslations } from "@/app/lib/i18n/server";
 import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
-import { getSiteSettings } from "@/app/lib/site-admin/repository";
+import {
+  getSiteSettings,
+  listSiteLanguages,
+} from "@/app/lib/site-admin/repository";
 
 export default async function SiteSettingsPage() {
   await assertSystemAdminAccess();
-  const [settings, { t }] = await Promise.all([
+  const [settings, languages, { t }] = await Promise.all([
     getSiteSettings(),
+    listSiteLanguages(),
     getServerTranslations(),
   ]);
 
@@ -19,7 +23,7 @@ export default async function SiteSettingsPage() {
         "Sistēmas nosaukums, slogans un head metadati",
       )}
     >
-      <SiteSettingsForm initialSettings={settings} />
+      <SiteSettingsForm initialSettings={settings} languages={languages} />
     </SectionPage>
   );
 }

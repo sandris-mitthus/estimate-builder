@@ -42,6 +42,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās saglabāt lietotāja profilu.": "errors.company_user_profile_save_failed",
   "Sistēmas administrators uzņēmumu šeit neveido.":
     "errors.system_admin_cannot_register_company",
+  "Ievadi sistēmas sloganu vismaz vienā valodā.":
+    "site_settings.validation.slogan_required",
   "Ievadi sistēmas sloganu.": "site_settings.validation.slogan_required",
   "Ievadi derīgu pārziņa e-pasta adresi.":
     "site_settings.validation.controller_email_invalid",

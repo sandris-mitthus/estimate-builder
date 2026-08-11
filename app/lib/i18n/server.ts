@@ -1,14 +1,12 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
+import { getAnonymousActiveLanguageCode } from "@/app/lib/i18n/anonymous-language";
 import {
-  getDefaultSiteLanguageCode,
   getSiteTranslationDictionary,
   getUserActiveLanguageCode,
   listSiteLanguages,
 } from "@/app/lib/site-admin/repository";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
-import { ANONYMOUS_LANGUAGE_COOKIE } from "@/app/lib/i18n/language-cookie";
 import {
   translateText,
   type TranslationDictionary,
@@ -30,20 +28,8 @@ export const getServerTranslations = cache(
       if (user) {
         languageCode = await getUserActiveLanguageCode(user.id);
       } else {
-        const [languages, defaultCode, cookieStore] = await Promise.all([
-          listSiteLanguages({ activeOnly: true }),
-          getDefaultSiteLanguageCode(),
-          cookies(),
-        ]);
-        const activeCodes = new Set(languages.map((language) => language.code));
-        const cookieCode =
-          cookieStore.get(ANONYMOUS_LANGUAGE_COOKIE)?.value?.trim() ?? "";
-
-        languageCode = activeCodes.has(cookieCode)
-          ? cookieCode
-          : activeCodes.has(defaultCode)
-            ? defaultCode
-            : (languages[0]?.code ?? "lv");
+        const languages = await listSiteLanguages({ activeOnly: true });
+        languageCode = await getAnonymousActiveLanguageCode(languages);
       }
     }
 

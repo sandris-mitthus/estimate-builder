@@ -15,6 +15,12 @@ import {
   type SiteBrandingAssetKind,
 } from "@/app/lib/site-admin/branding-validation";
 import { slugifyName } from "@/app/lib/slugify";
+import {
+  normalizeLocalizedValues,
+  parseLocalizedValues,
+  resolveLocalizedValue,
+  type LocalizedValues,
+} from "@/app/lib/i18n/localized-values";
 import { isValidEmail } from "@/app/lib/validation/contact-fields";
 import {
   DEFAULT_GROUP_DEFINITIONS,
@@ -98,6 +104,7 @@ type GlobalSiteSettingsRow = {
   id: number;
   system_name: string;
   slogan: string;
+  slogan_values: unknown;
   controller_name: string;
   controller_registration_number: string;
   controller_address: string;
@@ -171,6 +178,7 @@ export type SiteCompanyUserSummary = {
 export type SiteSettingsSummary = {
   systemName: string;
   slogan: string;
+  sloganValues: LocalizedValues;
   controllerName: string;
   controllerRegistrationNumber: string;
   controllerAddress: string;
@@ -182,7 +190,7 @@ export type SiteSettingsSummary = {
 
 export type SiteSettingsInput = {
   systemName: string;
-  slogan: string;
+  sloganValues: LocalizedValues;
   controllerName: string;
   controllerRegistrationNumber: string;
   controllerAddress: string;
@@ -261,6 +269,10 @@ export type SiteDocReorderItem = {
 export const DEFAULT_SITE_SETTINGS: SiteSettingsSummary = {
   systemName: "Estimate Builder",
   slogan: "Tāmes piedāvājumu veidošana",
+  sloganValues: {
+    lv: "Tāmes piedāvājumu veidošana",
+    en: "Building estimate offers",
+  },
   controllerName: "",
   controllerRegistrationNumber: "",
   controllerAddress: "",
@@ -1438,12 +1450,22 @@ export async function updateUserActiveLanguageCode({
 }
 
 const SITE_SETTINGS_COLUMNS =
-  "id, system_name, slogan, controller_name, controller_registration_number, controller_address, controller_email, logo_url, favicon_url, updated_at";
+  "id, system_name, slogan, slogan_values, controller_name, controller_registration_number, controller_address, controller_email, logo_url, favicon_url, updated_at";
 
 function mapGlobalSiteSettingsRow(row: GlobalSiteSettingsRow): SiteSettingsSummary {
+  const sloganValues = parseLocalizedValues(row.slogan_values);
+  if (!Object.values(sloganValues).some((value) => value.trim()) && row.slogan) {
+    sloganValues.lv = row.slogan;
+  }
+  const slogan =
+    resolveLocalizedValue(sloganValues, "lv") ||
+    row.slogan.trim() ||
+    DEFAULT_SITE_SETTINGS.slogan;
+
   return {
     systemName: row.system_name,
-    slogan: row.slogan,
+    slogan,
+    sloganValues,
     controllerName: row.controller_name ?? "",
     controllerRegistrationNumber: row.controller_registration_number ?? "",
     controllerAddress: row.controller_address ?? "",
@@ -1491,7 +1513,8 @@ export async function saveSiteSettings(
   }
 
   const systemName = settings.systemName.trim();
-  const slogan = settings.slogan.trim();
+  const sloganValues = normalizeLocalizedValues(settings.sloganValues);
+  const slogan = resolveLocalizedValue(sloganValues, "lv");
   const controllerName = settings.controllerName.trim();
   const controllerRegistrationNumber = settings.controllerRegistrationNumber.trim();
   const controllerAddress = settings.controllerAddress.trim();
@@ -1502,7 +1525,7 @@ export async function saveSiteSettings(
   }
 
   if (!slogan) {
-    return { ok: false, error: "Ievadi sistēmas sloganu." };
+    return { ok: false, error: "Ievadi sistēmas sloganu vismaz vienā valodā." };
   }
 
   if (controllerEmail && !isValidEmail(controllerEmail)) {
@@ -1517,6 +1540,7 @@ export async function saveSiteSettings(
         id: 1,
         system_name: systemName,
         slogan,
+        slogan_values: sloganValues,
         controller_name: controllerName,
         controller_registration_number: controllerRegistrationNumber,
         controller_address: controllerAddress,
@@ -1556,6 +1580,7 @@ export async function updateSiteBrandingUrl(
         id: 1,
         system_name: current.systemName,
         slogan: current.slogan,
+        slogan_values: current.sloganValues,
         controller_name: current.controllerName,
         controller_registration_number: current.controllerRegistrationNumber,
         controller_address: current.controllerAddress,
