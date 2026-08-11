@@ -96,6 +96,54 @@ export function getPaymentPlanPriceForPeriod(
   return plan.priceMonth;
 }
 
+const BILLING_PERIODS: PaymentPlanBillingPeriod[] = ["month", "quarter", "year"];
+
+/** True when the plan offers this billing period (price > 0). */
+export function paymentPlanHasPriceForPeriod(
+  plan: Pick<
+    PaymentPlanSummary,
+    | "priceMonth"
+    | "priceQuarter"
+    | "priceYear"
+    | "earlyBirdPriceMonth"
+    | "earlyBirdPriceQuarter"
+    | "earlyBirdPriceYear"
+  >,
+  period: PaymentPlanBillingPeriod,
+  options?: { earlyBird?: boolean },
+): boolean {
+  if (getPaymentPlanPriceForPeriod(plan, period) > 0) {
+    return true;
+  }
+  if (options?.earlyBird) {
+    return getPaymentPlanPriceForPeriod(plan, period, { earlyBird: true }) > 0;
+  }
+  return false;
+}
+
+/**
+ * Landing period tabs: only periods that at least one plan prices
+ * (empty / 0 = not offered).
+ */
+export function listAvailablePaymentPlanBillingPeriods(
+  plans: Array<
+    Pick<
+      PaymentPlanSummary,
+      | "priceMonth"
+      | "priceQuarter"
+      | "priceYear"
+      | "earlyBirdPriceMonth"
+      | "earlyBirdPriceQuarter"
+      | "earlyBirdPriceYear"
+    >
+  >,
+  options?: { earlyBird?: boolean },
+): PaymentPlanBillingPeriod[] {
+  return BILLING_PERIODS.filter((period) =>
+    plans.some((plan) => paymentPlanHasPriceForPeriod(plan, period, options)),
+  );
+}
+
 /** True when the public Early Bird offer should still be shown (slots remain). */
 export function isEarlyBirdOfferAvailable(
   availability: Pick<EarlyBirdAvailability, "limit" | "claimed">,

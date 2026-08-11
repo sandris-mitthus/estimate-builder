@@ -38,7 +38,7 @@ const fieldClassName = `mt-1.5 ${fieldBaseClassName}`;
 const selectClassName = `${fieldBaseClassName} appearance-none pr-10`;
 
 function priceToInput(value: number): string {
-  if (!Number.isFinite(value)) return "";
+  if (!Number.isFinite(value) || value <= 0) return "";
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
@@ -357,19 +357,44 @@ export function SitePaymentPlansForm({
     if (!dirty || isBusy) return;
     clearFeedback();
 
-    if (
-      !draft.priceMonth.trim() ||
-      !draft.priceQuarter.trim() ||
-      !draft.priceYear.trim() ||
-      !draft.earlyBirdPriceMonth.trim() ||
-      !draft.earlyBirdPriceQuarter.trim() ||
-      !draft.earlyBirdPriceYear.trim()
-    ) {
+    const priceFields = [
+      draft.priceMonth,
+      draft.priceQuarter,
+      draft.priceYear,
+      draft.earlyBirdPriceMonth,
+      draft.earlyBirdPriceQuarter,
+      draft.earlyBirdPriceYear,
+    ];
+    for (const field of priceFields) {
+      const trimmed = field.trim();
+      if (!trimmed) continue;
+      const parsed = Number(trimmed.replace(/\s/g, "").replace(",", "."));
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        showFeedback({
+          type: "error",
+          text: t(
+            "errors.payment_plan_price_invalid",
+            "Ievadi derīgu cenu (0 vai vairāk) aizpildītajiem periodiem.",
+          ),
+        });
+        return;
+      }
+    }
+
+    const hasRegularPeriod =
+      Number(draft.priceMonth.trim().replace(/\s/g, "").replace(",", ".") || 0) >
+        0 ||
+      Number(
+        draft.priceQuarter.trim().replace(/\s/g, "").replace(",", ".") || 0,
+      ) > 0 ||
+      Number(draft.priceYear.trim().replace(/\s/g, "").replace(",", ".") || 0) >
+        0;
+    if (!hasRegularPeriod) {
       showFeedback({
         type: "error",
         text: t(
-          "errors.payment_plan_price_invalid",
-          "Ievadi derīgu cenu (0 vai vairāk) katram periodam.",
+          "errors.payment_plan_price_period_required",
+          "Norādi vismaz vienu perioda cenu (mēnesis, ceturksnis vai gads).",
         ),
       });
       return;
@@ -705,42 +730,78 @@ export function SitePaymentPlansForm({
                         </p>
                       </td>
                       <td className="px-5 py-4 text-xs tabular-nums text-zinc-600">
-                        <p>
-                          {formatMoney(plan.priceMonth, "EUR")}{" "}
-                          {t("site_payment_plans.period.month_short", "/ mēn.")}
-                        </p>
-                        <p className="mt-0.5">
-                          {formatMoney(plan.priceQuarter, "EUR")}{" "}
-                          {t(
-                            "site_payment_plans.period.quarter_short",
-                            "/ cet.",
-                          )}
-                        </p>
-                        <p className="mt-0.5">
-                          {formatMoney(plan.priceYear, "EUR")}{" "}
-                          {t("site_payment_plans.period.year_short", "/ gadā")}
-                        </p>
-                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                          {t(
-                            "site_payment_plans.list.early_bird_prices",
-                            "Early Bird",
-                          )}
-                        </p>
-                        <p className="mt-0.5">
-                          {formatMoney(plan.earlyBirdPriceMonth, "EUR")}{" "}
-                          {t("site_payment_plans.period.month_short", "/ mēn.")}
-                        </p>
-                        <p className="mt-0.5">
-                          {formatMoney(plan.earlyBirdPriceQuarter, "EUR")}{" "}
-                          {t(
-                            "site_payment_plans.period.quarter_short",
-                            "/ cet.",
-                          )}
-                        </p>
-                        <p className="mt-0.5">
-                          {formatMoney(plan.earlyBirdPriceYear, "EUR")}{" "}
-                          {t("site_payment_plans.period.year_short", "/ gadā")}
-                        </p>
+                        {plan.priceMonth > 0 ? (
+                          <p>
+                            {formatMoney(plan.priceMonth, "EUR")}{" "}
+                            {t(
+                              "site_payment_plans.period.month_short",
+                              "/ mēn.",
+                            )}
+                          </p>
+                        ) : null}
+                        {plan.priceQuarter > 0 ? (
+                          <p className={plan.priceMonth > 0 ? "mt-0.5" : undefined}>
+                            {formatMoney(plan.priceQuarter, "EUR")}{" "}
+                            {t(
+                              "site_payment_plans.period.quarter_short",
+                              "/ cet.",
+                            )}
+                          </p>
+                        ) : null}
+                        {plan.priceYear > 0 ? (
+                          <p
+                            className={
+                              plan.priceMonth > 0 || plan.priceQuarter > 0
+                                ? "mt-0.5"
+                                : undefined
+                            }
+                          >
+                            {formatMoney(plan.priceYear, "EUR")}{" "}
+                            {t(
+                              "site_payment_plans.period.year_short",
+                              "/ gadā",
+                            )}
+                          </p>
+                        ) : null}
+                        {plan.earlyBirdPriceMonth > 0 ||
+                        plan.earlyBirdPriceQuarter > 0 ||
+                        plan.earlyBirdPriceYear > 0 ? (
+                          <>
+                            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                              {t(
+                                "site_payment_plans.list.early_bird_prices",
+                                "Early Bird",
+                              )}
+                            </p>
+                            {plan.earlyBirdPriceMonth > 0 ? (
+                              <p className="mt-0.5">
+                                {formatMoney(plan.earlyBirdPriceMonth, "EUR")}{" "}
+                                {t(
+                                  "site_payment_plans.period.month_short",
+                                  "/ mēn.",
+                                )}
+                              </p>
+                            ) : null}
+                            {plan.earlyBirdPriceQuarter > 0 ? (
+                              <p className="mt-0.5">
+                                {formatMoney(plan.earlyBirdPriceQuarter, "EUR")}{" "}
+                                {t(
+                                  "site_payment_plans.period.quarter_short",
+                                  "/ cet.",
+                                )}
+                              </p>
+                            ) : null}
+                            {plan.earlyBirdPriceYear > 0 ? (
+                              <p className="mt-0.5">
+                                {formatMoney(plan.earlyBirdPriceYear, "EUR")}{" "}
+                                {t(
+                                  "site_payment_plans.period.year_short",
+                                  "/ gadā",
+                                )}
+                              </p>
+                            ) : null}
+                          </>
+                        ) : null}
                       </td>
                       <td className="px-5 py-4 text-xs text-zinc-600">
                         {plan.moduleKeys.length === 0
@@ -908,7 +969,7 @@ export function SitePaymentPlansForm({
             <p className="mt-1 text-xs text-zinc-500">
               {t(
                 "site_payment_plans.form.prices_hint",
-                "Norādi cenu eiro. Decimālatdalītājs ir punkts, piemēram 29.00.",
+                "Aizpildi tikai piedāvātos periodus. Tukšs periods landing lapā netiek rādīts. Decimālatdalītājs ir punkts, piemēram 29.00.",
               )}
             </p>
             <div className="mt-2 grid gap-3 sm:grid-cols-3">
@@ -982,7 +1043,7 @@ export function SitePaymentPlansForm({
             <p className="mt-1 text-xs text-zinc-500">
               {t(
                 "site_payment_plans.form.early_bird_prices_hint",
-                "Šīs cenas attiecas uz uzņēmumiem ar Early Bird statusu un paliek uz mūžu.",
+                "Šīs cenas attiecas uz uzņēmumiem ar Early Bird statusu. Tukšus periodus vari atstāt tukšus.",
               )}
             </p>
             <div className="mt-2 grid gap-3 sm:grid-cols-3">

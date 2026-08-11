@@ -322,14 +322,18 @@ function normalizePlanPrices(input: PaymentPlanInput): {
     early_bird_price_year: number;
   };
 } | { ok: false; error: string } {
-  const priceMonth = parsePaymentPlanPrice(input.priceMonth);
-  const priceQuarter = parsePaymentPlanPrice(input.priceQuarter);
-  const priceYear = parsePaymentPlanPrice(input.priceYear);
-  const earlyBirdPriceMonth = parsePaymentPlanPrice(input.earlyBirdPriceMonth);
-  const earlyBirdPriceQuarter = parsePaymentPlanPrice(
-    input.earlyBirdPriceQuarter,
-  );
-  const earlyBirdPriceYear = parsePaymentPlanPrice(input.earlyBirdPriceYear);
+  const parseOptional = (value: number | string): number | null => {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) return 0;
+    return parsePaymentPlanPrice(value);
+  };
+
+  const priceMonth = parseOptional(input.priceMonth);
+  const priceQuarter = parseOptional(input.priceQuarter);
+  const priceYear = parseOptional(input.priceYear);
+  const earlyBirdPriceMonth = parseOptional(input.earlyBirdPriceMonth);
+  const earlyBirdPriceQuarter = parseOptional(input.earlyBirdPriceQuarter);
+  const earlyBirdPriceYear = parseOptional(input.earlyBirdPriceYear);
 
   if (
     priceMonth === null ||
@@ -341,7 +345,15 @@ function normalizePlanPrices(input: PaymentPlanInput): {
   ) {
     return {
       ok: false,
-      error: "Ievadi derīgu cenu (0 vai vairāk) katram periodam.",
+      error: "Ievadi derīgu cenu (0 vai vairāk) aizpildītajiem periodiem.",
+    };
+  }
+
+  if (priceMonth <= 0 && priceQuarter <= 0 && priceYear <= 0) {
+    return {
+      ok: false,
+      error:
+        "Norādi vismaz vienu perioda cenu (mēnesis, ceturksnis vai gads).",
     };
   }
 

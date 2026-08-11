@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.5
+
+**Landing cenu periodi un UX**
+
+- Landing maksas plānu tabos rāda tikai periodus ar cenu > 0 (tukšs mēnesis/ceturksnis/gads = nav opcijas); adminā periodi ir opcionāli (migrācijas `196`–`197`)
+- Uzņēmuma uzstādījumu / reģistrācijas **Valūta** select vienotā stilā (chevron kā citiem selectiem)
+
 ## v1.4.4
 
 **Google Auth integrācija un dokumentācija**

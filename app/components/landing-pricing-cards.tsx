@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/app/components/translations-provider";
 import { formatMoney } from "@/app/lib/estimates/format-money";
 import {
   getPaymentPlanPriceForPeriod,
+  listAvailablePaymentPlanBillingPeriods,
+  paymentPlanHasPriceForPeriod,
   resolveLocalizedValue,
   type PaymentPlanBillingPeriod,
   type PaymentPlanSummary,
 } from "@/app/lib/payment-plans/helpers";
-
-const PERIODS: PaymentPlanBillingPeriod[] = ["month", "quarter", "year"];
 
 const MODULE_LABEL_FALLBACKS: Record<string, string> = {
   module_todo_list: "Darāmo darbu saraksts",
@@ -45,7 +45,27 @@ export function LandingPricingCards({
   planCtaLabel,
 }: LandingPricingCardsProps) {
   const { t } = useTranslations();
-  const [period, setPeriod] = useState<PaymentPlanBillingPeriod>("month");
+
+  const availablePeriods = useMemo(
+    () =>
+      listAvailablePaymentPlanBillingPeriods(plans, {
+        earlyBird: earlyBirdAvailable,
+      }),
+    [plans, earlyBirdAvailable],
+  );
+
+  const [period, setPeriod] = useState<PaymentPlanBillingPeriod>(
+    () => availablePeriods[0] ?? "month",
+  );
+
+  useEffect(() => {
+    if (
+      availablePeriods.length > 0 &&
+      !availablePeriods.includes(period)
+    ) {
+      setPeriod(availablePeriods[0]);
+    }
+  }, [availablePeriods, period]);
 
   const periodLabels: Record<PaymentPlanBillingPeriod, string> = {
     month: t("landing.pricing.period.month", "Mēnesis"),
@@ -61,34 +81,40 @@ export function LandingPricingCards({
 
   return (
     <div>
-      <div className="mx-auto flex w-fit items-center gap-1 rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
-        {PERIODS.map((item) => {
-          const active = item === period;
-          return (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setPeriod(item)}
-              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
-                active
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              {periodLabels[item]}
-            </button>
-          );
-        })}
-      </div>
+      {availablePeriods.length > 1 ? (
+        <div className="mx-auto flex w-fit items-center gap-1 rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
+          {availablePeriods.map((item) => {
+            const active = item === period;
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setPeriod(item)}
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+                  active
+                    ? "bg-zinc-900 text-white"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                {periodLabels[item]}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {trialNote ? (
-        <p className="mt-4 text-center text-sm font-medium text-zinc-500">
+        <p
+          className={`${availablePeriods.length > 1 ? "mt-4" : ""} text-center text-sm font-medium text-zinc-500`}
+        >
           {trialNote}
         </p>
       ) : null}
 
       {earlyBirdAvailable && earlyBirdRemaining != null ? (
-        <p className="mt-3 text-center text-sm font-medium text-violet-700">
+        <p
+          className={`${trialNote || availablePeriods.length > 1 ? "mt-3" : ""} text-center text-sm font-medium text-violet-700`}
+        >
           {t(
             "landing.pricing.early_bird_slots",
             "Atlikušas Early Bird vietas: {remaining}",
@@ -115,13 +141,17 @@ export function LandingPricingCards({
             languageCode,
           ).trim();
           const recommended = plan.id === recommendedPlanId;
+          const periodOffered = paymentPlanHasPriceForPeriod(plan, period, {
+            earlyBird: earlyBirdAvailable,
+          });
           const regularPrice = getPaymentPlanPriceForPeriod(plan, period);
           const earlyBirdPrice = getPaymentPlanPriceForPeriod(plan, period, {
             earlyBird: true,
           });
-          const displayPrice = earlyBirdAvailable
-            ? earlyBirdPrice
-            : regularPrice;
+          const displayPrice =
+            earlyBirdAvailable && earlyBirdPrice > 0
+              ? earlyBirdPrice
+              : regularPrice;
           const moduleLabels = plan.moduleKeys.map((moduleKey) =>
             t(
               `frontend_modules.label.${moduleKey}`,
@@ -164,19 +194,33 @@ export function LandingPricingCards({
               ) : null}
 
               <div className="mt-5">
-                {earlyBirdAvailable && earlyBirdPrice !== regularPrice ? (
-                  <p className="text-sm text-zinc-400 line-through tabular-nums">
-                    {formatMoney(regularPrice, "EUR")}
+                {periodOffered ? (
+                  <>
+                    {earlyBirdAvailable &&
+                    earlyBirdPrice > 0 &&
+                    earlyBirdPrice !== regularPrice &&
+                    regularPrice > 0 ? (
+                      <p className="text-sm text-zinc-400 line-through tabular-nums">
+                        {formatMoney(regularPrice, "EUR")}
+                      </p>
+                    ) : null}
+                    <p className="flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold tracking-[-0.04em] tabular-nums text-zinc-950">
+                        {formatMoney(displayPrice, "EUR")}
+                      </span>
+                      <span className="text-sm text-zinc-500">
+                        {periodShort[period]}
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-zinc-500">
+                    {t(
+                      "landing.pricing.period_not_offered",
+                      "Šis periods šim plānam nav pieejams",
+                    )}
                   </p>
-                ) : null}
-                <p className="flex items-baseline gap-2">
-                  <span className="text-3xl font-semibold tracking-[-0.04em] tabular-nums text-zinc-950">
-                    {formatMoney(displayPrice, "EUR")}
-                  </span>
-                  <span className="text-sm text-zinc-500">
-                    {periodShort[period]}
-                  </span>
-                </p>
+                )}
               </div>
 
               <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
