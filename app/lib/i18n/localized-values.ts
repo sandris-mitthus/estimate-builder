@@ -25,17 +25,18 @@ export function normalizeLocalizedValues(
 }
 
 export function resolveLocalizedValue(
-  values: LocalizedValues,
+  values: LocalizedValues | null | undefined,
   languageCode: string,
   fallbackCodes: string[] = ["lv", "en"],
 ): string {
-  const preferred = values[languageCode]?.trim();
+  const map = values ?? {};
+  const preferred = map[languageCode]?.trim();
   if (preferred) return preferred;
   for (const code of fallbackCodes) {
-    const value = values[code]?.trim();
+    const value = map[code]?.trim();
     if (value) return value;
   }
-  const first = Object.values(values).find((value) => value.trim());
+  const first = Object.values(map).find((value) => value.trim());
   return first?.trim() ?? "";
 }
 

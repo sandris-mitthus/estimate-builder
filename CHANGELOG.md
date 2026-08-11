@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.9
+
+**Metadata slogan crash fix**
+
+- `resolveLocalizedValue` un `getSiteSettings` panes trūkstošu / novecojušu `sloganValues` kešu, lai `generateMetadata` nekristu ar TypeError
+
 ## v1.4.8
 
 **Drošības follow-up (Medium/Low)**

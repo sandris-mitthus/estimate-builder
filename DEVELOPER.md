@@ -224,7 +224,7 @@ app/
 ├── components/         # UI (company-settings-form, register-company-view, estimate-table, project-additional-work-section, line-item-total-only-toggle, estimate-table-sticky-shell, estimate-table-header-label, restore-button, project-excluded-positions-panel, sync-sagatave-changes-modal, restore-sagatave-positions-modal, material-consumption-basis-control, mechanism-basis-control, line-item-catalog-ref-sortable-list, mechanism-quantity-control, modal-stack-context, public-docs-view, site-docs-manager, navigation-loading-context, action-permissions-context, project-materials-table, landing-page, landing-pricing-cards, auth-screen, public-language-selector, site-integrations-form, site-footer, cookie-consent-provider/context/dialog, cookie-settings-link, cookie-registry-table, legal-document-view, legal-controller-details, legal-nav, ui/toggle-switch, …)
 ├── lib/
 │   ├── slugify.ts      # slugifyName — kopīgs slug uzņēmuma un sistēmas grupām
-│   ├── i18n/           # server translations, anonymous geo language (country-language aliases), cache tags, localized-values
+│   ├── i18n/           # server translations, anonymous geo language (country-language aliases), cache tags, localized-values (null-safe resolve)
 │   ├── additional-work-estimates/  # list/create/save/delete additional work estimates (estimate_kind = additional_work)
 │   ├── auth/           # getCurrentUser, permissions, requireAction, assertNavAccess, signInWithGoogle, signOut, mapUserDisplay, resolve-related-user-ids, require-auth
 │   ├── companies/      # current company resolution, bootstrap company id, registerCompanyForCurrentUser (incl. signup trial plan), payment-access (kešots maksas/VIP/bloķēšanas snapshots)

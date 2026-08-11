@@ -1502,7 +1502,21 @@ const getCachedSiteSettings = unstable_cache(
 );
 
 export async function getSiteSettings(): Promise<SiteSettingsSummary> {
-  return getCachedSiteSettings();
+  const settings = await getCachedSiteSettings();
+  // Guard stale cache entries from before slogan_values existed.
+  const sloganValues = parseLocalizedValues(settings.sloganValues);
+  if (!Object.values(sloganValues).some((value) => value.trim()) && settings.slogan) {
+    sloganValues.lv = settings.slogan;
+  }
+  return {
+    ...DEFAULT_SITE_SETTINGS,
+    ...settings,
+    sloganValues,
+    slogan:
+      resolveLocalizedValue(sloganValues, "lv") ||
+      settings.slogan ||
+      DEFAULT_SITE_SETTINGS.slogan,
+  };
 }
 
 export async function saveSiteSettings(
