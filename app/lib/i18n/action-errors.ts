@@ -257,6 +257,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Instruments ar šo numuru jau eksistē.": "errors.tool_number_exists",
   "Foto nedrīkst būt lielāks par 5 MB.": "errors.worker_photo_too_large",
   "Neizdevās pievienot darbinieku.": "errors.worker_create_failed",
+  "Neizdevās saglabāt Google autentifikācijas iestatījumus.":
+    "site_integrations.google.save_failed",
   "Neizdevās saglabāt darbinieku.": "errors.worker_save_failed",
   "Neizdevās dzēst darbinieku.": "errors.worker_delete_failed",
   "Neizdevās pievienot instrumentu.": "errors.tool_create_failed",

@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { resolveAllowedEmailDomain } from "@/app/lib/integrations/google-auth";
 import { getSafeRedirectPath } from "@/app/lib/security/safe-redirect-path";
 import { createClient } from "@/app/lib/supabase/server";
 import { activateInvitedCompanyMemberships } from "@/app/lib/users/activate-invited-membership";
 
 const ALLOWED_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
-function resolveRedirectOrigin(origin: string, forwardedHost: string | null): string {
+function resolveRedirectOrigin(
+  origin: string,
+  forwardedHost: string | null,
+): string {
   if (process.env.NODE_ENV === "development") {
     return origin;
   }
@@ -38,14 +42,18 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN?.trim();
+      const allowedDomain = await resolveAllowedEmailDomain();
 
       if (allowedDomain) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (!user?.email?.toLowerCase().endsWith(`@${allowedDomain.toLowerCase()}`)) {
+        if (
+          !user?.email
+            ?.toLowerCase()
+            .endsWith(`@${allowedDomain.toLowerCase()}`)
+        ) {
           await supabase.auth.signOut();
           return NextResponse.redirect(`${origin}/auth/auth-code-error`);
         }

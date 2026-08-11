@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.4
+
+**Google Auth integrācija un dokumentācija**
+
+- `/site_integrations` — Google karte: ieslēgšana, atļautais e-pasta domēns, Client ID piezīme, Free (`*.supabase.co`) vs Pro (`api.uupis.com`) kontrolsaraksts (migrācijas `193`–`195`)
+- Login/signup Google poga seko `google_auth_enabled`; `/auth/callback` lasa domēna ierobežojumu no DB (env fallback)
+- README / DEVELOPER: Free tagad, Custom Domain soļi vēlāk; `uupis.com` = app, `api.uupis.com` = Auth pēc Pro
+
 ## v1.4.3
 
 **Login / signup paroles rādīšana**

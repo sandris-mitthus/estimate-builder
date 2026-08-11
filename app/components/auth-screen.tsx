@@ -35,6 +35,7 @@ export function AuthScreen({
   languages = [],
   activeLanguageCode = "lv",
   emailAuthEnabled = false,
+  googleAuthEnabled = true,
   showHomeLink = true,
 }: {
   mode: AuthScreenMode;
@@ -45,6 +46,8 @@ export function AuthScreen({
   activeLanguageCode?: string;
   /** Custom email/password auth — only when Resend is enabled. */
   emailAuthEnabled?: boolean;
+  /** Google OAuth button — from /site_integrations. */
+  googleAuthEnabled?: boolean;
   /** Off when the landing page integration is disabled: "/" would come back here. */
   showHomeLink?: boolean;
 }) {
@@ -452,17 +455,26 @@ export function AuthScreen({
                   </p>
                 ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => void handleGoogleSignIn()}
-                  disabled={busy}
-                  className="inline-flex h-[54px] w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-6 text-[15px] font-medium tracking-[-0.01em] text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <GoogleIcon />
-                  {googleLoading
-                    ? t("auth.signing_in", "Signing in...")
-                    : t("auth.google_sign_in", "Continue with Google")}
-                </button>
+                {googleAuthEnabled ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleGoogleSignIn()}
+                    disabled={busy}
+                    className="inline-flex h-[54px] w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-6 text-[15px] font-medium tracking-[-0.01em] text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <GoogleIcon />
+                    {googleLoading
+                      ? t("auth.signing_in", "Signing in...")
+                      : t("auth.google_sign_in", "Continue with Google")}
+                  </button>
+                ) : !emailAuthEnabled ? (
+                  <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
+                    {t(
+                      "auth.google_disabled",
+                      "Google pierakstīšanās pašlaik nav pieejama.",
+                    )}
+                  </p>
+                ) : null}
               </>
             )}
           </div>

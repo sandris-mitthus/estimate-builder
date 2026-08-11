@@ -6,6 +6,10 @@ import {
   type ResendSettingsInput,
 } from "@/app/lib/email/resend-config";
 import { SITE_SETTINGS_CACHE_TAG } from "@/app/lib/i18n/cache-tags";
+import {
+  saveGoogleAuthSettings,
+  type GoogleAuthSettingsInput,
+} from "@/app/lib/integrations/google-auth";
 import { setLandingPageEnabled } from "@/app/lib/integrations/landing-page";
 import { assertSystemAdminAccess } from "@/app/lib/site-admin/access";
 
@@ -32,6 +36,17 @@ export async function setLandingPageEnabledAction(enabled: boolean) {
 export async function saveResendSettingsAction(input: ResendSettingsInput) {
   await assertSystemAdminAccess();
   const result = await saveResendSettings(input);
+  if (result.ok) {
+    revalidateIntegrations();
+  }
+  return result;
+}
+
+export async function saveGoogleAuthSettingsAction(
+  input: GoogleAuthSettingsInput,
+) {
+  await assertSystemAdminAccess();
+  const result = await saveGoogleAuthSettings(input);
   if (result.ok) {
     revalidateIntegrations();
   }
