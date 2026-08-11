@@ -20,7 +20,7 @@ const MODULE_LABEL_FALLBACKS: Record<string, string> = {
   module_timeline_graph: "Laika grafiks",
   module_additional_work: "Papildu darbu tāmes",
   module_profit: "Plānotā peļņa",
-  module_delegated_orders: "Materiālu pasūtīšana un deleģēšana",
+  module_delegated_orders: "Materiālu deleģēšana",
 };
 
 type LandingPricingCardsProps = {

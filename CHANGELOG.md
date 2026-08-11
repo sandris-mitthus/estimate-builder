@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.12
+
+**Materiālu pasūtīšana vs deleģēšana**
+
+- Materiālu saraksts un `materials.order` ir pamata iespēja (arī Starter); `module_delegated_orders` tagad nozīmē tikai deleģēšanu
+- Landing plānu kartēs `core_included` ietver pasūtīšanu; moduļa etiķete — *Materiālu deleģēšana* (`208`)
+
 ## v1.4.11
 
 **Lint**

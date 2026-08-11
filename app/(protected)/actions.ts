@@ -43,7 +43,7 @@ const PROFIT_MODULE_DISABLED = {
 
 const DELEGATED_ORDERS_MODULE_DISABLED = {
   ok: false as const,
-  error: "Materiālu pasūtīšanas modulis nav pieejams.",
+  error: "Materiālu deleģēšanas modulis nav pieejams.",
 };
 
 function statusActionPermission(status: ProjectStatus) {
@@ -328,10 +328,6 @@ export async function markProjectMaterialOrderedAction(
 ) {
   const { denied } = await requireAction("materials.order");
   if (denied) return denied;
-
-  if (!(await isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.delegatedOrders))) {
-    return DELEGATED_ORDERS_MODULE_DISABLED;
-  }
 
   const result = await markProjectMaterialOrdered(projectId, positionPriceId);
 

@@ -131,7 +131,7 @@ export async function LandingPage({
   const planCtaLabel = t("landing.pricing.cta", "Sākt ar šo plānu");
   const coreIncludedLabel = t(
     "landing.pricing.core_included",
-    "Tāmes redaktors, katalogs un piedāvājumi",
+    "Tāmes redaktors, katalogs, piedāvājumi un materiālu pasūtīšana",
   );
 
   return (

@@ -174,6 +174,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Modulis nav globāli ieslēgts un to nevar piešķirt uzņēmumam.":
     "errors.company_module_global_off",
   "Plānotās peļņas modulis nav pieejams.": "errors.profit_module_disabled",
+  "Materiālu deleģēšanas modulis nav pieejams.":
+    "errors.delegated_orders_module_disabled",
   "Materiālu pasūtīšanas modulis nav pieejams.":
     "errors.delegated_orders_module_disabled",
   "Uzņēmums nav norādīts.": "errors.company_required",

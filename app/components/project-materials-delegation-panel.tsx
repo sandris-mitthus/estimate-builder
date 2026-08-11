@@ -28,6 +28,8 @@ type ProjectMaterialsDelegationPanelProps = {
   users: UserSummary[];
   materialAssigneeUserIds: Record<string, string>;
   showMaterialsColumn: boolean;
+  /** When false, materials can still be ordered but not assigned to users. */
+  delegationModuleEnabled?: boolean;
   categories: EstimateCategory[];
   catalogPositions: PositionPriceSummary[];
   moduleSizeOptions: BuildingModuleSizeOption[];
@@ -43,6 +45,7 @@ export function ProjectMaterialsDelegationPanel({
   users,
   materialAssigneeUserIds,
   showMaterialsColumn,
+  delegationModuleEnabled = false,
   categories,
   catalogPositions,
   moduleSizeOptions,
@@ -60,6 +63,8 @@ export function ProjectMaterialsDelegationPanel({
     null,
   );
   const [isPending, startTransition] = useTransition();
+  const canDelegate =
+    delegationModuleEnabled && canAssignMaterials && !isPending;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -68,6 +73,10 @@ export function ProjectMaterialsDelegationPanel({
   );
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!canDelegate) {
+      return;
+    }
+
     const { active, over } = event;
     if (!over) {
       return;
@@ -128,6 +137,27 @@ export function ProjectMaterialsDelegationPanel({
     return null;
   }
 
+  const materialsTable = (
+    <ProjectMaterialsTable
+      projectId={projectId}
+      categories={categories}
+      catalogPositions={catalogPositions}
+      moduleSizeOptions={moduleSizeOptions}
+      orderedMaterialPositionIds={orderedMaterialPositionIds}
+      materialAssigneeUserIds={materialAssigneeUserIds}
+      users={users}
+      delegationEnabled={canDelegate}
+      assigningMaterialId={assigningMaterialId}
+      currency={currency}
+      useFrozenPrices={useFrozenPrices}
+      onMaterialOrdered={onMaterialOrdered}
+    />
+  );
+
+  if (!delegationModuleEnabled) {
+    return materialsTable;
+  }
+
   return (
     <DndContext
       id={PROJECT_MATERIAL_DELEGATION_DND_ID}
@@ -135,27 +165,12 @@ export function ProjectMaterialsDelegationPanel({
       onDragEnd={handleDragEnd}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ProjectMaterialsTable
-            projectId={projectId}
-            categories={categories}
-            catalogPositions={catalogPositions}
-            moduleSizeOptions={moduleSizeOptions}
-            orderedMaterialPositionIds={orderedMaterialPositionIds}
-            materialAssigneeUserIds={materialAssigneeUserIds}
-            users={users}
-            delegationEnabled={canAssignMaterials && !isPending}
-            assigningMaterialId={assigningMaterialId}
-            currency={currency}
-            useFrozenPrices={useFrozenPrices}
-            onMaterialOrdered={onMaterialOrdered}
-          />
-        </div>
+        <div className="lg:col-span-2">{materialsTable}</div>
         {users.length > 0 ? (
           <div className="lg:col-span-1">
             <ProjectUsersPanel
               users={users}
-              dragEnabled={canAssignMaterials && !isPending}
+              dragEnabled={canDelegate}
             />
           </div>
         ) : null}

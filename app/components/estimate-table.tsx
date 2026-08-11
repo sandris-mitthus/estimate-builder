@@ -2454,7 +2454,7 @@ type EstimateTableProps = {
   users?: UserSummary[];
   /** `module_profit`: without it the planned profit input and 0% notices are hidden. */
   profitModuleEnabled?: boolean;
-  /** `module_delegated_orders`: gates the materials-to-order list and delegation. */
+  /** `module_delegated_orders`: gates material delegation (assign to users), not ordering itself. */
   delegatedOrdersModuleEnabled?: boolean;
 };
 
@@ -2554,8 +2554,7 @@ export function EstimateTable({
     profitModuleEnabled,
   );
   const showPlannedProfitField = profitModuleEnabled && project != null;
-  const showProjectMaterials =
-    delegatedOrdersModuleEnabled && estimateStatusLocked;
+  const showProjectMaterials = estimateStatusLocked;
   const showPlannedProfitMissingNotice =
     showPlannedProfitField && isPlannedProfitUnset(meta.plannedProfitPercent);
   const openPositionModal = useCallback(
@@ -3504,6 +3503,7 @@ export function EstimateTable({
           users={users}
           materialAssigneeUserIds={meta.materialAssigneeUserIds ?? {}}
           showMaterialsColumn={pendingMaterialsSummary.pendingCount > 0}
+          delegationModuleEnabled={delegatedOrdersModuleEnabled}
           categories={categories}
           catalogPositions={catalogPositions}
           moduleSizeOptions={moduleSizeOptions}
