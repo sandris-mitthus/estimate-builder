@@ -174,7 +174,7 @@ export function SiteBrandingDropzone({
             <p className="mt-1 text-xs text-zinc-500">
               {t(
                 "site_settings.branding.formats_hint",
-                "PNG, JPG, WEBP vai SVG · max 2 MB",
+                "PNG, JPG, WEBP · max 2 MB",
               )}
             </p>
 
@@ -195,7 +195,7 @@ export function SiteBrandingDropzone({
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={(event) => {
           handleFiles(event.target.files);

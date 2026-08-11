@@ -246,6 +246,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Sistēmas grupas nosaukumu nevar mainīt.": "errors.system_group_rename_forbidden",
   "Sistēmas grupu nevar dzēst.": "errors.system_group_delete_forbidden",
   "SVG fails nav derīgs.": "errors.svg_invalid",
+  "SVG fails nav atļauts.": "errors.svg_not_allowed",
+  "Darbinieks nav atrasts.": "errors.worker_not_found",
   "Fails neatbilst deklarētajam WebP formātam.":
     "errors.webp_magic_bytes_mismatch",
   "Faila saturs neatbilst deklarētajam formātam.":
@@ -271,6 +273,8 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
   "Neizdevās pievienot darbinieku.": "errors.worker_create_failed",
   "Neizdevās saglabāt Google autentifikācijas iestatījumus.":
     "site_integrations.google.save_failed",
+  "Lai glabātu Resend atslēgu DB, iestati SECRETS_ENCRYPTION_KEY (vai izmanto RESEND_API_KEY vidē).":
+    "site_integrations.resend.validation.encryption_key_required",
   "Neizdevās saglabāt darbinieku.": "errors.worker_save_failed",
   "Neizdevās dzēst darbinieku.": "errors.worker_delete_failed",
   "Neizdevās pievienot instrumentu.": "errors.tool_create_failed",

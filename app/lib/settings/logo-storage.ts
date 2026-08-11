@@ -39,11 +39,7 @@ export async function downloadCompanyLogoFile(
       if (!error && data) {
         const mimeType =
           data.type ||
-          (extension === "jpg"
-            ? "image/jpeg"
-            : extension === "svg"
-              ? "image/svg+xml"
-              : `image/${extension}`);
+          (extension === "jpg" ? "image/jpeg" : `image/${extension}`);
 
         return { data, mimeType };
       }

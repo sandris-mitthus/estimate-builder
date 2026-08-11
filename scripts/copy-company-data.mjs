@@ -2,9 +2,11 @@
  * One-off: copy company-scoped demo data from SOURCE → DEST.
  * Remaps primary keys and rewrites UUID / storage path refs in JSONB.
  *
+ * Destructive on DEST (deletes existing company rows). CLI-only — not an HTTP route.
+ *
  * Usage:
- *   node scripts/copy-company-data.mjs
- *   SOURCE_COMPANY_ID=… DEST_COMPANY_ID=… node scripts/copy-company-data.mjs
+ *   SOURCE_COMPANY_ID=… DEST_COMPANY_ID=… node scripts/copy-company-data.mjs --confirm
+ *   SOURCE_COMPANY_ID=… DEST_COMPANY_ID=… node scripts/copy-company-data.mjs --dry-run
  */
 import { randomUUID } from "crypto";
 import { readFileSync } from "fs";
@@ -137,6 +139,18 @@ async function copyStorageObjects(storage, sourceCompanyId, destCompanyId, idMap
 }
 
 async function main() {
+  const args = new Set(process.argv.slice(2));
+  const dryRun = args.has("--dry-run");
+  const confirmed =
+    args.has("--confirm") || process.env.CONFIRM_COPY === "1";
+
+  if (!dryRun && !confirmed) {
+    console.error(
+      "Refusing to run: pass --confirm (or CONFIRM_COPY=1), or --dry-run.",
+    );
+    process.exit(1);
+  }
+
   const env = loadEnv(".env.local");
   const SOURCE =
     process.env.SOURCE_COMPANY_ID || "00000000-0000-0000-0000-000000000001";
@@ -144,6 +158,11 @@ async function main() {
     process.env.DEST_COMPANY_ID || "d5a0231e-096b-4559-bf93-bac2fb30fcbf";
 
   if (SOURCE === DEST) throw new Error("SOURCE and DEST must differ");
+
+  if (dryRun) {
+    console.log(`[dry-run] Would copy ${SOURCE} → ${DEST} (no writes).`);
+    process.exit(0);
+  }
 
   const client = await connectPg(env);
   const supabase = createClient(

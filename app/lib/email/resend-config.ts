@@ -1,6 +1,11 @@
 import { createAdminClient } from "@/app/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/app/lib/supabase/env";
 import { SITE_SETTINGS_CACHE_TAG } from "@/app/lib/i18n/cache-tags";
+import {
+  canEncryptSecrets,
+  decryptSecretFromStorage,
+  encryptSecretForStorage,
+} from "@/app/lib/security/secret-crypto";
 import { unstable_cache } from "next/cache";
 
 export type ResendSettingsPublic = {
@@ -39,6 +44,10 @@ function envFrom(): string {
   return process.env.EMAIL_FROM?.trim() ?? "";
 }
 
+function storedApiKeyPlaintext(row: ResendSettingsRow | null): string {
+  return decryptSecretFromStorage(row?.resend_api_key?.trim() ?? "");
+}
+
 async function loadResendSettingsRow(): Promise<ResendSettingsRow | null> {
   if (!isSupabaseAdminConfigured()) {
     return null;
@@ -61,7 +70,7 @@ async function loadResendSettingsRow(): Promise<ResendSettingsRow | null> {
 const getCachedResendSettingsPublic = unstable_cache(
   async (): Promise<ResendSettingsPublic> => {
     const row = await loadResendSettingsRow();
-    const storedKey = row?.resend_api_key?.trim() ?? "";
+    const storedKey = storedApiKeyPlaintext(row);
     return {
       enabled: row?.resend_enabled === true,
       emailFrom: (row?.email_from ?? "").trim() || envFrom(),
@@ -78,7 +87,7 @@ export async function getResendSettingsPublic(): Promise<ResendSettingsPublic> {
 }
 
 /**
- * Resolves credentials for sending. Prefer DB values; fall back to env.
+ * Resolves credentials for sending. Prefer env API key over DB; from prefers DB then env.
  * Returns null when Resend is off or incomplete.
  */
 export async function resolveResendConfig(): Promise<ResolvedResendConfig | null> {
@@ -88,7 +97,7 @@ export async function resolveResendConfig(): Promise<ResolvedResendConfig | null
     return null;
   }
 
-  const apiKey = (row?.resend_api_key?.trim() || envApiKey()).trim();
+  const apiKey = (envApiKey() || storedApiKeyPlaintext(row)).trim();
   const from = (row?.email_from?.trim() || envFrom()).trim();
   if (!apiKey || !from) {
     return null;
@@ -120,7 +129,7 @@ export async function saveResendSettings(
 
   const supabase = createAdminClient();
   const existing = await loadResendSettingsRow();
-  const storedKey = existing?.resend_api_key?.trim() ?? "";
+  const storedKey = storedApiKeyPlaintext(existing);
   const nextKey = apiKeyInput || storedKey;
 
   if (enabled && !nextKey && !envApiKey()) {
@@ -131,13 +140,27 @@ export async function saveResendSettings(
     };
   }
 
+  if (apiKeyInput && !envApiKey() && !canEncryptSecrets()) {
+    return {
+      ok: false,
+      error:
+        "Lai glabātu Resend atslēgu DB, iestati SECRETS_ENCRYPTION_KEY (vai izmanto RESEND_API_KEY vidē).",
+    };
+  }
+
   const payload: Record<string, unknown> = {
     id: 1,
     resend_enabled: enabled,
     email_from: emailFrom,
   };
   if (apiKeyInput) {
-    payload.resend_api_key = apiKeyInput;
+    payload.resend_api_key = encryptSecretForStorage(apiKeyInput);
+  } else if (storedKey && existing?.resend_api_key && canEncryptSecrets()) {
+    // Upgrade legacy plaintext keys when encryption becomes available.
+    const raw = existing.resend_api_key.trim();
+    if (raw && !raw.startsWith("enc:v1:")) {
+      payload.resend_api_key = encryptSecretForStorage(raw);
+    }
   }
 
   const { error } = await supabase

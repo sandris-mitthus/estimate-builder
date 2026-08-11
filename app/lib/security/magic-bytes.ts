@@ -1,6 +1,7 @@
 /**
  * Server-side magic-byte validation for uploaded files.
  * Validates the actual file header bytes, not the browser-supplied Content-Type.
+ * SVG is rejected — branding / logos must be raster only (XSS surface).
  */
 
 const SIGNATURES: Array<{
@@ -14,7 +15,6 @@ const SIGNATURES: Array<{
   { mimeType: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 },
   { mimeType: "image/webp", bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },
   { mimeType: "application/pdf", bytes: [0x25, 0x50, 0x44, 0x46] },
-  { mimeType: "image/svg+xml", bytes: [] },
 ];
 
 function matchesSignature(
@@ -33,13 +33,11 @@ export async function validateFileMagicBytes(
   file: File,
   expectedMimeType: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (expectedMimeType === "image/svg+xml") {
-    const text = await file.text();
-    const trimmed = text.trimStart().toLowerCase();
-    if (!trimmed.startsWith("<svg") && !trimmed.startsWith("<?xml")) {
-      return { ok: false, error: "SVG fails nav derīgs." };
-    }
-    return { ok: true };
+  if (
+    expectedMimeType === "image/svg+xml" ||
+    expectedMimeType.includes("svg")
+  ) {
+    return { ok: false, error: "SVG fails nav atļauts." };
   }
 
   const HEADER_BYTES = 12;

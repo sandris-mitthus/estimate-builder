@@ -9,6 +9,11 @@ export async function assertSystemAdminAccess(): Promise<boolean> {
       notFound();
     }
 
+    // Local-only escape hatch — never open site admin without explicit opt-in.
+    if (process.env.ALLOW_OPEN_SITE_ADMIN !== "1") {
+      redirect("/");
+    }
+
     return true;
   }
 

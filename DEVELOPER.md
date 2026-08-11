@@ -255,7 +255,7 @@ app/
 │   ├── timeline-graph/ # Labor workload schedule: types, people-count, repository/order/parallel, build-sections, workday schedule
 │   ├── users/          # Auth user list, public.users sync, company membership status, invite, groups-repository (company membership + permissions)
 │   ├── validation/     # email, phone, formatDisplayPhone, image-file (kopīgs mime + izmēra validators logo/favicon/foto/moduļu attēliem)
-│   ├── security/       # safe redirect paths, magic-bytes (file header validation), rate-limit, auth-rate-limit (signup/login/reset)
+│   ├── security/       # safe redirect paths, magic-bytes (no SVG), rate-limit (Upstash→in-process fallback), auth-rate-limit, secret-crypto (AES-GCM)
 │   └── supabase/       # clients, update-session (session refresh + auth redirect), storage-key cookie cleanup
 proxy.ts                # Supabase session refresh middleware
 scripts/                # db:migrate, db:test, copy-pdf-worker.mjs, copy-company-data.mjs (one-off company clone)
@@ -288,7 +288,7 @@ gitleaks detect --redact -v --exit-code=2 --log-opts=-1
 
 `npm run audit:check` (`scripts/audit-check.mjs`) fails on every HIGH or CRITICAL advisory except the ones listed in `ACCEPTED_ADVISORIES`, where each entry carries a reason and the condition for removing it. Transitive dependencies are pinned through `overrides` in `package.json` (`postcss`, `sharp`, `js-yaml`, `uuid`, `brace-expansion` same-major patches).
 
-Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.6 / 10**, pārbaude v1.4.7).
+Pilns audits un atlikušie punkti: **`security-check.md`** (pašreiz **9.7 / 10**, pārbaude v1.4.8).
 
 ---
 
@@ -371,7 +371,7 @@ Skip version bump only for typo/docs-only changes when you explicitly say no rel
 - [x] Sidebar — **Tāme** grupa, Laika grafiks virs moduļiem, Tasks apakšā (`156`); nekompletu moduļu nav brīdinājums (`151`–`152`)
 - [x] UI atbilstība tiesībām — pogas slēptas pēc `permissions.actions` (`useActionPermission`)
 - [x] System admin sadaļas — uzņēmumi, lietotāji, default grupas, Docs pārvaldība, Todo dēlis, valodas, tulkojumi, e-pasta šabloni, integrācijas un sistēmas uzstādījumi
-- [x] Drošības audits — `security-check.md` **9.6 / 10** (v1.4.7: storagePath scope, grupas membership, OAuth host, signup password, SVG logo, auth rate limit; `npm run audit:check` tīrs)
+- [x] Drošības audits — `security-check.md` **9.7 / 10** (v1.4.8 follow-up: SVG serve, auth RPC lookup, Resend encrypt, geo, Upstash fallback, worker photo, CLI confirm)
 - [x] Moduļa lielumi — **Dzīvojamā platība** (m²; arī `module_data_complete`), logu/durvju **kopējais perimetrs**, vairākas vienlaikus atvērtas sadaļas apjoma izvēlē un sagataves piemēra piezīme bez moduļa nosaukuma
 - [x] Sanmezgli projekta aprakstā; apjomu **+/-** un **×2**; logu/durvju/sanmezglu neitrāli kārtas numuri; logu **Vitrīna** slēdzis
 - [x] Juridiskās lapas un sīkdatņu piekrišana — `/privacy`, `/terms`, `/cookies` publiski pieejami, kājene visos skatos, kategoriju slēdži ar reālu preferenču sīkdatņu bloķēšanu un dzēšanu (`163`)

@@ -2,8 +2,52 @@
 
 **Sākotnējā atzīme:** 4 / 10  
 **Atzīme pēc labojumiem:** 8 / 10  
-**Pēdējā pilnā pārbaude:** 2026-08-11 (**v1.4.7**) — **9.6 / 10**  
-**Iepriekšējā pilnā pārbaude:** 2026-08-04 (v1.3.110) — 9.5 / 10
+**Pēdējā pilnā pārbaude:** 2026-08-11 (**v1.4.8**) — **9.7 / 10**  
+**Iepriekšējā pilnā pārbaude:** 2026-08-11 (v1.4.7) — 9.6 / 10
+
+---
+
+## Ātrā pārbaude v1.4.8 (2026-08-11)
+
+Follow-up uz Medium/Low punktiem no padziļinātā audita (SVG serve, auth lookup DoS, geo, Resend, Upstash, CLI, worker photo, enumeration).
+
+| Kontrole | Rezultāts |
+|----------|-----------|
+| SVG branding XSS | ✅ Raster-only upload + UI; magic-bytes noraida SVG; serve `nosniff` + CSP sandbox; bucket mime bez SVG (`202`) |
+| Auth email lookup | ✅ `find_auth_user_by_email` RPC (bez `listUsers` pagination); rate limit saglabāts |
+| Signup / resend enumeration | ✅ Confirmed/missing → silent `{ ok: true }` |
+| Geo / ipapi | ✅ Prod+Vercel: tikai `x-vercel-ip-country`; timeout; IP validācija; in-memory cache; calling-code rate limit |
+| Resend API key | ✅ Preferē `RESEND_API_KEY` env; DB glabāšana AES-GCM ar `SECRETS_ENCRYPTION_KEY` |
+| Upstash multi-instance | ✅ Kļūmes gadījumā fallback uz in-process (nevis hard lock) |
+| `copy-company-data.mjs` | ✅ Prasa `--confirm` / `CONFIRM_COPY=1` (vai `--dry-run`) |
+| Worker photo | ✅ Ownership check pirms upload/delete |
+| `assertSystemAdminAccess` | ✅ Non-prod bez Supabase tikai ar `ALLOW_OPEN_SITE_ADMIN=1` |
+
+### Labojumi šajā ciklā
+
+| # | Severity | Apraksts | Statuss |
+|---|----------|----------|---------|
+| M5 | 🟠 MED | SVG serve / weak magic-bytes | ✅ LABOTS |
+| M6 | 🟠 MED | Auth listUsers DoS + enumeration | ✅ LABOTS |
+| M7 | 🟠 MED | Geo hang / spoof / abuse | ✅ LABOTS |
+| M8 | 🟠 MED | Resend key plaintext in DB | ✅ LABOTS (env prefer + encrypt) |
+| M9 | 🟠 MED | Upstash fail-closed locks exports | ✅ LABOTS (fail → in-process) |
+| L10 | 🟡 LOW | copy-company-data without confirm | ✅ LABOTS |
+| L11 | 🟡 LOW | Worker photo without ownership check | ✅ LABOTS |
+| L13 | 🟡 LOW | Signup email enumeration | ✅ LABOTS |
+| L14 | 🟡 LOW | Open site-admin without Supabase in non-prod | ✅ LABOTS |
+
+### Atlikušās piezīmes / ieteikumi (nebloķējoši)
+
+| # | Severity | Apraksts |
+|---|----------|----------|
+| L25 | ℹ️ DEPLOY | Production: `ALLOWED_EMAIL_DOMAIN` + Supabase Auth invite-only, ja publiskais signup nav vajadzīgs |
+| L27 | ℹ️ ARHITEKTŪRA | Service role repository apzināti apiet RLS; klienti deny — company scope serverī |
+| L29 | ℹ️ DEPLOY | Multi-instance: iestatīt `UPSTASH_REDIS_REST_*` |
+| L30 | ℹ️ AUTH | Login rate limit ir soft-gate; Supabase Auth limitē tiešo `signInWithPassword` |
+| L31 | ℹ️ DEPLOY | Iestatīt `SECRETS_ENCRYPTION_KEY` ja Resend atslēga glabājas DB; preferē `RESEND_API_KEY` env |
+
+**Atzīme:** **9.7 / 10** — Medium follow-up punkti aizvērti; atlikušais galvenokārt deploy konfigurācija.
 
 ---
 

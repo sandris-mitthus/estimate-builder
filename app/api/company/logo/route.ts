@@ -27,10 +27,32 @@ export async function GET(request: Request) {
   }
 
   const buffer = await logo.data.arrayBuffer();
+  const mimeType =
+    (logo.mimeType || "").split(";")[0]?.trim().toLowerCase() || "";
+  if (
+    !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(mimeType) ||
+    mimeType.includes("svg")
+  ) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const extension =
+    mimeType === "image/png"
+      ? "png"
+      : mimeType === "image/jpeg"
+        ? "jpg"
+        : mimeType === "image/webp"
+          ? "webp"
+          : mimeType === "image/gif"
+            ? "gif"
+            : "bin";
 
   return new Response(buffer, {
     headers: {
-      "Content-Type": logo.mimeType,
+      "Content-Type": mimeType,
+      "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": `inline; filename="logo.${extension}"`,
+      "Content-Security-Policy": "default-src 'none'; sandbox",
       "Cache-Control": "private, max-age=3600",
     },
   });

@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.8
+
+**Drošības follow-up (Medium/Low)**
+
+- SVG branding: raster-only UI + serve headers (`nosniff`, CSP sandbox); bucket mime bez SVG; auth `find_auth_user_by_email` RPC; signup/resend bez e-pasta enumeration
+- Resend: preferē env atslēgu; DB glabāšana ar `SECRETS_ENCRYPTION_KEY`; geo Vercel-only prod; calling-code rate limit; Upstash fail → in-process; worker photo ownership; `copy-company-data --confirm`
+
 ## v1.4.7
 
 **Drošība, veiktspēja un ģeo valoda**

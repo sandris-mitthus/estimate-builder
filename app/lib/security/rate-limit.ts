@@ -73,8 +73,8 @@ async function checkUpstashRateLimit(
 
     return count <= maxRequests;
   } catch (error) {
-    console.error("Upstash rate limiter failed.", error);
-    return false;
+    console.error("Upstash rate limiter failed; falling back to in-process.", error);
+    return null;
   }
 }
 

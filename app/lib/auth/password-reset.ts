@@ -10,39 +10,8 @@ import {
   authConfirmRedirectUrl,
   resolveAuthEmailLink,
 } from "@/app/lib/auth/auth-confirm-link";
+import { findAuthUserByEmailExact } from "@/app/lib/auth/find-auth-user-by-email";
 import { checkAuthEmailRateLimit } from "@/app/lib/security/auth-rate-limit";
-
-async function findAuthUserByEmailExact(email: string): Promise<{
-  id: string;
-  emailConfirmed: boolean;
-} | null> {
-  const supabase = createAdminClient();
-  const normalized = email.trim().toLowerCase();
-  let page = 1;
-  for (;;) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
-    if (error) {
-      return null;
-    }
-    const users = data.users ?? [];
-    const match = users.find(
-      (user) => (user.email ?? "").trim().toLowerCase() === normalized,
-    );
-    if (match) {
-      return {
-        id: match.id,
-        emailConfirmed: Boolean(match.email_confirmed_at),
-      };
-    }
-    if (users.length < 200) {
-      return null;
-    }
-    page += 1;
-  }
-}
 
 /**
  * Sends a password reset email via Resend when the account exists.

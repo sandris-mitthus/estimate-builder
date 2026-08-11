@@ -1,23 +1,41 @@
 import { headers } from "next/headers";
 
-function isPrivateOrLocalIp(ip: string): boolean {
+const GEO_FETCH_TIMEOUT_MS = 1500;
+const GEO_CACHE_TTL_MS = 10 * 60 * 1000;
+const geoCache = new Map<string, { country: string | null; expiresAt: number }>();
+
+const IPV4_RE =
+  /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const IPV6_RE = /^[0-9a-f:]+$/i;
+
+function isValidPublicIp(ip: string): boolean {
   const trimmed = ip.trim().toLowerCase();
+  if (!trimmed || trimmed.includes("/") || trimmed.includes(" ")) {
+    return false;
+  }
+
+  const isV4 = IPV4_RE.test(trimmed);
+  const isV6 = trimmed.includes(":") && IPV6_RE.test(trimmed);
+  if (!isV4 && !isV6) {
+    return false;
+  }
+
   if (
     trimmed === "127.0.0.1" ||
     trimmed === "::1" ||
     trimmed === "0.0.0.0" ||
     trimmed === "localhost"
   ) {
-    return true;
+    return false;
   }
 
   if (trimmed.startsWith("192.168.") || trimmed.startsWith("10.")) {
-    return true;
+    return false;
   }
 
   // IPv4 link-local and CGNAT
   if (trimmed.startsWith("169.254.") || trimmed.startsWith("100.64.")) {
-    return true;
+    return false;
   }
 
   // 172.16.0.0 – 172.31.255.255
@@ -25,53 +43,48 @@ function isPrivateOrLocalIp(ip: string): boolean {
   if (match172) {
     const second = Number(match172[1]);
     if (second >= 16 && second <= 31) {
-      return true;
+      return false;
     }
   }
 
-  // Basic IPv6 ULA / link-local
+  // IPv6 ULA / link-local / localhost
   if (
     trimmed.startsWith("fc") ||
     trimmed.startsWith("fd") ||
-    trimmed.startsWith("fe80:")
+    trimmed.startsWith("fe80:") ||
+    trimmed === "::" ||
+    trimmed.startsWith("::ffff:127.")
   ) {
-    return true;
+    return false;
   }
 
-  return false;
+  return true;
 }
 
 function readClientIp(headerStore: Headers): string | null {
-  // Prefer platform-provided client IP when present.
+  // Prefer platform-provided client IP when present (harder to spoof than XFF).
   const vercelIp = headerStore.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
-  if (vercelIp) return vercelIp;
+  if (vercelIp && isValidPublicIp(vercelIp)) return vercelIp;
 
   const realIp = headerStore.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
+  if (realIp && isValidPublicIp(realIp)) return realIp;
 
-  const forwarded = headerStore.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+  // Only trust X-Forwarded-For outside production (local / non-Vercel).
+  if (process.env.NODE_ENV !== "production") {
+    const forwarded = headerStore.get("x-forwarded-for");
+    if (forwarded) {
+      const first = forwarded.split(",")[0]?.trim();
+      if (first && isValidPublicIp(first)) return first;
+    }
   }
 
   return null;
 }
 
-const GEO_FETCH_TIMEOUT_MS = 1500;
-
-/** ISO 3166-1 alpha-2 country code from Vercel / IP lookup, or null. */
-export async function detectCountryIsoFromRequest(): Promise<string | null> {
-  const headerStore = await headers();
-
-  const vercelCountry = headerStore.get("x-vercel-ip-country")?.trim();
-  if (vercelCountry) {
-    return vercelCountry.toUpperCase();
-  }
-
-  const ip = readClientIp(headerStore);
-  if (!ip || isPrivateOrLocalIp(ip)) {
-    return null;
+async function lookupCountryFromIpapi(ip: string): Promise<string | null> {
+  const cached = geoCache.get(ip);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.country;
   }
 
   try {
@@ -87,16 +100,48 @@ export async function detectCountryIsoFromRequest(): Promise<string | null> {
       );
 
       if (!response.ok) {
+        geoCache.set(ip, { country: null, expiresAt: Date.now() + GEO_CACHE_TTL_MS });
         return null;
       }
 
       const data = (await response.json()) as { country_code?: string };
       const code = data.country_code?.trim();
-      return code ? code.toUpperCase() : null;
+      const country = code ? code.toUpperCase() : null;
+      geoCache.set(ip, {
+        country,
+        expiresAt: Date.now() + GEO_CACHE_TTL_MS,
+      });
+      return country;
     } finally {
       clearTimeout(timer);
     }
   } catch {
+    geoCache.set(ip, { country: null, expiresAt: Date.now() + GEO_CACHE_TTL_MS });
     return null;
   }
+}
+
+/** ISO 3166-1 alpha-2 country code from Vercel / IP lookup, or null. */
+export async function detectCountryIsoFromRequest(): Promise<string | null> {
+  const headerStore = await headers();
+
+  const vercelCountry = headerStore.get("x-vercel-ip-country")?.trim();
+  if (vercelCountry) {
+    return vercelCountry.toUpperCase();
+  }
+
+  // Production on Vercel: prefer header only — skip spoofable IP → ipapi path.
+  if (
+    process.env.NODE_ENV === "production" &&
+    (process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV))
+  ) {
+    return null;
+  }
+
+  const ip = readClientIp(headerStore);
+  if (!ip) {
+    return null;
+  }
+
+  return lookupCountryFromIpapi(ip);
 }

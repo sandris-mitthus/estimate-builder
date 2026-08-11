@@ -10,6 +10,7 @@ import {
   authConfirmRedirectUrl,
   resolveAuthEmailLink,
 } from "@/app/lib/auth/auth-confirm-link";
+import { findAuthUserByEmailExact } from "@/app/lib/auth/find-auth-user-by-email";
 import { checkAuthEmailRateLimit } from "@/app/lib/security/auth-rate-limit";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -39,38 +40,6 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
-async function findAuthUserByEmailExact(email: string): Promise<{
-  id: string;
-  emailConfirmed: boolean;
-} | null> {
-  const supabase = createAdminClient();
-  const normalized = email.trim().toLowerCase();
-  let page = 1;
-  for (;;) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
-    if (error) {
-      return null;
-    }
-    const users = data.users ?? [];
-    const match = users.find(
-      (user) => (user.email ?? "").trim().toLowerCase() === normalized,
-    );
-    if (match) {
-      return {
-        id: match.id,
-        emailConfirmed: Boolean(match.email_confirmed_at),
-      };
-    }
-    if (users.length < 200) {
-      return null;
-    }
-    page += 1;
-  }
-}
-
 async function sendSignupLink(
   email: string,
   password: string,
@@ -92,10 +61,8 @@ async function sendSignupLink(
     if (generated.error && isAlreadyRegisteredError(generated.error)) {
       const existing = await findAuthUserByEmailExact(email);
       if (existing?.emailConfirmed) {
-        return {
-          ok: false,
-          error: "Šis e-pasts jau ir reģistrēts. Pieraksties ar paroli.",
-        };
+        // Avoid account enumeration — same success as a fresh signup.
+        return { ok: true };
       }
 
       if (existing && !existing.emailConfirmed) {
@@ -175,15 +142,8 @@ export async function registerWithEmailPassword(
 
   const existing = await findAuthUserByEmailExact(trimmedEmail);
   if (existing?.emailConfirmed) {
-    return {
-      ok: false,
-      error: "Šis e-pasts jau ir reģistrēts. Pieraksties ar paroli.",
-    };
-  }
-
-  if (existing && !existing.emailConfirmed) {
-    // Re-send confirmation for an unfinished registration.
-    return sendSignupLink(trimmedEmail, password);
+    // Silent success — do not reveal that the account already exists.
+    return { ok: true };
   }
 
   return sendSignupLink(trimmedEmail, password);
@@ -191,6 +151,7 @@ export async function registerWithEmailPassword(
 
 /**
  * Re-sends the signup confirmation email (unconfirmed accounts only).
+ * Always returns ok for missing/confirmed accounts to avoid enumeration.
  */
 export async function resendSignupConfirmationEmail(
   email: string,
@@ -228,14 +189,8 @@ export async function resendSignupConfirmationEmail(
   }
 
   const existing = await findAuthUserByEmailExact(trimmedEmail);
-  if (!existing) {
-    return { ok: false, error: "Konts ar šo e-pastu nav atrasts." };
-  }
-  if (existing.emailConfirmed) {
-    return {
-      ok: false,
-      error: "E-pasts jau ir apstiprināts. Vari pierakstīties.",
-    };
+  if (!existing || existing.emailConfirmed) {
+    return { ok: true };
   }
 
   return sendSignupLink(trimmedEmail, password);

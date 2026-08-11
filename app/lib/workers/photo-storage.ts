@@ -88,6 +88,17 @@ export async function uploadWorkerPhoto(
   }
 
   const supabase = createAdminClient();
+  const { data: worker, error: workerError } = await supabase
+    .from("company_workers")
+    .select("id")
+    .eq("id", workerId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (workerError || !worker) {
+    return { ok: false, error: "Darbinieks nav atrasts." };
+  }
+
   await removeExistingWorkerPhotos(supabase, companyId, workerId);
 
   const path = `companies/${companyId}/workers/${workerId}/photo.${extension}`;
@@ -132,6 +143,17 @@ export async function deleteWorkerPhotoFromStorage(
   }
 
   const supabase = createAdminClient();
+  const { data: worker, error: workerError } = await supabase
+    .from("company_workers")
+    .select("id")
+    .eq("id", workerId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (workerError || !worker) {
+    return { ok: false, error: "Darbinieks nav atrasts." };
+  }
+
   await removeExistingWorkerPhotos(supabase, companyId, workerId);
 
   await supabase

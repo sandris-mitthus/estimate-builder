@@ -8,11 +8,6 @@ export const RASTER_IMAGE_EXTENSIONS_BY_MIME = {
   "image/webp": "webp",
 } as const;
 
-export const RASTER_AND_SVG_EXTENSIONS_BY_MIME = {
-  ...RASTER_IMAGE_EXTENSIONS_BY_MIME,
-  "image/svg+xml": "svg",
-} as const;
-
 type ImageFileRules = {
   extensionByMimeType: Record<string, string>;
   maxBytes: number;

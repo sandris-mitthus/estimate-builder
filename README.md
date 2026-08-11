@@ -3,7 +3,7 @@
 Estimate Builder is a web app for construction companies that prepare tender estimates and client offers. You keep one reusable estimate template and a shared price catalog, and every new project starts from them — so a full estimate with categories, positions, quantities and prices is ready in minutes instead of hours. Prices stay linked to the catalog, the app warns you when they get out of date, and the finished estimate exports as a client-ready PDF offer or a detailed Excel spreadsheet. Approved projects continue in the app: the material list shows what still needs to be ordered, work can be handed to a specific team member, and workers, tools and project schedules are tracked in one place.
 
 **Repository:** [github.com/sandris-mitthus/estimate-builder](https://github.com/sandris-mitthus/estimate-builder)  
-**Current version:** `1.4.7`
+**Current version:** `1.4.8`
 
 ---
 
@@ -72,8 +72,10 @@ Copy `.env.example` → `.env.local` and fill in **real** values locally. Never 
 | `SUPABASE_DB_PASSWORD` or `DATABASE_URL` | Migrations | `npm run db:migrate` only |
 | `SUPABASE_DB_REGION` | Migrations | Pooler region (default `eu-west-1`) if direct `db.*` host fails |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | Fallback Google email domain lock. Prefer **Integrācijas → Google** (`google_allowed_email_domain`); DB wins when set |
-| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional for multi-instance production | Enables distributed PDF/Excel export rate limiting; without these, local/single-instance deploys use in-process limits |
-| `RESEND_API_KEY` + `EMAIL_FROM` | Optional fallback for transactional email | Prefer configuring Resend under system admin **Integrācijas** (`/site_integrations`); env vars work as fallback when the toggle is on. Email copy stays under **E-pasta šabloni**. Domain must be verified in [Resend](https://resend.com) |
+| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional for multi-instance production | Distributed rate limiting; if Redis is down, falls back to in-process limits |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Optional preferred for transactional email | Preferred over DB-stored key when Resend is enabled under **Integrācijas**. Domain must be verified in [Resend](https://resend.com) |
+| `SECRETS_ENCRYPTION_KEY` | Optional | Required to store a Resend API key in the database (AES-GCM); prefer env key when possible |
+| `ALLOW_OPEN_SITE_ADMIN` | Local only | Set to `1` only if you need site-admin routes without Supabase configured |
 
 ### Supabase setup
 
