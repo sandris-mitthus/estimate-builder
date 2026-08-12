@@ -8,13 +8,25 @@ import type {
   SiteDocSummary,
 } from "@/app/lib/site-admin/repository";
 
+export type PublicDocsCapability = {
+  title: string;
+  description: string;
+};
+
 export type PublicDocsLabels = {
   backToLogin: string;
   title: string;
   subtitle: string;
   navLabel: string;
-  allDocsTitle: string;
-  allDocsSubtitle: string;
+  getStartedNav: string;
+  getStartedEyebrow: string;
+  getStartedTitle: string;
+  getStartedBody1: string;
+  getStartedBody2: string;
+  capabilitiesTitle: string;
+  capabilities: PublicDocsCapability[];
+  browseTitle: string;
+  browseSubtitle: string;
   categoryLabel: string;
   emptyCategory: string;
   emptyTitle: string;
@@ -57,11 +69,35 @@ function setArticleHash(docId: string | null) {
   window.history.replaceState(null, "", window.location.pathname);
 }
 
-function splitContent(description: string) {
-  return description
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+type ContentBlock =
+  | { type: "paragraph"; text: string }
+  | { type: "list"; items: string[] };
+
+function splitContent(description: string): ContentBlock[] {
+  const blocks: ContentBlock[] = [];
+
+  for (const chunk of description.split(/\n{2,}/)) {
+    const lines = chunk
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) continue;
+
+    const listItems = lines
+      .filter((line) => /^[-•]\s+/.test(line))
+      .map((line) => line.replace(/^[-•]\s+/, "").trim())
+      .filter(Boolean);
+
+    if (listItems.length > 0 && listItems.length === lines.length) {
+      blocks.push({ type: "list", items: listItems });
+      continue;
+    }
+
+    blocks.push({ type: "paragraph", text: lines.join(" ") });
+  }
+
+  return blocks;
 }
 
 function DocsCard({
@@ -121,6 +157,7 @@ export function PublicDocsView({
     () => findDoc(visibleCategories, selectedDocId),
     [selectedDocId, visibleCategories],
   );
+  const showingOverview = selected == null;
 
   useEffect(() => {
     const initialDocId = getDocIdFromHash(window.location.hash);
@@ -152,7 +189,7 @@ export function PublicDocsView({
     setArticleHash(docId);
   }
 
-  function showAllDocs() {
+  function showOverview() {
     setSelectedDocId(null);
     setArticleHash(null);
   }
@@ -174,17 +211,30 @@ export function PublicDocsView({
               </p>
               <button
                 type="button"
-                onClick={showAllDocs}
+                onClick={showOverview}
                 className="mt-2 block text-left text-2xl font-semibold tracking-[-0.05em] text-zinc-950 transition hover:text-blue-700"
               >
                 {labels.title}
               </button>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">{labels.subtitle}</p>
             </div>
 
             <nav
               className="mt-7 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"
               aria-label={labels.navLabel}
             >
+              <button
+                type="button"
+                onClick={showOverview}
+                className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
+                  showingOverview
+                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
+                }`}
+              >
+                {labels.getStartedNav}
+              </button>
+
               {visibleCategories.map((category) => {
                 const expanded = expandedCategoryIds.has(category.id);
                 return (
@@ -207,23 +257,23 @@ export function PublicDocsView({
                     >
                       <div className="min-h-0 overflow-hidden">
                         <div className="mt-2 space-y-1">
-                        {category.docs.map((doc) => {
-                          const active = selectedDocId === doc.id;
-                          return (
-                            <button
-                              key={doc.id}
-                              type="button"
-                              onClick={() => selectDoc(doc.id)}
-                              className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
-                                active
-                                  ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
-                                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950"
-                              }`}
-                            >
-                              {doc.title}
-                            </button>
-                          );
-                        })}
+                          {category.docs.map((doc) => {
+                            const active = selectedDocId === doc.id;
+                            return (
+                              <button
+                                key={doc.id}
+                                type="button"
+                                onClick={() => selectDoc(doc.id)}
+                                className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                                  active
+                                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+                                    : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950"
+                                }`}
+                              >
+                                {doc.title}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -251,7 +301,7 @@ export function PublicDocsView({
             <article className="max-w-4xl">
               <button
                 type="button"
-                onClick={showAllDocs}
+                onClick={showOverview}
                 className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
               >
                 <i className="fas fa-arrow-left text-xs" aria-hidden="true" />
@@ -264,36 +314,91 @@ export function PublicDocsView({
                 {selected.doc.title}
               </h1>
               <div className="mt-8 max-w-3xl space-y-5 text-base leading-8 text-zinc-600">
-                {splitContent(selected.doc.description).map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
+                {splitContent(selected.doc.description).map((block, index) =>
+                  block.type === "list" ? (
+                    <ul key={`list-${index}`} className="list-disc space-y-2 pl-5">
+                      {block.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p key={block.text}>{block.text}</p>
+                  ),
+                )}
               </div>
             </article>
           ) : (
-            <div className="space-y-12">
-              {visibleCategories.map((category) => (
-                <section key={category.id} className="space-y-4">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    {category.title}
+            <div className="max-w-4xl space-y-12">
+              <article>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                  {labels.getStartedEyebrow}
+                </p>
+                <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em] text-zinc-950 md:text-5xl">
+                  {labels.getStartedTitle}
+                </h1>
+                <div className="mt-6 max-w-3xl space-y-5 text-base leading-8 text-zinc-600">
+                  <p>{labels.getStartedBody1}</p>
+                  <p>{labels.getStartedBody2}</p>
+                </div>
+              </article>
+
+              <section className="space-y-5">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
+                    {labels.capabilitiesTitle}
                   </h2>
-                  {category.docs.length > 0 ? (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {category.docs.map((doc) => (
-                        <DocsCard
-                          key={doc.id}
-                          doc={doc}
-                          onSelect={selectDoc}
-                          openArticleLabel={labels.openArticle}
-                        />
-                      ))}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {labels.capabilities.map((capability) => (
+                    <div
+                      key={capability.title}
+                      className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm"
+                    >
+                      <h3 className="text-base font-semibold tracking-[-0.03em] text-zinc-950">
+                        {capability.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-zinc-500">
+                        {capability.description}
+                      </p>
                     </div>
-                  ) : (
-                    <p className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 text-sm text-zinc-500">
-                      {labels.emptyCategory}
-                    </p>
-                  )}
-                </section>
-              ))}
+                  ))}
+                </div>
+              </section>
+
+              <section className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
+                    {labels.browseTitle}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-base leading-7 text-zinc-500">
+                    {labels.browseSubtitle}
+                  </p>
+                </div>
+
+                {visibleCategories.map((category) => (
+                  <section key={category.id} className="space-y-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                      {category.title}
+                    </h3>
+                    {category.docs.length > 0 ? (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {category.docs.map((doc) => (
+                          <DocsCard
+                            key={doc.id}
+                            doc={doc}
+                            onSelect={selectDoc}
+                            openArticleLabel={labels.openArticle}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 text-sm text-zinc-500">
+                        {labels.emptyCategory}
+                      </p>
+                    )}
+                  </section>
+                ))}
+              </section>
             </div>
           )}
         </section>

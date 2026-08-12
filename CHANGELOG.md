@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.14
+
+**Publiskā dokumentācija un krievu valoda**
+
+- `/docs` sākuma skats kā ShipFast „Get started”: īss sistēmas apraksts, galvenās iespējas un bagātāki seed raksti (`211_seed_docs_get_started_overview`)
+- Pievienota aktīva `ru` (Русский) sistēmas valoda un RU vērtības `site_translations` / slogan / plānu nosaukumiem (`211_add_russian…`, `212`)
+
 ## v1.4.13
 
 **SEO un Umami**
