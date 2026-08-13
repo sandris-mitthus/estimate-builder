@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.16
+
+**PDF piedāvājuma kājene**
+
+- Katrā PDF piedāvājuma lapā maza kājene „Piedāvājums ģenerēts {sistēmas nosaukums} sistēmā” ar hipersaiti uz sistēmu (`213`, lv / en / ru)
+
 ## v1.4.15
 
 **Umami skripts HTML galvenē**

@@ -3,6 +3,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { getAdditionalWorkEstimate } from "@/app/lib/additional-work-estimates/repository";
+import { getSiteOrigin } from "@/app/lib/auth/auth-confirm-link";
 import { getCurrentUser } from "@/app/lib/auth/get-current-user";
 import { getCurrentCompanyId } from "@/app/lib/companies/current-company";
 import { canPerformAction, getUserAccess } from "@/app/lib/users/groups-repository";
@@ -30,6 +31,7 @@ import { getBuildingModule } from "@/app/lib/modules/repository";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
 import { syncSubcategoryOfferVisibilityFromSagatave } from "@/app/lib/estimate-positions/sync-subcategory-offer-visibility";
 import { getServerTranslations } from "@/app/lib/i18n/server";
+import { getSiteSettings } from "@/app/lib/site-admin/repository";
 import type { EstimateCategory } from "@/app/lib/estimates/types";
 
 function sanitizeDownloadFilenamePart(value: string, fallback: string): string {
@@ -67,14 +69,21 @@ export async function GET(
     return new Response("Forbidden", { status: 403 });
   }
 
-  const [{ t }, project, catalogPositions, companySettings, profitModuleEnabled] =
-    await Promise.all([
-      getServerTranslations(),
-      getProject(projectId),
-      listPositionPrices(),
-      getCompanySettings(),
-      isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
-    ]);
+  const [
+    { t },
+    project,
+    catalogPositions,
+    companySettings,
+    profitModuleEnabled,
+    siteSettings,
+  ] = await Promise.all([
+    getServerTranslations(),
+    getProject(projectId),
+    listPositionPrices(),
+    getCompanySettings(),
+    isFrontendModuleEnabled(FRONTEND_MODULE_KEYS.profit),
+    getSiteSettings(),
+  ]);
 
   if (!project) {
     return new Response("Not found", { status: 404 });
@@ -149,6 +158,8 @@ export async function GET(
       },
       visualizationImages,
       excludedPositions,
+      systemName: siteSettings.systemName.trim() || "Estimate Builder",
+      siteUrl: getSiteOrigin(),
       t,
     }),
   );

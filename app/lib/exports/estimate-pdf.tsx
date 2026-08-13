@@ -3,6 +3,7 @@ import {
   Document,
   Font,
   Image,
+  Link,
   Page,
   StyleSheet,
   Text,
@@ -68,7 +69,12 @@ const IMG_COL_WIDTH = 261;
 const IMG_HEIGHT = 155;
 
 const s = StyleSheet.create({
-  page: { fontFamily: "Roboto", fontSize: 9, color: c.black, padding: "28pt 32pt" },
+  page: {
+    fontFamily: "Roboto",
+    fontSize: 9,
+    color: c.black,
+    padding: "28pt 32pt 48pt 32pt",
+  },
 
   reqRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
   reqLines: { flex: 1, paddingRight: 16 },
@@ -117,8 +123,19 @@ const s = StyleSheet.create({
   excludedTitle: { fontSize: 8, fontWeight: "bold", color: c.gray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
   excludedLine: { fontSize: 8, color: c.black, marginBottom: 3, paddingLeft: 4 },
 
-  footer: { position: "absolute", bottom: 20, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between" },
+  footer: { position: "absolute", bottom: 12, left: 32, right: 32 },
+  footerMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
   footerText: { fontSize: 7, color: c.gray },
+  footerAd: { fontSize: 6.5, color: "#a1a1aa", textAlign: "center" },
+  footerAdLink: {
+    fontSize: 6.5,
+    color: "#52525b",
+    textDecoration: "underline",
+  },
 
   colNr: { width: 22, flexShrink: 0 },
   colName: { flex: 1 },
@@ -304,8 +321,41 @@ type Props = {
   projectInfo: OfferProjectInfo;
   visualizationImages: PdfImageAsset[];
   excludedPositions: ExcludedPosition[];
+  systemName: string;
+  siteUrl: string;
   t?: Translate;
 };
+
+const SYSTEM_NAME_PLACEHOLDER = "{systemName}";
+
+function PdfGeneratedByFooter({
+  template,
+  systemName,
+  siteUrl,
+}: {
+  template: string;
+  systemName: string;
+  siteUrl: string;
+}) {
+  const name = systemName.trim() || "Estimate Builder";
+  const markerIndex = template.indexOf(SYSTEM_NAME_PLACEHOLDER);
+  const before =
+    markerIndex >= 0 ? template.slice(0, markerIndex) : `${template} `;
+  const after =
+    markerIndex >= 0
+      ? template.slice(markerIndex + SYSTEM_NAME_PLACEHOLDER.length)
+      : "";
+
+  return (
+    <Text style={s.footerAd}>
+      {before}
+      <Link src={siteUrl} style={s.footerAdLink}>
+        {name}
+      </Link>
+      {after}
+    </Text>
+  );
+}
 
 function pairImages(images: PdfImageAsset[]): Array<[PdfImageAsset, PdfImageAsset | null]> {
   const pairs: Array<[PdfImageAsset, PdfImageAsset | null]> = [];
@@ -326,6 +376,8 @@ export function EstimatePdfDocument({
   projectInfo,
   visualizationImages,
   excludedPositions,
+  systemName,
+  siteUrl,
   t,
 }: Props) {
   const tx: Translate = t ?? ((_key, fallback) => fallback ?? _key);
@@ -600,8 +652,27 @@ export function EstimatePdfDocument({
 
         {/* Kajene */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>{projectInfo.clientName}{" \u00B7 "}{projectInfo.address}</Text>
-          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
+          <View style={s.footerMeta}>
+            <Text style={s.footerText}>
+              {projectInfo.clientName}
+              {" \u00B7 "}
+              {projectInfo.address}
+            </Text>
+            <Text
+              style={s.footerText}
+              render={({ pageNumber, totalPages }) =>
+                `${pageNumber} / ${totalPages}`
+              }
+            />
+          </View>
+          <PdfGeneratedByFooter
+            template={tx(
+              "exports.pdf.generated_by",
+              "Piedāvājums ģenerēts {systemName} sistēmā",
+            )}
+            systemName={systemName}
+            siteUrl={siteUrl}
+          />
         </View>
       </Page>
     </Document>
