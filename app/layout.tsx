@@ -4,6 +4,10 @@ import { CookieConsentProvider } from "@/app/components/cookie-consent-provider"
 import { FeedbackToastProvider } from "@/app/components/feedback-toast-provider";
 import { TranslationsProvider } from "@/app/components/translations-provider";
 import { UmamiAnalytics } from "@/app/components/umami-analytics";
+import {
+  getUmamiWebsiteId,
+  UMAMI_SCRIPT_SRC,
+} from "@/app/lib/analytics/umami";
 import { getSiteOrigin } from "@/app/lib/auth/auth-confirm-link";
 import { resolveLocalizedValue } from "@/app/lib/i18n/localized-values";
 import { getServerTranslations } from "@/app/lib/i18n/server";
@@ -54,9 +58,20 @@ export default async function RootLayout({
   // Sīkdatņu piekrišana un kājene ir vajadzīgas arī publiskajās lapās, tāpēc
   // tulkojumi tiek ielādēti jau šeit, nevis tikai aizsargātajā layout.
   const { languageCode, translations } = await getServerTranslations();
+  const umamiWebsiteId = getUmamiWebsiteId();
 
   return (
     <html lang={languageCode} className={`${geistSans.variable} h-full`}>
+      <head>
+        {umamiWebsiteId ? (
+          <script
+            defer
+            src={UMAMI_SCRIPT_SRC}
+            data-website-id={umamiWebsiteId}
+            data-auto-track="false"
+          />
+        ) : null}
+      </head>
       <body className="min-h-full">
         <TranslationsProvider
           languageCode={languageCode}

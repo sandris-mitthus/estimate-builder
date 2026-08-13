@@ -1,30 +1,47 @@
 "use client";
 
-import Script from "next/script";
+import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { useCookieConsent } from "@/app/components/cookie-consent-context";
 import {
-  getUmamiWebsiteId,
+  trackUmamiPageview,
   UMAMI_SCRIPT_SRC,
 } from "@/app/lib/analytics/umami";
 
 /**
- * Loads Umami only after the visitor has accepted the analytics cookie category.
- * Placed in the root layout so every public and signed-in page is covered.
+ * Sends Umami pageviews only after analytics cookie consent.
+ * The tracker script itself is in the root layout `<head>` so it appears in
+ * the HTML source; auto-tracking stays off until this component records a view.
  */
 export function UmamiAnalytics() {
   const { isReady, isAllowed } = useCookieConsent();
-  const websiteId = getUmamiWebsiteId();
+  const pathname = usePathname();
+  const allowed = isReady && isAllowed("analytics");
 
-  if (!isReady || !websiteId || !isAllowed("analytics")) {
-    return null;
-  }
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
 
-  return (
-    <Script
-      defer
-      src={UMAMI_SCRIPT_SRC}
-      data-website-id={websiteId}
-      strategy="afterInteractive"
-    />
-  );
+    if (trackUmamiPageview()) {
+      return;
+    }
+
+    const script = document.querySelector<HTMLScriptElement>(
+      `script[src="${UMAMI_SCRIPT_SRC}"]`,
+    );
+    if (!script) {
+      return;
+    }
+
+    const onLoad = () => {
+      trackUmamiPageview();
+    };
+    script.addEventListener("load", onLoad);
+    return () => {
+      script.removeEventListener("load", onLoad);
+    };
+  }, [allowed, pathname]);
+
+  return null;
 }

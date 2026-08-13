@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.15
+
+**Umami skripts HTML galvenē**
+
+- Umami Cloud skripts ir root layout `<head>` (redzams lapas avotā); lapu skaitīšana paliek aiz statistikas sīkdatņu piekrišanas (`data-auto-track="false"`)
+
 ## v1.4.14
 
 **Publiskā dokumentācija un krievu valoda**
