@@ -1,6 +1,7 @@
 import {
   isEstimateLineItem,
   isEstimateMultiPosition,
+  resolveLineItemDisplayName,
 } from "@/app/lib/estimates/multi-position";
 import {
   getLineItemModuleSizeItemKeys,
@@ -17,9 +18,10 @@ import type {
   LineItemCatalogRef,
   LineItemModuleSizeAttachment,
 } from "@/app/lib/estimates/types";
+import { cloneMultiOption } from "@/app/lib/estimate-positions/clone-sagatave-for-project";
 import {
-  findCorrespondingOptionLineItems,
   findSagataveRowForProjectRow,
+  findUnpairedProjectOptionForSagataveOption,
   normalizeRowTitle,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
 import { normalizeAttentionBudget } from "@/app/lib/estimates/attention-budget";
@@ -43,6 +45,7 @@ export type SagataveChangeField =
   | "multiNote"
   | "multiRequiresAttention"
   | "multiAttentionBudget"
+  | "multiOptionAdd"
   | "hiddenInOffer"
   | "hiddenPricesInOffer";
 
@@ -435,29 +438,40 @@ function collectRowChanges(
       toValue: attentionBudgetValue(sagataveMulti),
     });
 
-    const optionCount = Math.max(
-      projectMulti.options.length,
-      sagataveMulti.options.length,
-    );
+    const usedProjectOptionIds = new Set<string>();
 
-    for (let optionIndex = 0; optionIndex < optionCount; optionIndex += 1) {
-      const { projectLineItem, sagataveLineItem } = findCorrespondingOptionLineItems(
-        sagataveMulti.options,
+    for (const [optionIndex, sagataveOption] of sagataveMulti.options.entries()) {
+      const projectOption = findUnpairedProjectOptionForSagataveOption(
         projectMulti.options,
+        sagataveOption,
         optionIndex,
+        sagataveMulti.options,
+        usedProjectOptionIds,
       );
-      if (!projectLineItem || !sagataveLineItem) {
+
+      if (!projectOption) {
+        const optionLabel = resolveLineItemDisplayName(sagataveOption.lineItem);
+        pushChange(changes, {
+          ...context,
+          path: { ...context.path, optionIndex },
+          positionName: `${projectMulti.name} — ${optionLabel}`,
+          field: "multiOptionAdd",
+          fromValue: null,
+          toValue: optionLabel,
+        });
         continue;
       }
 
+      usedProjectOptionIds.add(projectOption.id);
+
       collectLineItemChanges(
         changes,
-        projectLineItem,
-        sagataveLineItem,
+        projectOption.lineItem,
+        sagataveOption.lineItem,
         {
           ...context,
           path: { ...context.path, optionIndex },
-          positionName: `${projectMulti.name} — ${projectLineItem.name}`,
+          positionName: `${projectMulti.name} — ${resolveLineItemDisplayName(projectOption.lineItem)}`,
         },
       );
     }
@@ -996,47 +1010,106 @@ export function applySelectedSagataveChangesToProject(
         };
       }
 
+      const usedProjectOptionIds = new Set<string>();
+      const sagataveToProjectOptionId = new Map<number, string>();
+
+      for (const [optionIndex, sagataveOption] of sagataveRow.options.entries()) {
+        const projectOption = findUnpairedProjectOptionForSagataveOption(
+          nextMulti.options,
+          sagataveOption,
+          optionIndex,
+          sagataveRow.options,
+          usedProjectOptionIds,
+        );
+        if (projectOption) {
+          usedProjectOptionIds.add(projectOption.id);
+          sagataveToProjectOptionId.set(optionIndex, projectOption.id);
+        }
+      }
+
       const options = [...nextMulti.options];
       let optionsChanged = nextMulti !== projectRow;
 
-      for (const [optionIndex] of sagataveRow.options.entries()) {
+      for (const [optionIndex, sagataveOption] of sagataveRow.options.entries()) {
         const optionKey = `${rowKey}:o${optionIndex}`;
-        const hasSelectedOptionChange =
+        const hasSelectedOptionFieldChange =
           optionKeysToSync.has(optionKey) ||
           changes.some(
             (change) =>
+              change.field !== "multiOptionAdd" &&
               rowOnlySyncKey(change.path) === rowKey &&
               change.path.optionIndex === optionIndex,
           );
 
-        if (!hasSelectedOptionChange) {
+        if (!hasSelectedOptionFieldChange) {
           continue;
         }
 
-        const { projectLineItem, sagataveLineItem } =
-          findCorrespondingOptionLineItems(
-            sagataveRow.options,
-            nextMulti.options,
-            optionIndex,
-          );
-        if (!projectLineItem || !sagataveLineItem) {
+        const projectOptionId = sagataveToProjectOptionId.get(optionIndex);
+        if (projectOptionId == null) {
           continue;
         }
 
-        const projectOption = options[optionIndex];
+        const optionArrayIndex = options.findIndex(
+          (option) => option.id === projectOptionId,
+        );
+        const projectOption = optionArrayIndex >= 0 ? options[optionArrayIndex] : undefined;
         if (!projectOption) {
           continue;
         }
 
         const nextLineItem = syncLineItemFromSagatave(
-          projectLineItem,
-          sagataveLineItem,
+          projectOption.lineItem,
+          sagataveOption.lineItem,
         );
-        if (nextLineItem === projectLineItem) {
+        if (nextLineItem === projectOption.lineItem) {
           continue;
         }
 
-        options[optionIndex] = { ...projectOption, lineItem: nextLineItem };
+        options[optionArrayIndex] = { ...projectOption, lineItem: nextLineItem };
+        optionsChanged = true;
+      }
+
+      const optionIndicesToAdd = changes
+        .filter(
+          (change) =>
+            change.field === "multiOptionAdd" &&
+            rowOnlySyncKey(change.path) === rowKey &&
+            change.path.optionIndex != null,
+        )
+        .map((change) => change.path.optionIndex as number)
+        .sort((a, b) => a - b);
+
+      for (const optionIndex of optionIndicesToAdd) {
+        if (sagataveToProjectOptionId.has(optionIndex)) {
+          continue;
+        }
+
+        const sagataveOption = sagataveRow.options[optionIndex];
+        if (!sagataveOption) {
+          continue;
+        }
+
+        const cloned = cloneMultiOption(sagataveOption, new Map());
+        let insertAt = Math.min(optionIndex, options.length);
+
+        for (let previousIndex = optionIndex - 1; previousIndex >= 0; previousIndex -= 1) {
+          const previousOptionId = sagataveToProjectOptionId.get(previousIndex);
+          if (!previousOptionId) {
+            continue;
+          }
+
+          const previousArrayIndex = options.findIndex(
+            (option) => option.id === previousOptionId,
+          );
+          if (previousArrayIndex >= 0) {
+            insertAt = previousArrayIndex + 1;
+            break;
+          }
+        }
+
+        options.splice(insertAt, 0, cloned);
+        sagataveToProjectOptionId.set(optionIndex, cloned.id);
         optionsChanged = true;
       }
 

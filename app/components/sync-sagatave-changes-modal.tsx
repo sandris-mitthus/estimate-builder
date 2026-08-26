@@ -47,6 +47,7 @@ const FIELD_LABEL_KEYS: Record<SagataveChangeField, string> = {
   multiNote: "estimate.sagatave.change_field.multi_note",
   multiRequiresAttention: "estimate.sagatave.change_field.multi_requires_attention",
   multiAttentionBudget: "estimate.sagatave.change_field.multi_attention_budget",
+  multiOptionAdd: "estimate.sagatave.change_field.multi_option_add",
   hiddenInOffer: "estimate.sagatave.change_field.hidden_in_offer",
   hiddenPricesInOffer: "estimate.sagatave.change_field.hidden_prices_in_offer",
 };
@@ -70,6 +71,7 @@ const FIELD_LABEL_FALLBACKS: Record<SagataveChangeField, string> = {
   multiNote: "Multi piezīme",
   multiRequiresAttention: "Multi īpaša uzmanība",
   multiAttentionBudget: "Multi aptuvens budžets",
+  multiOptionAdd: "Jauna multi izvēle",
   hiddenInOffer: "Pozīcijas paslēptas piedāvājumā",
   hiddenPricesInOffer: "Cenas paslēptas piedāvājumā",
 };

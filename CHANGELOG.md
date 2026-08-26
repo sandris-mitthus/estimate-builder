@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.18
+
+**Jaunas multi izvēles no sagataves**
+
+- Ja sagataves multi-pozīcijai pievieno jaunu opciju, projekta tāmē parādās **Pielāgot no sagataves** ar lauku „Jauna multi izvēle” un pēc apstiprināšanas opcija tiek pievienota (`215`)
+
 ## v1.4.17
 
 **Sagataves sync un individuālo projektu apjomi**

@@ -22,7 +22,7 @@ function cloneLineItem(item: EstimateLineItem): EstimateLineItem {
   };
 }
 
-function cloneMultiOption(
+export function cloneMultiOption(
   option: EstimateMultiPositionOption,
   optionIdMap: Map<string, string>,
 ): EstimateMultiPositionOption {

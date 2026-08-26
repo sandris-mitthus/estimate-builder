@@ -477,3 +477,62 @@ export function findCorrespondingOptionLineItems(
 
   return { sagataveLineItem, projectLineItem };
 }
+
+/**
+ * Atrod projekta multi opciju sagataves opcijai, ja tā vēl nav pāra ar citu.
+ */
+export function findUnpairedProjectOptionForSagataveOption(
+  projectOptions: { id: string; lineItem: EstimateLineItem }[],
+  sagataveOption: { id: string; lineItem: EstimateLineItem },
+  optionIndex: number,
+  sagataveOptions: { id: string; lineItem: EstimateLineItem }[],
+  usedProjectOptionIds: ReadonlySet<string>,
+): { id: string; lineItem: EstimateLineItem } | undefined {
+  const byIndex = projectOptions[optionIndex];
+  if (
+    byIndex &&
+    !usedProjectOptionIds.has(byIndex.id) &&
+    lineItemsCorrespond(byIndex.lineItem, sagataveOption.lineItem)
+  ) {
+    return byIndex;
+  }
+
+  const key = lineItemCorrespondenceKey(sagataveOption.lineItem);
+  if (key) {
+    let occurrence = 0;
+    for (let index = 0; index < optionIndex; index++) {
+      const previous = sagataveOptions[index];
+      if (
+        previous &&
+        lineItemCorrespondenceKey(previous.lineItem) === key
+      ) {
+        occurrence++;
+      }
+    }
+
+    let seen = 0;
+    for (const option of projectOptions) {
+      if (usedProjectOptionIds.has(option.id)) {
+        continue;
+      }
+      if (lineItemCorrespondenceKey(option.lineItem) !== key) {
+        continue;
+      }
+      if (seen === occurrence) {
+        return option;
+      }
+      seen++;
+    }
+  }
+
+  for (const option of projectOptions) {
+    if (usedProjectOptionIds.has(option.id)) {
+      continue;
+    }
+    if (lineItemsCorrespond(option.lineItem, sagataveOption.lineItem)) {
+      return option;
+    }
+  }
+
+  return undefined;
+}
