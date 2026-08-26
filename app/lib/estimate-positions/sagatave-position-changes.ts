@@ -76,15 +76,15 @@ function findSagataveCategory(
   projectCategory: EstimateCategory,
   categoryIndex: number,
 ): EstimateCategory | undefined {
-  const byIndex = sagataveSections[categoryIndex];
-  if (byIndex) return byIndex;
-
   const normalizedTitle = normalizeTitle(projectCategory.title);
-  if (!normalizedTitle) return undefined;
+  if (normalizedTitle) {
+    const byTitle = sagataveSections.find(
+      (section) => normalizeTitle(section.title) === normalizedTitle,
+    );
+    if (byTitle) return byTitle;
+  }
 
-  return sagataveSections.find(
-    (section) => normalizeTitle(section.title) === normalizedTitle,
-  );
+  return sagataveSections[categoryIndex];
 }
 
 function findSagataveSubcategory(
@@ -820,19 +820,43 @@ function resolveRowContext(
     return null;
   }
 
-  const projectItems =
-    path.subcategoryIndex != null
-      ? projectCategory.subcategories[path.subcategoryIndex]?.items
-      : projectCategory.items;
-  const sagataveItems =
-    path.subcategoryIndex != null
-      ? sagataveCategory.subcategories[path.subcategoryIndex]?.items
-      : sagataveCategory.items;
+  if (path.subcategoryIndex != null) {
+    const projectSubcategory =
+      projectCategory.subcategories[path.subcategoryIndex];
+    if (!projectSubcategory) {
+      return null;
+    }
 
-  if (!projectItems || !sagataveItems) {
-    return null;
+    // Path indeksī ir projekta subkategorija — sagatavē jāmeklē pēc
+    // nosaukuma (kā collect), nevis pēc tā paša indeksa (secība var atšķirties).
+    const sagataveSubcategory = findSagataveSubcategory(
+      sagataveCategory.subcategories,
+      projectSubcategory,
+      path.subcategoryIndex,
+    );
+    if (!sagataveSubcategory) {
+      return null;
+    }
+
+    const projectItems = projectSubcategory.items;
+    const sagataveItems = sagataveSubcategory.items;
+    const projectRow = projectItems[path.rowIndex];
+    const sagataveRow = findSagataveRowForProjectRow(
+      sagataveItems,
+      projectRow,
+      path.rowIndex,
+      projectItems.length,
+      projectItems,
+    );
+    if (!projectRow || !sagataveRow) {
+      return null;
+    }
+
+    return { projectItems, sagataveItems, projectRow, sagataveRow };
   }
 
+  const projectItems = projectCategory.items;
+  const sagataveItems = sagataveCategory.items;
   const projectRow = projectItems[path.rowIndex];
   const sagataveRow = findSagataveRowForProjectRow(
     sagataveItems,

@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.19
+
+**Sagataves pielāgošana ar atšķirīgu sadaļu secību**
+
+- **Pielāgot no sagataves** multi opcijas un citas rindas meklē pēc kategorijas/subkategorijas nosaukuma, nevis indeksa — ja projekta sadaļu secība atšķiras, jaunās multi izvēles vairs netiek klusi izlaistas
+
 ## v1.4.18
 
 **Jaunas multi izvēles no sagataves**

@@ -35,15 +35,15 @@ function findProjectCategory(
   sagataveCategory: EstimateCategory,
   categoryIndex: number,
 ): EstimateCategory | undefined {
-  const byIndex = projectCategories[categoryIndex];
-  if (byIndex) return byIndex;
-
   const normalizedTitle = normalizeTitle(sagataveCategory.title);
-  if (!normalizedTitle) return undefined;
+  if (normalizedTitle) {
+    const byTitle = projectCategories.find(
+      (category) => normalizeTitle(category.title) === normalizedTitle,
+    );
+    if (byTitle) return byTitle;
+  }
 
-  return projectCategories.find(
-    (category) => normalizeTitle(category.title) === normalizedTitle,
-  );
+  return projectCategories[categoryIndex];
 }
 
 function findProjectSubcategory(
@@ -51,15 +51,15 @@ function findProjectSubcategory(
   sagataveSubcategory: EstimateSubcategory,
   subcategoryIndex: number,
 ): EstimateSubcategory | undefined {
-  const byIndex = projectSubcategories[subcategoryIndex];
-  if (byIndex) return byIndex;
-
   const normalizedTitle = normalizeTitle(sagataveSubcategory.title);
-  if (!normalizedTitle) return undefined;
+  if (normalizedTitle) {
+    const byTitle = projectSubcategories.find(
+      (subcategory) => normalizeTitle(subcategory.title) === normalizedTitle,
+    );
+    if (byTitle) return byTitle;
+  }
 
-  return projectSubcategories.find(
-    (subcategory) => normalizeTitle(subcategory.title) === normalizedTitle,
-  );
+  return projectSubcategories[subcategoryIndex];
 }
 
 function countExistingSagataveRowPredecessors(

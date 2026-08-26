@@ -411,15 +411,15 @@ export function findSagataveCategoryForProject(
   projectCategory: EstimateCategory,
   categoryIndex: number,
 ): EstimateCategory | undefined {
-  const byIndex = sagataveSections[categoryIndex];
-  if (byIndex) return byIndex;
-
   const normalizedTitle = normalizeRowTitle(projectCategory.title);
-  if (!normalizedTitle) return undefined;
+  if (normalizedTitle) {
+    const byTitle = sagataveSections.find(
+      (section) => normalizeRowTitle(section.title) === normalizedTitle,
+    );
+    if (byTitle) return byTitle;
+  }
 
-  return sagataveSections.find(
-    (section) => normalizeRowTitle(section.title) === normalizedTitle,
-  );
+  return sagataveSections[categoryIndex];
 }
 
 export function findSagataveSubcategoryForProject(
