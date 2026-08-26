@@ -380,3 +380,32 @@ export function syncCategoriesQuantitiesFromModuleSizes(
     })),
   }));
 }
+
+/**
+ * `true`, ja pēc sinhronizācijas no projekta/moduļa apraksta mainās kādas
+ * piesaistītās pozīcijas `quantity` vai `unit` (saglabātā tāme atpaliek).
+ */
+export function moduleSizeSyncedQuantitiesDiffer(
+  before: EstimateCategory[],
+  after: EstimateCategory[],
+): boolean {
+  const beforeById = new Map(
+    collectEstimateLineItems(before).map((item) => [item.id, item]),
+  );
+
+  for (const item of collectEstimateLineItems(after)) {
+    const previous = beforeById.get(item.id);
+    if (!previous) {
+      continue;
+    }
+
+    if (
+      previous.quantity !== item.quantity ||
+      previous.unit.trim() !== item.unit.trim()
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}

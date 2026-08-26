@@ -9,6 +9,7 @@ import { isFrontendModuleEnabled } from "@/app/lib/frontend-modules/repository";
 import { ProjectAdditionalWorkSection } from "@/app/components/project-additional-work-section";
 import {
   buildProjectModuleSizeOptions,
+  moduleSizeSyncedQuantitiesDiffer,
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import { ensureDefaultEstimatePosition } from "@/app/lib/estimate-positions/repository";
@@ -109,6 +110,14 @@ export default async function ProjectDetailPage({
           catalogPositions,
         )
       : categoriesWithVariableQty;
+  const persistedCategoriesBaseline =
+    moduleSizeOptions.length > 0 &&
+    moduleSizeSyncedQuantitiesDiffer(
+      categoriesWithVariableQty,
+      initialCategories,
+    )
+      ? categoriesWithVariableQty
+      : undefined;
 
   return (
     <main className="page">
@@ -123,6 +132,7 @@ export default async function ProjectDetailPage({
         initialTitle={estimate.title}
         initialMeta={estimate.meta}
         initialCategories={initialCategories}
+        persistedCategoriesBaseline={persistedCategoriesBaseline}
         initialMultiOptionLinks={estimate.multiOptionLinks}
         estimateUpdatedAt={estimate.updatedAt}
         moduleName={buildingModule?.name ?? null}

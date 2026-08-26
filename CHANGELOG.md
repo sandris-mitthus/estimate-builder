@@ -10,6 +10,14 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.17
+
+**Sagataves sync un individuālo projektu apjomi**
+
+- Precīzāka pozīciju pārošana ar sagatavi (tukši nosaukumi un nobīdītas rindas vairs nesajauc jaunās pozīcijas)
+- Pēc projekta apjomu maiņas tāme rāda baneri un aktivizē **Saglabāt**, lai atjauninātie daudzumi tiktu saglabāti (`214`)
+- Moduļa lieluma piesaistes salīdzināšana ignorē piemēra `moduleId`, lai **Pielāgot no sagataves** rādītu īstās apjomu atslēgu izmaiņas
+
 ## v1.4.16
 
 **PDF piedāvājuma kājene**

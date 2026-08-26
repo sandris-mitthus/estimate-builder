@@ -2436,6 +2436,12 @@ type EstimateTableProps = {
   initialTitle?: string;
   initialMeta?: EstimateMeta;
   initialCategories?: EstimateCategory[];
+  /**
+   * DB kategorijas pirms apjomu sync no projekta/moduļa apraksta.
+   * Ja padots — savedSnapshot startē no šīm, lai pēc apjomu maiņas
+   * **Saglabāt** kļūst aktīvs un UI piedāvā saglabāt atjauninājumus.
+   */
+  persistedCategoriesBaseline?: EstimateCategory[];
   initialMultiOptionLinks?: MultiOptionLinkGroup[];
   /** ISO timestamp of last save (`estimates.updated_at` from DB). */
   estimateUpdatedAt?: string;
@@ -2465,6 +2471,7 @@ export function EstimateTable({
   initialTitle = SAMPLE_TITLE,
   initialMeta = SAMPLE_META,
   initialCategories = createSampleCategories(),
+  persistedCategoriesBaseline,
   initialMultiOptionLinks = [],
   estimateUpdatedAt,
   moduleName = null,
@@ -2506,6 +2513,8 @@ export function EstimateTable({
   >(() => new Set());
   const [syncSagataveChangesModalOpen, setSyncSagataveChangesModalOpen] = useState(false);
   const [hideSagataveChangesBanner, setHideSagataveChangesBanner] = useState(false);
+  const [hideModuleSizeQuantityBanner, setHideModuleSizeQuantityBanner] =
+    useState(false);
   const [showHiddenEstimateRows, setShowHiddenEstimateRows] = useState(false);
   const [excludedPositions, setExcludedPositions] = useState(globalExcludedPositions);
   const [, startSaveDatesTransition] = useTransition();
@@ -2514,14 +2523,19 @@ export function EstimateTable({
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfDownloading, setIsPdfDownloading] = useState(false);
   const [isExcelDownloading, setIsExcelDownloading] = useState(false);
+  const baselineCategoriesForSnapshot =
+    persistedCategoriesBaseline ?? initialCategories;
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     serializeEstimatePositionDocument(
       initialTitle,
       isAdditionalWork
-        ? ensureAdditionalWorkManualQuantities(initialCategories)
-        : initialCategories,
+        ? ensureAdditionalWorkManualQuantities(baselineCategoriesForSnapshot)
+        : baselineCategoriesForSnapshot,
       initialMultiOptionLinks,
     ),
+  );
+  const [hasPendingModuleSizeQuantitySync] = useState(
+    () => persistedCategoriesBaseline != null,
   );
   const [savedPlannedProfitPercent, setSavedPlannedProfitPercent] = useState(() =>
     resolvePlannedProfitPercent(
@@ -2911,10 +2925,18 @@ export function EstimateTable({
 
   useEffect(() => {
     setHideSagataveChangesBanner(false);
+    setHideModuleSizeQuantityBanner(false);
   }, [sagataveSections, project?.id]);
 
   const hasSagatavePositionChanges =
     sagatavePositionChanges.length > 0 && !hideSagataveChangesBanner;
+
+  const hasModuleSizeQuantityRefresh =
+    Boolean(project) &&
+    hasPendingModuleSizeQuantitySync &&
+    isDirty &&
+    !editorLocked &&
+    !hideModuleSizeQuantityBanner;
 
   const totals = useMemo(
     () =>
@@ -3532,6 +3554,29 @@ export function EstimateTable({
         >
           <i className="fas fa-sync-alt text-xs" aria-hidden="true" />
           {t("estimate.stale_prices.available", "Pieejami jauni izcenojumi")}
+        </div>
+      ) : null}
+
+      {project && hasModuleSizeQuantityRefresh ? (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+        >
+          <div className="flex items-center gap-2">
+            <i className="fas fa-ruler-combined text-xs" aria-hidden="true" />
+            {t(
+              "estimate.module_size.quantities_refresh_available",
+              "Projekta apjomi ir mainījušies — tāme ir atjaunināta. Saglabā, lai izmaiņas paliktu.",
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setHideModuleSizeQuantityBanner(true)}
+            disabled={isSaving}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("estimate.module_size.quantities_refresh_dismiss", "Sapratu")}
+          </button>
         </div>
       ) : null}
 

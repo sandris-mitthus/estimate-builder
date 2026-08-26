@@ -199,13 +199,25 @@ function normalizeModuleSizeAttachment(
   };
 }
 
+function moduleSizeAttachmentSemantics(
+  attachment: LineItemModuleSizeAttachment | undefined,
+): string {
+  const normalized = normalizeModuleSizeAttachment(attachment);
+  if (!normalized) {
+    return "";
+  }
+
+  // moduleId sagatavē ir tikai piemērs — salīdzinām piesaistes atslēgas un korekcijas.
+  const { moduleId: _moduleId, ...semantics } = normalized;
+  return JSON.stringify(semantics);
+}
+
 function moduleSizeAttachmentsEqual(
   left: LineItemModuleSizeAttachment | undefined,
   right: LineItemModuleSizeAttachment | undefined,
 ): boolean {
   return (
-    JSON.stringify(normalizeModuleSizeAttachment(left)) ===
-    JSON.stringify(normalizeModuleSizeAttachment(right))
+    moduleSizeAttachmentSemantics(left) === moduleSizeAttachmentSemantics(right)
   );
 }
 
