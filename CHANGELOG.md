@@ -10,6 +10,13 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.20
+
+**Vienādi nosauktu multi opciju apvienošana**
+
+- Ja sagatavē ir vairākas multi ar to pašu nosaukumu (piem. Extra karkass dažādās kategorijās), **Pielāgot no sagataves** piedāvā trūkstošās opcijas no jebkuras no tām
+- Saglabājot sagatavi, vienādi nosauktās multi automātiski savieno opciju kopu
+
 ## v1.4.19
 
 **Sagataves pielāgošana ar atšķirīgu sadaļu secību**

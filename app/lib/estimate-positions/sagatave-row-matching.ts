@@ -68,6 +68,90 @@ function normalizedMultiLabel(multi: EstimateMultiPosition): string {
   return normalizeRowTitle(multi.name.trim() || "—");
 }
 
+export function getNormalizedMultiLabel(multi: EstimateMultiPosition): string {
+  return normalizedMultiLabel(multi);
+}
+
+/**
+ * Visas multi-pozīcijas ar to pašu nosaukumu visā tāmes struktūrā.
+ */
+export function collectEstimateMultisByLabel(
+  sections: EstimateCategory[],
+  label: string,
+): EstimateMultiPosition[] {
+  const normalized = normalizeRowTitle(label.trim() || "—");
+  const found: EstimateMultiPosition[] = [];
+
+  const visit = (items: EstimateRowItem[]) => {
+    for (const row of items) {
+      if (
+        isEstimateMultiPosition(row) &&
+        normalizedMultiLabel(row) === normalized
+      ) {
+        found.push(row);
+      }
+    }
+  };
+
+  for (const category of sections) {
+    visit(category.items);
+    for (const subcategory of category.subcategories) {
+      visit(subcategory.items);
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Apvieno opcijas no vienādi nosauktām multi: primārās secībā, tad trūkstošās no pārējām.
+ * Vajadzīgs, ja sagatavē „Extra karkass” ir vairākās kategorijās un opcija pievienota tikai vienā.
+ */
+export function unionMultiOptionsPreferringPrimary(
+  primary: EstimateMultiPosition,
+  sameNamed: readonly EstimateMultiPosition[],
+): EstimateMultiPosition["options"] {
+  const result = [...primary.options];
+  const seenKeys = new Set<string>();
+
+  for (const option of result) {
+    const key = lineItemCorrespondenceKey(option.lineItem);
+    if (key) {
+      seenKeys.add(key);
+    }
+  }
+
+  for (const multi of sameNamed) {
+    if (multi.id === primary.id) {
+      continue;
+    }
+
+    for (const option of multi.options) {
+      const key = lineItemCorrespondenceKey(option.lineItem);
+      if (key) {
+        if (seenKeys.has(key)) {
+          continue;
+        }
+        seenKeys.add(key);
+        result.push(option);
+        continue;
+      }
+
+      if (
+        result.some((existing) =>
+          lineItemsCorrespond(existing.lineItem, option.lineItem),
+        )
+      ) {
+        continue;
+      }
+
+      result.push(option);
+    }
+  }
+
+  return result;
+}
+
 /**
  * Vai divas rindas atbilst vienai un tai pašai sagataves / projekta pozīcijai.
  */

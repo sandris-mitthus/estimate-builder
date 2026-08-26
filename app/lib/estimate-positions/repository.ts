@@ -1,5 +1,6 @@
 import { DEFAULT_SAGATAVE_TITLE } from "@/app/lib/estimate-positions/default-sagatave";
 import { getSampleEstimatePosition } from "@/app/lib/estimate-positions/sample-templates";
+import { propagateSameNamedMultiOptions } from "@/app/lib/estimate-positions/propagate-same-named-multi-options";
 import {
   buildEstimatePositionSectionsStorage,
   parseEstimatePositionDocumentPayload,
@@ -149,7 +150,9 @@ export async function saveEstimatePositionDocument(
   }
 
   const sections = buildEstimatePositionSectionsStorage(
-    sanitizeEstimatePositionSections(input.sections),
+    propagateSameNamedMultiOptions(
+      sanitizeEstimatePositionSections(input.sections),
+    ),
     input.multiOptionLinks,
   );
   const companyId = await getCurrentCompanyId();

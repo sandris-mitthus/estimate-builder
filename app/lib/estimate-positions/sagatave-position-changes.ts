@@ -22,7 +22,9 @@ import { cloneMultiOption } from "@/app/lib/estimate-positions/clone-sagatave-fo
 import {
   findSagataveRowForProjectRow,
   findUnpairedProjectOptionForSagataveOption,
+  collectEstimateMultisByLabel,
   normalizeRowTitle,
+  unionMultiOptionsPreferringPrimary,
 } from "@/app/lib/estimate-positions/sagatave-row-matching";
 import { normalizeAttentionBudget } from "@/app/lib/estimates/attention-budget";
 
@@ -392,6 +394,21 @@ function collectLineItemChanges(
   }
 }
 
+function resolveSagataveMultiOptionsForSync(
+  sagataveSections: EstimateCategory[],
+  sagataveMulti: EstimateMultiPosition,
+): EstimateMultiPosition["options"] {
+  const sameNamed = collectEstimateMultisByLabel(
+    sagataveSections,
+    sagataveMulti.name,
+  );
+  if (sameNamed.length <= 1) {
+    return sagataveMulti.options;
+  }
+
+  return unionMultiOptionsPreferringPrimary(sagataveMulti, sameNamed);
+}
+
 function collectRowChanges(
   changes: SagatavePositionChange[],
   projectRow: EstimateRowItem,
@@ -401,10 +418,15 @@ function collectRowChanges(
     categoryTitle: string;
     subcategoryTitle?: string;
   },
+  sagataveSections: EstimateCategory[],
 ) {
   if (isEstimateMultiPosition(projectRow) && isEstimateMultiPosition(sagataveRow)) {
     const projectMulti = projectRow as EstimateMultiPosition;
     const sagataveMulti = sagataveRow as EstimateMultiPosition;
+    const sagataveOptions = resolveSagataveMultiOptionsForSync(
+      sagataveSections,
+      sagataveMulti,
+    );
 
     pushChange(changes, {
       ...context,
@@ -440,12 +462,12 @@ function collectRowChanges(
 
     const usedProjectOptionIds = new Set<string>();
 
-    for (const [optionIndex, sagataveOption] of sagataveMulti.options.entries()) {
+    for (const [optionIndex, sagataveOption] of sagataveOptions.entries()) {
       const projectOption = findUnpairedProjectOptionForSagataveOption(
         projectMulti.options,
         sagataveOption,
         optionIndex,
-        sagataveMulti.options,
+        sagataveOptions,
         usedProjectOptionIds,
       );
 
@@ -498,6 +520,7 @@ function collectSubcategoryChanges(
     subcategoryIndex: number;
     categoryTitle: string;
   },
+  sagataveSections: EstimateCategory[],
 ) {
   if (!sagataveSubcategory) {
     return;
@@ -540,15 +563,21 @@ function collectSubcategoryChanges(
       continue;
     }
 
-    collectRowChanges(changes, projectRow, sagataveRow, {
-      path: {
-        categoryIndex: context.categoryIndex,
-        subcategoryIndex: context.subcategoryIndex,
-        rowIndex,
+    collectRowChanges(
+      changes,
+      projectRow,
+      sagataveRow,
+      {
+        path: {
+          categoryIndex: context.categoryIndex,
+          subcategoryIndex: context.subcategoryIndex,
+          rowIndex,
+        },
+        categoryTitle: context.categoryTitle,
+        subcategoryTitle: projectSubcategory.title,
       },
-      categoryTitle: context.categoryTitle,
-      subcategoryTitle: projectSubcategory.title,
-    });
+      sagataveSections,
+    );
   }
 }
 
@@ -584,7 +613,7 @@ export function listSagatavePositionChanges(
         categoryIndex,
         subcategoryIndex,
         categoryTitle: projectCategory.title,
-      });
+      }, sagataveSections);
     }
 
     for (const [rowIndex, projectRow] of projectCategory.items.entries()) {
@@ -602,7 +631,7 @@ export function listSagatavePositionChanges(
       collectRowChanges(changes, projectRow, sagataveRow, {
         path: { categoryIndex, rowIndex },
         categoryTitle: projectCategory.title,
-      });
+      }, sagataveSections);
     }
   }
 
@@ -1036,13 +1065,17 @@ export function applySelectedSagataveChangesToProject(
 
       const usedProjectOptionIds = new Set<string>();
       const sagataveToProjectOptionId = new Map<number, string>();
+      const sagataveOptions = resolveSagataveMultiOptionsForSync(
+        sagataveSections,
+        sagataveRow,
+      );
 
-      for (const [optionIndex, sagataveOption] of sagataveRow.options.entries()) {
+      for (const [optionIndex, sagataveOption] of sagataveOptions.entries()) {
         const projectOption = findUnpairedProjectOptionForSagataveOption(
           nextMulti.options,
           sagataveOption,
           optionIndex,
-          sagataveRow.options,
+          sagataveOptions,
           usedProjectOptionIds,
         );
         if (projectOption) {
@@ -1054,7 +1087,7 @@ export function applySelectedSagataveChangesToProject(
       const options = [...nextMulti.options];
       let optionsChanged = nextMulti !== projectRow;
 
-      for (const [optionIndex, sagataveOption] of sagataveRow.options.entries()) {
+      for (const [optionIndex, sagataveOption] of sagataveOptions.entries()) {
         const optionKey = `${rowKey}:o${optionIndex}`;
         const hasSelectedOptionFieldChange =
           optionKeysToSync.has(optionKey) ||
@@ -1109,7 +1142,7 @@ export function applySelectedSagataveChangesToProject(
           continue;
         }
 
-        const sagataveOption = sagataveRow.options[optionIndex];
+        const sagataveOption = sagataveOptions[optionIndex];
         if (!sagataveOption) {
           continue;
         }
