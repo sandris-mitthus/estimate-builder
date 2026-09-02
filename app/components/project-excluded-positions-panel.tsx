@@ -118,7 +118,7 @@ function SortableProjectExcludedRow({
       {!readOnly ? (
         omitted ? (
           <RestoreButton
-            label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+            label={t("estimate.hidden.restore", "Atjaunot")}
             onClick={() => onRestore(position)}
             className={isPending ? "pointer-events-none opacity-50" : ""}
           />

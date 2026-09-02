@@ -10,6 +10,17 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.21
+
+**Globālie paziņojumi**
+
+- System admin sadaļa `/site_announcements` globāliem paziņojumiem ar virsrakstu/tekstu visās valodās, termiņu un ieslēgšanas slēdzi (`216`)
+- Ieslēgts paziņojums rādās visiem ielogotajiem lietotājiem kā aizverams bloks līdz termiņam; aizvēršana paliek cookie `eb_announcement_seen_<id>`
+
+**Kategoriju un subkategoriju atjaunošana**
+
+- Projekta tāmē **Dzēst** kategoriju vai subkategoriju tagad paslēpj (`hiddenInEstimate`), nevis izņem no datiem — atjaunojams ar **Rādīt noņemtās** un **Atjaunot** (`217`)
+
 ## v1.4.20
 
 **Vienādi nosauktu multi opciju apvienošana**

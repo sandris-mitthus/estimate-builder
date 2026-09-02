@@ -38,6 +38,18 @@ export function restoreEstimateRow(row: EstimateRowItem): EstimateRowItem {
   return { ...row, hiddenInEstimate: undefined };
 }
 
+export function hideEstimateCategory(
+  category: EstimateCategory,
+): EstimateCategory {
+  return { ...category, hiddenInEstimate: true };
+}
+
+export function hideEstimateSubcategory(
+  subcategory: EstimateSubcategory,
+): EstimateSubcategory {
+  return { ...subcategory, hiddenInEstimate: true };
+}
+
 export function hideEstimateStructureByNodeIds(
   categories: EstimateCategory[],
   nodeIds: ReadonlySet<string>,

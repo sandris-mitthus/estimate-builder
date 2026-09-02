@@ -109,6 +109,15 @@ const COOKIE_REGISTRY: CookieRegistryEntry[] = [
     retentionFallback: "12 mēneši",
   },
   {
+    name: "eb_announcement_seen_<paziņojums>",
+    category: "necessary",
+    purposeKey: "legal.cookies.table.announcement.purpose",
+    purposeFallback:
+      "Atceras, ka esi aizvēris globālo paziņojumu, lai tas netiktu rādīts atkārtoti.",
+    retentionKey: "legal.cookies.table.announcement.retention",
+    retentionFallback: "Līdz paziņojuma termiņam vai 12 mēnešiem",
+  },
+  {
     name: "umami",
     category: "analytics",
     purposeKey: "legal.cookies.table.umami.purpose",

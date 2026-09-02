@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ActionPermissionsProvider } from "@/app/components/action-permissions-context";
 import { AppNav } from "@/app/components/app-nav";
 import { AssignedMaterialsBannerLoader } from "@/app/components/assigned-materials-banner-loader";
+import { GlobalAnnouncementsBanner } from "@/app/components/global-announcements-banner";
 import { RegisterCompanyView } from "@/app/components/register-company-view";
 import { PendingCompanyInviteView } from "@/app/components/pending-company-invite-view";
 import { LandingPage } from "@/app/components/landing-page";
@@ -49,6 +50,11 @@ import { getCompanyDisplayName } from "@/app/lib/settings/repository";
 import { isSupabaseConfigured } from "@/app/lib/supabase/env";
 import { isSystemAdminUser } from "@/app/lib/users/system-admin-repository";
 import type { NavPermissionKey } from "@/app/lib/auth/permissions";
+import { announcementSeenCookieName } from "@/app/lib/announcements/seen-cookie";
+import {
+  listActiveSiteAnnouncements,
+  type SiteAnnouncementSummary,
+} from "@/app/lib/announcements/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +115,7 @@ export default async function ProtectedLayout({
   let initialSidebarCollapsed = false;
   let navCounts: NavCountMap = {};
   let delegatedOrdersModuleEnabled = false;
+  let visibleAnnouncements: SiteAnnouncementSummary[] = [];
 
   const [siteSettings, user] = await Promise.all([
     getSiteSettings(),
@@ -166,6 +173,7 @@ export default async function ProtectedLayout({
       companyId,
       pendingInvite,
       cookieStore,
+      activeAnnouncements,
     ] = await Promise.all([
       isSystemAdminUser(user),
       listSiteLanguages({ activeOnly: true }),
@@ -173,6 +181,7 @@ export default async function ProtectedLayout({
       getCurrentCompanyId(),
       hasPendingCompanyInvite(),
       cookies(),
+      listActiveSiteAnnouncements(),
     ]);
     isSystemAdmin = adminFlag;
     languages = languagesResult;
@@ -184,6 +193,11 @@ export default async function ProtectedLayout({
 
     initialSidebarCollapsed =
       cookieStore.get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
+    visibleAnnouncements = activeAnnouncements.filter(
+      (announcement) =>
+        cookieStore.get(announcementSeenCookieName(announcement.id))
+          ?.value !== "1",
+    );
 
     if (needsCompanyRegistration || pendingCompanyInvite) {
       // Čaula paliek; saturs = reģistrācija vai gaidošs uzaicinājums.
@@ -278,6 +292,11 @@ export default async function ProtectedLayout({
                 data-app-main
                 className="flex min-h-screen min-w-0 w-full flex-col pl-[var(--app-sidebar-width-collapsed)] transition-[padding] duration-200 peer-data-[expanded=true]/sidebar:pl-[var(--app-sidebar-width-expanded)]"
               >
+                {currentUser && visibleAnnouncements.length > 0 ? (
+                  <GlobalAnnouncementsBanner
+                    announcements={visibleAnnouncements}
+                  />
+                ) : null}
                 {currentUser &&
                 currentUserId &&
                 delegatedOrdersModuleEnabled &&

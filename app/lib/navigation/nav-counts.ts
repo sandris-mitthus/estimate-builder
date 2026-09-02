@@ -113,6 +113,7 @@ export async function getNavigationCounts({
   if (isSystemAdmin) {
     const [
       docs,
+      announcements,
       companies,
       companyUsers,
       groups,
@@ -121,6 +122,7 @@ export async function getNavigationCounts({
       translations,
     ] = await Promise.all([
       countRows("site_docs"),
+      countRows("site_announcements"),
       countRows("companies"),
       countRows("company_users"),
       countRows("site_user_groups"),
@@ -131,6 +133,7 @@ export async function getNavigationCounts({
 
     return {
       "system_admin:site_docs": docs,
+      "system_admin:site_announcements": announcements,
       "system_admin:site_companies": companies,
       "system_admin:site_companies_users": companyUsers,
       "system_admin:site_user_groups": groups,

@@ -882,7 +882,7 @@ export function EstimateMultiPositionRow({
               {allowOfferMultiEdit ? (
                 hiddenInEstimate && onRestore ? (
                   <RestoreButton
-                    label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                    label={t("estimate.hidden.restore", "Atjaunot")}
                     onClick={onRestore}
                     className="opacity-100"
                   />
@@ -997,7 +997,7 @@ export function EstimateMultiPositionRow({
                   />
                   {hiddenInEstimate && onRestore ? (
                     <RestoreButton
-                      label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                      label={t("estimate.hidden.restore", "Atjaunot")}
                       onClick={onRestore}
                       className="opacity-100"
                     />

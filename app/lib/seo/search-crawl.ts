@@ -31,6 +31,7 @@ export const SEARCH_CRAWL_DISALLOW_PATHS = [
   "/site_companies_users",
   "/site_user_groups",
   "/site_docs",
+  "/site_announcements",
   "/site_frontend_modules",
   "/site_payment_plans",
   "/site_languages",

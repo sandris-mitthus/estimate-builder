@@ -200,6 +200,13 @@ const SYSTEM_ADMIN_NAV_ITEMS: NavItem[] = [
     fallbackLabel: "Docs",
   },
   {
+    key: "system_admin:site_announcements",
+    href: "/site_announcements",
+    icon: "fas fa-bullhorn",
+    labelKey: "nav.system_admin.site_announcements",
+    fallbackLabel: "Paziņojumi",
+  },
+  {
     key: "system_admin:todo",
     href: "/todo",
     icon: "fas fa-clipboard-list",

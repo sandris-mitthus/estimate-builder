@@ -45,6 +45,18 @@ const ERROR_KEYS_BY_TEXT: Record<string, string> = {
     "errors.system_admin_cannot_register_company",
   "Ievadi sistēmas sloganu vismaz vienā valodā.":
     "site_settings.validation.slogan_required",
+  "Ievadi paziņojuma virsrakstu vismaz vienā valodā.":
+    "site_announcements.validation.title_required",
+  "Norādi paziņojuma termiņu.":
+    "site_announcements.validation.expires_required",
+  "Ievadi derīgu termiņa datumu.":
+    "site_announcements.validation.expires_invalid",
+  "Paziņojums nav atrasts.": "errors.announcement_not_found",
+  "Neizdevās izveidot paziņojumu.": "errors.announcement_create_failed",
+  "Neizdevās saglabāt paziņojumu.": "errors.announcement_save_failed",
+  "Neizdevās dzēst paziņojumu.": "errors.announcement_delete_failed",
+  "Neizdevās saglabāt paziņojuma statusu.":
+    "errors.announcement_status_save_failed",
   "Ievadi sistēmas sloganu.": "site_settings.validation.slogan_required",
   "Ievadi derīgu pārziņa e-pasta adresi.":
     "site_settings.validation.controller_email_invalid",

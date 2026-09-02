@@ -208,6 +208,8 @@ import {
 } from "@/app/lib/estimates/reorder-estimate";
 import {
   countHiddenEstimateRows,
+  hideEstimateCategory,
+  hideEstimateSubcategory,
   hideMultiFromCategories,
   isEstimateCategoryHidden,
   isEstimateRowHidden,
@@ -870,7 +872,7 @@ function LineItemRow({
             />
             {hiddenInEstimate && onRestore ? (
               <RestoreButton
-                label={t("estimate.hidden.restore", "Atjaunot pozīciju")}
+                label={t("estimate.hidden.restore", "Atjaunot")}
                 onClick={onRestore}
                 className="opacity-100"
               />
@@ -1069,6 +1071,7 @@ function SectionRow({
   colSpan,
   estimateLocked = false,
   highlightMergedSagatave = false,
+  hiddenInEstimate = false,
   collapsed = false,
   collapsedSummaryParts,
   onToggleCollapse,
@@ -1090,6 +1093,7 @@ function SectionRow({
   colSpan: number;
   estimateLocked?: boolean;
   highlightMergedSagatave?: boolean;
+  hiddenInEstimate?: boolean;
   collapsed?: boolean;
   collapsedSummaryParts?: CollapsedSectionSummaryParts;
   onToggleCollapse?: () => void;
@@ -1104,17 +1108,22 @@ function SectionRow({
   const shouldFocus = focusCtx?.focusRowId === sectionRowId;
   const isCategory = kind === "category";
   const topBorderClass = showDropLine ? "border-t-4 border-t-zinc-900" : "";
-  const rowBgClassName = highlightMergedSagatave
+  const titleReadOnly = estimateLocked || hiddenInEstimate;
+  const rowBgClassName = hiddenInEstimate
     ? isCategory
-      ? mergedSagataveCategoryRowClass
-      : mergedSagataveSubcategoryRowClass
-    : isCategory
-      ? "border-b border-b-zinc-300 bg-zinc-200/90"
-      : "border-t border-t-zinc-300 border-b border-b-zinc-200 bg-zinc-50";
+      ? "border-b border-b-zinc-300 bg-zinc-100/90 hover:bg-zinc-100/90"
+      : "border-t border-t-zinc-300 border-b border-b-zinc-200 bg-zinc-100/90 hover:bg-zinc-100/90"
+    : highlightMergedSagatave
+      ? isCategory
+        ? mergedSagataveCategoryRowClass
+        : mergedSagataveSubcategoryRowClass
+      : isCategory
+        ? "border-b border-b-zinc-300 bg-zinc-200/90"
+        : "border-t border-t-zinc-300 border-b border-b-zinc-200 bg-zinc-50";
   const sectionActionCellClass = `${rowBgClassName} max-w-0 overflow-hidden px-1 py-0.5 text-center align-middle`;
 
   useEffect(() => {
-    if (!shouldFocus || estimateLocked) {
+    if (!shouldFocus || titleReadOnly) {
       return;
     }
 
@@ -1125,13 +1134,13 @@ function SectionRow({
 
     input.focus({ preventScroll: false });
     focusCtx?.clearFocus();
-  }, [shouldFocus, estimateLocked, focusCtx]);
+  }, [shouldFocus, titleReadOnly, focusCtx]);
 
-  const titleField = estimateLocked ? (
+  const titleField = titleReadOnly ? (
     <span
       className={`block min-w-0 truncate text-sm text-zinc-900 ${
         isCategory ? "font-semibold" : "font-normal"
-      }`}
+      } ${hiddenInEstimate ? "opacity-55" : ""}`}
     >
       {value.trim() || placeholder}
     </span>
@@ -1275,6 +1284,7 @@ function SortableSectionRow({
   sectionRowId,
   dragLabel,
   estimateLocked = false,
+  hiddenInEstimate = false,
   ...props
 }: {
   sortId: string;
@@ -1288,6 +1298,7 @@ function SortableSectionRow({
   colSpan: number;
   estimateLocked?: boolean;
   highlightMergedSagatave?: boolean;
+  hiddenInEstimate?: boolean;
   collapsed?: boolean;
   collapsedSummaryParts?: CollapsedSectionSummaryParts;
   onToggleCollapse?: () => void;
@@ -1297,9 +1308,10 @@ function SortableSectionRow({
   sectionGroupHover?: SectionGroupHoverHandlers;
 }) {
   const showDropLine = useShowDropLine(sortId);
+  const dragDisabled = estimateLocked || hiddenInEstimate;
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: sortId,
-    disabled: estimateLocked,
+    disabled: dragDisabled,
     animateLayoutChanges: () => false,
   });
 
@@ -1308,12 +1320,13 @@ function SortableSectionRow({
       {...props}
       sectionRowId={sectionRowId}
       estimateLocked={estimateLocked}
+      hiddenInEstimate={hiddenInEstimate}
       colSpan={props.colSpan}
       showDropLine={showDropLine}
       rowRef={setNodeRef}
       rowStyle={isDragging ? { opacity: 0.45 } : undefined}
       dragHandle={
-        estimateLocked ? null : (
+        dragDisabled ? null : (
           <DragHandle
             label={dragLabel}
             attributes={attributes}
@@ -1448,6 +1461,8 @@ function SubcategoryBlock({
     return null;
   }
 
+  const subcategoryHidden = isEstimateSubcategoryHidden(subcategory);
+
   return (
     <>
       <SortableSectionRow
@@ -1460,13 +1475,14 @@ function SubcategoryBlock({
         value={resolveEstimateGroupTitleInput(subcategory)}
         onChange={(title) => onChange({ ...subcategory, title })}
         estimateLocked={estimateLocked}
+        hiddenInEstimate={subcategoryHidden}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(subcategory.id)}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
         onToggleCollapse={onToggleCollapse}
         showQuantityColumn={showQuantityColumn}
         volumeTotals={volumeTotals}
-        actionsVisible={subcategoryHover.hovered}
+        actionsVisible={subcategoryHover.hovered || subcategoryHidden}
         sectionGroupHover={sectionGroupHover}
         actions={
           <EstimateSectionRowActions
@@ -1480,6 +1496,11 @@ function SubcategoryBlock({
             }
             onAddItem={handleAddItem}
             onDelete={onDelete}
+            onRestore={
+              softDeleteRows && subcategoryHidden
+                ? () => onChange(restoreEstimateSubcategory(subcategory))
+                : undefined
+            }
           />
         }
       />
@@ -1705,6 +1726,8 @@ function CategoryBlock({
     return null;
   }
 
+  const categoryHidden = isEstimateCategoryHidden(category);
+
   return (
     <>
       <SortableSectionRow
@@ -1717,13 +1740,14 @@ function CategoryBlock({
         value={resolveEstimateGroupTitleInput(category)}
         onChange={(title) => onChange({ ...category, title })}
         estimateLocked={estimateLocked}
+        hiddenInEstimate={categoryHidden}
         highlightMergedSagatave={mergedSagataveHighlightIds.has(category.id)}
         collapsed={collapsed}
         collapsedSummaryParts={collapsedSummaryParts}
         onToggleCollapse={onToggleCollapse}
         showQuantityColumn={showQuantityColumn}
         volumeTotals={volumeTotals}
-        actionsVisible={categoryHover.hovered}
+        actionsVisible={categoryHover.hovered || categoryHidden}
         sectionGroupHover={categoryHover}
         actions={
           <EstimateSectionRowActions
@@ -1749,6 +1773,11 @@ function CategoryBlock({
             }
             onAddItem={handleAddItem}
             onDelete={onDelete}
+            onRestore={
+              softDeleteRows && categoryHidden
+                ? () => onChange(restoreEstimateCategory(category))
+                : undefined
+            }
           />
         }
       />
@@ -1806,7 +1835,19 @@ function CategoryBlock({
                   ),
                 })
               }
-              onDelete={() =>
+              onDelete={() => {
+                if (softDeleteRows) {
+                  onChange({
+                    ...category,
+                    subcategories: category.subcategories.map((entry) =>
+                      entry.id === subcategory.id
+                        ? hideEstimateSubcategory(entry)
+                        : entry,
+                    ),
+                  });
+                  return;
+                }
+
                 onChange(
                   removeCategoryChildRef(
                     {
@@ -1817,8 +1858,8 @@ function CategoryBlock({
                     },
                     { kind: "subcategory", id: subcategory.id },
                   ),
-                )
-              }
+                );
+              }}
             />
           );
         }
@@ -2278,7 +2319,13 @@ function EstimateDndTableInner({
               }
               onDelete={() =>
                 setCategories((current) =>
-                  current.filter((entry) => entry.id !== category.id),
+                  softDeleteRows
+                    ? current.map((entry) =>
+                        entry.id === category.id
+                          ? hideEstimateCategory(entry)
+                          : entry,
+                      )
+                    : current.filter((entry) => entry.id !== category.id),
                 )
               }
             />
