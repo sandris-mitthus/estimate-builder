@@ -10,6 +10,12 @@ See [README.md](README.md) for the product overview and setup, and [DEVELOPER.md
 
 - (none)
 
+## v1.4.22
+
+**Projekta apjomu izvēle tāmē**
+
+- Kad projekta apjomi atšķiras no saglabātās tāmes, paziņojumā var **Atjaunot apjomus** vai **Atstāt vecos apjomus**; vecie paliek, kamēr apjoms atkal nemainās (`218`)
+
 ## v1.4.21
 
 **Globālie paziņojumi**

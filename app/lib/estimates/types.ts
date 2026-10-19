@@ -70,6 +70,13 @@ export type EstimateLineItem = {
   mechanisms?: LineItemCatalogRef[];
   /** Ja `true` — apjoms nav saistīts ar moduļa lielumu; katrā projektā ierakstāms manuāli. */
   variableQuantity?: boolean;
+  /**
+   * Projekta apjoms, no kura lietotājs atteicās.
+   * Kamēr tas sakrīt ar aprēķināto, tāme rāda saglabāto `quantity`.
+   */
+  heldModuleSizeQuantity?: number;
+  /** Mērvienība pie atteiktā projekta apjoma. */
+  heldModuleSizeUnit?: string;
   /** Ja `true` — mērvienību norāda manuāli (ne tikai no moduļa apjoma). */
   manualUnitEnabled?: boolean;
   /** Manuāli norādītā mērvienība, kad `manualUnitEnabled`. */

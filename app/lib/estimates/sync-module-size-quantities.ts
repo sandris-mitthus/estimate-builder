@@ -250,6 +250,14 @@ export function resolveLineItemDisplayUnitFromModuleSize(
   const moduleOption =
     moduleSizeOptions.find((entry) => entry.id === attachment.moduleId) ??
     moduleSizeOptions[0];
+  const live = resolveLiveModuleSizeMeasure(
+    attachment,
+    moduleOption.projectDescription,
+  );
+
+  if (moduleSizeQuantityHoldIsActive(item, live.quantity, live.unit)) {
+    return item.unit.trim() || live.unit || null;
+  }
 
   const items = resolveSummaryItemsFromAttachment(
     attachment,
@@ -258,12 +266,75 @@ export function resolveLineItemDisplayUnitFromModuleSize(
   const units = [
     ...new Set(
       items
-        .map((item) => item.unit)
+        .map((entry) => entry.unit)
         .filter((unit): unit is string => unit != null && unit.trim().length > 0),
     ),
   ];
 
   return units[0] ?? null;
+}
+
+function resolveLiveModuleSizeMeasure(
+  attachment: LineItemModuleSizeAttachment,
+  projectDescription: ProjectDescriptionFormState,
+): { quantity: number | null; unit: string } {
+  const quantity = resolveQuantityFromModuleSizeAttachment(
+    attachment,
+    projectDescription,
+  );
+  const summaryItem = resolveSummaryItemFromAttachment(
+    attachment,
+    projectDescription,
+  );
+
+  return {
+    quantity,
+    unit: summaryItem?.unit?.trim() ?? "",
+  };
+}
+
+function clearModuleSizeQuantityHold(item: EstimateLineItem): EstimateLineItem {
+  if (
+    item.heldModuleSizeQuantity == null &&
+    item.heldModuleSizeUnit == null
+  ) {
+    return item;
+  }
+
+  const next = { ...item };
+  delete next.heldModuleSizeQuantity;
+  delete next.heldModuleSizeUnit;
+  return next;
+}
+
+/** `true`, ja lietotājs izvēlējās paturēt saglabāto apjomu šim projekta aprēķinam. */
+function moduleSizeQuantityHoldIsActive(
+  item: EstimateLineItem,
+  liveQuantity: number | null,
+  liveUnit: string,
+): boolean {
+  if (item.heldModuleSizeQuantity == null || liveQuantity == null) {
+    return false;
+  }
+
+  return (
+    item.heldModuleSizeQuantity === liveQuantity &&
+    (item.heldModuleSizeUnit ?? "").trim() === liveUnit
+  );
+}
+
+function resolveModuleOption(
+  attachment: LineItemModuleSizeAttachment,
+  moduleSizeOptions: BuildingModuleSizeOption[],
+): BuildingModuleSizeOption | null {
+  if (moduleSizeOptions.length === 0) {
+    return null;
+  }
+
+  return (
+    moduleSizeOptions.find((entry) => entry.id === attachment.moduleId) ??
+    moduleSizeOptions[0]
+  );
 }
 
 export function resolveLineItemDisplayQuantityFromModuleSize(
@@ -273,19 +344,24 @@ export function resolveLineItemDisplayQuantityFromModuleSize(
   const attachment = normalizeLineItemModuleSizeAttachment(
     item.moduleSizeAttachment,
   );
+  const moduleOption = attachment
+    ? resolveModuleOption(attachment, moduleSizeOptions)
+    : null;
 
-  if (!attachment || moduleSizeOptions.length === 0) {
+  if (!attachment || !moduleOption) {
     return null;
   }
 
-  const moduleOption =
-    moduleSizeOptions.find((entry) => entry.id === attachment.moduleId) ??
-    moduleSizeOptions[0];
-
-  return resolveQuantityFromModuleSizeAttachment(
+  const live = resolveLiveModuleSizeMeasure(
     attachment,
     moduleOption.projectDescription,
   );
+
+  if (moduleSizeQuantityHoldIsActive(item, live.quantity, live.unit)) {
+    return item.quantity;
+  }
+
+  return live.quantity;
 }
 
 export function syncLineItemQuantityFromModuleSize(
@@ -299,26 +375,24 @@ export function syncLineItemQuantityFromModuleSize(
 
   // Individuālais apjoms ir stiprāks par moduļa piesaisti — ievadīto apjomu nepārraksta
   if (!attachment || item.variableQuantity === true) {
-    return item;
+    return clearModuleSizeQuantityHold(item);
   }
 
   const normalizedItem = { ...item, moduleSizeAttachment: attachment };
-  const quantity = resolveQuantityFromModuleSizeAttachment(
-    attachment,
-    projectDescription,
-  );
-  const summaryItem = resolveSummaryItemFromAttachment(
-    attachment,
-    projectDescription,
-  );
-  const unit = summaryItem?.unit ?? null;
+  const live = resolveLiveModuleSizeMeasure(attachment, projectDescription);
+  const quantity = live.quantity;
+  const unit = live.unit || null;
 
-  if (quantity == null && summaryItem == null) {
+  if (moduleSizeQuantityHoldIsActive(item, quantity, live.unit)) {
     return normalizedItem;
   }
 
+  if (quantity == null && !live.unit) {
+    return clearModuleSizeQuantityHold(normalizedItem);
+  }
+
   return {
-    ...normalizedItem,
+    ...clearModuleSizeQuantityHold(normalizedItem),
     ...(quantity != null ? { quantity } : {}),
     ...(unit ? { unit } : {}),
   };
@@ -379,6 +453,139 @@ export function syncCategoriesQuantitiesFromModuleSizes(
       ),
     })),
   }));
+}
+
+function indexEstimateLineItems(
+  categories: EstimateCategory[],
+): Map<string, EstimateLineItem> {
+  const byId = new Map<string, EstimateLineItem>();
+
+  const visit = (row: EstimateRowItem) => {
+    if (isEstimateLineItem(row)) {
+      byId.set(row.id, row);
+      return;
+    }
+
+    if (!isEstimateMultiPosition(row)) {
+      return;
+    }
+
+    for (const option of row.options) {
+      byId.set(option.lineItem.id, option.lineItem);
+    }
+  };
+
+  for (const category of categories) {
+    for (const row of category.items) {
+      visit(row);
+    }
+
+    for (const subcategory of category.subcategories) {
+      for (const row of subcategory.items) {
+        visit(row);
+      }
+    }
+  }
+
+  return byId;
+}
+
+function holdLineItemAtSavedQuantity(
+  item: EstimateLineItem,
+  baseline: EstimateLineItem | undefined,
+  projectDescription: ProjectDescriptionFormState,
+): EstimateLineItem {
+  const attachment = normalizeLineItemModuleSizeAttachment(
+    item.moduleSizeAttachment,
+  );
+
+  if (!attachment || item.variableQuantity === true || !baseline) {
+    return clearModuleSizeQuantityHold(item);
+  }
+
+  const live = resolveLiveModuleSizeMeasure(attachment, projectDescription);
+  if (live.quantity == null) {
+    return clearModuleSizeQuantityHold(item);
+  }
+
+  const quantityChanged = baseline.quantity !== live.quantity;
+  const unitChanged =
+    live.unit.length > 0 && baseline.unit.trim() !== live.unit;
+
+  if (!quantityChanged && !unitChanged) {
+    return clearModuleSizeQuantityHold({
+      ...item,
+      moduleSizeAttachment: attachment,
+    });
+  }
+
+  return {
+    ...item,
+    moduleSizeAttachment: attachment,
+    quantity: baseline.quantity,
+    unit: baseline.unit,
+    heldModuleSizeQuantity: live.quantity,
+    heldModuleSizeUnit: live.unit,
+  };
+}
+
+function mapRowsModuleSizeQuantityHold(
+  categories: EstimateCategory[],
+  mapItem: (item: EstimateLineItem) => EstimateLineItem,
+): EstimateCategory[] {
+  const mapRow = (row: EstimateRowItem): EstimateRowItem => {
+    if (isEstimateLineItem(row)) {
+      return mapItem(row);
+    }
+
+    if (!isEstimateMultiPosition(row)) {
+      return row;
+    }
+
+    return {
+      ...row,
+      options: row.options.map((option) => ({
+        ...option,
+        lineItem: mapItem(option.lineItem),
+      })),
+    };
+  };
+
+  return categories.map((category) => ({
+    ...category,
+    items: category.items.map(mapRow),
+    subcategories: category.subcategories.map((subcategory) => ({
+      ...subcategory,
+      items: subcategory.items.map(mapRow),
+    })),
+  }));
+}
+
+/** Noņem atteikuma atzīmi, lai nākamā sinhronizācija ieraksta projekta apjomus. */
+export function clearHeldModuleSizeQuantities(
+  categories: EstimateCategory[],
+): EstimateCategory[] {
+  return mapRowsModuleSizeQuantityHold(categories, clearModuleSizeQuantityHold);
+}
+
+/**
+ * Atstāj saglabātos apjomus un atzīmē, no kura projekta aprēķina lietotājs atteicās.
+ * Citas rindas izmaiņas paliek.
+ */
+export function restoreHeldModuleSizeQuantities(
+  categories: EstimateCategory[],
+  baselineCategories: EstimateCategory[],
+  projectDescription: ProjectDescriptionFormState,
+): EstimateCategory[] {
+  const baselineById = indexEstimateLineItems(baselineCategories);
+
+  return mapRowsModuleSizeQuantityHold(categories, (item) =>
+    holdLineItemAtSavedQuantity(
+      item,
+      baselineById.get(item.id),
+      projectDescription,
+    ),
+  );
 }
 
 /**

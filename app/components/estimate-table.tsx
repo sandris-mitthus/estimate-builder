@@ -165,8 +165,10 @@ import {
 import type { ExcludedPosition } from "@/app/lib/excluded-positions/types";
 import type { PositionPriceSummary } from "@/app/lib/positions/types";
 import {
+  clearHeldModuleSizeQuantities,
   hasModuleSizeAttachment,
   resolveLineItemDisplayQuantityFromModuleSize,
+  restoreHeldModuleSizeQuantities,
   syncCategoriesQuantitiesFromModuleSizes,
 } from "@/app/lib/estimates/sync-module-size-quantities";
 import {
@@ -2560,8 +2562,11 @@ export function EstimateTable({
   >(() => new Set());
   const [syncSagataveChangesModalOpen, setSyncSagataveChangesModalOpen] = useState(false);
   const [hideSagataveChangesBanner, setHideSagataveChangesBanner] = useState(false);
-  const [hideModuleSizeQuantityBanner, setHideModuleSizeQuantityBanner] =
-    useState(false);
+  const [moduleSizeQuantityPromptOpen, setModuleSizeQuantityPromptOpen] =
+    useState(() => persistedCategoriesBaseline != null);
+  const [moduleSizePromptAction, setModuleSizePromptAction] = useState<
+    "apply" | "keep" | null
+  >(null);
   const [showHiddenEstimateRows, setShowHiddenEstimateRows] = useState(false);
   const [excludedPositions, setExcludedPositions] = useState(globalExcludedPositions);
   const [, startSaveDatesTransition] = useTransition();
@@ -2580,9 +2585,6 @@ export function EstimateTable({
         : baselineCategoriesForSnapshot,
       initialMultiOptionLinks,
     ),
-  );
-  const [hasPendingModuleSizeQuantitySync] = useState(
-    () => persistedCategoriesBaseline != null,
   );
   const [savedPlannedProfitPercent, setSavedPlannedProfitPercent] = useState(() =>
     resolvePlannedProfitPercent(
@@ -2794,12 +2796,14 @@ export function EstimateTable({
     }, 1500);
   }
 
-  async function handleSave() {
+  async function handleSave(sourceCategories?: EstimateCategory[]) {
     if (!project || isSaving || editorLocked) return;
     if (isAdditionalWork && !estimateId) return;
 
+    const categoriesToSync = sourceCategories ?? categories;
+
     // Multi-pozīcijām apjoms vajadzīgs tikai izvēlētajai opcijai
-    const missingQuantityCount = collectEstimateLineItems(categories, {
+    const missingQuantityCount = collectEstimateLineItems(categoriesToSync, {
       forTotals: true,
     }).filter(
       (item) =>
@@ -2826,11 +2830,11 @@ export function EstimateTable({
     const syncedCategories =
       moduleSizeOptions.length > 0
         ? syncCategoriesQuantitiesFromModuleSizes(
-            categories,
+            categoriesToSync,
             moduleSizeOptions[0].projectDescription,
             catalogPositions,
           )
-        : categories;
+        : categoriesToSync;
 
     const bakedCategories = bakeInCatalogPrices(
       syncedCategories,
@@ -2878,6 +2882,7 @@ export function EstimateTable({
         ),
       );
       setSavedAt(savedAtIso);
+      setModuleSizeQuantityPromptOpen(false);
       showFeedback({
         type: "success",
         text: isAdditionalWork
@@ -2889,6 +2894,48 @@ export function EstimateTable({
       });
     } else {
       showFeedback({ type: "error", text: translateActionError(t, result) });
+    }
+  }
+
+  async function handleApplyModuleSizeQuantities() {
+    const refreshed =
+      moduleSizeOptions.length > 0
+        ? syncCategoriesQuantitiesFromModuleSizes(
+            clearHeldModuleSizeQuantities(categories),
+            moduleSizeOptions[0].projectDescription,
+            catalogPositions,
+          )
+        : categories;
+    setCategories(refreshed);
+    setModuleSizePromptAction("apply");
+    try {
+      await handleSave(refreshed);
+    } finally {
+      setModuleSizePromptAction(null);
+    }
+  }
+
+  async function handleKeepModuleSizeQuantities() {
+    if (
+      !persistedCategoriesBaseline ||
+      moduleSizeOptions.length === 0 ||
+      isSaving ||
+      editorLocked
+    ) {
+      return;
+    }
+
+    const restored = restoreHeldModuleSizeQuantities(
+      categories,
+      persistedCategoriesBaseline,
+      moduleSizeOptions[0].projectDescription,
+    );
+    setCategories(restored);
+    setModuleSizePromptAction("keep");
+    try {
+      await handleSave(restored);
+    } finally {
+      setModuleSizePromptAction(null);
     }
   }
 
@@ -2970,20 +3017,27 @@ export function EstimateTable({
     [highlightSagatavePositionChanges, sagataveSections, categories],
   );
 
+  const hasModuleSizeQuantityBaseline = persistedCategoriesBaseline != null;
+
   useEffect(() => {
     setHideSagataveChangesBanner(false);
-    setHideModuleSizeQuantityBanner(false);
   }, [sagataveSections, project?.id]);
+
+  useEffect(() => {
+    if (hasModuleSizeQuantityBaseline) {
+      setModuleSizeQuantityPromptOpen(true);
+    }
+  }, [hasModuleSizeQuantityBaseline]);
 
   const hasSagatavePositionChanges =
     sagatavePositionChanges.length > 0 && !hideSagataveChangesBanner;
 
   const hasModuleSizeQuantityRefresh =
     Boolean(project) &&
-    hasPendingModuleSizeQuantitySync &&
-    isDirty &&
-    !editorLocked &&
-    !hideModuleSizeQuantityBanner;
+    !isAdditionalWork &&
+    moduleSizeQuantityPromptOpen &&
+    hasModuleSizeQuantityBaseline &&
+    !editorLocked;
 
   const totals = useMemo(
     () =>
@@ -3359,7 +3413,7 @@ export function EstimateTable({
               {!editorLocked ? (
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={() => void handleSave()}
                   disabled={isSaving || !isDirty}
                   className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -3607,23 +3661,51 @@ export function EstimateTable({
       {project && hasModuleSizeQuantityRefresh ? (
         <div
           role="status"
-          className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+          className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-2">
             <i className="fas fa-ruler-combined text-xs" aria-hidden="true" />
             {t(
               "estimate.module_size.quantities_refresh_available",
-              "Projekta apjomi ir mainījušies — tāme ir atjaunināta. Saglabā, lai izmaiņas paliktu.",
+              "Projekta apjomi ir mainījušies. Vari atjaunot tāmes apjomus vai atstāt iepriekš saglabātos.",
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setHideModuleSizeQuantityBanner(true)}
-            disabled={isSaving}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {t("estimate.module_size.quantities_refresh_dismiss", "Sapratu")}
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleKeepModuleSizeQuantities()}
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {moduleSizePromptAction === "keep" ? (
+                <i
+                  className="fas fa-circle-notch fa-spin text-xs"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {t(
+                "estimate.module_size.quantities_refresh_keep",
+                "Atstāt vecos apjomus",
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleApplyModuleSizeQuantities()}
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {moduleSizePromptAction === "apply" ? (
+                <i
+                  className="fas fa-circle-notch fa-spin text-xs"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {t(
+                "estimate.module_size.quantities_refresh_apply",
+                "Atjaunot apjomus",
+              )}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -3836,7 +3918,7 @@ export function EstimateTable({
             {!editorLocked ? (
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => void handleSave()}
                 disabled={isSaving || !isDirty}
                 className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
